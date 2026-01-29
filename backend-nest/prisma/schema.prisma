@@ -28,6 +28,7 @@ model User {
   sessions     Session[]
   projects     Project[]
   subscription Subscription?
+  tags         Tag[]
 
   @@map("users")
 }
@@ -115,6 +116,7 @@ model Project {
   owner       User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   slides      Slide[]
   blocks      Block[]
+  tags        Tag[]
 
   @@index([ownerId])
   @@index([shareToken])
@@ -149,6 +151,13 @@ enum BlockType {
   DIVIDER
   TABLE
   EMBED
+  CHART
+  VIDEO
+  AUDIO
+  TIMELINE
+  COMPARISON
+  STATS_GRID
+  CALL_TO_ACTION
 }
 
 model Block {
@@ -741,4 +750,65 @@ enum SyncStatus {
   PROCESSING
   COMPLETED
   FAILED
+}
+
+// ============================================
+// TAGS
+// ============================================
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String
+  color     String
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projects  Project[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("tags")
+}
+
+// ============================================
+// WEBHOOKS
+// ============================================
+
+model Webhook {
+  id              String    @id @default(cuid())
+  userId          String
+  url             String
+  events          String[]
+  secret          String
+  active          Boolean   @default(true)
+  failureCount    Int       @default(0)
+  lastTriggeredAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  logs            WebhookLog[]
+
+  @@index([userId])
+  @@index([active])
+  @@map("webhooks")
+}
+
+model WebhookLog {
+  id         String   @id @default(cuid())
+  webhookId  String
+  event      String
+  payload    Json
+  success    Boolean
+  statusCode Int?
+  response   String?  @db.Text
+  error      String?
+  createdAt  DateTime @default(now())
+
+  webhook    Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+  @@index([createdAt])
+  @@map("webhook_logs")
 }

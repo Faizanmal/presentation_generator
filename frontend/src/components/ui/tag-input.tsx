@@ -11,12 +11,9 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-
-interface Tag {
-  id: string;
-  name: string;
-  color: string;
-}
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api';
+import type { Tag, CreateTagInput } from '@/types';
 
 interface TagInputProps {
   selectedTags: Tag[];
@@ -38,20 +35,31 @@ const TAG_COLORS = [
 export function TagInput({ selectedTags, onChange, className }: TagInputProps) {
   const [open, setOpen] = React.useState(false);
   const [newTagName, setNewTagName] = React.useState('');
-  // const { data: tags = [], isLoading } = useTags();
-  // const createTag = useCreateTag();
-  const tags: Tag[] = []; // Stub
-  const isLoading = false;
-  const createTag = { isPending: false }; // Stub
+  const queryClient = useQueryClient();
+
+  // Fetch all tags
+  const { data: tags = [], isLoading } = useQuery({
+    queryKey: ['tags'],
+    queryFn: () => api.tags.getAll(),
+  });
+
+  // Create tag mutation
+  const createTag = useMutation({
+    mutationFn: (input: CreateTagInput) => api.tags.create(input),
+    onSuccess: (newTag) => {
+      queryClient.invalidateQueries({ queryKey: ['tags'] });
+      // Auto-select the newly created tag
+      onChange([...selectedTags, newTag]);
+      setNewTagName('');
+    },
+  });
 
   const handleCreateTag = async () => {
     if (!newTagName.trim()) return;
     
     try {
       const color = TAG_COLORS[Math.floor(Math.random() * TAG_COLORS.length)];
-      // await createTag.mutateAsync({ name: newTagName, color });
-      console.log('Create tag:', newTagName, color); // Stub
-      setNewTagName('');
+      await createTag.mutateAsync({ name: newTagName, color });
     } catch (error) {
       console.error('Failed to create tag:', error);
     }

@@ -17,6 +17,9 @@ import type {
   PaginatedResponse,
   Asset,
   PresignedUploadResponse,
+  Tag,
+  CreateTagInput,
+  UpdateTagInput,
 } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
@@ -81,6 +84,30 @@ class ApiClient {
 
   getToken(): string | null {
     return this.token;
+  }
+
+  // ============================================
+  // RAW HTTP METHODS
+  // ============================================
+
+  async get<T = any>(url: string, config?: any): Promise<{ data: T }> {
+    return this.client.get<T>(url, config);
+  }
+
+  async post<T = any>(url: string, data?: any, config?: any): Promise<{ data: T }> {
+    return this.client.post<T>(url, data, config);
+  }
+
+  async patch<T = any>(url: string, data?: any, config?: any): Promise<{ data: T }> {
+    return this.client.patch<T>(url, data, config);
+  }
+
+  async put<T = any>(url: string, data?: any, config?: any): Promise<{ data: T }> {
+    return this.client.put<T>(url, data, config);
+  }
+
+  async delete<T = any>(url: string, config?: any): Promise<{ data: T }> {
+    return this.client.delete<T>(url, config);
   }
 
   // ============================================
@@ -335,13 +362,40 @@ class ApiClient {
     });
     return data;
   }
+  // ============================================
+  // TAGS ENDPOINTS
+  // ============================================
 
-  async generateSpeakerNotes(slideContent: string, context?: string): Promise<{ speakerNotes: string }> {
-    const { data } = await this.client.post<{ speakerNotes: string }>('/ai/speaker-notes', {
-      slideContent,
-      context,
-    });
+  async getTags(): Promise<Tag[]> {
+    const { data } = await this.client.get<Tag[]>('/tags');
     return data;
+  }
+
+  async getTag(id: string): Promise<Tag> {
+    const { data } = await this.client.get<Tag>(`/tags/${id}`);
+    return data;
+  }
+
+  async createTag(input: CreateTagInput): Promise<Tag> {
+    const { data } = await this.client.post<Tag>('/tags', input);
+    return data;
+  }
+
+  async updateTag(id: string, input: UpdateTagInput): Promise<Tag> {
+    const { data } = await this.client.patch<Tag>(`/tags/${id}`, input);
+    return data;
+  }
+
+  async deleteTag(id: string): Promise<void> {
+    await this.client.delete(`/tags/${id}`);
+  }
+
+  async addTagToProject(tagId: string, projectId: string): Promise<void> {
+    await this.client.post(`/tags/${tagId}/projects/${projectId}`);
+  }
+
+  async removeTagFromProject(tagId: string, projectId: string): Promise<void> {
+    await this.client.delete(`/tags/${tagId}/projects/${projectId}`);
   }
 
   async transformText(
@@ -895,6 +949,224 @@ class ApiClient {
     return data;
   }
 
+  // ============================================
+  // AI ADVANCED ENDPOINTS
+  // ============================================
+
+  async generateImage(prompt: string, options?: {
+    size?: '1024x1024' | '1792x1024' | '1024x1792';
+    style?: string;
+    quality?: 'standard' | 'hd';
+  }): Promise<{ imageUrl: string; revisedPrompt?: string }> {
+    const { data } = await this.client.post('/ai/generate-image', {
+      prompt,
+      ...options,
+    });
+    return data;
+  }
+
+  async suggestLayout(content: string): Promise<{
+    layout: string;
+    confidence: number;
+    alternatives: string[];
+  }> {
+    const { data } = await this.client.post('/ai/suggest-layout', { content });
+    return data;
+  }
+
+  async generateVoiceNarration(text: string, options?: {
+    voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+    speed?: number;
+  }): Promise<{ audioUrl: string; duration: number }> {
+    const { data } = await this.client.post('/ai/generate-narration', {
+      text,
+      ...options,
+    });
+    return data;
+  }
+
+  async generateSpeakerNotes(slideContent: string): Promise<{ notes: string }> {
+    const { data } = await this.client.post('/ai/generate-speaker-notes', {
+      content: slideContent,
+    });
+    return data;
+  }
+
+  async suggestImages(topic: string, count?: number): Promise<{
+    suggestions: Array<{ prompt: string; description: string }>;
+  }> {
+    const { data } = await this.client.post('/ai/suggest-images', {
+      topic,
+      count: count || 3,
+    });
+    return data;
+  }
+
+  // ============================================
+  // LIVE PRESENTATION ENDPOINTS
+  // ============================================
+
+  async startLiveSession(projectId: string): Promise<{
+    sessionId: string;
+    joinCode: string;
+    joinUrl: string;
+  }> {
+    const { data } = await this.client.post(`/collaboration/${projectId}/live/start`);
+    return data;
+  }
+
+  async endLiveSession(projectId: string, sessionId: string): Promise<void> {
+    await this.client.post(`/collaboration/${projectId}/live/${sessionId}/end`);
+  }
+
+  async getLiveSessionQuestions(sessionId: string): Promise<Array<{
+    id: string;
+    question: string;
+    author: string;
+    votes: number;
+    answered: boolean;
+    timestamp: string;
+  }>> {
+    const { data } = await this.client.get(`/collaboration/live/${sessionId}/questions`);
+    return data;
+  }
+
+  async createPoll(sessionId: string, question: string, options: string[]): Promise<{
+    pollId: string;
+    question: string;
+    options: Array<{ id: string; text: string; votes: number }>;
+  }> {
+    const { data } = await this.client.post(`/collaboration/live/${sessionId}/polls`, {
+      question,
+      options,
+    });
+    return data;
+  }
+
+  async closePoll(sessionId: string, pollId: string): Promise<{
+    results: Array<{ option: string; votes: number; percentage: number }>;
+  }> {
+    const { data } = await this.client.post(`/collaboration/live/${sessionId}/polls/${pollId}/close`);
+    return data;
+  }
+
+  // ============================================
+  // ANALYTICS ADVANCED ENDPOINTS
+  // ============================================
+
+  async getAIInsights(projectId: string): Promise<{
+    insights: string[];
+    recommendations: string[];
+    score: number;
+  }> {
+    const { data } = await this.client.get(`/analytics/${projectId}/ai-insights`);
+    return data;
+  }
+
+  async getEngagementHeatmap(projectId: string): Promise<{
+    slides: Array<{
+      slideId: string;
+      viewTime: number;
+      interactions: number;
+      dropoffRate: number;
+    }>;
+  }> {
+    const { data } = await this.client.get(`/analytics/${projectId}/heatmap`);
+    return data;
+  }
+
+  async getAudienceBreakdown(projectId: string): Promise<{
+    devices: Record<string, number>;
+    browsers: Record<string, number>;
+    locations: Record<string, number>;
+    referrers: Record<string, number>;
+  }> {
+    const { data } = await this.client.get(`/analytics/${projectId}/audience`);
+    return data;
+  }
+
+  // ============================================
+  // EXPORT ADVANCED ENDPOINTS
+  // ============================================
+
+  async exportToPptx(projectId: string, options?: {
+    includeNotes?: boolean;
+    includeAnimations?: boolean;
+  }): Promise<Blob> {
+    const { data } = await this.client.post(
+      `/export/${projectId}/pptx`,
+      options,
+      { responseType: 'blob' }
+    );
+    return data;
+  }
+
+  async exportToVideo(projectId: string, options?: {
+    resolution?: '720p' | '1080p' | '4k';
+    includeNarration?: boolean;
+    transitionDuration?: number;
+  }): Promise<{ jobId: string; estimatedTime: number }> {
+    const { data } = await this.client.post(`/export/${projectId}/video`, options);
+    return data;
+  }
+
+  async getExportJobStatus(jobId: string): Promise<{
+    status: 'pending' | 'processing' | 'completed' | 'failed';
+    progress: number;
+    downloadUrl?: string;
+    error?: string;
+  }> {
+    const { data } = await this.client.get(`/export/jobs/${jobId}`);
+    return data;
+  }
+
+  // ============================================
+  // WEBHOOKS ENDPOINTS
+  // ============================================
+
+  async getWebhooks(): Promise<Array<{
+    id: string;
+    url: string;
+    events: string[];
+    active: boolean;
+    createdAt: string;
+  }>> {
+    const { data } = await this.client.get('/integrations/webhooks');
+    return data;
+  }
+
+  async createWebhook(url: string, events: string[], secret?: string): Promise<{
+    id: string;
+    url: string;
+    events: string[];
+    secret: string;
+  }> {
+    const { data } = await this.client.post('/integrations/webhooks', {
+      url,
+      events,
+      secret,
+    });
+    return data;
+  }
+
+  async updateWebhook(id: string, updates: {
+    url?: string;
+    events?: string[];
+    active?: boolean;
+  }): Promise<any> {
+    const { data } = await this.client.patch(`/integrations/webhooks/${id}`, updates);
+    return data;
+  }
+
+  async deleteWebhook(id: string): Promise<void> {
+    await this.client.delete(`/integrations/webhooks/${id}`);
+  }
+
+  async testWebhook(id: string): Promise<{ success: boolean; response?: any; error?: string }> {
+    const { data } = await this.client.post(`/integrations/webhooks/${id}/test`);
+    return data;
+  }
+
 
   // ============================================
   // NAMESPACED API (for cleaner usage)
@@ -967,6 +1239,46 @@ class ApiClient {
 
   readonly ai = {
     enhance: (content: string, instruction: string) => this.enhanceContent(content, instruction),
+    generateImage: (prompt: string, options?: { size?: '1024x1024' | '1792x1024' | '1024x1792'; style?: string }) => 
+      this.generateImage(prompt, options),
+    suggestLayout: (content: string) => this.suggestLayout(content),
+    generateNarration: (text: string, options?: { voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer'; speed?: number }) => 
+      this.generateVoiceNarration(text, options),
+    generateSpeakerNotes: (content: string) => this.generateSpeakerNotes(content),
+    suggestImages: (topic: string, count?: number) => this.suggestImages(topic, count),
+  };
+
+  readonly live = {
+    startSession: (projectId: string) => this.startLiveSession(projectId),
+    endSession: (projectId: string, sessionId: string) => this.endLiveSession(projectId, sessionId),
+    getQuestions: (sessionId: string) => this.getLiveSessionQuestions(sessionId),
+    createPoll: (sessionId: string, question: string, options: string[]) => 
+      this.createPoll(sessionId, question, options),
+    closePoll: (sessionId: string, pollId: string) => this.closePoll(sessionId, pollId),
+  };
+
+  readonly analytics = {
+    getInsights: (projectId: string) => this.getAIInsights(projectId),
+    getHeatmap: (projectId: string) => this.getEngagementHeatmap(projectId),
+    getAudience: (projectId: string) => this.getAudienceBreakdown(projectId),
+  };
+
+  readonly webhooks = {
+    getAll: () => this.getWebhooks(),
+    create: (url: string, events: string[], secret?: string) => this.createWebhook(url, events, secret),
+    update: (id: string, updates: any) => this.updateWebhook(id, updates),
+    delete: (id: string) => this.deleteWebhook(id),
+    test: (id: string) => this.testWebhook(id),
+  };
+
+  readonly tags = {
+    getAll: () => this.getTags(),
+    getById: (id: string) => this.getTag(id),
+    create: (input: CreateTagInput) => this.createTag(input),
+    update: (id: string, input: UpdateTagInput) => this.updateTag(id, input),
+    delete: (id: string) => this.deleteTag(id),
+    addToProject: (tagId: string, projectId: string) => this.addTagToProject(tagId, projectId),
+    removeFromProject: (tagId: string, projectId: string) => this.removeTagFromProject(tagId, projectId),
   };
 }
 

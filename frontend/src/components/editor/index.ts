@@ -30,3 +30,55 @@ export {
 
 // Presentation mode
 export { PresentationMode, PresenterView } from "./presentation-mode";
+// Advanced AI components
+export { AIImageGenerator } from "./ai-image-generator";
+export { SmartLayoutSelector } from "./smart-layout-selector";
+
+// Chart and embed blocks
+export { ChartBlock } from "./chart-block";
+export { EmbedBlock } from "./embed-block";
+
+// Voice narration
+export { VoiceNarrationPlayer, BatchNarrationGenerator } from "./voice-narration-player";
+
+// Live presentation
+export { LivePresentationPanel } from "./live-presentation-panel";
+
+// Export options
+export { ExportOptionsPanel } from "./export-options-panel";
+
+// AI Presentation Coach
+export { PresentationCoach } from "./presentation-coach";
+
+// Keyboard shortcuts
+export { KeyboardShortcutsHelp, KeyboardShortcutsButton } from "./keyboard-shortcuts-help";
+
+// Slide transitions and animations
+export { SlideTransitionsPanel } from "./slide-transitions-panel";
+
+// Accessibility checker
+export { AccessibilityChecker } from "./accessibility-checker";
+
+// Presentation scheduler
+export { PresentationScheduler } from "./presentation-scheduler";
+
+// Magic resize
+export { MagicResize } from "./magic-resize";
+
+// Version history panel
+export { VersionHistoryPanel } from "./version-history-panel";
+
+// Smart suggestions
+export { SmartSuggestionsPanel } from "./smart-suggestions-panel";
+
+// Translation panel
+export { TranslationPanel } from "./translation-panel";
+
+// Slide notes editor
+export { SlideNotesEditor } from "./slide-notes-editor";
+
+// Quiz/Poll builder
+export { QuizPollBuilder } from "./quiz-poll-builder";
+
+// Smart chart builder
+export { SmartChartBuilder } from "./smart-chart-builder";

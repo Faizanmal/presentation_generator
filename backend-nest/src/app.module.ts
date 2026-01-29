@@ -25,6 +25,11 @@ import { IntegrationsModule } from './integrations/integrations.module';
 import { PersonalizationModule } from './personalization/personalization.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { SyncModule } from './sync/sync.module';
+import { TagsModule } from './tags/tags.module';
+
+// Common modules for production
+import { CacheModule } from './common/cache/cache.module';
+import { SecurityModule } from './common/security/security.module';
 
 // Services for seeding
 import { ThemesService } from './themes/themes.service';
@@ -82,6 +87,11 @@ import { ThemesService } from './themes/themes.service';
     PersonalizationModule,
     OrganizationsModule,
     SyncModule,
+    TagsModule,
+    
+    // Production modules
+    CacheModule,
+    SecurityModule,
   ],
   providers: [
     // Global rate limiting

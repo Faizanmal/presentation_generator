@@ -733,4 +733,207 @@ Focus on:
 
     this.logger.log(`Aggregated analytics for ${projectViews.size} projects`);
   }
+
+  // ============================================
+  // DETAILED AI RECOMMENDATIONS
+  // ============================================
+
+  async generateDetailedRecommendations(
+    projectId: string,
+    presentationContent?: any,
+  ): Promise<{
+    recommendations: Array<{
+      category: string;
+      title: string;
+      description: string;
+      priority: 'high' | 'medium' | 'low';
+      impact: string;
+      implementation: string;
+    }>;
+    overallScore: number;
+    generatedAt: string;
+  }> {
+    try {
+      // Get analytics data
+      const summary = await this.getAnalyticsSummary(projectId);
+      const slidePerformance = await this.getSlidePerformance(projectId);
+
+      const prompt = `You are a presentation optimization expert. Analyze this presentation data and provide detailed, actionable recommendations.
+
+ANALYTICS DATA:
+- Total Views: ${summary.totalViews}
+- Unique Viewers: ${summary.uniqueViews}
+- Average Duration: ${summary.averageDuration} seconds
+- Completion Rate: ${Math.round(summary.completionRate * 100)}%
+- Drop-off Slide: ${summary.dropOffSlide !== null ? `Slide ${summary.dropOffSlide + 1}` : 'None identified'}
+
+SLIDE PERFORMANCE:
+${slidePerformance.map((s: any) => `Slide ${s.slideNumber}: ${s.views} views, ${s.avgDuration}s avg, ${s.dropOffRate}% drop-off`).join('\n')}
+
+${presentationContent ? `CONTENT OVERVIEW:\n${JSON.stringify(presentationContent).substring(0, 2000)}` : ''}
+
+Provide recommendations in JSON format:
+{
+  "recommendations": [
+    {
+      "category": "Content|Design|Engagement|Structure|Performance",
+      "title": "Short title",
+      "description": "Detailed explanation of the issue",
+      "priority": "high|medium|low",
+      "impact": "Expected improvement description",
+      "implementation": "Step-by-step implementation guide"
+    }
+  ],
+  "overallScore": 75
+}
+
+Provide 5-8 specific, actionable recommendations based on the data patterns.`;
+
+      const response = await this.openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        max_tokens: 2000,
+        response_format: { type: 'json_object' },
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        return this.getDefaultRecommendations(summary);
+      }
+
+      const parsed = JSON.parse(content);
+      return {
+        recommendations: parsed.recommendations || [],
+        overallScore: parsed.overallScore || 70,
+        generatedAt: new Date().toISOString(),
+      };
+    } catch (error) {
+      this.logger.error('Failed to generate detailed recommendations', error);
+      return this.getDefaultRecommendations(await this.getAnalyticsSummary(projectId));
+    }
+  }
+
+  private getDefaultRecommendations(summary: AnalyticsSummary) {
+    const recommendations: any[] = [];
+
+    if (summary.completionRate < 0.5) {
+      recommendations.push({
+        category: 'Structure',
+        title: 'Improve Presentation Flow',
+        description: 'Less than 50% of viewers complete the presentation.',
+        priority: 'high' as const,
+        impact: 'Could increase completion rate by 20-30%',
+        implementation: 'Consider reducing the number of slides, adding more visual elements, or restructuring content to front-load key information.',
+      });
+    }
+
+    if (summary.dropOffSlide !== null) {
+      recommendations.push({
+        category: 'Content',
+        title: `Review Slide ${summary.dropOffSlide + 1}`,
+        description: 'This slide has the highest viewer drop-off rate.',
+        priority: 'high' as const,
+        impact: 'Could reduce drop-off by 15-25%',
+        implementation: 'Analyze the content density, add engaging visuals, or consider splitting into multiple slides.',
+      });
+    }
+
+    if (summary.averageDuration < 60) {
+      recommendations.push({
+        category: 'Engagement',
+        title: 'Increase Viewer Engagement',
+        description: 'Average viewing time is under 1 minute.',
+        priority: 'medium' as const,
+        impact: 'Could increase engagement time by 50%',
+        implementation: 'Add interactive elements, embed videos, or include thought-provoking questions.',
+      });
+    }
+
+    recommendations.push({
+      category: 'Performance',
+      title: 'Optimize for Mobile',
+      description: 'Ensure presentation is mobile-friendly.',
+      priority: 'medium' as const,
+      impact: 'Could increase mobile viewership by 40%',
+      implementation: 'Use larger fonts, reduce text density, and test on various screen sizes.',
+    });
+
+    return {
+      recommendations,
+      overallScore: 70,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  // ============================================
+  // EXPORT ANALYTICS DATA
+  // ============================================
+
+  async exportAnalyticsData(
+    projectId: string,
+    format: 'json' | 'csv',
+    startDate?: Date,
+    endDate?: Date,
+  ): Promise<{ data: string; filename: string; mimeType: string }> {
+    const summary = await this.getAnalyticsSummary(projectId, startDate, endDate);
+    const slidePerformance = await this.getSlidePerformance(projectId, startDate, endDate);
+    const { data: sessions } = await this.getViewerSessions(projectId, 1, 1000);
+
+    const exportData = {
+      summary,
+      slidePerformance,
+      sessions,
+      exportedAt: new Date().toISOString(),
+      dateRange: {
+        start: startDate?.toISOString() || 'Last 30 days',
+        end: endDate?.toISOString() || 'Now',
+      },
+    };
+
+    if (format === 'csv') {
+      const csvData = this.convertToCSV(exportData);
+      return {
+        data: csvData,
+        filename: `analytics-${projectId}-${Date.now()}.csv`,
+        mimeType: 'text/csv',
+      };
+    }
+
+    return {
+      data: JSON.stringify(exportData, null, 2),
+      filename: `analytics-${projectId}-${Date.now()}.json`,
+      mimeType: 'application/json',
+    };
+  }
+
+  private convertToCSV(data: any): string {
+    const lines: string[] = [];
+
+    // Summary section
+    lines.push('SUMMARY');
+    lines.push('Metric,Value');
+    lines.push(`Total Views,${data.summary.totalViews}`);
+    lines.push(`Unique Views,${data.summary.uniqueViews}`);
+    lines.push(`Average Duration (s),${data.summary.averageDuration}`);
+    lines.push(`Completion Rate,${data.summary.completionRate}`);
+    lines.push('');
+
+    // Slide Performance section
+    lines.push('SLIDE PERFORMANCE');
+    lines.push('Slide,Views,Avg Duration (s),Drop-off Rate (%),Clicks');
+    data.slidePerformance.forEach((slide: any) => {
+      lines.push(`${slide.slideNumber},${slide.views},${slide.avgDuration},${slide.dropOffRate},${slide.clicks}`);
+    });
+    lines.push('');
+
+    // Sessions section
+    lines.push('VIEWER SESSIONS');
+    lines.push('ID,Start Time,Duration (s),Slides Viewed,Device,Completion Rate (%)');
+    data.sessions.forEach((session: any) => {
+      lines.push(`${session.id},${session.startTime},${session.duration},${session.slidesViewed},${session.device},${session.completionRate}`);
+    });
+
+    return lines.join('\n');
+  }
 }

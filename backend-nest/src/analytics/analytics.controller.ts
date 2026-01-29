@@ -188,4 +188,64 @@ export class AnalyticsController {
   async getPresentationStats(@Param('projectId') projectId: string) {
     return this.analyticsService.getPresentationStats(projectId);
   }
+
+  /**
+   * Get AI-powered insights for analytics data
+   */
+  @Get(':projectId/ai-insights')
+  @UseGuards(JwtAuthGuard)
+  async getAIInsights(
+    @Param('projectId') projectId: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    const summary = await this.analyticsService.getAnalyticsSummary(
+      projectId,
+      startDate ? new Date(startDate) : undefined,
+      endDate ? new Date(endDate) : undefined,
+    );
+
+    return {
+      insights: summary.insights,
+      generatedAt: new Date().toISOString(),
+      dataRange: {
+        start: startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        end: endDate || new Date().toISOString(),
+      },
+    };
+  }
+
+  /**
+   * Get detailed AI recommendations for improving presentation
+   */
+  @Post(':projectId/ai-recommendations')
+  @UseGuards(JwtAuthGuard)
+  async getAIRecommendations(
+    @Param('projectId') projectId: string,
+    @Body() body: { presentationContent?: any },
+  ) {
+    return this.analyticsService.generateDetailedRecommendations(
+      projectId,
+      body.presentationContent,
+    );
+  }
+
+  /**
+   * Export analytics data
+   */
+  @Get(':projectId/export')
+  @UseGuards(JwtAuthGuard)
+  async exportAnalytics(
+    @Param('projectId') projectId: string,
+    @Query('format') format: 'json' | 'csv' = 'json',
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.analyticsService.exportAnalyticsData(
+      projectId,
+      format,
+      startDate ? new Date(startDate) : undefined,
+      endDate ? new Date(endDate) : undefined,
+    );
+  }
 }

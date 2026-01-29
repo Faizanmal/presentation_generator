@@ -220,4 +220,200 @@ Format as a numbered list with clear structure.`;
 
     return { ideas };
   }
+
+  // ============================================
+  // ADVANCED AI ENDPOINTS - GAMMA LEVEL
+  // ============================================
+
+  /**
+   * Generate AI image using DALL-E 3
+   */
+  @Post('generate-image')
+  @HttpCode(HttpStatus.OK)
+  async generateImage(
+    @CurrentUser() user: { id: string },
+    @Body() body: { prompt: string; style?: 'vivid' | 'natural'; size?: '1024x1024' | '1792x1024' | '1024x1792' },
+  ) {
+    const canGenerate = await this.usersService.canGenerateAI(user.id);
+    if (!canGenerate) {
+      throw new ForbiddenException('AI generation limit reached');
+    }
+
+    const result = await this.aiService.generateImage(
+      body.prompt,
+      body.style || 'vivid',
+      body.size || '1792x1024',
+    );
+    
+    await this.usersService.incrementAIGenerations(user.id, 5); // Image generation costs more
+
+    return result;
+  }
+
+  /**
+   * Generate text-to-speech narration
+   */
+  @Post('generate-narration')
+  @HttpCode(HttpStatus.OK)
+  async generateNarration(
+    @CurrentUser() user: { id: string },
+    @Body() body: { text: string; voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer'; speed?: number },
+  ) {
+    const canGenerate = await this.usersService.canGenerateAI(user.id);
+    if (!canGenerate) {
+      throw new ForbiddenException('AI generation limit reached');
+    }
+
+    const result = await this.aiService.generateNarration(
+      body.text,
+      body.voice || 'nova',
+      body.speed || 1.0,
+    );
+    
+    await this.usersService.incrementAIGenerations(user.id, 3);
+
+    return {
+      audio: result.audioBuffer.toString('base64'),
+      duration: result.duration,
+      mimeType: 'audio/mpeg',
+    };
+  }
+
+  /**
+   * Generate chart data from natural language
+   */
+  @Post('generate-chart')
+  @HttpCode(HttpStatus.OK)
+  async generateChart(
+    @CurrentUser() user: { id: string },
+    @Body() body: { description: string; chartType?: 'bar' | 'line' | 'pie' | 'doughnut' | 'radar' | 'scatter' },
+  ) {
+    const canGenerate = await this.usersService.canGenerateAI(user.id);
+    if (!canGenerate) {
+      throw new ForbiddenException('AI generation limit reached');
+    }
+
+    const chartData = await this.aiService.generateChartData(
+      body.description,
+      body.chartType || 'bar',
+    );
+    
+    await this.usersService.incrementAIGenerations(user.id);
+
+    return { chartData };
+  }
+
+  /**
+   * Advanced presentation generation with smart layouts
+   */
+  @Post('generate-advanced')
+  @HttpCode(HttpStatus.OK)
+  async generateAdvancedPresentation(
+    @CurrentUser() user: { id: string },
+    @Body() body: {
+      topic: string;
+      tone?: string;
+      audience?: string;
+      length?: number;
+      type?: string;
+      generateImages?: boolean;
+      smartLayout?: boolean;
+    },
+  ) {
+    const canGenerate = await this.usersService.canGenerateAI(user.id);
+    if (!canGenerate) {
+      throw new ForbiddenException('AI generation limit reached');
+    }
+
+    const presentation = await this.aiService.generateAdvancedPresentation(body);
+    
+    // Advanced generation costs more
+    const cost = body.generateImages ? 10 : 2;
+    await this.usersService.incrementAIGenerations(user.id, cost);
+
+    return presentation;
+  }
+
+  /**
+   * Generate speaker notes for all slides
+   */
+  @Post('generate-all-notes')
+  @HttpCode(HttpStatus.OK)
+  async generateAllSpeakerNotes(
+    @CurrentUser() user: { id: string },
+    @Body() body: { presentation: any },
+  ) {
+    const canGenerate = await this.usersService.canGenerateAI(user.id);
+    if (!canGenerate) {
+      throw new ForbiddenException('AI generation limit reached');
+    }
+
+    const notes = await this.aiService.generateAllSpeakerNotes(body.presentation);
+    await this.usersService.incrementAIGenerations(user.id, 2);
+
+    return { notes };
+  }
+
+  /**
+   * Translate presentation content
+   */
+  @Post('translate')
+  @HttpCode(HttpStatus.OK)
+  async translateContent(
+    @CurrentUser() user: { id: string },
+    @Body() body: { content: string; targetLanguage: string; preserveFormatting?: boolean },
+  ) {
+    const canGenerate = await this.usersService.canGenerateAI(user.id);
+    if (!canGenerate) {
+      throw new ForbiddenException('AI generation limit reached');
+    }
+
+    const translated = await this.aiService.translateContent(
+      body.content,
+      body.targetLanguage,
+      body.preserveFormatting ?? true,
+    );
+    
+    await this.usersService.incrementAIGenerations(user.id);
+
+    return { translated, targetLanguage: body.targetLanguage };
+  }
+
+  /**
+   * Extract and structure document into presentation
+   */
+  @Post('document-to-slides')
+  @HttpCode(HttpStatus.OK)
+  async documentToSlides(
+    @CurrentUser() user: { id: string },
+    @Body() body: { documentText: string; targetSlides?: number },
+  ) {
+    const canGenerate = await this.usersService.canGenerateAI(user.id);
+    if (!canGenerate) {
+      throw new ForbiddenException('AI generation limit reached');
+    }
+
+    const presentation = await this.aiService.extractAndStructureDocument(
+      body.documentText,
+      body.targetSlides || 10,
+    );
+    
+    await this.usersService.incrementAIGenerations(user.id, 3);
+
+    return presentation;
+  }
+
+  /**
+   * Recommend layout for slide content
+   */
+  @Post('recommend-layout')
+  @HttpCode(HttpStatus.OK)
+  async recommendLayout(
+    @CurrentUser() user: { id: string },
+    @Body() body: { blocks: any[]; heading: string },
+  ) {
+    const layout = await this.aiService.recommendLayout(body.blocks, body.heading);
+    return { layout };
+  }
 }
+

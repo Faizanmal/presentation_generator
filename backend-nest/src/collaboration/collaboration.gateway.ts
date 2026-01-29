@@ -365,4 +365,402 @@ export class CollaborationGateway
 
     return { success: true, version };
   }
+
+  // ============================================
+  // LIVE Q&A AND POLLS - GAMMA LEVEL FEATURES
+  // ============================================
+
+  // Store for active Q&A sessions and polls (in production, use Redis)
+  private qaQuestions: Map<string, Array<{
+    id: string;
+    question: string;
+    askedBy: string;
+    askedByName: string;
+    upvotes: number;
+    upvotedBy: string[];
+    answered: boolean;
+    timestamp: Date;
+  }>> = new Map();
+
+  private activePolls: Map<string, {
+    id: string;
+    projectId: string;
+    question: string;
+    options: Array<{ id: string; text: string; votes: number }>;
+    voters: string[];
+    createdBy: string;
+    isActive: boolean;
+    createdAt: Date;
+    endsAt?: Date;
+  }> = new Map();
+
+  @SubscribeMessage('qa:start')
+  async handleQAStart(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { projectId: string },
+  ) {
+    const projectId = client.data.projectId;
+    if (!projectId || projectId !== data.projectId) return;
+
+    // Initialize Q&A for this project
+    if (!this.qaQuestions.has(projectId)) {
+      this.qaQuestions.set(projectId, []);
+    }
+
+    this.server.to(projectId).emit('qa:started', {
+      startedBy: client.data.userName,
+      timestamp: new Date(),
+    });
+
+    this.logger.log(`Q&A started for project ${projectId} by ${client.data.userName}`);
+    return { success: true };
+  }
+
+  @SubscribeMessage('qa:askQuestion')
+  async handleAskQuestion(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { projectId: string; question: string },
+  ) {
+    const projectId = client.data.projectId;
+    if (!projectId || projectId !== data.projectId) return;
+
+    const questions = this.qaQuestions.get(projectId) || [];
+    
+    const newQuestion = {
+      id: `q_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      question: data.question,
+      askedBy: client.data.userId,
+      askedByName: client.data.userName || 'Anonymous',
+      upvotes: 0,
+      upvotedBy: [],
+      answered: false,
+      timestamp: new Date(),
+    };
+
+    questions.push(newQuestion);
+    this.qaQuestions.set(projectId, questions);
+
+    this.server.to(projectId).emit('qa:newQuestion', {
+      question: newQuestion,
+    });
+
+    this.logger.log(`New question in ${projectId}: ${data.question.substring(0, 50)}...`);
+    return { success: true, questionId: newQuestion.id };
+  }
+
+  @SubscribeMessage('qa:upvoteQuestion')
+  async handleUpvoteQuestion(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { projectId: string; questionId: string },
+  ) {
+    const projectId = client.data.projectId;
+    if (!projectId || projectId !== data.projectId) return;
+
+    const questions = this.qaQuestions.get(projectId) || [];
+    const question = questions.find(q => q.id === data.questionId);
+
+    if (question && !question.upvotedBy.includes(client.data.userId)) {
+      question.upvotes++;
+      question.upvotedBy.push(client.data.userId);
+      
+      this.server.to(projectId).emit('qa:questionUpvoted', {
+        questionId: data.questionId,
+        upvotes: question.upvotes,
+        upvotedBy: client.data.userName,
+      });
+    }
+
+    return { success: true };
+  }
+
+  @SubscribeMessage('qa:answerQuestion')
+  async handleAnswerQuestion(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { projectId: string; questionId: string },
+  ) {
+    const projectId = client.data.projectId;
+    if (!projectId || projectId !== data.projectId) return;
+
+    const questions = this.qaQuestions.get(projectId) || [];
+    const question = questions.find(q => q.id === data.questionId);
+
+    if (question) {
+      question.answered = true;
+      
+      this.server.to(projectId).emit('qa:questionAnswered', {
+        questionId: data.questionId,
+        answeredBy: client.data.userName,
+      });
+    }
+
+    return { success: true };
+  }
+
+  @SubscribeMessage('qa:getQuestions')
+  async handleGetQuestions(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { projectId: string },
+  ) {
+    const projectId = client.data.projectId;
+    if (!projectId || projectId !== data.projectId) return;
+
+    const questions = this.qaQuestions.get(projectId) || [];
+    
+    // Sort by upvotes (most upvoted first), then by timestamp
+    const sortedQuestions = [...questions].sort((a, b) => {
+      if (b.upvotes !== a.upvotes) return b.upvotes - a.upvotes;
+      return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+    });
+
+    return { success: true, questions: sortedQuestions };
+  }
+
+  @SubscribeMessage('qa:end')
+  async handleQAEnd(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { projectId: string },
+  ) {
+    const projectId = client.data.projectId;
+    if (!projectId || projectId !== data.projectId) return;
+
+    const questions = this.qaQuestions.get(projectId) || [];
+    
+    this.server.to(projectId).emit('qa:ended', {
+      endedBy: client.data.userName,
+      totalQuestions: questions.length,
+      answeredQuestions: questions.filter(q => q.answered).length,
+    });
+
+    // Optionally clear questions or archive them
+    this.qaQuestions.delete(projectId);
+
+    return { success: true };
+  }
+
+  // Poll functionality
+  @SubscribeMessage('poll:create')
+  async handlePollCreate(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { 
+      projectId: string; 
+      question: string; 
+      options: string[]; 
+      durationMinutes?: number;
+    },
+  ) {
+    const projectId = client.data.projectId;
+    if (!projectId || projectId !== data.projectId) return;
+
+    const pollId = `poll_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    const poll = {
+      id: pollId,
+      projectId,
+      question: data.question,
+      options: data.options.map((text, index) => ({
+        id: `opt_${index}`,
+        text,
+        votes: 0,
+      })),
+      voters: [],
+      createdBy: client.data.userId,
+      isActive: true,
+      createdAt: new Date(),
+      endsAt: data.durationMinutes 
+        ? new Date(Date.now() + data.durationMinutes * 60 * 1000) 
+        : undefined,
+    };
+
+    this.activePolls.set(pollId, poll);
+
+    this.server.to(projectId).emit('poll:created', {
+      poll: {
+        ...poll,
+        options: poll.options.map(o => ({ ...o, votes: 0 })), // Don't send vote counts initially
+      },
+      createdBy: client.data.userName,
+    });
+
+    // Auto-end poll after duration
+    if (data.durationMinutes) {
+      setTimeout(() => {
+        this.endPoll(pollId, projectId);
+      }, data.durationMinutes * 60 * 1000);
+    }
+
+    this.logger.log(`Poll created in ${projectId}: ${data.question}`);
+    return { success: true, pollId };
+  }
+
+  @SubscribeMessage('poll:vote')
+  async handlePollVote(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { projectId: string; pollId: string; optionId: string },
+  ) {
+    const projectId = client.data.projectId;
+    if (!projectId || projectId !== data.projectId) return;
+
+    const poll = this.activePolls.get(data.pollId);
+    
+    if (!poll || !poll.isActive) {
+      return { success: false, error: 'Poll not found or inactive' };
+    }
+
+    if (poll.voters.includes(client.data.userId)) {
+      return { success: false, error: 'Already voted' };
+    }
+
+    const option = poll.options.find(o => o.id === data.optionId);
+    if (!option) {
+      return { success: false, error: 'Invalid option' };
+    }
+
+    option.votes++;
+    poll.voters.push(client.data.userId);
+
+    // Broadcast updated vote counts
+    this.server.to(projectId).emit('poll:voteReceived', {
+      pollId: data.pollId,
+      totalVotes: poll.voters.length,
+      // Only send percentage for live updates
+      results: poll.options.map(o => ({
+        id: o.id,
+        percentage: poll.voters.length > 0 
+          ? Math.round((o.votes / poll.voters.length) * 100) 
+          : 0,
+      })),
+    });
+
+    return { success: true };
+  }
+
+  @SubscribeMessage('poll:end')
+  async handlePollEnd(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { projectId: string; pollId: string },
+  ) {
+    const projectId = client.data.projectId;
+    if (!projectId || projectId !== data.projectId) return;
+
+    this.endPoll(data.pollId, projectId);
+    return { success: true };
+  }
+
+  private endPoll(pollId: string, projectId: string) {
+    const poll = this.activePolls.get(pollId);
+    if (!poll) return;
+
+    poll.isActive = false;
+
+    // Send final results
+    this.server.to(projectId).emit('poll:ended', {
+      pollId,
+      question: poll.question,
+      totalVotes: poll.voters.length,
+      results: poll.options.map(o => ({
+        id: o.id,
+        text: o.text,
+        votes: o.votes,
+        percentage: poll.voters.length > 0 
+          ? Math.round((o.votes / poll.voters.length) * 100) 
+          : 0,
+      })),
+    });
+
+    this.logger.log(`Poll ended: ${poll.question} - ${poll.voters.length} votes`);
+  }
+
+  @SubscribeMessage('poll:getActive')
+  async handleGetActivePolls(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { projectId: string },
+  ) {
+    const projectId = client.data.projectId;
+    if (!projectId || projectId !== data.projectId) return;
+
+    const activePolls = Array.from(this.activePolls.values())
+      .filter(p => p.projectId === projectId && p.isActive)
+      .map(poll => ({
+        id: poll.id,
+        question: poll.question,
+        options: poll.options.map(o => ({ id: o.id, text: o.text })),
+        hasVoted: poll.voters.includes(client.data.userId),
+        totalVotes: poll.voters.length,
+        createdAt: poll.createdAt,
+        endsAt: poll.endsAt,
+      }));
+
+    return { success: true, polls: activePolls };
+  }
+
+  // Presentation mode controls
+  @SubscribeMessage('presentation:start')
+  async handlePresentationStart(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { projectId: string },
+  ) {
+    const projectId = client.data.projectId;
+    if (!projectId || projectId !== data.projectId) return;
+
+    this.server.to(projectId).emit('presentation:started', {
+      presenterId: client.data.userId,
+      presenterName: client.data.userName,
+      currentSlide: 0,
+    });
+
+    return { success: true };
+  }
+
+  @SubscribeMessage('presentation:navigate')
+  async handlePresentationNavigate(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { projectId: string; slideIndex: number },
+  ) {
+    const projectId = client.data.projectId;
+    if (!projectId || projectId !== data.projectId) return;
+
+    this.server.to(projectId).emit('presentation:slideChanged', {
+      slideIndex: data.slideIndex,
+      changedBy: client.data.userName,
+    });
+
+    return { success: true };
+  }
+
+  @SubscribeMessage('presentation:end')
+  async handlePresentationEnd(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { projectId: string },
+  ) {
+    const projectId = client.data.projectId;
+    if (!projectId || projectId !== data.projectId) return;
+
+    this.server.to(projectId).emit('presentation:ended', {
+      endedBy: client.data.userName,
+    });
+
+    return { success: true };
+  }
+
+  @SubscribeMessage('reaction:send')
+  async handleReaction(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { projectId: string; reaction: string },
+  ) {
+    const projectId = client.data.projectId;
+    if (!projectId || projectId !== data.projectId) return;
+
+    const allowedReactions = ['👍', '❤️', '🎉', '👏', '🔥', '💡', '❓', '✅'];
+    if (!allowedReactions.includes(data.reaction)) {
+      return { success: false, error: 'Invalid reaction' };
+    }
+
+    this.server.to(projectId).emit('reaction:received', {
+      reaction: data.reaction,
+      userName: client.data.userName,
+      userId: client.data.userId,
+    });
+
+    return { success: true };
+  }
 }

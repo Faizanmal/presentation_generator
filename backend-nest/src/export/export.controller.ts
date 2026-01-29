@@ -25,11 +25,13 @@ export class ExportController {
   async exportProject(
     @CurrentUser() user: { id: string },
     @Param('projectId') projectId: string,
-    @Query('format') format: 'pdf' | 'html' | 'json' = 'html',
+    @Query('format') format: 'pdf' | 'html' | 'json' | 'pptx' = 'html',
+    @Query('includeNotes') includeNotes: string = 'false',
     @Res() res: Response,
   ) {
     const result = await this.exportService.exportProject(user.id, projectId, {
       format,
+      includeNotes: includeNotes === 'true',
     });
 
     res.setHeader('Content-Type', result.mimeType);

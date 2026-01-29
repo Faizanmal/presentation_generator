@@ -165,6 +165,10 @@ export class CollaborationService {
     }));
   }
 
+  async getCollaborators(projectId: string) {
+    return this.getProjectCollaborators(projectId);
+  }
+
   async getUserRole(projectId: string, userId: string) {
     const collaborator = await this.prisma.projectCollaborator.findUnique({
       where: {
