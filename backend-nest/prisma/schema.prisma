@@ -1,0 +1,744 @@
+// Prisma Schema for Presentation Designer SaaS
+// Similar to Gamma - AI-powered presentation generation
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================
+// AUTHENTICATION MODELS
+// ============================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  password      String?   // null for OAuth users
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  accounts     Account[]
+  sessions     Session[]
+  projects     Project[]
+  subscription Subscription?
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ============================================
+// CORE APPLICATION MODELS
+// ============================================
+
+enum ProjectType {
+  PRESENTATION
+  DOCUMENT
+}
+
+enum ProjectStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  title       String
+  description String?
+  type        ProjectType   @default(PRESENTATION)
+  status      ProjectStatus @default(DRAFT)
+  
+  // Theme settings
+  themeId     String?
+  theme       Theme?        @relation(fields: [themeId], references: [id])
+  
+  // Sharing settings
+  isPublic    Boolean       @default(false)
+  shareToken  String?       @unique
+  
+  // AI generation metadata
+  generatedFromPrompt String? @db.Text
+  tone                String?
+  audience            String?
+  
+  // Timestamps
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  ownerId     String
+  owner       User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  slides      Slide[]
+  blocks      Block[]
+
+  @@index([ownerId])
+  @@index([shareToken])
+  @@map("projects")
+}
+
+model Slide {
+  id        String   @id @default(cuid())
+  projectId String
+  order     Int
+  layout    String   @default("default") // layout template name
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  blocks    Block[]
+
+  @@index([projectId])
+  @@map("slides")
+}
+
+enum BlockType {
+  HEADING
+  SUBHEADING
+  PARAGRAPH
+  BULLET_LIST
+  NUMBERED_LIST
+  IMAGE
+  CODE
+  QUOTE
+  DIVIDER
+  TABLE
+  EMBED
+}
+
+model Block {
+  id        String    @id @default(cuid())
+  projectId String
+  slideId   String?
+  blockType BlockType
+  content   Json      // Flexible content storage
+  order     Int
+  
+  // Styling overrides
+  style     Json?     // Custom styling for this block
+  
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  slide     Slide?    @relation(fields: [slideId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([slideId])
+  @@map("blocks")
+}
+
+// ============================================
+// THEME SYSTEM
+// ============================================
+
+model Theme {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  isDefault   Boolean  @default(false)
+  isPremium   Boolean  @default(false)
+  
+  // Theme configuration
+  colors      Json     // { primary, secondary, background, text, accent }
+  fonts       Json     // { heading, body }
+  spacing     Json     // { base, scale }
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  projects    Project[]
+
+  @@map("themes")
+}
+
+// ============================================
+// SUBSCRIPTION & BILLING
+// ============================================
+
+enum SubscriptionPlan {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+  TRIALING
+  PAUSED
+}
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  userId               String             @unique
+  plan                 SubscriptionPlan   @default(FREE)
+  status               SubscriptionStatus @default(ACTIVE)
+  
+  // Stripe integration
+  stripeCustomerId     String?            @unique
+  stripeSubscriptionId String?            @unique
+  stripePriceId        String?
+  
+  // Usage limits
+  projectsLimit        Int                @default(3)
+  aiGenerationsLimit   Int                @default(10)
+  aiGenerationsUsed    Int                @default(0)
+  
+  // Billing period
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+// ============================================
+// USAGE & ANALYTICS
+// ============================================
+
+model AIGeneration {
+  id        String   @id @default(cuid())
+  userId    String
+  projectId String?
+  
+  prompt    String   @db.Text
+  response  Json
+  tokens    Int
+  model     String
+  
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("ai_generations")
+}
+
+model Asset {
+  id        String   @id @default(cuid())
+  userId    String
+  filename  String
+  url       String
+  mimeType  String
+  size      Int
+  
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("assets")
+}
+
+// ============================================
+// REAL-TIME COLLABORATION
+// ============================================
+
+model CollaborationSession {
+  id          String   @id @default(cuid())
+  projectId   String
+  userId      String
+  socketId    String
+  cursorX     Float?
+  cursorY     Float?
+  cursorSlide Int?
+  isActive    Boolean  @default(true)
+  color       String   // User's cursor color
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([userId])
+  @@map("collaboration_sessions")
+}
+
+model ProjectCollaborator {
+  id          String   @id @default(cuid())
+  projectId   String
+  userId      String
+  role        CollaboratorRole @default(VIEWER)
+  invitedBy   String?
+  invitedAt   DateTime @default(now())
+  acceptedAt  DateTime?
+  
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
+  @@map("project_collaborators")
+}
+
+enum CollaboratorRole {
+  OWNER
+  EDITOR
+  COMMENTER
+  VIEWER
+}
+
+model Comment {
+  id          String   @id @default(cuid())
+  projectId   String
+  slideId     String?
+  blockId     String?
+  userId      String
+  content     String   @db.Text
+  resolved    Boolean  @default(false)
+  pinned      Boolean  @default(false)
+  parentId    String?  // For reply threads
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([slideId])
+  @@map("comments")
+}
+
+
+model ProjectVersion {
+  id          String   @id @default(cuid())
+  projectId   String
+  version     Int
+  snapshot    Json     // Full project snapshot
+  message     String?  // Version message/description
+  createdBy   String
+  
+  createdAt   DateTime @default(now())
+
+  @@unique([projectId, version])
+  @@index([projectId])
+  @@map("project_versions")
+}
+
+// ============================================
+// VOICE-TO-SLIDE GENERATION
+// ============================================
+
+model VoiceRecording {
+  id           String   @id @default(cuid())
+  userId       String
+  projectId    String?
+  filename     String
+  url          String
+  duration     Float    // Duration in seconds
+  transcription String? @db.Text
+  status       VoiceProcessingStatus @default(UPLOADING)
+  
+  createdAt    DateTime @default(now())
+  processedAt  DateTime?
+
+  @@index([userId])
+  @@index([projectId])
+  @@map("voice_recordings")
+}
+
+enum VoiceProcessingStatus {
+  UPLOADING
+  TRANSCRIBING
+  GENERATING
+  COMPLETED
+  FAILED
+}
+
+// ============================================
+// PRESENTATION ANALYTICS
+// ============================================
+
+model PresentationView {
+  id           String   @id @default(cuid())
+  projectId    String
+  viewerId     String?  // Anonymous if null
+  sessionId    String   // Unique session identifier
+  ipAddress    String?
+  userAgent    String?
+  referrer     String?
+  
+  startedAt    DateTime @default(now())
+  endedAt      DateTime?
+  totalDuration Int?    // Total time in seconds
+
+  slideViews   SlideView[]
+
+  @@index([projectId])
+  @@index([sessionId])
+  @@map("presentation_views")
+}
+
+model SlideView {
+  id                 String   @id @default(cuid())
+  presentationViewId String
+  slideId            String
+  slideIndex         Int
+  
+  enterTime          DateTime @default(now())
+  exitTime           DateTime?
+  duration           Int?     // Time spent in seconds
+  interactions       Int      @default(0) // Click count
+  
+  presentationView   PresentationView @relation(fields: [presentationViewId], references: [id], onDelete: Cascade)
+
+  @@index([presentationViewId])
+  @@index([slideId])
+  @@map("slide_views")
+}
+
+model EngagementHeatmap {
+  id          String   @id @default(cuid())
+  projectId   String
+  slideId     String
+  x           Float    // Percentage position
+  y           Float
+  clickCount  Int      @default(1)
+  
+  updatedAt   DateTime @updatedAt
+
+  @@unique([projectId, slideId, x, y])
+  @@index([projectId])
+  @@map("engagement_heatmaps")
+}
+
+model AnalyticsSnapshot {
+  id          String   @id @default(cuid())
+  projectId   String
+  date        DateTime @db.Date
+  views       Int      @default(0)
+  uniqueViews Int      @default(0)
+  avgDuration Float    @default(0)
+  dropOffSlide Int?    // Slide where most viewers left
+  
+  @@unique([projectId, date])
+  @@index([projectId])
+  @@map("analytics_snapshots")
+}
+
+// ============================================
+// INTEGRATIONS
+// ============================================
+
+model Integration {
+  id           String   @id @default(cuid())
+  userId       String
+  provider     IntegrationProvider
+  accessToken  String   @db.Text
+  refreshToken String?  @db.Text
+  expiresAt    DateTime?
+  metadata     Json?    // Provider-specific data
+  isActive     Boolean  @default(true)
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, provider])
+  @@index([userId])
+  @@map("integrations")
+}
+
+enum IntegrationProvider {
+  ZOOM
+  SLACK
+  TEAMS
+  GOOGLE_DRIVE
+  FIGMA
+  NOTION
+  DROPBOX
+}
+
+model IntegrationWebhook {
+  id           String   @id @default(cuid())
+  integrationId String
+  eventType    String
+  payload      Json
+  status       WebhookStatus @default(PENDING)
+  
+  createdAt    DateTime @default(now())
+  processedAt  DateTime?
+
+  @@index([integrationId])
+  @@map("integration_webhooks")
+}
+
+enum WebhookStatus {
+  PENDING
+  PROCESSED
+  FAILED
+}
+
+// ============================================
+// CUSTOM AI MODELS & PERSONALIZATION
+// ============================================
+
+model BrandProfile {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  companyName  String?
+  brandVoice   String?  @db.Text // Tone/style description
+  industry     String?
+  targetAudience String? @db.Text
+  keywords     String[] // Brand-specific terms
+  colorPalette Json?    // Brand colors
+  logoUrl      String?
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("brand_profiles")
+}
+
+model TrainingDocument {
+  id           String   @id @default(cuid())
+  userId       String
+  filename     String
+  url          String
+  content      String?  @db.Text // Extracted text
+  embeddings   Json?    // Vector embeddings for RAG
+  status       DocumentStatus @default(UPLOADING)
+  
+  createdAt    DateTime @default(now())
+  processedAt  DateTime?
+
+  @@index([userId])
+  @@map("training_documents")
+}
+
+enum DocumentStatus {
+  UPLOADING
+  PROCESSING
+  READY
+  FAILED
+}
+
+model AIPersonalization {
+  id           String   @id @default(cuid())
+  userId       String
+  projectId    String?
+  promptTemplate String? @db.Text // Custom system prompt
+  examples     Json?    // Few-shot examples
+  preferences  Json?    // Style preferences
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+  @@map("ai_personalizations")
+}
+
+// ============================================
+// ENTERPRISE FEATURES
+// ============================================
+
+model Organization {
+  id           String   @id @default(cuid())
+  name         String
+  slug         String   @unique
+  logo         String?
+  domain       String?  @unique // For SSO domain verification
+  
+  // White-labeling
+  brandingEnabled Boolean @default(false)
+  primaryColor    String?
+  secondaryColor  String?
+  customCss       String? @db.Text
+  customDomain    String? @unique
+  
+  // Settings
+  settings     Json?
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  members      OrganizationMember[]
+  ssoConfigs   SSOConfig[]
+
+  @@map("organizations")
+}
+
+model OrganizationMember {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  role           OrgRole  @default(MEMBER)
+  
+  createdAt      DateTime @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+  @@map("organization_members")
+}
+
+enum OrgRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+model SSOConfig {
+  id             String   @id @default(cuid())
+  organizationId String
+  provider       SSOProvider
+  
+  // SAML Configuration
+  entityId       String?
+  ssoUrl         String?
+  certificate    String?  @db.Text
+  
+  // OIDC Configuration
+  clientId       String?
+  clientSecret   String?
+  issuerUrl      String?
+  
+  isActive       Boolean  @default(false)
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, provider])
+  @@map("sso_configs")
+}
+
+enum SSOProvider {
+  SAML
+  OIDC
+  AZURE_AD
+  OKTA
+  GOOGLE_WORKSPACE
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String?
+  userId         String
+  action         String
+  resource       String
+  resourceId     String?
+  oldValue       Json?
+  newValue       Json?
+  ipAddress      String?
+  userAgent      String?
+  
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+model TeamInvitation {
+  id             String   @id @default(cuid())
+  organizationId String
+  email          String
+  role           OrgRole  @default(MEMBER)
+  token          String   @unique
+  invitedBy      String
+  expiresAt      DateTime
+  
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([email])
+  @@map("team_invitations")
+}
+
+// ============================================
+// OFFLINE & PWA SUPPORT
+// ============================================
+
+model OfflineCache {
+  id           String   @id @default(cuid())
+  userId       String
+  projectId    String
+  version      Int
+  data         Json     // Cached project data
+  lastSynced   DateTime @default(now())
+  pendingSync  Boolean  @default(false)
+  
+  @@unique([userId, projectId])
+  @@index([userId])
+  @@map("offline_caches")
+}
+
+model SyncQueue {
+  id           String   @id @default(cuid())
+  userId       String
+  projectId    String
+  operation    SyncOperation
+  data         Json
+  priority     Int      @default(0)
+  attempts     Int      @default(0)
+  status       SyncStatus @default(PENDING)
+  error        String?
+  
+  createdAt    DateTime @default(now())
+  processedAt  DateTime?
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([status])
+  @@map("sync_queue")
+}
+
+enum SyncOperation {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+enum SyncStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
