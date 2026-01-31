@@ -33,7 +33,7 @@ class ConfirmUploadDto {
 @Controller('upload')
 @UseGuards(JwtAuthGuard)
 export class UploadController {
-  constructor(private readonly uploadService: UploadService) { }
+  constructor(private readonly uploadService: UploadService) {}
 
   /**
    * Upload a file directly
@@ -60,7 +60,6 @@ export class UploadController {
   ): Promise<UploadResult> {
     return this.uploadService.uploadFile(file, user.id);
   }
-
 
   /**
    * Get presigned URL for direct client upload

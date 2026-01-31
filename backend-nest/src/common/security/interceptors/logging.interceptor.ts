@@ -19,7 +19,7 @@ export class LoggingInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
     const response = context.switchToHttp().getResponse();
-    
+
     const requestId = uuidv4();
     const method = request.method;
     const url = request.url;
@@ -51,9 +51,7 @@ export class LoggingInterceptor implements NestInterceptor {
 
         // Log slow requests as warnings
         if (duration > 1000) {
-          this.logger.warn(
-            `Slow request: ${method} ${url} took ${duration}ms`,
-          );
+          this.logger.warn(`Slow request: ${method} ${url} took ${duration}ms`);
         }
       }),
       catchError((error) => {

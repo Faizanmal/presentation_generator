@@ -34,7 +34,7 @@ class TrackHeatmapDto {
 
 @Controller('analytics')
 export class AnalyticsController {
-  constructor(private readonly analyticsService: AnalyticsService) { }
+  constructor(private readonly analyticsService: AnalyticsService) {}
 
   // ============================================
   // PUBLIC TRACKING ENDPOINTS (no auth required for viewers)
@@ -209,7 +209,9 @@ export class AnalyticsController {
       insights: summary.insights,
       generatedAt: new Date().toISOString(),
       dataRange: {
-        start: startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        start:
+          startDate ||
+          new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
         end: endDate || new Date().toISOString(),
       },
     };

@@ -226,7 +226,7 @@ export class AnalyticsService {
     const averageDuration =
       completedViews.length > 0
         ? completedViews.reduce((sum, v) => sum + (v.totalDuration || 0), 0) /
-        completedViews.length
+          completedViews.length
         : 0;
 
     // Get project slide count
@@ -427,7 +427,11 @@ export class AnalyticsService {
   /**
    * Get viewer sessions with pagination
    */
-  async getViewerSessions(projectId: string, page: number = 1, limit: number = 20) {
+  async getViewerSessions(
+    projectId: string,
+    page: number = 1,
+    limit: number = 20,
+  ) {
     const skip = (page - 1) * limit;
 
     const [sessions, total] = await Promise.all([
@@ -454,7 +458,9 @@ export class AnalyticsService {
     const totalSlides = project?.slides.length || 1;
 
     // Parse user agent for device info
-    const parseDevice = (ua: string | null): 'desktop' | 'mobile' | 'tablet' => {
+    const parseDevice = (
+      ua: string | null,
+    ): 'desktop' | 'mobile' | 'tablet' => {
       if (!ua) return 'desktop';
       if (/mobile/i.test(ua)) return 'mobile';
       if (/tablet|ipad/i.test(ua)) return 'tablet';
@@ -503,15 +509,15 @@ export class AnalyticsService {
     const totalSlides = project?.slides.length || 1;
 
     const totalViews = views.length;
-    const uniqueViewers = new Set(
-      views.filter((v) => v.viewerId).map((v) => v.viewerId),
-    ).size || new Set(views.map((v) => v.sessionId)).size;
+    const uniqueViewers =
+      new Set(views.filter((v) => v.viewerId).map((v) => v.viewerId)).size ||
+      new Set(views.map((v) => v.sessionId)).size;
 
     const completedViews = views.filter((v) => v.totalDuration);
     const avgViewDuration =
       completedViews.length > 0
         ? completedViews.reduce((sum, v) => sum + (v.totalDuration || 0), 0) /
-        completedViews.length
+          completedViews.length
         : 0;
 
     // Completion rate
@@ -709,7 +715,7 @@ Focus on:
       const avgDuration =
         completedViews.length > 0
           ? completedViews.reduce((sum, v) => sum + (v.totalDuration || 0), 0) /
-          completedViews.length
+            completedViews.length
           : 0;
 
       await this.prisma.analyticsSnapshot.upsert({
@@ -810,7 +816,9 @@ Provide 5-8 specific, actionable recommendations based on the data patterns.`;
       };
     } catch (error) {
       this.logger.error('Failed to generate detailed recommendations', error);
-      return this.getDefaultRecommendations(await this.getAnalyticsSummary(projectId));
+      return this.getDefaultRecommendations(
+        await this.getAnalyticsSummary(projectId),
+      );
     }
   }
 
@@ -824,7 +832,8 @@ Provide 5-8 specific, actionable recommendations based on the data patterns.`;
         description: 'Less than 50% of viewers complete the presentation.',
         priority: 'high' as const,
         impact: 'Could increase completion rate by 20-30%',
-        implementation: 'Consider reducing the number of slides, adding more visual elements, or restructuring content to front-load key information.',
+        implementation:
+          'Consider reducing the number of slides, adding more visual elements, or restructuring content to front-load key information.',
       });
     }
 
@@ -835,7 +844,8 @@ Provide 5-8 specific, actionable recommendations based on the data patterns.`;
         description: 'This slide has the highest viewer drop-off rate.',
         priority: 'high' as const,
         impact: 'Could reduce drop-off by 15-25%',
-        implementation: 'Analyze the content density, add engaging visuals, or consider splitting into multiple slides.',
+        implementation:
+          'Analyze the content density, add engaging visuals, or consider splitting into multiple slides.',
       });
     }
 
@@ -846,7 +856,8 @@ Provide 5-8 specific, actionable recommendations based on the data patterns.`;
         description: 'Average viewing time is under 1 minute.',
         priority: 'medium' as const,
         impact: 'Could increase engagement time by 50%',
-        implementation: 'Add interactive elements, embed videos, or include thought-provoking questions.',
+        implementation:
+          'Add interactive elements, embed videos, or include thought-provoking questions.',
       });
     }
 
@@ -856,7 +867,8 @@ Provide 5-8 specific, actionable recommendations based on the data patterns.`;
       description: 'Ensure presentation is mobile-friendly.',
       priority: 'medium' as const,
       impact: 'Could increase mobile viewership by 40%',
-      implementation: 'Use larger fonts, reduce text density, and test on various screen sizes.',
+      implementation:
+        'Use larger fonts, reduce text density, and test on various screen sizes.',
     });
 
     return {
@@ -876,8 +888,16 @@ Provide 5-8 specific, actionable recommendations based on the data patterns.`;
     startDate?: Date,
     endDate?: Date,
   ): Promise<{ data: string; filename: string; mimeType: string }> {
-    const summary = await this.getAnalyticsSummary(projectId, startDate, endDate);
-    const slidePerformance = await this.getSlidePerformance(projectId, startDate, endDate);
+    const summary = await this.getAnalyticsSummary(
+      projectId,
+      startDate,
+      endDate,
+    );
+    const slidePerformance = await this.getSlidePerformance(
+      projectId,
+      startDate,
+      endDate,
+    );
     const { data: sessions } = await this.getViewerSessions(projectId, 1, 1000);
 
     const exportData = {
@@ -923,15 +943,21 @@ Provide 5-8 specific, actionable recommendations based on the data patterns.`;
     lines.push('SLIDE PERFORMANCE');
     lines.push('Slide,Views,Avg Duration (s),Drop-off Rate (%),Clicks');
     data.slidePerformance.forEach((slide: any) => {
-      lines.push(`${slide.slideNumber},${slide.views},${slide.avgDuration},${slide.dropOffRate},${slide.clicks}`);
+      lines.push(
+        `${slide.slideNumber},${slide.views},${slide.avgDuration},${slide.dropOffRate},${slide.clicks}`,
+      );
     });
     lines.push('');
 
     // Sessions section
     lines.push('VIEWER SESSIONS');
-    lines.push('ID,Start Time,Duration (s),Slides Viewed,Device,Completion Rate (%)');
+    lines.push(
+      'ID,Start Time,Duration (s),Slides Viewed,Device,Completion Rate (%)',
+    );
     data.sessions.forEach((session: any) => {
-      lines.push(`${session.id},${session.startTime},${session.duration},${session.slidesViewed},${session.device},${session.completionRate}`);
+      lines.push(
+        `${session.id},${session.startTime},${session.duration},${session.slidesViewed},${session.device},${session.completionRate}`,
+      );
     });
 
     return lines.join('\n');

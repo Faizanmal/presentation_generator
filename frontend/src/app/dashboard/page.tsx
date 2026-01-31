@@ -27,7 +27,6 @@ import {
   User,
   ChevronDown,
   Star,
-  Keyboard,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,7 +64,6 @@ import { KeyboardShortcutsDialog } from "@/components/ui/keyboard-shortcuts";
 import {
   useFavorites,
   useRecentProjects,
-  FavoriteButton,
   FavoritesRecentPanel,
 } from "@/components/ui/favorites-recent";
 

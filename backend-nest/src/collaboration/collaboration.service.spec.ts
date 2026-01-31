@@ -118,6 +118,7 @@ describe('CollaborationService', () => {
         'project-1',
         'new@test.com',
         'VIEWER',
+        'user-1',
       );
 
       expect(result).toHaveProperty('id');
@@ -128,7 +129,12 @@ describe('CollaborationService', () => {
       mockPrismaService.user.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.addCollaborator('project-1', 'notfound@test.com', 'VIEWER'),
+        service.addCollaborator(
+          'project-1',
+          'notfound@test.com',
+          'VIEWER',
+          'user-1',
+        ),
       ).rejects.toThrow();
     });
 
@@ -139,7 +145,12 @@ describe('CollaborationService', () => {
       });
 
       await expect(
-        service.addCollaborator('project-1', 'existing@test.com', 'VIEWER'),
+        service.addCollaborator(
+          'project-1',
+          'existing@test.com',
+          'VIEWER',
+          'user-1',
+        ),
       ).rejects.toThrow();
     });
   });
@@ -201,11 +212,11 @@ describe('CollaborationService', () => {
         projectId: 'project-1',
       });
 
-      const result = await service.createComment(
-        'user-1',
-        'project-1',
-        'New comment',
-      );
+      const result = await service.createComment({
+        userId: 'user-1',
+        projectId: 'project-1',
+        content: 'New comment',
+      });
 
       expect(result).toHaveProperty('id');
       expect(result.content).toBe('New comment');
@@ -218,14 +229,12 @@ describe('CollaborationService', () => {
         parentId: 'comment-1',
       });
 
-      const result = await service.createComment(
-        'user-1',
-        'project-1',
-        'Reply',
-        undefined,
-        undefined,
-        'comment-1',
-      );
+      const result = await service.createComment({
+        userId: 'user-1',
+        projectId: 'project-1',
+        content: 'Reply',
+        parentId: 'comment-1',
+      });
 
       expect(result.parentId).toBe('comment-1');
     });
@@ -251,7 +260,7 @@ describe('CollaborationService', () => {
         pinned: true,
       });
 
-      const result = await service.pinComment('comment-1');
+      const result = await service.pinComment('comment-1', true);
 
       expect(result.pinned).toBe(true);
     });
@@ -269,8 +278,12 @@ describe('CollaborationService', () => {
         snapshot: {},
       });
 
-      const result = await service.createVersion('project-1', 'user-1', {
-        slides: [],
+      const result = await service.createVersion({
+        projectId: 'project-1',
+        createdBy: 'user-1',
+        snapshot: {
+          slides: [],
+        },
       });
 
       expect(result).toHaveProperty('version');
@@ -285,7 +298,11 @@ describe('CollaborationService', () => {
         projectId: 'project-1',
       });
 
-      const result = await service.createVersion('project-1', 'user-1', {});
+      const result = await service.createVersion({
+        projectId: 'project-1',
+        createdBy: 'user-1',
+        snapshot: {},
+      });
 
       expect(result.version).toBe(1);
     });
@@ -325,9 +342,7 @@ describe('CollaborationService', () => {
     it('should throw error for non-existent version', async () => {
       mockPrismaService.projectVersion.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.restoreVersion('project-1', 999),
-      ).rejects.toThrow();
+      await expect(service.restoreVersion('project-1', 999)).rejects.toThrow();
     });
   });
 });

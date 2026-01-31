@@ -9,12 +9,12 @@ import {
   X,
   Maximize,
   Minimize,
-  Home,
   Loader2,
+  Home,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
-import { Project, Slide, Theme, Block } from "@/types";
+import { Slide, Theme, Block } from "@/types";
 
 export default function PresentPage() {
   const params = useParams();
@@ -55,6 +55,45 @@ export default function PresentPage() {
     };
   }, []);
 
+  // Listen for fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  const prevSlide = useCallback(() => {
+    if (currentSlideIndex > 0) {
+      setCurrentSlideIndex(currentSlideIndex - 1);
+    }
+  }, [currentSlideIndex]);
+
+  const nextSlide = useCallback(() => {
+    if (project?.slides && currentSlideIndex < project.slides.length - 1) {
+      setCurrentSlideIndex(currentSlideIndex + 1);
+    }
+  }, [currentSlideIndex, project]);
+
+  const exitFullscreen = () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  };
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen();
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  };
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -81,46 +120,9 @@ export default function PresentPage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [project, isFullscreen, router]);
+  }, [project, isFullscreen, router, nextSlide, prevSlide]);
 
-  const nextSlide = useCallback(() => {
-    if (project?.slides && currentSlideIndex < project.slides.length - 1) {
-      setCurrentSlideIndex(currentSlideIndex + 1);
-    }
-  }, [currentSlideIndex, project]);
 
-  const prevSlide = useCallback(() => {
-    if (currentSlideIndex > 0) {
-      setCurrentSlideIndex(currentSlideIndex - 1);
-    }
-  }, [currentSlideIndex]);
-
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen();
-      setIsFullscreen(false);
-    }
-  };
-
-  const exitFullscreen = () => {
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
-      setIsFullscreen(false);
-    }
-  };
-
-  // Listen for fullscreen changes
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
-
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
-  }, []);
 
   if (isLoading) {
     return (
@@ -156,9 +158,8 @@ export default function PresentPage() {
 
       {/* Controls overlay */}
       <div
-        className={`absolute inset-0 pointer-events-none transition-opacity duration-300 ${
-          showControls ? "opacity-100" : "opacity-0"
-        }`}
+        className={`absolute inset-0 pointer-events-none transition-opacity duration-300 ${showControls ? "opacity-100" : "opacity-0"
+          }`}
       >
         {/* Top bar */}
         <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-black/50 to-transparent flex items-center justify-between px-4 pointer-events-auto">
@@ -206,11 +207,10 @@ export default function PresentPage() {
               <button
                 key={index}
                 onClick={() => setCurrentSlideIndex(index)}
-                className={`h-2 w-2 rounded-full transition-all ${
-                  index === currentSlideIndex
-                    ? "bg-white w-4"
-                    : "bg-white/50 hover:bg-white/80"
-                }`}
+                className={`h-2 w-2 rounded-full transition-all ${index === currentSlideIndex
+                  ? "bg-white w-4"
+                  : "bg-white/50 hover:bg-white/80"
+                  }`}
               />
             ))}
           </div>
@@ -250,10 +250,9 @@ export default function PresentPage() {
 
 // Slide View Component
 function SlideView({ slide, theme }: { slide: Slide; theme?: Theme }) {
-  const bgColor = (theme?.colors as any)?.background || "#ffffff";
-  const textColor = (theme?.colors as any)?.text || "#1f2937";
-  const primaryColor = (theme?.colors as any)?.primary || "#3b82f6";
-  const accentColor = (theme?.colors as any)?.accent || "#10b981";
+  const bgColor = (theme?.colors as Theme['colors'] | undefined)?.background || "#ffffff";
+  const textColor = (theme?.colors as Theme['colors'] | undefined)?.text || "#1f2937";
+
 
   // Sort blocks by order
   const sortedBlocks = [...(slide.blocks || [])].sort((a, b) => a.order - b.order);
@@ -264,7 +263,7 @@ function SlideView({ slide, theme }: { slide: Slide; theme?: Theme }) {
       style={{
         backgroundColor: bgColor,
         color: textColor,
-        fontFamily: (theme?.fonts as any)?.body || "system-ui",
+        fontFamily: (theme?.fonts as Theme['fonts'] | undefined)?.body || "system-ui",
       }}
     >
       <div className="h-full p-12 overflow-y-auto flex flex-col justify-center">
@@ -284,9 +283,17 @@ function SlideView({ slide, theme }: { slide: Slide; theme?: Theme }) {
 
 // Block View Component (read-only)
 function BlockView({ block, theme }: { block: Block; theme?: Theme }) {
-  const primaryColor = (theme?.colors as any)?.primary || "#3b82f6";
-  const accentColor = (theme?.colors as any)?.accent || "#10b981";
-  const content = block.content as any;
+  const primaryColor = (theme?.colors as Theme['colors'] | undefined)?.primary || "#3b82f6";
+  const accentColor = (theme?.colors as Theme['colors'] | undefined)?.accent || "#10b981";
+  const content = block.content as Record<string, unknown> & {
+    text?: string;
+    items?: string[];
+    url?: string;
+    alt?: string;
+    code?: string;
+    author?: string;
+    rows?: string[][];
+  };
 
   switch (block.type) {
     case "HEADING":
@@ -294,7 +301,7 @@ function BlockView({ block, theme }: { block: Block; theme?: Theme }) {
         <h1
           className="text-6xl font-bold"
           style={{
-            fontFamily: (theme?.fonts as any)?.heading || "system-ui",
+            fontFamily: (theme?.fonts as Theme['fonts'] | undefined)?.heading || "system-ui",
             color: primaryColor,
           }}
         >
@@ -306,7 +313,7 @@ function BlockView({ block, theme }: { block: Block; theme?: Theme }) {
       return (
         <h2
           className="text-3xl font-semibold"
-          style={{ fontFamily: (theme?.fonts as any)?.heading || "system-ui" }}
+          style={{ fontFamily: (theme?.fonts as Theme['fonts'] | undefined)?.heading || "system-ui" }}
         >
           {content?.text || ""}
         </h2>
@@ -316,7 +323,7 @@ function BlockView({ block, theme }: { block: Block; theme?: Theme }) {
       return (
         <p
           className="text-2xl leading-relaxed"
-          style={{ fontFamily: (theme?.fonts as any)?.body || "system-ui" }}
+          style={{ fontFamily: (theme?.fonts as Theme['fonts'] | undefined)?.body || "system-ui" }}
         >
           {content?.text || ""}
         </p>
@@ -342,6 +349,7 @@ function BlockView({ block, theme }: { block: Block; theme?: Theme }) {
 
     case "IMAGE":
       return content?.url ? (
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={content.url}
           alt={content.alt || ""}
@@ -373,7 +381,7 @@ function BlockView({ block, theme }: { block: Block; theme?: Theme }) {
       return (
         <hr
           className="my-8"
-          style={{ borderColor: (theme?.colors as any)?.secondary || "#e2e8f0" }}
+          style={{ borderColor: (theme?.colors as Theme['colors'] | undefined)?.secondary || "#e2e8f0" }}
         />
       );
 
@@ -387,11 +395,10 @@ function BlockView({ block, theme }: { block: Block; theme?: Theme }) {
                 {row.map((cell: string, cellIndex: number) => (
                   <td
                     key={cellIndex}
-                    className={`border p-3 ${
-                      rowIndex === 0 ? "font-semibold bg-slate-100 dark:bg-slate-800" : ""
-                    }`}
+                    className={`border p-3 ${rowIndex === 0 ? "font-semibold bg-slate-100 dark:bg-slate-800" : ""
+                      }`}
                     style={{
-                      borderColor: (theme?.colors as any)?.secondary || "#e2e8f0",
+                      borderColor: (theme?.colors as Theme['colors'] | undefined)?.secondary || "#e2e8f0",
                     }}
                   >
                     {cell}

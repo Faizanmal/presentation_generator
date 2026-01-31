@@ -55,7 +55,12 @@ export class TranslationService {
     { code: 'el', name: 'Greek', nativeName: 'Ελληνικά', rtl: false },
     { code: 'ro', name: 'Romanian', nativeName: 'Română', rtl: false },
     { code: 'uk', name: 'Ukrainian', nativeName: 'Українська', rtl: false },
-    { code: 'id', name: 'Indonesian', nativeName: 'Bahasa Indonesia', rtl: false },
+    {
+      code: 'id',
+      name: 'Indonesian',
+      nativeName: 'Bahasa Indonesia',
+      rtl: false,
+    },
     { code: 'ms', name: 'Malay', nativeName: 'Bahasa Melayu', rtl: false },
   ];
 
@@ -69,7 +74,9 @@ export class TranslationService {
     return this.supportedLanguages;
   }
 
-  async detectLanguage(text: string): Promise<{ code: string; confidence: number }> {
+  async detectLanguage(
+    text: string,
+  ): Promise<{ code: string; confidence: number }> {
     const prompt = `Detect the language of the following text and return the ISO 639-1 language code.
 
 Text: "${text.substring(0, 500)}"
@@ -83,7 +90,9 @@ Return JSON: { "code": "xx", "confidence": 0.0 }`;
         temperature: 0.1,
       });
 
-      const result = this.parseJsonResponse(response.choices[0].message.content || '{}');
+      const result = this.parseJsonResponse(
+        response.choices[0].message.content || '{}',
+      );
       return {
         code: result.code || 'en',
         confidence: result.confidence || 0.5,
@@ -100,9 +109,11 @@ Return JSON: { "code": "xx", "confidence": 0.0 }`;
       preserveFormatting?: boolean;
       adaptCulturally?: boolean;
       glossary?: Record<string, string>;
-    } = {}
+    } = {},
   ): Promise<TranslationResult> {
-    const targetLang = this.supportedLanguages.find((l) => l.code === targetLanguage);
+    const targetLang = this.supportedLanguages.find(
+      (l) => l.code === targetLanguage,
+    );
     if (!targetLang) {
       throw new Error(`Unsupported language: ${targetLanguage}`);
     }
@@ -120,7 +131,7 @@ Return JSON: { "code": "xx", "confidence": 0.0 }`;
           slide,
           sourceLanguage.code,
           targetLanguage,
-          options
+          options,
         );
         translations.push(translated);
       } catch (error) {
@@ -150,10 +161,10 @@ Return JSON: { "code": "xx", "confidence": 0.0 }`;
       preserveFormatting?: boolean;
       adaptCulturally?: boolean;
       glossary?: Record<string, string>;
-    } = {}
+    } = {},
   ): Promise<SlideTranslation> {
     const textElements = this.extractTextElements(slide.content);
-    
+
     if (textElements.length === 0) {
       return {
         slideId: slide.id,
@@ -189,7 +200,8 @@ Return the translated content as a JSON array with the same structure.`;
         messages: [
           {
             role: 'system',
-            content: 'You are a professional translator specializing in business presentations. Maintain formatting, structure, and professional tone.',
+            content:
+              'You are a professional translator specializing in business presentations. Maintain formatting, structure, and professional tone.',
           },
           { role: 'user', content: prompt },
         ],
@@ -197,13 +209,13 @@ Return the translated content as a JSON array with the same structure.`;
       });
 
       const translatedElements = this.parseJsonResponse(
-        response.choices[0].message.content || '[]'
+        response.choices[0].message.content || '[]',
       );
 
       const translatedContent = this.applyTranslations(
         slide.content,
         textElements,
-        translatedElements
+        translatedElements,
       );
 
       return {
@@ -229,15 +241,13 @@ Return the translated content as a JSON array with the same structure.`;
     options: {
       context?: string;
       formal?: boolean;
-    } = {}
+    } = {},
   ): Promise<{ translated: string; confidence: number }> {
     const formalityNote = options.formal
       ? 'Use formal language appropriate for business presentations.'
       : '';
 
-    const contextNote = options.context
-      ? `Context: ${options.context}`
-      : '';
+    const contextNote = options.context ? `Context: ${options.context}` : '';
 
     const prompt = `Translate the following text to ${targetLanguage}:
 
@@ -255,7 +265,9 @@ Return JSON: { "translated": "...", "confidence": 0.0 }`;
         temperature: 0.3,
       });
 
-      const result = this.parseJsonResponse(response.choices[0].message.content || '{}');
+      const result = this.parseJsonResponse(
+        response.choices[0].message.content || '{}',
+      );
       return {
         translated: result.translated || text,
         confidence: result.confidence || 0.5,
@@ -267,7 +279,7 @@ Return JSON: { "translated": "...", "confidence": 0.0 }`;
 
   async createMultilingualPresentation(
     slides: any[],
-    targetLanguages: string[]
+    targetLanguages: string[],
   ): Promise<Map<string, TranslationResult>> {
     const results = new Map<string, TranslationResult>();
 
@@ -281,7 +293,7 @@ Return JSON: { "translated": "...", "confidence": 0.0 }`;
 
   async suggestLocalizationImprovements(
     slides: any[],
-    targetLanguage: string
+    targetLanguage: string,
   ): Promise<{
     suggestions: {
       slideId: string;
@@ -321,7 +333,9 @@ Return JSON:
         temperature: 0.5,
       });
 
-      return this.parseJsonResponse(response.choices[0].message.content || '{ "suggestions": [] }');
+      return this.parseJsonResponse(
+        response.choices[0].message.content || '{ "suggestions": [] }',
+      );
     } catch {
       return { suggestions: [] };
     }
@@ -344,7 +358,7 @@ Return JSON:
 
   private extractTextElements(
     content: any,
-    path: string[] = []
+    path: string[] = [],
   ): { path: string[]; text: string }[] {
     const elements: { path: string[]; text: string }[] = [];
 
@@ -352,7 +366,9 @@ Return JSON:
       elements.push({ path, text: content });
     } else if (Array.isArray(content)) {
       content.forEach((item, index) => {
-        elements.push(...this.extractTextElements(item, [...path, String(index)]));
+        elements.push(
+          ...this.extractTextElements(item, [...path, String(index)]),
+        );
       });
     } else if (typeof content === 'object' && content !== null) {
       for (const [key, value] of Object.entries(content)) {
@@ -370,11 +386,15 @@ Return JSON:
   private applyTranslations(
     originalContent: any,
     originalElements: { path: string[]; text: string }[],
-    translatedElements: { path: string[]; text: string }[]
+    translatedElements: { path: string[]; text: string }[],
   ): any {
     const content = JSON.parse(JSON.stringify(originalContent));
 
-    for (let i = 0; i < originalElements.length && i < translatedElements.length; i++) {
+    for (
+      let i = 0;
+      i < originalElements.length && i < translatedElements.length;
+      i++
+    ) {
       const { path } = originalElements[i];
       const { text: translatedText } = translatedElements[i];
 

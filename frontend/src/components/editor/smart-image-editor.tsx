@@ -139,18 +139,17 @@ export function SmartImageEditor({ imageUrl, isOpen, onClose, onSave }: ImageEdi
   const [brushColor, setBrushColor] = useState('#000000');
   const [brushSize, setBrushSize] = useState(5);
 
-  // Load image
-  useEffect(() => {
-    if (!imageUrl) return;
+  const saveToHistory = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      setImage(img);
-      initCanvas(img);
-    };
-    img.src = imageUrl;
-  }, [imageUrl]);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    setHistory((prev) => [...prev.slice(0, historyIndex + 1), imageData]);
+    setHistoryIndex((prev) => prev + 1);
+  }, [historyIndex]);
 
   const initCanvas = useCallback((img: HTMLImageElement) => {
     const canvas = canvasRef.current;
@@ -165,19 +164,20 @@ export function SmartImageEditor({ imageUrl, isOpen, onClose, onSave }: ImageEdi
 
     // Save initial state
     saveToHistory();
-  }, []);
+  }, [saveToHistory]);
 
-  const saveToHistory = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+  // Load image
+  useEffect(() => {
+    if (!imageUrl) return;
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    setHistory((prev) => [...prev.slice(0, historyIndex + 1), imageData]);
-    setHistoryIndex((prev) => prev + 1);
-  }, [historyIndex]);
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      setImage(img);
+      initCanvas(img);
+    };
+    img.src = imageUrl;
+  }, [imageUrl, initCanvas]);
 
   const undo = useCallback(() => {
     if (historyIndex <= 0) return;
@@ -258,7 +258,7 @@ export function SmartImageEditor({ imageUrl, isOpen, onClose, onSave }: ImageEdi
       if (!isCropping || !cropArea || !containerRef.current) return;
 
       const rect = containerRef.current.getBoundingClientRect();
-      let width = e.clientX - rect.left - cropArea.x;
+      const width = e.clientX - rect.left - cropArea.x;
       let height = e.clientY - rect.top - cropArea.y;
 
       if (cropRatio) {
@@ -510,9 +510,8 @@ export function SmartImageEditor({ imageUrl, isOpen, onClose, onSave }: ImageEdi
                     {['top-left', 'top-right', 'bottom-left', 'bottom-right'].map((pos) => (
                       <div
                         key={pos}
-                        className={`absolute w-3 h-3 bg-white rounded-full ${
-                          pos.includes('top') ? 'top-0' : 'bottom-0'
-                        } ${pos.includes('left') ? 'left-0' : 'right-0'} -translate-x-1/2 -translate-y-1/2`}
+                        className={`absolute w-3 h-3 bg-white rounded-full ${pos.includes('top') ? 'top-0' : 'bottom-0'
+                          } ${pos.includes('left') ? 'left-0' : 'right-0'} -translate-x-1/2 -translate-y-1/2`}
                       />
                     ))}
                   </div>
@@ -707,11 +706,10 @@ export function SmartImageEditor({ imageUrl, isOpen, onClose, onSave }: ImageEdi
                         <button
                           key={filter.name}
                           onClick={() => applyFilter(filter)}
-                          className={`aspect-square rounded-lg overflow-hidden border-2 transition-colors ${
-                            selectedFilter.name === filter.name
+                          className={`aspect-square rounded-lg overflow-hidden border-2 transition-colors ${selectedFilter.name === filter.name
                               ? 'border-primary'
                               : 'border-transparent'
-                          }`}
+                            }`}
                         >
                           <div
                             className="w-full h-full bg-gradient-to-br from-slate-300 to-slate-500"

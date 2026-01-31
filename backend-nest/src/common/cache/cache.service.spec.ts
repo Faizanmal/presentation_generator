@@ -190,7 +190,9 @@ describe('CacheService', () => {
     });
 
     it('should generate correct user projects key', () => {
-      expect(service.userProjectsKey('user-456')).toBe('user:user-456:projects');
+      expect(service.userProjectsKey('user-456')).toBe(
+        'user:user-456:projects',
+      );
     });
 
     it('should generate correct themes key', () => {

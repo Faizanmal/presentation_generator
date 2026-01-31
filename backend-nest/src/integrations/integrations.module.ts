@@ -9,9 +9,16 @@ import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
   imports: [PrismaModule],
-  controllers: [IntegrationsController, AdvancedIntegrationsController, WebhooksController],
-  providers: [IntegrationsService, AdvancedIntegrationsService, WebhooksService],
+  controllers: [
+    IntegrationsController,
+    AdvancedIntegrationsController,
+    WebhooksController,
+  ],
+  providers: [
+    IntegrationsService,
+    AdvancedIntegrationsService,
+    WebhooksService,
+  ],
   exports: [IntegrationsService, AdvancedIntegrationsService, WebhooksService],
 })
 export class IntegrationsModule {}
-

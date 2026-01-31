@@ -70,6 +70,7 @@ export default function SlideCanvas({ projectId, slide, theme }: SlideCanvasProp
 
   // Handle block content change
   const handleBlockChange = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (blockId: string, content: any) => {
       updateBlock(slide.id, blockId, { content });
       updateBlockMutation.mutate({ blockId, data: { content } });

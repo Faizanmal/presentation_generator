@@ -39,15 +39,15 @@ export interface ChartData {
   options?: Record<string, any>;
 }
 
-export type LayoutType = 
-  | 'title' 
-  | 'title-content' 
-  | 'two-column' 
-  | 'image-left' 
-  | 'image-right' 
-  | 'image-full' 
-  | 'comparison' 
-  | 'timeline' 
+export type LayoutType =
+  | 'title'
+  | 'title-content'
+  | 'two-column'
+  | 'image-left'
+  | 'image-right'
+  | 'image-full'
+  | 'comparison'
+  | 'timeline'
   | 'quote-highlight'
   | 'stats-grid'
   | 'chart-focus';
@@ -211,10 +211,11 @@ AVAILABLE BLOCK TYPES:
 - "quote" - For impactful quotes or statistics
 - "numbered" - For numbered/ordered lists
 
-${isPresentation
-        ? 'For presentations: Keep each section focused on ONE key idea. Use bullet points for easy scanning. Limit content per slide.'
-        : 'For documents: Provide more detailed content. Use paragraphs for explanations. Structure with clear headings.'
-      }`;
+${
+  isPresentation
+    ? 'For presentations: Keep each section focused on ONE key idea. Use bullet points for easy scanning. Limit content per slide.'
+    : 'For documents: Provide more detailed content. Use paragraphs for explanations. Structure with clear headings.'
+}`;
   }
 
   /**
@@ -442,7 +443,9 @@ No text overlays, clean composition, high quality.`;
         throw new InternalServerErrorException('No image generated');
       }
 
-      this.logger.log(`Generated image for prompt: ${prompt.substring(0, 50)}...`);
+      this.logger.log(
+        `Generated image for prompt: ${prompt.substring(0, 50)}...`,
+      );
 
       return {
         url: imageData.url,
@@ -450,7 +453,9 @@ No text overlays, clean composition, high quality.`;
       };
     } catch (error) {
       this.logger.error('Image generation failed', error);
-      throw new InternalServerErrorException('Failed to generate image. Please try again.');
+      throw new InternalServerErrorException(
+        'Failed to generate image. Please try again.',
+      );
     }
   }
 
@@ -461,7 +466,7 @@ No text overlays, clean composition, high quality.`;
     sections: GeneratedSection[],
   ): Promise<Map<number, ImageGenerationResult>> {
     const imageMap = new Map<number, ImageGenerationResult>();
-    
+
     // Generate images for sections that have suggestedImage
     const imagePromises = sections
       .map((section, index) => ({ section, index }))
@@ -471,7 +476,10 @@ No text overlays, clean composition, high quality.`;
           const result = await this.generateImage(section.suggestedImage!);
           imageMap.set(index, result);
         } catch (error) {
-          this.logger.warn(`Failed to generate image for section ${index}`, error);
+          this.logger.warn(
+            `Failed to generate image for section ${index}`,
+            error,
+          );
         }
       });
 
@@ -499,12 +507,14 @@ No text overlays, clean composition, high quality.`;
       });
 
       const buffer = Buffer.from(await response.arrayBuffer());
-      
+
       // Estimate duration (roughly 150 words per minute)
       const wordCount = truncatedText.split(/\s+/).length;
-      const estimatedDuration = (wordCount / 150) * 60 / speed;
+      const estimatedDuration = ((wordCount / 150) * 60) / speed;
 
-      this.logger.log(`Generated narration: ${wordCount} words, ~${Math.round(estimatedDuration)}s`);
+      this.logger.log(
+        `Generated narration: ${wordCount} words, ~${Math.round(estimatedDuration)}s`,
+      );
 
       return {
         audioBuffer: buffer,
@@ -564,18 +574,20 @@ Return as JSON: { "notes": ["Note for slide 1", "Note for slide 2", ...] }`,
     heading: string,
   ): Promise<LayoutType> {
     // Analyze content to recommend layout
-    const hasImage = content.some(b => b.type === 'image');
-    const hasChart = content.some(b => b.type === 'chart');
-    const hasQuote = content.some(b => b.type === 'quote');
-    const bulletCount = content.filter(b => b.type === 'bullet').length;
-    const hasComparison = heading.toLowerCase().includes('vs') || 
-                          heading.toLowerCase().includes('comparison') ||
-                          heading.toLowerCase().includes('versus');
-    const hasTimeline = heading.toLowerCase().includes('timeline') ||
-                        heading.toLowerCase().includes('history') ||
-                        heading.toLowerCase().includes('roadmap');
-    const hasStats = content.some(b => 
-      b.content.match(/\d+%|\$[\d,]+|\d+\s*(million|billion|k)/i)
+    const hasImage = content.some((b) => b.type === 'image');
+    const hasChart = content.some((b) => b.type === 'chart');
+    const hasQuote = content.some((b) => b.type === 'quote');
+    const bulletCount = content.filter((b) => b.type === 'bullet').length;
+    const hasComparison =
+      heading.toLowerCase().includes('vs') ||
+      heading.toLowerCase().includes('comparison') ||
+      heading.toLowerCase().includes('versus');
+    const hasTimeline =
+      heading.toLowerCase().includes('timeline') ||
+      heading.toLowerCase().includes('history') ||
+      heading.toLowerCase().includes('roadmap');
+    const hasStats = content.some((b) =>
+      b.content.match(/\d+%|\$[\d,]+|\d+\s*(million|billion|k)/i),
     );
 
     // Priority-based layout selection
@@ -587,9 +599,12 @@ Return as JSON: { "notes": ["Note for slide 1", "Note for slide 2", ...] }`,
     if (hasImage && bulletCount > 2) return 'image-left';
     if (hasImage) return 'image-right';
     if (bulletCount >= 6) return 'two-column';
-    if (heading.toLowerCase().includes('introduction') || 
-        heading.toLowerCase().includes('welcome')) return 'title';
-    
+    if (
+      heading.toLowerCase().includes('introduction') ||
+      heading.toLowerCase().includes('welcome')
+    )
+      return 'title';
+
     return 'title-content';
   }
 
@@ -641,11 +656,13 @@ Generate realistic, plausible data that matches the description.`,
       return {
         type: chartType,
         labels: ['Q1', 'Q2', 'Q3', 'Q4'],
-        datasets: [{
-          label: 'Data',
-          data: [25, 35, 45, 55],
-          backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'],
-        }],
+        datasets: [
+          {
+            label: 'Data',
+            data: [25, 35, 45, 55],
+            backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'],
+          },
+        ],
       };
     }
   }
@@ -667,7 +684,13 @@ Generate realistic, plausible data that matches the description.`,
     } = params;
 
     const systemPrompt = this.buildAdvancedSystemPrompt(type);
-    const userPrompt = this.buildAdvancedUserPrompt(topic, tone, audience, length, type);
+    const userPrompt = this.buildAdvancedUserPrompt(
+      topic,
+      tone,
+      audience,
+      length,
+      type,
+    );
 
     try {
       const response = await this.openai.chat.completions.create({
@@ -692,7 +715,10 @@ Generate realistic, plausible data that matches the description.`,
       if (smartLayout) {
         for (const section of parsed.sections) {
           if (!section.layout) {
-            section.layout = await this.recommendLayout(section.blocks, section.heading);
+            section.layout = await this.recommendLayout(
+              section.blocks,
+              section.heading,
+            );
           }
         }
       }
@@ -711,15 +737,23 @@ Generate realistic, plausible data that matches the description.`,
       }
 
       // Log generation
-      await this.logGeneration(params, parsed, response.usage?.total_tokens || 0);
+      await this.logGeneration(
+        params,
+        parsed,
+        response.usage?.total_tokens || 0,
+      );
 
-      this.logger.log(`Generated advanced ${type} with ${parsed.sections.length} sections`);
+      this.logger.log(
+        `Generated advanced ${type} with ${parsed.sections.length} sections`,
+      );
 
       return parsed;
     } catch (error) {
       this.logger.error('Advanced AI generation failed', error);
       if (error instanceof BadRequestException) throw error;
-      throw new InternalServerErrorException('Failed to generate content. Please try again.');
+      throw new InternalServerErrorException(
+        'Failed to generate content. Please try again.',
+      );
     }
   }
 
@@ -819,26 +853,30 @@ Generate the complete ${type} with all metadata.`;
       parsed = JSON.parse(content);
     } catch {
       this.logger.error('Failed to parse advanced AI response', content);
-      throw new BadRequestException('AI generated invalid content. Please try again.');
+      throw new BadRequestException(
+        'AI generated invalid content. Please try again.',
+      );
     }
 
     if (!parsed.title || !Array.isArray(parsed.sections)) {
       throw new BadRequestException('Invalid presentation structure');
     }
 
-    const sections: GeneratedSection[] = parsed.sections.map((section: any) => ({
-      heading: section.heading || 'Untitled',
-      layout: section.layout || 'title-content',
-      suggestedImage: section.suggestedImage,
-      speakerNotes: section.speakerNotes,
-      blocks: (section.blocks || []).map((block: any) => ({
-        type: block.type || 'paragraph',
-        content: block.content || '',
-        chartData: block.chartData,
-        embedUrl: block.embedUrl,
-        embedType: block.embedType,
-      })),
-    }));
+    const sections: GeneratedSection[] = parsed.sections.map(
+      (section: any) => ({
+        heading: section.heading || 'Untitled',
+        layout: section.layout || 'title-content',
+        suggestedImage: section.suggestedImage,
+        speakerNotes: section.speakerNotes,
+        blocks: (section.blocks || []).map((block: any) => ({
+          type: block.type || 'paragraph',
+          content: block.content || '',
+          chartData: block.chartData,
+          embedUrl: block.embedUrl,
+          embedType: block.embedType,
+        })),
+      }),
+    );
 
     return {
       title: parsed.title,
@@ -860,7 +898,11 @@ Generate the complete ${type} with all metadata.`;
     averageDuration: number;
     completionRate: number;
     dropOffSlide: number | null;
-    topSlides: Array<{ slideIndex: number; averageDuration: number; viewCount: number }>;
+    topSlides: Array<{
+      slideIndex: number;
+      averageDuration: number;
+      viewCount: number;
+    }>;
     totalSlides: number;
   }): Promise<AIInsight[]> {
     try {
@@ -967,7 +1009,9 @@ Use the advanced presentation JSON format with layouts and image suggestions.`,
 
       const content = response.choices[0]?.message?.content;
       if (!content) {
-        throw new InternalServerErrorException('Failed to extract document content');
+        throw new InternalServerErrorException(
+          'Failed to extract document content',
+        );
       }
 
       return this.parseAdvancedResponse(content);

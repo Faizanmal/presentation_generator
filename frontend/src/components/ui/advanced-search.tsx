@@ -1,17 +1,15 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
-    Search,
-    Clock,
-    FileText,
-    Sparkles,
     Loader2,
     SlidersHorizontal,
     X,
-    Calendar,
-    User,
+    Search,
+    Clock,
+    FileText,
 } from "lucide-react";
+import { Slide, Block } from "@/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,7 +30,6 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useRouter } from "next/navigation";
 import { useDebounce } from "@/hooks/use-debounce";
-import { cn } from "@/lib/utils";
 
 interface SearchResult {
     id: string;
@@ -49,7 +46,7 @@ interface SearchResult {
 interface AdvancedSearchProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    projects: { id: string; title: string; updatedAt: string; slides?: any[] }[];
+    projects: { id: string; title: string; updatedAt: string; slides?: Slide[] }[];
 }
 
 type SortOption = "relevance" | "recent" | "oldest" | "title";
@@ -76,7 +73,9 @@ export function AdvancedSearch({
         if (open) {
             setTimeout(() => inputRef.current?.focus(), 100);
         } else {
+
             setQuery("");
+
             setResults([]);
         }
     }, [open]);
@@ -84,6 +83,7 @@ export function AdvancedSearch({
     // Perform search
     useEffect(() => {
         if (!debouncedQuery.trim()) {
+
             setResults([]);
             return;
         }

@@ -1,16 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Star, Clock, FileText, MoreVertical, ExternalLink, Trash2 } from "lucide-react";
+// import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Star, Clock, FileText, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -61,6 +55,7 @@ export function useFavorites() {
     const [favorites, setFavorites] = useState<string[]>([]);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setFavorites(getFavoritesFromStorage());
     }, []);
 
@@ -84,6 +79,7 @@ export function useRecentProjects() {
     const [recent, setRecent] = useState<{ id: string; visitedAt: string }[]>([]);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setRecent(getRecentFromStorage());
     }, []);
 
@@ -338,11 +334,9 @@ function ProjectQuickLink({
 export function FavoritesBar({
     projects,
     favorites,
-    onToggleFavorite,
 }: {
     projects: Project[];
     favorites: string[];
-    onToggleFavorite: (projectId: string) => void;
 }) {
     const favoriteProjects = favorites
         .map((id) => projects.find((p) => p.id === id))

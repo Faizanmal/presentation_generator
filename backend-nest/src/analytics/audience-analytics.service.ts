@@ -23,7 +23,12 @@ export interface AudienceInsights {
   locationBreakdown: { location: string; count: number; percentage: number }[];
   slideEngagement: SlideEngagement[];
   viewerTimeline: { date: string; views: number }[];
-  interactionHotspots: { slideId: string; x: number; y: number; count: number }[];
+  interactionHotspots: {
+    slideId: string;
+    x: number;
+    y: number;
+    count: number;
+  }[];
 }
 
 export interface SlideEngagement {
@@ -79,24 +84,27 @@ export class AudienceAnalyticsService {
       startDate?: Date;
       endDate?: Date;
       granularity?: 'hour' | 'day' | 'week' | 'month';
-    } = {}
+    } = {},
   ): Promise<AudienceInsights> {
     const events = this.events.filter(
       (e) =>
         e.projectId === projectId &&
         (!options.startDate || e.timestamp >= options.startDate) &&
-        (!options.endDate || e.timestamp <= options.endDate)
+        (!options.endDate || e.timestamp <= options.endDate),
     );
 
-    const sessions = Array.from(this.sessions.values()).filter(
-      (s) => events.some((e) => e.sessionId === s.sessionId)
+    const sessions = Array.from(this.sessions.values()).filter((s) =>
+      events.some((e) => e.sessionId === s.sessionId),
     );
 
-    const uniqueViewers = new Set(events.filter((e) => e.userId).map((e) => e.userId)).size;
+    const uniqueViewers = new Set(
+      events.filter((e) => e.userId).map((e) => e.userId),
+    ).size;
     const totalViews = sessions.length;
 
     const completedSessions = sessions.filter((s) => s.completed);
-    const completionRate = totalViews > 0 ? completedSessions.length / totalViews : 0;
+    const completionRate =
+      totalViews > 0 ? completedSessions.length / totalViews : 0;
 
     const totalDuration = sessions.reduce((sum, s) => sum + s.totalDuration, 0);
     const averageViewDuration = totalViews > 0 ? totalDuration / totalViews : 0;
@@ -107,11 +115,13 @@ export class AudienceAnalyticsService {
       const device = this.parseDevice(session.userAgent);
       deviceCounts.set(device, (deviceCounts.get(device) || 0) + 1);
     }
-    const deviceBreakdown = Array.from(deviceCounts.entries()).map(([device, count]) => ({
-      device,
-      count,
-      percentage: (count / totalViews) * 100,
-    }));
+    const deviceBreakdown = Array.from(deviceCounts.entries()).map(
+      ([device, count]) => ({
+        device,
+        count,
+        percentage: (count / totalViews) * 100,
+      }),
+    );
 
     // Location breakdown
     const locationCounts = new Map<string, number>();
@@ -129,7 +139,11 @@ export class AudienceAnalyticsService {
       .slice(0, 10);
 
     // Slide engagement
-    const slideEngagement = await this.calculateSlideEngagement(projectId, events, sessions);
+    const slideEngagement = await this.calculateSlideEngagement(
+      projectId,
+      events,
+      sessions,
+    );
 
     // Drop-off analysis
     const dropOffSlide = this.findDropOffSlide(slideEngagement);
@@ -138,7 +152,10 @@ export class AudienceAnalyticsService {
     const peakViewingTime = this.calculatePeakViewingTime(events);
 
     // Timeline
-    const viewerTimeline = this.calculateTimeline(sessions, options.granularity || 'day');
+    const viewerTimeline = this.calculateTimeline(
+      sessions,
+      options.granularity || 'day',
+    );
 
     // Interaction hotspots
     const interactionHotspots = this.calculateInteractionHotspots(events);
@@ -160,17 +177,20 @@ export class AudienceAnalyticsService {
 
   async getSlideHeatmap(
     projectId: string,
-    slideId: string
+    slideId: string,
   ): Promise<{ x: number; y: number; intensity: number }[]> {
     const interactionEvents = this.events.filter(
       (e) =>
         e.projectId === projectId &&
         e.slideId === slideId &&
         e.eventType === 'interaction' &&
-        e.metadata?.x !== undefined
+        e.metadata?.x !== undefined,
     );
 
-    const heatmapData = new Map<string, { x: number; y: number; count: number }>();
+    const heatmapData = new Map<
+      string,
+      { x: number; y: number; count: number }
+    >();
 
     for (const event of interactionEvents) {
       const x = Math.round(event.metadata!.x / 10) * 10;
@@ -183,7 +203,10 @@ export class AudienceAnalyticsService {
       heatmapData.get(key)!.count++;
     }
 
-    const maxCount = Math.max(...Array.from(heatmapData.values()).map((d) => d.count), 1);
+    const maxCount = Math.max(
+      ...Array.from(heatmapData.values()).map((d) => d.count),
+      1,
+    );
 
     return Array.from(heatmapData.values()).map((d) => ({
       x: d.x,
@@ -197,7 +220,7 @@ export class AudienceAnalyticsService {
     options: {
       limit?: number;
       offset?: number;
-    } = {}
+    } = {},
   ): Promise<{ sessions: ViewerSession[]; total: number }> {
     const projectEvents = this.events.filter((e) => e.projectId === projectId);
     const sessionIds = new Set(projectEvents.map((e) => e.sessionId));
@@ -218,10 +241,12 @@ export class AudienceAnalyticsService {
 
   async exportAnalytics(
     projectId: string,
-    format: 'csv' | 'json' | 'pdf'
+    format: 'csv' | 'json' | 'pdf',
   ): Promise<Buffer> {
     const insights = await this.getInsights(projectId);
-    const { sessions } = await this.getViewerSessions(projectId, { limit: 1000 });
+    const { sessions } = await this.getViewerSessions(projectId, {
+      limit: 1000,
+    });
 
     if (format === 'json') {
       return Buffer.from(JSON.stringify({ insights, sessions }, null, 2));
@@ -245,7 +270,7 @@ export class AudienceAnalyticsService {
           s.slidesViewed.length,
           s.completed,
           s.location || '',
-        ].join(',')
+        ].join(','),
       );
 
       return Buffer.from([headers, ...rows].join('\n'));
@@ -262,7 +287,7 @@ export class AudienceAnalyticsService {
     const recentThreshold = new Date(Date.now() - 5 * 60 * 1000); // 5 minutes
 
     const recentEvents = this.events.filter(
-      (e) => e.projectId === projectId && e.timestamp >= recentThreshold
+      (e) => e.projectId === projectId && e.timestamp >= recentThreshold,
     );
 
     const activeSessionIds = new Set(recentEvents.map((e) => e.sessionId));
@@ -334,7 +359,7 @@ export class AudienceAnalyticsService {
   private async calculateSlideEngagement(
     projectId: string,
     events: ViewEvent[],
-    sessions: ViewerSession[]
+    sessions: ViewerSession[],
   ): Promise<SlideEngagement[]> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
@@ -358,12 +383,16 @@ export class AudienceAnalyticsService {
       let dropOffRate = 0;
       if (nextSlide) {
         const nextSlideViews = new Set(
-          events.filter((e) => e.slideId === nextSlide.id).map((e) => e.sessionId)
+          events
+            .filter((e) => e.slideId === nextSlide.id)
+            .map((e) => e.sessionId),
         ).size;
         dropOffRate = views > 0 ? (views - nextSlideViews) / views : 0;
       }
 
-      const interactions = slideEvents.filter((e) => e.eventType === 'interaction').length;
+      const interactions = slideEvents.filter(
+        (e) => e.eventType === 'interaction',
+      ).length;
 
       return {
         slideId: slide.id,
@@ -406,7 +435,7 @@ export class AudienceAnalyticsService {
 
   private calculateTimeline(
     sessions: ViewerSession[],
-    granularity: 'hour' | 'day' | 'week' | 'month'
+    granularity: 'hour' | 'day' | 'week' | 'month',
   ): { date: string; views: number }[] {
     const dateCounts = new Map<string, number>();
 
@@ -440,9 +469,12 @@ export class AudienceAnalyticsService {
   }
 
   private calculateInteractionHotspots(
-    events: ViewEvent[]
+    events: ViewEvent[],
   ): { slideId: string; x: number; y: number; count: number }[] {
-    const hotspots = new Map<string, { slideId: string; x: number; y: number; count: number }>();
+    const hotspots = new Map<
+      string,
+      { slideId: string; x: number; y: number; count: number }
+    >();
 
     for (const event of events) {
       if (

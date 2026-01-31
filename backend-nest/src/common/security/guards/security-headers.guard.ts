@@ -31,13 +31,13 @@ export class SecurityHeadersGuard implements CanActivate {
     response.setHeader(
       'Content-Security-Policy',
       "default-src 'self'; " +
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com; " +
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-      "img-src 'self' data: https: blob:; " +
-      "font-src 'self' https://fonts.gstatic.com; " +
-      "connect-src 'self' https://api.openai.com https://api.stripe.com wss:; " +
-      "frame-src 'self' https://js.stripe.com https://www.youtube.com https://player.vimeo.com; " +
-      "object-src 'none';",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com; " +
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+        "img-src 'self' data: https: blob:; " +
+        "font-src 'self' https://fonts.gstatic.com; " +
+        "connect-src 'self' https://api.openai.com https://api.stripe.com wss:; " +
+        "frame-src 'self' https://js.stripe.com https://www.youtube.com https://player.vimeo.com; " +
+        "object-src 'none';",
     );
 
     // Strict Transport Security (HTTPS only)

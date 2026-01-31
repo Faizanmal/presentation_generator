@@ -32,7 +32,7 @@ interface EmbedBlockProps {
     autoplay?: boolean;
     muted?: boolean;
   };
-  onChange?: (data: any) => void;
+  onChange?: (data: EmbedBlockProps['data']) => void;
   isEditable?: boolean;
   className?: string;
 }
@@ -116,15 +116,7 @@ export function EmbedBlock({
   const [showDialog, setShowDialog] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  useEffect(() => {
-    if (url) {
-      const detected = detectEmbedType(url);
-      if (detected) {
-        setEmbedType(detected.type);
-        setEmbedUrl(detected.embedUrl);
-      }
-    }
-  }, [url]);
+
 
   const handleUrlChange = (newUrl: string) => {
     setUrl(newUrl);

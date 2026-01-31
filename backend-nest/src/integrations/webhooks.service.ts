@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import * as crypto from 'crypto';
@@ -42,7 +47,7 @@ export const WEBHOOK_EVENTS = [
   'ai.generation.completed',
 ] as const;
 
-export type WebhookEvent = typeof WEBHOOK_EVENTS[number];
+export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 
 @Injectable()
 export class WebhooksService {
@@ -99,9 +104,13 @@ export class WebhooksService {
     }
 
     // Validate events
-    const invalidEvents = events.filter(e => !WEBHOOK_EVENTS.includes(e as WebhookEvent));
+    const invalidEvents = events.filter(
+      (e) => !WEBHOOK_EVENTS.includes(e as WebhookEvent),
+    );
     if (invalidEvents.length > 0) {
-      throw new BadRequestException(`Invalid events: ${invalidEvents.join(', ')}`);
+      throw new BadRequestException(
+        `Invalid events: ${invalidEvents.join(', ')}`,
+      );
     }
 
     // Generate secret if not provided
@@ -155,10 +164,12 @@ export class WebhooksService {
     // Validate events if provided
     if (updates.events) {
       const invalidEvents = updates.events.filter(
-        e => !WEBHOOK_EVENTS.includes(e as WebhookEvent),
+        (e) => !WEBHOOK_EVENTS.includes(e as WebhookEvent),
       );
       if (invalidEvents.length > 0) {
-        throw new BadRequestException(`Invalid events: ${invalidEvents.join(', ')}`);
+        throw new BadRequestException(
+          `Invalid events: ${invalidEvents.join(', ')}`,
+        );
       }
     }
 
@@ -195,7 +206,12 @@ export class WebhooksService {
   async testWebhook(
     userId: string,
     webhookId: string,
-  ): Promise<{ success: boolean; statusCode?: number; response?: string; error?: string }> {
+  ): Promise<{
+    success: boolean;
+    statusCode?: number;
+    response?: string;
+    error?: string;
+  }> {
     const webhook = await this.getWebhook(userId, webhookId);
 
     const testPayload: WebhookPayload = {
@@ -253,8 +269,8 @@ export class WebhooksService {
 
     // Fire webhooks in parallel but don't block
     Promise.all(
-      webhooks.map(webhook => this.deliverWebhook(webhook, payload)),
-    ).catch(error => {
+      webhooks.map((webhook) => this.deliverWebhook(webhook, payload)),
+    ).catch((error) => {
       this.logger.error('Error delivering webhooks', error);
     });
   }
@@ -270,7 +286,10 @@ export class WebhooksService {
 
     for (let attempt = 0; attempt < this.maxRetries; attempt++) {
       try {
-        const result = await this.sendWebhook(this.mapWebhook(webhook), payload);
+        const result = await this.sendWebhook(
+          this.mapWebhook(webhook),
+          payload,
+        );
 
         if (result.success) {
           // Reset failure count on success
@@ -291,13 +310,17 @@ export class WebhooksService {
 
         // Wait before retry
         if (attempt < this.maxRetries - 1) {
-          await new Promise(resolve => setTimeout(resolve, this.retryDelay * (attempt + 1)));
+          await new Promise((resolve) =>
+            setTimeout(resolve, this.retryDelay * (attempt + 1)),
+          );
         }
       }
     }
 
     // All retries failed
-    this.logger.error(`Webhook ${webhook.id} delivery failed after ${this.maxRetries} attempts`);
+    this.logger.error(
+      `Webhook ${webhook.id} delivery failed after ${this.maxRetries} attempts`,
+    );
 
     // Increment failure count
     const updatedWebhook = await this.prisma.webhook.update({
@@ -314,7 +337,9 @@ export class WebhooksService {
         where: { id: webhook.id },
         data: { active: false },
       });
-      this.logger.warn(`Webhook ${webhook.id} disabled due to repeated failures`);
+      this.logger.warn(
+        `Webhook ${webhook.id} disabled due to repeated failures`,
+      );
     }
 
     // Log the failure
@@ -361,18 +386,20 @@ export class WebhooksService {
           payload: payload as any,
           success,
           statusCode: response.status,
-          response: typeof response.data === 'string' 
-            ? response.data.substring(0, 1000) 
-            : JSON.stringify(response.data).substring(0, 1000),
+          response:
+            typeof response.data === 'string'
+              ? response.data.substring(0, 1000)
+              : JSON.stringify(response.data).substring(0, 1000),
         },
       });
 
       return {
         success,
         statusCode: response.status,
-        response: typeof response.data === 'string' 
-          ? response.data 
-          : JSON.stringify(response.data),
+        response:
+          typeof response.data === 'string'
+            ? response.data
+            : JSON.stringify(response.data),
       };
     } catch (error: any) {
       throw new Error(`Request failed: ${error.message}`);
@@ -383,10 +410,7 @@ export class WebhooksService {
    * Generate HMAC signature for webhook payload
    */
   private generateSignature(payload: string, secret: string): string {
-    return crypto
-      .createHmac('sha256', secret)
-      .update(payload)
-      .digest('hex');
+    return crypto.createHmac('sha256', secret).update(payload).digest('hex');
   }
 
   /**

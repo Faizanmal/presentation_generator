@@ -45,7 +45,7 @@ interface ChartBlockProps {
     showLegend?: boolean;
     showGrid?: boolean;
   };
-  onChange?: (data: any) => void;
+  onChange?: (data: ChartBlockProps['data']) => void;
   isEditable?: boolean;
   className?: string;
 }
@@ -80,43 +80,6 @@ export function ChartBlock({
   const [showLegend, setShowLegend] = useState(data.showLegend ?? true);
   const [showGrid, setShowGrid] = useState(data.showGrid ?? true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  // Draw chart on canvas
-  const drawChart = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const width = canvas.width;
-    const height = canvas.height;
-    const padding = 40;
-
-    // Clear canvas
-    ctx.clearRect(0, 0, width, height);
-
-    // Draw based on chart type
-    switch (chartType) {
-      case 'bar':
-        drawBarChart(ctx, width, height, padding);
-        break;
-      case 'line':
-        drawLineChart(ctx, width, height, padding);
-        break;
-      case 'pie':
-        drawPieChart(ctx, width, height);
-        break;
-      case 'area':
-        drawAreaChart(ctx, width, height, padding);
-        break;
-    }
-
-    // Draw legend
-    if (showLegend) {
-      drawLegend(ctx, width, height);
-    }
-  }, [chartType, chartData, showLegend, showGrid]);
 
   const drawBarChart = (
     ctx: CanvasRenderingContext2D,
@@ -337,6 +300,43 @@ export function ChartBlock({
       legendX += ctx.measureText(point.label).width + 36;
     });
   };
+
+  // Draw chart on canvas
+  const drawChart = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const width = canvas.width;
+    const height = canvas.height;
+    const padding = 40;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, width, height);
+
+    // Draw based on chart type
+    switch (chartType) {
+      case 'bar':
+        drawBarChart(ctx, width, height, padding);
+        break;
+      case 'line':
+        drawLineChart(ctx, width, height, padding);
+        break;
+      case 'pie':
+        drawPieChart(ctx, width, height);
+        break;
+      case 'area':
+        drawAreaChart(ctx, width, height, padding);
+        break;
+    }
+
+    // Draw legend
+    if (showLegend) {
+      drawLegend(ctx, width, height);
+    }
+  }, [chartType, chartData, showLegend, showGrid]);
 
   useEffect(() => {
     drawChart();

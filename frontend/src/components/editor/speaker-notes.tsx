@@ -61,7 +61,7 @@ export function SpeakerNotesPanel({
     const aiGenerateMutation = useMutation({
         mutationFn: async () => {
             const response = await api.generateSpeakerNotes(slideContent);
-            return response.speakerNotes;
+            return response.notes;
         },
         onSuccess: (generatedNotes) => {
             setNotes(generatedNotes);

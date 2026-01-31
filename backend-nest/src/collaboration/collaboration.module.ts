@@ -21,7 +21,11 @@ import { PrismaModule } from '../prisma/prisma.module';
       }),
     }),
   ],
-  providers: [CollaborationGateway, CollaborationService, PresentationSchedulerService],
+  providers: [
+    CollaborationGateway,
+    CollaborationService,
+    PresentationSchedulerService,
+  ],
   controllers: [CollaborationController],
   exports: [CollaborationService, PresentationSchedulerService],
 })

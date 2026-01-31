@@ -78,7 +78,9 @@ export class SecurityService {
 
     for (const pattern of this.sqlInjectionPatterns) {
       if (pattern.test(input)) {
-        this.logger.warn(`SQL injection attempt detected: ${input.substring(0, 100)}`);
+        this.logger.warn(
+          `SQL injection attempt detected: ${input.substring(0, 100)}`,
+        );
         return true;
       }
     }
@@ -132,12 +134,12 @@ export class SecurityService {
     const key = this.getEncryptionKey();
     const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-    
+
     let encrypted = cipher.update(text, 'utf8', 'hex');
     encrypted += cipher.final('hex');
-    
+
     const authTag = cipher.getAuthTag();
-    
+
     return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
   }
 
@@ -147,16 +149,16 @@ export class SecurityService {
   decrypt(encryptedText: string): string {
     const key = this.getEncryptionKey();
     const [ivHex, authTagHex, encrypted] = encryptedText.split(':');
-    
+
     const iv = Buffer.from(ivHex, 'hex');
     const authTag = Buffer.from(authTagHex, 'hex');
     const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-    
+
     decipher.setAuthTag(authTag);
-    
+
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
-    
+
     return decrypted;
   }
 
@@ -223,7 +225,11 @@ export class SecurityService {
     }
 
     entry.count++;
-    return { allowed: true, remaining: limit - entry.count, resetAt: entry.resetAt };
+    return {
+      allowed: true,
+      remaining: limit - entry.count,
+      resetAt: entry.resetAt,
+    };
   }
 
   /**
@@ -317,7 +323,8 @@ export class SecurityService {
    * Check if IP is in blocklist
    */
   isBlockedIP(ip: string): boolean {
-    const blocklist = this.configService.get<string>('IP_BLOCKLIST')?.split(',') || [];
+    const blocklist =
+      this.configService.get<string>('IP_BLOCKLIST')?.split(',') || [];
     return blocklist.includes(ip);
   }
 
@@ -331,7 +338,9 @@ export class SecurityService {
       'http://localhost:3001',
     ].filter(Boolean);
 
-    return allowedOrigins.some((allowed) => origin?.startsWith(allowed as string));
+    return allowedOrigins.some((allowed) =>
+      origin?.startsWith(allowed as string),
+    );
   }
 
   // ============================================

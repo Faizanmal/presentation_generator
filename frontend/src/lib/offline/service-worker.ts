@@ -1,5 +1,4 @@
 /// <reference lib="webworker" />
-// @ts-ignore
 
 const CACHE_VERSION = 'v1';
 const STATIC_CACHE = `static-${CACHE_VERSION}`;
@@ -28,26 +27,32 @@ const CACHEABLE_ASSET_PATTERNS = [
   /\.(css|js)$/i,
 ];
 
-declare const self: ServiceWorkerGlobalScope;
+// TypeScript types for service worker events
+interface SyncEvent extends ExtendableEvent {
+  tag: string;
+}
+
+// Cast self to avoid type conflicts
+const sw = self as any;
 
 // Install event - cache static files
-self.addEventListener('install', (event) => {
+sw.addEventListener('install', (event: ExtendableEvent) => {
   console.log('[SW] Installing service worker...');
-  
+
   event.waitUntil(
     caches.open(STATIC_CACHE).then((cache) => {
       console.log('[SW] Caching static files');
       return cache.addAll(STATIC_FILES);
     }).then(() => {
-      return self.skipWaiting();
+      return sw.skipWaiting();
     })
   );
 });
 
 // Activate event - clean up old caches
-self.addEventListener('activate', (event) => {
+sw.addEventListener('activate', (event: ExtendableEvent) => {
   console.log('[SW] Activating service worker...');
-  
+
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -64,13 +69,13 @@ self.addEventListener('activate', (event) => {
         })
       );
     }).then(() => {
-      return self.clients.claim();
+      return sw.clients.claim();
     })
   );
 });
 
 // Fetch event - serve from cache or network
-self.addEventListener('fetch', (event) => {
+sw.addEventListener('fetch', (event: FetchEvent) => {
   const { request } = event;
   const url = new URL(request.url);
 
@@ -113,12 +118,12 @@ async function handleApiRequest(request: Request): Promise<Response> {
 
   try {
     const response = await fetch(request);
-    
+
     if (response.ok && isCacheable) {
       const cache = await caches.open(API_CACHE);
       cache.put(request, response.clone());
     }
-    
+
     return response;
   } catch (error) {
     // Network failed, try cache
@@ -126,7 +131,7 @@ async function handleApiRequest(request: Request): Promise<Response> {
     if (cached) {
       return cached;
     }
-    
+
     // Return offline response for API
     return new Response(
       JSON.stringify({ error: 'Offline', message: 'You are currently offline' }),
@@ -147,19 +152,19 @@ async function handleAssetRequest(request: Request): Promise<Response> {
 
   try {
     const response = await fetch(request);
-    
+
     if (response.ok) {
       const cache = await caches.open(ASSET_CACHE);
       cache.put(request, response.clone());
     }
-    
+
     return response;
   } catch {
     // Return placeholder for images
     if (request.url.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
       return createPlaceholderImage();
     }
-    
+
     return new Response('Asset not available offline', { status: 503 });
   }
 }
@@ -168,12 +173,12 @@ async function handleAssetRequest(request: Request): Promise<Response> {
 async function handleNavigationRequest(request: Request): Promise<Response> {
   try {
     const response = await fetch(request);
-    
+
     if (response.ok) {
       const cache = await caches.open(DYNAMIC_CACHE);
       cache.put(request, response.clone());
     }
-    
+
     return response;
   } catch {
     // Try cache
@@ -181,13 +186,13 @@ async function handleNavigationRequest(request: Request): Promise<Response> {
     if (cached) {
       return cached;
     }
-    
+
     // Return offline page
     const offlinePage = await caches.match('/offline');
     if (offlinePage) {
       return offlinePage;
     }
-    
+
     // Fallback offline response
     return new Response(
       `<!DOCTYPE html>
@@ -245,7 +250,7 @@ async function handleNavigationRequest(request: Request): Promise<Response> {
 // Handle static requests - Stale while revalidate
 async function handleStaticRequest(request: Request): Promise<Response> {
   const cached = await caches.match(request);
-  
+
   const fetchPromise = fetch(request).then((response) => {
     if (response.ok) {
       const cache = caches.open(STATIC_CACHE);
@@ -253,7 +258,7 @@ async function handleStaticRequest(request: Request): Promise<Response> {
     }
     return response;
   }).catch(() => cached || new Response('Not available', { status: 503 }));
-  
+
   return cached || fetchPromise;
 }
 
@@ -272,7 +277,7 @@ function createPlaceholderImage(): Response {
       </text>
     </svg>
   `;
-  
+
   return new Response(svg, {
     status: 200,
     headers: { 'Content-Type': 'image/svg+xml' },
@@ -280,7 +285,7 @@ function createPlaceholderImage(): Response {
 }
 
 // Background sync
-self.addEventListener('sync', (event: SyncEvent) => {
+sw.addEventListener('sync', (event: SyncEvent) => {
   if (event.tag === 'sync-presentations') {
     event.waitUntil(syncPresentations());
   }
@@ -288,8 +293,8 @@ self.addEventListener('sync', (event: SyncEvent) => {
 
 async function syncPresentations(): Promise<void> {
   // Notify the app to run sync
-  const clients = await self.clients.matchAll();
-  clients.forEach((client) => {
+  const clients = await sw.clients.matchAll();
+  clients.forEach((client: any) => {
     client.postMessage({
       type: 'SYNC_REQUIRED',
     });
@@ -297,30 +302,30 @@ async function syncPresentations(): Promise<void> {
 }
 
 // Push notifications
-self.addEventListener('push', (event: PushEvent) => {
+sw.addEventListener('push', (event: PushEvent) => {
   const data = event.data?.json() || {};
-  
-  const options: NotificationOptions = {
+
+  const options: any = {
     body: data.body || 'You have a notification',
     icon: '/icons/icon-192.png',
     badge: '/icons/badge-72.png',
     data: data.data,
     actions: data.actions || [],
   };
-  
+
   event.waitUntil(
-    self.registration.showNotification(data.title || 'Presentation Generator', options)
+    sw.registration.showNotification(data.title || 'Presentation Generator', options)
   );
 });
 
 // Notification click handler
-self.addEventListener('notificationclick', (event: NotificationEvent) => {
+sw.addEventListener('notificationclick', (event: NotificationEvent) => {
   event.notification.close();
-  
+
   const urlToOpen = event.notification.data?.url || '/';
-  
+
   event.waitUntil(
-    self.clients.matchAll({ type: 'window' }).then((clients) => {
+    sw.clients.matchAll({ type: 'window' }).then((clients: any) => {
       // Check if there's already a window open
       for (const client of clients) {
         if (client.url === urlToOpen && 'focus' in client) {
@@ -328,26 +333,26 @@ self.addEventListener('notificationclick', (event: NotificationEvent) => {
         }
       }
       // Open a new window
-      return self.clients.openWindow(urlToOpen);
+      return sw.clients.openWindow(urlToOpen);
     })
   );
 });
 
 // Message handler for communication with the app
-self.addEventListener('message', (event: ExtendableMessageEvent) => {
+sw.addEventListener('message', (event: ExtendableMessageEvent) => {
   const { type, payload } = event.data || {};
-  
+
   switch (type) {
     case 'SKIP_WAITING':
-      self.skipWaiting();
+      sw.skipWaiting();
       break;
-      
+
     case 'CACHE_URLS':
       caches.open(DYNAMIC_CACHE).then((cache) => {
         cache.addAll(payload.urls);
       });
       break;
-      
+
     case 'CLEAR_CACHE':
       caches.keys().then((cacheNames) => {
         Promise.all(cacheNames.map((name) => caches.delete(name)));
@@ -355,21 +360,3 @@ self.addEventListener('message', (event: ExtendableMessageEvent) => {
       break;
   }
 });
-
-// TypeScript types for service worker events
-interface SyncEvent extends ExtendableEvent {
-  tag: string;
-}
-
-interface PushEvent extends ExtendableEvent {
-  data: PushMessageData | null;
-}
-
-interface NotificationEvent extends ExtendableEvent {
-  notification: Notification;
-  action: string;
-}
-
-interface ExtendableMessageEvent extends ExtendableEvent {
-  data: { type: string; payload?: { urls?: string[] } };
-}

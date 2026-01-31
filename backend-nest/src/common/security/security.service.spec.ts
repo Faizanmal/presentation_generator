@@ -57,7 +57,9 @@ describe('SecurityService', () => {
     });
 
     it('should detect UNION injection', () => {
-      expect(service.detectSQLInjection("' UNION SELECT * FROM passwords--")).toBe(true);
+      expect(
+        service.detectSQLInjection("' UNION SELECT * FROM passwords--"),
+      ).toBe(true);
     });
 
     it('should detect comment injection', () => {
@@ -211,14 +213,18 @@ describe('SecurityService', () => {
       const result = service.validatePasswordStrength('Short1!');
 
       expect(result.valid).toBe(false);
-      expect(result.feedback).toContain('Password must be at least 8 characters');
+      expect(result.feedback).toContain(
+        'Password must be at least 8 characters',
+      );
     });
 
     it('should require mixed case', () => {
       const result = service.validatePasswordStrength('alllowercase123!');
 
       expect(result.valid).toBe(false);
-      expect(result.feedback).toContain('Password must contain uppercase letters');
+      expect(result.feedback).toContain(
+        'Password must contain uppercase letters',
+      );
     });
 
     it('should detect common patterns', () => {

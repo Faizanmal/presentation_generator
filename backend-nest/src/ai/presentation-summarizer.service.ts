@@ -70,7 +70,7 @@ export class PresentationSummarizerService {
 
   async summarizePresentation(
     presentation: PresentationData,
-    options: Partial<SummaryOptions> = {}
+    options: Partial<SummaryOptions> = {},
   ): Promise<PresentationSummary> {
     const defaultOptions: SummaryOptions = {
       style: 'executive',
@@ -108,7 +108,7 @@ export class PresentationSummarizerService {
 
     const audienceNotes = await this.generateAudienceNotes(
       presentationText,
-      defaultOptions.audience
+      defaultOptions.audience,
     );
 
     const outline = this.generateOutline(presentation);
@@ -161,7 +161,7 @@ export class PresentationSummarizerService {
 
   private async generateExecutiveSummary(
     text: string,
-    options: SummaryOptions
+    options: SummaryOptions,
   ): Promise<string> {
     const lengthGuide = {
       short: '2-3 sentences',
@@ -170,8 +170,10 @@ export class PresentationSummarizerService {
     };
 
     const styleGuide = {
-      executive: 'high-level, business-focused, emphasizing key outcomes and decisions',
-      detailed: 'comprehensive, covering all major points with supporting details',
+      executive:
+        'high-level, business-focused, emphasizing key outcomes and decisions',
+      detailed:
+        'comprehensive, covering all major points with supporting details',
       'bullet-points': 'structured as clear bullet points',
       narrative: 'flowing narrative style, telling a story',
     };
@@ -197,9 +199,10 @@ export class PresentationSummarizerService {
 
   private async extractKeyPoints(
     text: string,
-    options: SummaryOptions
+    options: SummaryOptions,
   ): Promise<string[]> {
-    const count = options.length === 'short' ? 3 : options.length === 'medium' ? 5 : 8;
+    const count =
+      options.length === 'short' ? 3 : options.length === 'medium' ? 5 : 8;
 
     const response = await this.openai.chat.completions.create({
       model: 'gpt-4o',
@@ -226,7 +229,7 @@ export class PresentationSummarizerService {
   }
 
   private async generateSlideOverviews(
-    slides: SlideContent[]
+    slides: SlideContent[],
   ): Promise<PresentationSummary['slideOverviews']> {
     const overviews: PresentationSummary['slideOverviews'] = [];
 
@@ -272,7 +275,9 @@ export class PresentationSummarizerService {
       });
 
       try {
-        const result = JSON.parse(response.choices[0]?.message?.content || '{}');
+        const result = JSON.parse(
+          response.choices[0]?.message?.content || '{}',
+        );
         overviews.push({
           slideNumber: i + 1,
           title: slide.title || `Slide ${i + 1}`,
@@ -320,7 +325,7 @@ export class PresentationSummarizerService {
 
   private async generateAudienceNotes(
     text: string,
-    audience: string
+    audience: string,
   ): Promise<string> {
     const response = await this.openai.chat.completions.create({
       model: 'gpt-4o',
@@ -369,7 +374,7 @@ export class PresentationSummarizerService {
 
   private async generateSocialPosts(
     title: string,
-    text: string
+    text: string,
   ): Promise<{ twitter: string; linkedin: string }> {
     const response = await this.openai.chat.completions.create({
       model: 'gpt-4o',
@@ -396,7 +401,7 @@ export class PresentationSummarizerService {
   }
 
   private async generateWordCloud(
-    text: string
+    text: string,
   ): Promise<Array<{ word: string; weight: number }>> {
     // Simple word frequency analysis
     const words = text
@@ -515,10 +520,13 @@ export class PresentationSummarizerService {
     return Math.ceil(words / wordsPerMinute);
   }
 
-  private assessComplexity(text: string): 'beginner' | 'intermediate' | 'advanced' {
+  private assessComplexity(
+    text: string,
+  ): 'beginner' | 'intermediate' | 'advanced' {
     // Simple heuristic based on average word length and sentence length
     const words = text.split(/\s+/);
-    const avgWordLength = words.reduce((sum, w) => sum + w.length, 0) / words.length;
+    const avgWordLength =
+      words.reduce((sum, w) => sum + w.length, 0) / words.length;
     const sentences = text.split(/[.!?]+/).length;
     const avgSentenceLength = words.length / sentences;
 

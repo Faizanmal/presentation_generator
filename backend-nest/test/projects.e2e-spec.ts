@@ -46,7 +46,9 @@ describe('Projects (e2e)', () => {
   afterAll(async () => {
     // Clean up test data
     if (testProjectId) {
-      await prisma.project.delete({ where: { id: testProjectId } }).catch(() => {});
+      await prisma.project
+        .delete({ where: { id: testProjectId } })
+        .catch(() => {});
     }
     if (testUserId) {
       await prisma.user.delete({ where: { id: testUserId } }).catch(() => {});
@@ -153,7 +155,9 @@ describe('Projects (e2e)', () => {
       expect(response.body.id).not.toBe(testProjectId);
 
       // Clean up duplicated project
-      await prisma.project.delete({ where: { id: response.body.id } }).catch(() => {});
+      await prisma.project
+        .delete({ where: { id: response.body.id } })
+        .catch(() => {});
     });
   });
 

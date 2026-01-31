@@ -56,6 +56,7 @@ export default function BlockToolbar({ projectId, slide }: BlockToolbarProps) {
 
   // Add block mutation
   const addBlockMutation = useMutation({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mutationFn: (data: { projectId: string; blockType: BlockType; content: any; order: number }) =>
       api.blocks.create(projectId, slide!.id, data),
     onSuccess: (newBlock) => {
@@ -70,6 +71,7 @@ export default function BlockToolbar({ projectId, slide }: BlockToolbarProps) {
     },
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleAddBlock = (type: BlockType, content: any) => {
     if (!slide) return;
     setIsAdding(true);
@@ -102,7 +104,7 @@ export default function BlockToolbar({ projectId, slide }: BlockToolbarProps) {
               {block.label}
             </DropdownMenuItem>
           ))}
-          
+
           <DropdownMenuSeparator />
           <div className="px-2 py-1.5 text-xs font-semibold text-slate-500">
             Lists
@@ -116,7 +118,7 @@ export default function BlockToolbar({ projectId, slide }: BlockToolbarProps) {
               {block.label}
             </DropdownMenuItem>
           ))}
-          
+
           <DropdownMenuSeparator />
           <div className="px-2 py-1.5 text-xs font-semibold text-slate-500">
             Media & Code
@@ -130,7 +132,7 @@ export default function BlockToolbar({ projectId, slide }: BlockToolbarProps) {
               {block.label}
             </DropdownMenuItem>
           ))}
-          
+
           <DropdownMenuSeparator />
           <div className="px-2 py-1.5 text-xs font-semibold text-slate-500">
             Layout

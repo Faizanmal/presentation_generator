@@ -71,13 +71,17 @@ describe('Collaboration (e2e)', () => {
   afterAll(async () => {
     // Clean up test data
     if (testProjectId) {
-      await prisma.project.delete({ where: { id: testProjectId } }).catch(() => {});
+      await prisma.project
+        .delete({ where: { id: testProjectId } })
+        .catch(() => {});
     }
     if (testUserId) {
       await prisma.user.delete({ where: { id: testUserId } }).catch(() => {});
     }
     if (collaboratorUserId) {
-      await prisma.user.delete({ where: { id: collaboratorUserId } }).catch(() => {});
+      await prisma.user
+        .delete({ where: { id: collaboratorUserId } })
+        .catch(() => {});
     }
     await app.close();
   });
@@ -139,7 +143,9 @@ describe('Collaboration (e2e)', () => {
     describe('PATCH /api/collaboration/:projectId/collaborators/:id', () => {
       it('should update collaborator role', async () => {
         const response = await request(app.getHttpServer())
-          .patch(`/api/collaboration/${testProjectId}/collaborators/${collaboratorId}`)
+          .patch(
+            `/api/collaboration/${testProjectId}/collaborators/${collaboratorId}`,
+          )
           .set('Authorization', `Bearer ${authToken}`)
           .send({
             role: 'VIEWER',
@@ -153,7 +159,9 @@ describe('Collaboration (e2e)', () => {
     describe('DELETE /api/collaboration/:projectId/collaborators/:id', () => {
       it('should remove collaborator', async () => {
         await request(app.getHttpServer())
-          .delete(`/api/collaboration/${testProjectId}/collaborators/${collaboratorId}`)
+          .delete(
+            `/api/collaboration/${testProjectId}/collaborators/${collaboratorId}`,
+          )
           .set('Authorization', `Bearer ${authToken}`)
           .expect(200);
       });
@@ -194,7 +202,9 @@ describe('Collaboration (e2e)', () => {
     describe('POST /api/collaboration/:projectId/comments/:id/resolve', () => {
       it('should resolve a comment', async () => {
         const response = await request(app.getHttpServer())
-          .post(`/api/collaboration/${testProjectId}/comments/${commentId}/resolve`)
+          .post(
+            `/api/collaboration/${testProjectId}/comments/${commentId}/resolve`,
+          )
           .set('Authorization', `Bearer ${authToken}`)
           .expect(200);
 

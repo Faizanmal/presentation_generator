@@ -24,7 +24,15 @@ class SpeakerNotesDto {
 
 class TransformTextDto {
   text: string;
-  action: 'shorten' | 'expand' | 'simplify' | 'professional' | 'casual' | 'academic' | 'persuasive' | 'fix-grammar';
+  action:
+    | 'shorten'
+    | 'expand'
+    | 'simplify'
+    | 'professional'
+    | 'casual'
+    | 'academic'
+    | 'persuasive'
+    | 'fix-grammar';
 }
 
 class BatchEnhanceDto {
@@ -43,7 +51,7 @@ export class AIController {
   constructor(
     private readonly aiService: AIService,
     private readonly usersService: UsersService,
-  ) { }
+  ) {}
 
   /**
    * Enhance content using AI
@@ -91,7 +99,10 @@ export class AIController {
 4. Be conversational but professional
 ${body.context ? `Context: ${body.context}` : ''}`;
 
-    const notes = await this.aiService.enhanceContent(body.slideContent, instruction);
+    const notes = await this.aiService.enhanceContent(
+      body.slideContent,
+      instruction,
+    );
     await this.usersService.incrementAIGenerations(user.id);
 
     return { speakerNotes: notes };
@@ -112,18 +123,28 @@ ${body.context ? `Context: ${body.context}` : ''}`;
     }
 
     const instructions: Record<string, string> = {
-      shorten: 'Make this text shorter and more concise while keeping the key message intact. Remove unnecessary words.',
-      expand: 'Expand this text with more details, examples, and explanations while maintaining the original message.',
-      simplify: 'Simplify this text to make it easier to understand for a general audience. Use simpler words and shorter sentences.',
-      professional: 'Rewrite this text in a professional, business-appropriate tone suitable for corporate presentations.',
+      shorten:
+        'Make this text shorter and more concise while keeping the key message intact. Remove unnecessary words.',
+      expand:
+        'Expand this text with more details, examples, and explanations while maintaining the original message.',
+      simplify:
+        'Simplify this text to make it easier to understand for a general audience. Use simpler words and shorter sentences.',
+      professional:
+        'Rewrite this text in a professional, business-appropriate tone suitable for corporate presentations.',
       casual: 'Rewrite this text in a casual, friendly, and approachable tone.',
-      academic: 'Rewrite this text in an academic, scholarly tone with formal language.',
-      persuasive: 'Rewrite this text to be more persuasive, compelling, and action-oriented.',
-      'fix-grammar': 'Fix any grammar, spelling, punctuation, and syntax errors in this text while preserving the original meaning.',
+      academic:
+        'Rewrite this text in an academic, scholarly tone with formal language.',
+      persuasive:
+        'Rewrite this text to be more persuasive, compelling, and action-oriented.',
+      'fix-grammar':
+        'Fix any grammar, spelling, punctuation, and syntax errors in this text while preserving the original meaning.',
     };
 
     const instruction = instructions[body.action] || 'Improve this text';
-    const transformed = await this.aiService.enhanceContent(body.text, instruction);
+    const transformed = await this.aiService.enhanceContent(
+      body.text,
+      instruction,
+    );
     await this.usersService.incrementAIGenerations(user.id);
 
     return { text: transformed, action: body.action };
@@ -150,7 +171,10 @@ ${body.context ? `Context: ${body.context}` : ''}`;
     const results = await Promise.all(
       body.items.map(async (item) => {
         try {
-          const enhanced = await this.aiService.enhanceContent(item.content, body.instruction);
+          const enhanced = await this.aiService.enhanceContent(
+            item.content,
+            body.instruction,
+          );
           return { id: item.id, content: enhanced, success: true };
         } catch {
           return { id: item.id, content: item.content, success: false };
@@ -185,7 +209,10 @@ ${body.context ? `Context: ${body.context}` : ''}`;
 ${body.slideType ? `This is a ${body.slideType} slide.` : ''}
 Return suggestions as a numbered list.`;
 
-    const suggestions = await this.aiService.enhanceContent(body.currentContent, instruction);
+    const suggestions = await this.aiService.enhanceContent(
+      body.currentContent,
+      instruction,
+    );
     await this.usersService.incrementAIGenerations(user.id);
 
     return { suggestions };
@@ -232,7 +259,12 @@ Format as a numbered list with clear structure.`;
   @HttpCode(HttpStatus.OK)
   async generateImage(
     @CurrentUser() user: { id: string },
-    @Body() body: { prompt: string; style?: 'vivid' | 'natural'; size?: '1024x1024' | '1792x1024' | '1024x1792' },
+    @Body()
+    body: {
+      prompt: string;
+      style?: 'vivid' | 'natural';
+      size?: '1024x1024' | '1792x1024' | '1024x1792';
+    },
   ) {
     const canGenerate = await this.usersService.canGenerateAI(user.id);
     if (!canGenerate) {
@@ -244,7 +276,7 @@ Format as a numbered list with clear structure.`;
       body.style || 'vivid',
       body.size || '1792x1024',
     );
-    
+
     await this.usersService.incrementAIGenerations(user.id, 5); // Image generation costs more
 
     return result;
@@ -257,7 +289,12 @@ Format as a numbered list with clear structure.`;
   @HttpCode(HttpStatus.OK)
   async generateNarration(
     @CurrentUser() user: { id: string },
-    @Body() body: { text: string; voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer'; speed?: number },
+    @Body()
+    body: {
+      text: string;
+      voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+      speed?: number;
+    },
   ) {
     const canGenerate = await this.usersService.canGenerateAI(user.id);
     if (!canGenerate) {
@@ -269,7 +306,7 @@ Format as a numbered list with clear structure.`;
       body.voice || 'nova',
       body.speed || 1.0,
     );
-    
+
     await this.usersService.incrementAIGenerations(user.id, 3);
 
     return {
@@ -286,7 +323,11 @@ Format as a numbered list with clear structure.`;
   @HttpCode(HttpStatus.OK)
   async generateChart(
     @CurrentUser() user: { id: string },
-    @Body() body: { description: string; chartType?: 'bar' | 'line' | 'pie' | 'doughnut' | 'radar' | 'scatter' },
+    @Body()
+    body: {
+      description: string;
+      chartType?: 'bar' | 'line' | 'pie' | 'doughnut' | 'radar' | 'scatter';
+    },
   ) {
     const canGenerate = await this.usersService.canGenerateAI(user.id);
     if (!canGenerate) {
@@ -297,7 +338,7 @@ Format as a numbered list with clear structure.`;
       body.description,
       body.chartType || 'bar',
     );
-    
+
     await this.usersService.incrementAIGenerations(user.id);
 
     return { chartData };
@@ -310,7 +351,8 @@ Format as a numbered list with clear structure.`;
   @HttpCode(HttpStatus.OK)
   async generateAdvancedPresentation(
     @CurrentUser() user: { id: string },
-    @Body() body: {
+    @Body()
+    body: {
       topic: string;
       tone?: string;
       audience?: string;
@@ -325,8 +367,9 @@ Format as a numbered list with clear structure.`;
       throw new ForbiddenException('AI generation limit reached');
     }
 
-    const presentation = await this.aiService.generateAdvancedPresentation(body);
-    
+    const presentation =
+      await this.aiService.generateAdvancedPresentation(body);
+
     // Advanced generation costs more
     const cost = body.generateImages ? 10 : 2;
     await this.usersService.incrementAIGenerations(user.id, cost);
@@ -348,7 +391,9 @@ Format as a numbered list with clear structure.`;
       throw new ForbiddenException('AI generation limit reached');
     }
 
-    const notes = await this.aiService.generateAllSpeakerNotes(body.presentation);
+    const notes = await this.aiService.generateAllSpeakerNotes(
+      body.presentation,
+    );
     await this.usersService.incrementAIGenerations(user.id, 2);
 
     return { notes };
@@ -361,7 +406,12 @@ Format as a numbered list with clear structure.`;
   @HttpCode(HttpStatus.OK)
   async translateContent(
     @CurrentUser() user: { id: string },
-    @Body() body: { content: string; targetLanguage: string; preserveFormatting?: boolean },
+    @Body()
+    body: {
+      content: string;
+      targetLanguage: string;
+      preserveFormatting?: boolean;
+    },
   ) {
     const canGenerate = await this.usersService.canGenerateAI(user.id);
     if (!canGenerate) {
@@ -373,7 +423,7 @@ Format as a numbered list with clear structure.`;
       body.targetLanguage,
       body.preserveFormatting ?? true,
     );
-    
+
     await this.usersService.incrementAIGenerations(user.id);
 
     return { translated, targetLanguage: body.targetLanguage };
@@ -397,7 +447,7 @@ Format as a numbered list with clear structure.`;
       body.documentText,
       body.targetSlides || 10,
     );
-    
+
     await this.usersService.incrementAIGenerations(user.id, 3);
 
     return presentation;
@@ -412,8 +462,10 @@ Format as a numbered list with clear structure.`;
     @CurrentUser() user: { id: string },
     @Body() body: { blocks: any[]; heading: string },
   ) {
-    const layout = await this.aiService.recommendLayout(body.blocks, body.heading);
+    const layout = await this.aiService.recommendLayout(
+      body.blocks,
+      body.heading,
+    );
     return { layout };
   }
 }
-

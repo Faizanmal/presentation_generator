@@ -19,7 +19,7 @@ interface BlockRendererProps {
   isActive: boolean;
   onFocus: () => void;
   onBlur: () => void;
-  onChange: (content: any) => void;
+  onChange: (content: Record<string, unknown>) => void;
   onDelete: () => void;
 }
 
@@ -278,9 +278,8 @@ export default function BlockRenderer({
                       }}
                       onFocus={onFocus}
                       onBlur={onBlur}
-                      className={`border p-2 outline-none ${
-                        rowIndex === 0 ? "font-semibold bg-slate-100 dark:bg-slate-800" : ""
-                      }`}
+                      className={`border p-2 outline-none ${rowIndex === 0 ? "font-semibold bg-slate-100 dark:bg-slate-800" : ""
+                        }`}
                       style={{
                         borderColor: theme?.colors?.secondary || "#e2e8f0",
                         fontFamily: theme?.fonts?.body || "system-ui",
@@ -321,11 +320,10 @@ export default function BlockRenderer({
     <div
       ref={setNodeRef}
       style={style}
-      className={`group relative rounded-lg transition-all ${
-        isActive
+      className={`group relative rounded-lg transition-all ${isActive
           ? "ring-2 ring-blue-500"
           : "hover:ring-1 hover:ring-slate-300"
-      } ${isDragging ? "opacity-50" : ""}`}
+        } ${isDragging ? "opacity-50" : ""}`}
     >
       {/* Controls */}
       <div className="absolute -left-8 top-1/2 -translate-y-1/2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

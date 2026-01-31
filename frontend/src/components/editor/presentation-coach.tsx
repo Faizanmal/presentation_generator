@@ -122,7 +122,7 @@ export function PresentationCoach({
         purpose,
       }),
     onSuccess: (data) => {
-      setAnalysis(data as PresentationAnalysis | null);
+      setAnalysis(data as unknown as PresentationAnalysis | null);
     },
   });
 

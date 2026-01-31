@@ -202,7 +202,9 @@ describe('ExportService', () => {
         ],
       };
 
-      mockPrismaService.project.findUnique.mockResolvedValue(projectWithLayouts);
+      mockPrismaService.project.findUnique.mockResolvedValue(
+        projectWithLayouts,
+      );
 
       const result = await service.exportToPPTX('project-1');
 
@@ -212,12 +214,12 @@ describe('ExportService', () => {
 
   describe('canExport', () => {
     it('should return true for users with valid subscription', async () => {
-      const result = await service.canExport('user-1', 'pdf');
+      const result = await service.canExport('user-1');
       expect(typeof result).toBe('boolean');
     });
 
     it('should check export limits', async () => {
-      const result = await service.canExport('user-1', 'pptx');
+      const result = await service.canExport('user-1');
       expect(typeof result).toBe('boolean');
     });
   });

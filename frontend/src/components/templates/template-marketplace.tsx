@@ -186,7 +186,7 @@ export function TemplateMarketplace() {
             <Grid3X3 className="h-4 w-4" />
             <span>All Templates</span>
           </button>
-          {categories?.map((category: TemplateCategory) => (
+          {categories?.data?.map((category: TemplateCategory) => (
             <button
               key={category.id}
               onClick={() => setSelectedCategory(category.slug)}
@@ -273,11 +273,11 @@ export function TemplateMarketplace() {
         <ScrollArea className="flex-1">
           <div className="p-4">
             {/* Featured Section */}
-            {!searchQuery && !selectedCategory && featuredTemplates?.length > 0 && (
+            {!searchQuery && !selectedCategory && featuredTemplates?.data?.length > 0 && (
               <div className="mb-8">
                 <h2 className="text-lg font-semibold mb-4">Featured Templates</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {featuredTemplates.slice(0, 3).map((template: TemplatePreview) => (
+                  {featuredTemplates!.data.slice(0, 3).map((template: TemplatePreview) => (
                     <Card
                       key={template.id}
                       className="cursor-pointer hover:shadow-lg transition-shadow overflow-hidden"
@@ -332,7 +332,7 @@ export function TemplateMarketplace() {
                 </div>
               ) : viewMode === 'grid' ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {templatesData?.templates?.map((template: TemplatePreview) => (
+                  {templatesData?.data?.templates?.map((template: TemplatePreview) => (
                     <Card
                       key={template.id}
                       className="cursor-pointer hover:shadow-lg transition-shadow overflow-hidden group"
@@ -368,7 +368,7 @@ export function TemplateMarketplace() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {templatesData?.templates?.map((template: TemplatePreview) => (
+                  {templatesData?.data?.templates?.map((template: TemplatePreview) => (
                     <Card
                       key={template.id}
                       className="cursor-pointer hover:shadow-md transition-shadow"
@@ -410,7 +410,7 @@ export function TemplateMarketplace() {
                 </div>
               )}
 
-              {templatesData?.templates?.length === 0 && (
+              {templatesData?.data?.templates?.length === 0 && (
                 <div className="text-center py-12">
                   <Search className="h-12 w-12 text-slate-300 mx-auto mb-4" />
                   <p className="text-slate-600">No templates found</p>

@@ -28,6 +28,7 @@ import {
   AlertCircle,
   Clock,
   Presentation,
+  FileText,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -195,7 +196,7 @@ export function OfflineModeManager({ onOpenPresentation }: OfflineModeManagerPro
                         onClick={() => onOpenPresentation?.(presentation.projectId)}
                       >
                         <div className="p-2 bg-muted rounded">
-                          <FilePresentation className="h-5 w-5" />
+                          <FileText className="h-5 w-5" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate">{presentation.name}</p>
@@ -246,7 +247,7 @@ export function OfflineModeManager({ onOpenPresentation }: OfflineModeManagerPro
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 rounded-lg bg-muted/50">
                     <div className="flex items-center gap-2 mb-2">
-                      <FilePresentation className="h-4 w-4 text-muted-foreground" />
+                      <FileText className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm text-muted-foreground">Presentations</span>
                     </div>
                     <p className="text-2xl font-bold">{storageStats.presentations}</p>

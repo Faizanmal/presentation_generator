@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface ColorPalette {
@@ -116,7 +121,10 @@ export class BrandKitService {
     return brandKit;
   }
 
-  async getBrandKits(userId: string, organizationId?: string): Promise<BrandKit[]> {
+  async getBrandKits(
+    userId: string,
+    organizationId?: string,
+  ): Promise<BrandKit[]> {
     // In production, fetch from database
     return [
       {
@@ -165,7 +173,7 @@ export class BrandKitService {
 
   async getBrandKitById(id: string): Promise<BrandKit> {
     const kits = await this.getBrandKits('');
-    const kit = kits.find(k => k.id === id);
+    const kit = kits.find((k) => k.id === id);
     if (!kit) {
       throw new NotFoundException('Brand kit not found');
     }
@@ -184,7 +192,7 @@ export class BrandKitService {
     }>,
   ): Promise<BrandKit> {
     const existing = await this.getBrandKitById(brandKitId);
-    
+
     if (existing.userId !== userId) {
       throw new ForbiddenException('Not authorized to update this brand kit');
     }
@@ -203,7 +211,7 @@ export class BrandKitService {
 
   async deleteBrandKit(userId: string, brandKitId: string): Promise<void> {
     const existing = await this.getBrandKitById(brandKitId);
-    
+
     if (existing.userId !== userId) {
       throw new ForbiddenException('Not authorized to delete this brand kit');
     }
@@ -234,7 +242,9 @@ export class BrandKitService {
   }
 
   async setDefaultBrandKit(userId: string, brandKitId: string): Promise<void> {
-    this.logger.log(`Set brand kit ${brandKitId} as default for user ${userId}`);
+    this.logger.log(
+      `Set brand kit ${brandKitId} as default for user ${userId}`,
+    );
   }
 
   async applyBrandKitToProject(
@@ -243,7 +253,7 @@ export class BrandKitService {
     brandKitId: string,
   ): Promise<void> {
     const brandKit = await this.getBrandKitById(brandKitId);
-    
+
     // Apply colors and typography to project theme
     // In production, this would update the project's theme settings
     this.logger.log(`Applied brand kit ${brandKitId} to project ${projectId}`);
@@ -266,34 +276,81 @@ export class BrandKitService {
     };
   }
 
-  async suggestFontPairings(primaryFont: string): Promise<Array<{
-    heading: string;
-    body: string;
-    description: string;
-  }>> {
-    const pairings: Record<string, Array<{ heading: string; body: string; description: string }>> = {
+  async suggestFontPairings(primaryFont: string): Promise<
+    Array<{
+      heading: string;
+      body: string;
+      description: string;
+    }>
+  > {
+    const pairings: Record<
+      string,
+      Array<{ heading: string; body: string; description: string }>
+    > = {
       Inter: [
         { heading: 'Inter', body: 'Inter', description: 'Clean and modern' },
-        { heading: 'Playfair Display', body: 'Inter', description: 'Elegant contrast' },
-        { heading: 'Space Grotesk', body: 'Inter', description: 'Tech-forward' },
+        {
+          heading: 'Playfair Display',
+          body: 'Inter',
+          description: 'Elegant contrast',
+        },
+        {
+          heading: 'Space Grotesk',
+          body: 'Inter',
+          description: 'Tech-forward',
+        },
       ],
       Roboto: [
-        { heading: 'Roboto', body: 'Roboto', description: 'Consistent and readable' },
-        { heading: 'Roboto Slab', body: 'Roboto', description: 'Professional mix' },
-        { heading: 'Poppins', body: 'Roboto', description: 'Friendly and modern' },
+        {
+          heading: 'Roboto',
+          body: 'Roboto',
+          description: 'Consistent and readable',
+        },
+        {
+          heading: 'Roboto Slab',
+          body: 'Roboto',
+          description: 'Professional mix',
+        },
+        {
+          heading: 'Poppins',
+          body: 'Roboto',
+          description: 'Friendly and modern',
+        },
       ],
       'Open Sans': [
-        { heading: 'Montserrat', body: 'Open Sans', description: 'Bold and clean' },
-        { heading: 'Open Sans', body: 'Open Sans', description: 'Highly readable' },
-        { heading: 'Raleway', body: 'Open Sans', description: 'Elegant simplicity' },
+        {
+          heading: 'Montserrat',
+          body: 'Open Sans',
+          description: 'Bold and clean',
+        },
+        {
+          heading: 'Open Sans',
+          body: 'Open Sans',
+          description: 'Highly readable',
+        },
+        {
+          heading: 'Raleway',
+          body: 'Open Sans',
+          description: 'Elegant simplicity',
+        },
       ],
     };
 
-    return pairings[primaryFont] || [
-      { heading: primaryFont, body: primaryFont, description: 'Unified style' },
-      { heading: 'Inter', body: primaryFont, description: 'Modern headings' },
-      { heading: 'Playfair Display', body: primaryFont, description: 'Classic touch' },
-    ];
+    return (
+      pairings[primaryFont] || [
+        {
+          heading: primaryFont,
+          body: primaryFont,
+          description: 'Unified style',
+        },
+        { heading: 'Inter', body: primaryFont, description: 'Modern headings' },
+        {
+          heading: 'Playfair Display',
+          body: primaryFont,
+          description: 'Classic touch',
+        },
+      ]
+    );
   }
 
   generateCSS(brandKit: BrandKit): string {

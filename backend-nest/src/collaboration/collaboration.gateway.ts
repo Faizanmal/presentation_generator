@@ -371,28 +371,34 @@ export class CollaborationGateway
   // ============================================
 
   // Store for active Q&A sessions and polls (in production, use Redis)
-  private qaQuestions: Map<string, Array<{
-    id: string;
-    question: string;
-    askedBy: string;
-    askedByName: string;
-    upvotes: number;
-    upvotedBy: string[];
-    answered: boolean;
-    timestamp: Date;
-  }>> = new Map();
+  private qaQuestions: Map<
+    string,
+    Array<{
+      id: string;
+      question: string;
+      askedBy: string;
+      askedByName: string;
+      upvotes: number;
+      upvotedBy: string[];
+      answered: boolean;
+      timestamp: Date;
+    }>
+  > = new Map();
 
-  private activePolls: Map<string, {
-    id: string;
-    projectId: string;
-    question: string;
-    options: Array<{ id: string; text: string; votes: number }>;
-    voters: string[];
-    createdBy: string;
-    isActive: boolean;
-    createdAt: Date;
-    endsAt?: Date;
-  }> = new Map();
+  private activePolls: Map<
+    string,
+    {
+      id: string;
+      projectId: string;
+      question: string;
+      options: Array<{ id: string; text: string; votes: number }>;
+      voters: string[];
+      createdBy: string;
+      isActive: boolean;
+      createdAt: Date;
+      endsAt?: Date;
+    }
+  > = new Map();
 
   @SubscribeMessage('qa:start')
   async handleQAStart(
@@ -412,7 +418,9 @@ export class CollaborationGateway
       timestamp: new Date(),
     });
 
-    this.logger.log(`Q&A started for project ${projectId} by ${client.data.userName}`);
+    this.logger.log(
+      `Q&A started for project ${projectId} by ${client.data.userName}`,
+    );
     return { success: true };
   }
 
@@ -425,7 +433,7 @@ export class CollaborationGateway
     if (!projectId || projectId !== data.projectId) return;
 
     const questions = this.qaQuestions.get(projectId) || [];
-    
+
     const newQuestion = {
       id: `q_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       question: data.question,
@@ -444,7 +452,9 @@ export class CollaborationGateway
       question: newQuestion,
     });
 
-    this.logger.log(`New question in ${projectId}: ${data.question.substring(0, 50)}...`);
+    this.logger.log(
+      `New question in ${projectId}: ${data.question.substring(0, 50)}...`,
+    );
     return { success: true, questionId: newQuestion.id };
   }
 
@@ -457,12 +467,12 @@ export class CollaborationGateway
     if (!projectId || projectId !== data.projectId) return;
 
     const questions = this.qaQuestions.get(projectId) || [];
-    const question = questions.find(q => q.id === data.questionId);
+    const question = questions.find((q) => q.id === data.questionId);
 
     if (question && !question.upvotedBy.includes(client.data.userId)) {
       question.upvotes++;
       question.upvotedBy.push(client.data.userId);
-      
+
       this.server.to(projectId).emit('qa:questionUpvoted', {
         questionId: data.questionId,
         upvotes: question.upvotes,
@@ -482,11 +492,11 @@ export class CollaborationGateway
     if (!projectId || projectId !== data.projectId) return;
 
     const questions = this.qaQuestions.get(projectId) || [];
-    const question = questions.find(q => q.id === data.questionId);
+    const question = questions.find((q) => q.id === data.questionId);
 
     if (question) {
       question.answered = true;
-      
+
       this.server.to(projectId).emit('qa:questionAnswered', {
         questionId: data.questionId,
         answeredBy: client.data.userName,
@@ -505,7 +515,7 @@ export class CollaborationGateway
     if (!projectId || projectId !== data.projectId) return;
 
     const questions = this.qaQuestions.get(projectId) || [];
-    
+
     // Sort by upvotes (most upvoted first), then by timestamp
     const sortedQuestions = [...questions].sort((a, b) => {
       if (b.upvotes !== a.upvotes) return b.upvotes - a.upvotes;
@@ -524,11 +534,11 @@ export class CollaborationGateway
     if (!projectId || projectId !== data.projectId) return;
 
     const questions = this.qaQuestions.get(projectId) || [];
-    
+
     this.server.to(projectId).emit('qa:ended', {
       endedBy: client.data.userName,
       totalQuestions: questions.length,
-      answeredQuestions: questions.filter(q => q.answered).length,
+      answeredQuestions: questions.filter((q) => q.answered).length,
     });
 
     // Optionally clear questions or archive them
@@ -541,10 +551,11 @@ export class CollaborationGateway
   @SubscribeMessage('poll:create')
   async handlePollCreate(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { 
-      projectId: string; 
-      question: string; 
-      options: string[]; 
+    @MessageBody()
+    data: {
+      projectId: string;
+      question: string;
+      options: string[];
       durationMinutes?: number;
     },
   ) {
@@ -552,7 +563,7 @@ export class CollaborationGateway
     if (!projectId || projectId !== data.projectId) return;
 
     const pollId = `poll_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     const poll = {
       id: pollId,
       projectId,
@@ -566,8 +577,8 @@ export class CollaborationGateway
       createdBy: client.data.userId,
       isActive: true,
       createdAt: new Date(),
-      endsAt: data.durationMinutes 
-        ? new Date(Date.now() + data.durationMinutes * 60 * 1000) 
+      endsAt: data.durationMinutes
+        ? new Date(Date.now() + data.durationMinutes * 60 * 1000)
         : undefined,
     };
 
@@ -576,16 +587,19 @@ export class CollaborationGateway
     this.server.to(projectId).emit('poll:created', {
       poll: {
         ...poll,
-        options: poll.options.map(o => ({ ...o, votes: 0 })), // Don't send vote counts initially
+        options: poll.options.map((o) => ({ ...o, votes: 0 })), // Don't send vote counts initially
       },
       createdBy: client.data.userName,
     });
 
     // Auto-end poll after duration
     if (data.durationMinutes) {
-      setTimeout(() => {
-        this.endPoll(pollId, projectId);
-      }, data.durationMinutes * 60 * 1000);
+      setTimeout(
+        () => {
+          this.endPoll(pollId, projectId);
+        },
+        data.durationMinutes * 60 * 1000,
+      );
     }
 
     this.logger.log(`Poll created in ${projectId}: ${data.question}`);
@@ -595,13 +609,14 @@ export class CollaborationGateway
   @SubscribeMessage('poll:vote')
   async handlePollVote(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { projectId: string; pollId: string; optionId: string },
+    @MessageBody()
+    data: { projectId: string; pollId: string; optionId: string },
   ) {
     const projectId = client.data.projectId;
     if (!projectId || projectId !== data.projectId) return;
 
     const poll = this.activePolls.get(data.pollId);
-    
+
     if (!poll || !poll.isActive) {
       return { success: false, error: 'Poll not found or inactive' };
     }
@@ -610,7 +625,7 @@ export class CollaborationGateway
       return { success: false, error: 'Already voted' };
     }
 
-    const option = poll.options.find(o => o.id === data.optionId);
+    const option = poll.options.find((o) => o.id === data.optionId);
     if (!option) {
       return { success: false, error: 'Invalid option' };
     }
@@ -623,11 +638,12 @@ export class CollaborationGateway
       pollId: data.pollId,
       totalVotes: poll.voters.length,
       // Only send percentage for live updates
-      results: poll.options.map(o => ({
+      results: poll.options.map((o) => ({
         id: o.id,
-        percentage: poll.voters.length > 0 
-          ? Math.round((o.votes / poll.voters.length) * 100) 
-          : 0,
+        percentage:
+          poll.voters.length > 0
+            ? Math.round((o.votes / poll.voters.length) * 100)
+            : 0,
       })),
     });
 
@@ -657,17 +673,20 @@ export class CollaborationGateway
       pollId,
       question: poll.question,
       totalVotes: poll.voters.length,
-      results: poll.options.map(o => ({
+      results: poll.options.map((o) => ({
         id: o.id,
         text: o.text,
         votes: o.votes,
-        percentage: poll.voters.length > 0 
-          ? Math.round((o.votes / poll.voters.length) * 100) 
-          : 0,
+        percentage:
+          poll.voters.length > 0
+            ? Math.round((o.votes / poll.voters.length) * 100)
+            : 0,
       })),
     });
 
-    this.logger.log(`Poll ended: ${poll.question} - ${poll.voters.length} votes`);
+    this.logger.log(
+      `Poll ended: ${poll.question} - ${poll.voters.length} votes`,
+    );
   }
 
   @SubscribeMessage('poll:getActive')
@@ -679,11 +698,11 @@ export class CollaborationGateway
     if (!projectId || projectId !== data.projectId) return;
 
     const activePolls = Array.from(this.activePolls.values())
-      .filter(p => p.projectId === projectId && p.isActive)
-      .map(poll => ({
+      .filter((p) => p.projectId === projectId && p.isActive)
+      .map((poll) => ({
         id: poll.id,
         question: poll.question,
-        options: poll.options.map(o => ({ id: o.id, text: o.text })),
+        options: poll.options.map((o) => ({ id: o.id, text: o.text })),
         hasVoted: poll.voters.includes(client.data.userId),
         totalVotes: poll.voters.length,
         createdAt: poll.createdAt,

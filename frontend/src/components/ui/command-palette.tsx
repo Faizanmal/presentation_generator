@@ -17,9 +17,7 @@ import {
     Plus,
     FileText,
     Wand2,
-    Settings,
     CreditCard,
-    Search,
     Home,
     User,
     LogOut,
@@ -29,25 +27,18 @@ import {
     Play,
     Undo,
     Redo,
-    Copy,
-    Trash2,
-    Upload,
     Mic,
-    BarChart3,
-    Users,
     Building2,
     Keyboard,
-    Moon,
     Sun,
     HelpCircle,
     MessageSquare,
     Link,
-    Image,
+    Image as ImageIcon,
     Code,
     Layout,
     Sparkles,
     Zap,
-    History,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -165,7 +156,7 @@ export function CommandPalette({
                                     <span>Add Paragraph</span>
                                 </CommandItem>
                                 <CommandItem onSelect={() => runCommand(() => {/* Insert image */ })}>
-                                    <Image className="mr-2 h-4 w-4" />
+                                    <ImageIcon className="mr-2 h-4 w-4" />
                                     <span>Add Image</span>
                                 </CommandItem>
                                 <CommandItem onSelect={() => runCommand(() => {/* Insert code block */ })}>

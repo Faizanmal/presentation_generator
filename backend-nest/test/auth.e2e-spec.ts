@@ -144,9 +144,7 @@ describe('Authentication (e2e)', () => {
     });
 
     it('should reject request without token', async () => {
-      await request(app.getHttpServer())
-        .get('/api/auth/profile')
-        .expect(401);
+      await request(app.getHttpServer()).get('/api/auth/profile').expect(401);
     });
 
     it('should reject invalid token', async () => {

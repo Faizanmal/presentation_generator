@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -29,7 +29,6 @@ import {
   Palette,
   Save,
   Layout,
-  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -37,7 +36,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -52,7 +50,7 @@ import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useEditorStore } from "@/stores/editor-store";
-import { Project, Theme, Slide, Block } from "@/types";
+import { Project, Theme, Slide } from "@/types";
 import SlidePanel from "@/components/editor/SlidePanel";
 import SlideCanvas from "@/components/editor/SlideCanvas";
 import ThemeSelector from "@/components/editor/ThemeSelector";
@@ -84,7 +82,6 @@ export default function EditorPage() {
     updateProject,
     addSlide,
     deleteSlide,
-    duplicateSlide,
     reorderSlides,
     setTheme,
   } = useEditorStore();
@@ -102,7 +99,6 @@ export default function EditorPage() {
   const {
     history,
     future,
-    pushAction,
     undo,
     redo,
     canUndo,
@@ -134,10 +130,17 @@ export default function EditorPage() {
   useEffect(() => {
     if (projectData) {
       loadProject(projectData);
-      setTitleInput(projectData.title);
       addToRecent(projectData.id);
     }
   }, [projectData, loadProject, addToRecent]);
+
+  // Sync title input with project title
+  useEffect(() => {
+    if (projectData?.title && projectData.title !== titleInput) {
+      setTitleInput(projectData.title);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectData?.title]);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -207,7 +210,7 @@ export default function EditorPage() {
       });
       addSlide(newSlide);
       setCurrentSlideIndex((project?.slides?.length || 0));
-    } catch (error) {
+    } catch {
       toast.error("Failed to add slide");
     }
   };
@@ -221,7 +224,7 @@ export default function EditorPage() {
     try {
       await api.slides.delete(projectId, slideId);
       deleteSlide(slideId);
-    } catch (error) {
+    } catch {
       toast.error("Failed to delete slide");
     }
   };
@@ -246,7 +249,7 @@ export default function EditorPage() {
       }
       // Refetch project to get updated data
       queryClient.invalidateQueries({ queryKey: ["project", projectId] });
-    } catch (error) {
+    } catch {
       toast.error("Failed to duplicate slide");
     }
   };
@@ -258,7 +261,7 @@ export default function EditorPage() {
       setTheme(theme);
       setIsThemePanelOpen(false);
       toast.success("Theme applied");
-    } catch (error) {
+    } catch {
       toast.error("Failed to apply theme");
     }
   };
@@ -283,7 +286,7 @@ export default function EditorPage() {
         a.click();
       }
       toast.success(`Exported as ${format.toUpperCase()}`);
-    } catch (error) {
+    } catch {
       toast.error("Failed to export");
     }
   };

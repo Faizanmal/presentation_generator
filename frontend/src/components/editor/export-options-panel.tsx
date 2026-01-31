@@ -132,7 +132,7 @@ export function ExportOptionsPanel({
 
     try {
       let blob: Blob | null = null;
-      let filename = `${projectTitle.replace(/[^a-z0-9]/gi, '_')}.${EXPORT_OPTIONS.find(o => o.id === selectedFormat)?.fileExtension}`;
+      const filename = `${projectTitle.replace(/[^a-z0-9]/gi, '_')}.${EXPORT_OPTIONS.find(o => o.id === selectedFormat)?.fileExtension}`;
 
       switch (selectedFormat) {
         case 'pdf':

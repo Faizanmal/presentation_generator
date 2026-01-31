@@ -1,6 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { AIService, GenerationParams, GeneratedPresentation, LayoutType } from './ai.service';
+import {
+  AIService,
+  GenerationParams,
+  GeneratedPresentation,
+  LayoutType,
+} from './ai.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 // Mock OpenAI
@@ -72,7 +77,10 @@ describe('AIService', () => {
         {
           heading: 'What is Machine Learning?',
           blocks: [
-            { type: 'paragraph', content: 'Machine learning is a subset of AI...' },
+            {
+              type: 'paragraph',
+              content: 'Machine learning is a subset of AI...',
+            },
             { type: 'bullet', content: 'Supervised learning' },
             { type: 'bullet', content: 'Unsupervised learning' },
           ],
@@ -207,7 +215,9 @@ describe('AIService', () => {
     });
 
     it('should return original content when AI fails', async () => {
-      mockOpenAI.chat.completions.create.mockRejectedValue(new Error('API Error'));
+      mockOpenAI.chat.completions.create.mockRejectedValue(
+        new Error('API Error'),
+      );
 
       await expect(
         service.enhanceContent('Original content', 'Make it better'),
@@ -365,7 +375,9 @@ describe('AIService', () => {
 
       const presentation: GeneratedPresentation = {
         title: 'Test',
-        sections: [{ heading: 'Intro', blocks: [], layout: 'title' as LayoutType }],
+        sections: [
+          { heading: 'Intro', blocks: [], layout: 'title' as LayoutType },
+        ],
       };
 
       const result = await service.generateSuggestions(presentation);
@@ -375,7 +387,9 @@ describe('AIService', () => {
     });
 
     it('should return empty array on error', async () => {
-      mockOpenAI.chat.completions.create.mockRejectedValue(new Error('API Error'));
+      mockOpenAI.chat.completions.create.mockRejectedValue(
+        new Error('API Error'),
+      );
 
       const presentation: GeneratedPresentation = {
         title: 'Test',
@@ -409,7 +423,11 @@ describe('AIService', () => {
         title: 'Test Presentation',
         sections: [
           { heading: 'Intro', blocks: [], layout: 'title' as LayoutType },
-          { heading: 'Main', blocks: [], layout: 'title-content' as LayoutType },
+          {
+            heading: 'Main',
+            blocks: [],
+            layout: 'title-content' as LayoutType,
+          },
           { heading: 'Conclusion', blocks: [], layout: 'title' as LayoutType },
         ],
       };

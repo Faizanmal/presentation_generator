@@ -112,119 +112,51 @@ export function PresentationRecorder() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
 
-  // Load available devices
-  useEffect(() => {
-    const loadDevices = async () => {
-      try {
-        // Request permission first
-        await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-
-        const deviceList = await navigator.mediaDevices.enumerateDevices();
-        const cameras = deviceList.filter((d) => d.kind === 'videoinput');
-        const microphones = deviceList.filter((d) => d.kind === 'audioinput');
-
-        setDevices({ cameras, microphones });
-
-        if (cameras.length > 0) {
-          setSelectedDevices((prev) => ({ ...prev, camera: cameras[0].deviceId }));
-        }
-        if (microphones.length > 0) {
-          setSelectedDevices((prev) => ({ ...prev, microphone: microphones[0].deviceId }));
-        }
-      } catch (error) {
-        console.error('Failed to load devices:', error);
-      }
-    };
-
-    if (isOpen) {
-      loadDevices();
-    }
-
-    return () => {
-      stopAllStreams();
-    };
-  }, [isOpen]);
-
-  // Start webcam preview
-  useEffect(() => {
-    const startWebcamPreview = async () => {
-      if (!settings.includeWebcam || !selectedDevices.camera || recordingState !== 'idle') {
-        return;
-      }
-
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { deviceId: selectedDevices.camera },
-          audio: false,
-        });
-
-        webcamStreamRef.current = stream;
-        if (webcamRef.current) {
-          webcamRef.current.srcObject = stream;
-        }
-      } catch (error) {
-        console.error('Failed to start webcam preview:', error);
-      }
-    };
-
-    startWebcamPreview();
-
-    return () => {
-      if (webcamStreamRef.current) {
-        webcamStreamRef.current.getTracks().forEach((track) => track.stop());
-      }
-    };
-  }, [settings.includeWebcam, selectedDevices.camera, recordingState]);
-
-  // Audio level monitoring
-  useEffect(() => {
-    if (!settings.includeAudio || !selectedDevices.microphone) return;
-
-    let animationFrame: number;
-
-    const startAudioMonitoring = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: { deviceId: selectedDevices.microphone },
-        });
-
-        audioContextRef.current = new AudioContext();
-        analyserRef.current = audioContextRef.current.createAnalyser();
-        const source = audioContextRef.current.createMediaStreamSource(stream);
-        source.connect(analyserRef.current);
-        analyserRef.current.fftSize = 256;
-
-        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-
-        const updateLevel = () => {
-          if (analyserRef.current) {
-            analyserRef.current.getByteFrequencyData(dataArray);
-            const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-            setAudioLevel(Math.min(100, (average / 128) * 100));
-          }
-          animationFrame = requestAnimationFrame(updateLevel);
-        };
-
-        updateLevel();
-      } catch (error) {
-        console.error('Failed to start audio monitoring:', error);
-      }
-    };
-
-    startAudioMonitoring();
-
-    return () => {
-      cancelAnimationFrame(animationFrame);
-      audioContextRef.current?.close();
-    };
-  }, [settings.includeAudio, selectedDevices.microphone]);
-
   const stopAllStreams = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     webcamStreamRef.current?.getTracks().forEach((track) => track.stop());
     audioContextRef.current?.close();
     if (timerRef.current) clearInterval(timerRef.current);
   }, []);
+
+  const processRecording = useCallback(() => {
+    const blob = new Blob(chunksRef.current, {
+      type: settings.format === 'webm' ? 'video/webm' : 'video/mp4',
+    });
+
+    const recording: Recording = {
+      id: `rec_${Date.now()}`,
+      name: `Recording ${recordings.length + 1}`,
+      duration,
+      size: blob.size,
+      createdAt: new Date(),
+      blob,
+    };
+
+    // Generate thumbnail
+    const video = document.createElement('video');
+    video.src = URL.createObjectURL(blob);
+    video.onloadeddata = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 160;
+      canvas.height = 90;
+      const ctx = canvas.getContext('2d');
+      ctx?.drawImage(video, 0, 0, 160, 90);
+      recording.thumbnailUrl = canvas.toDataURL();
+      setRecordings((prev) => [...prev, recording]);
+      setCurrentRecording(recording);
+      setRecordingState('complete');
+    };
+  }, [duration, recordings.length, settings.format]);
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop();
+      stopAllStreams();
+      if (timerRef.current) clearInterval(timerRef.current);
+      setRecordingState('processing');
+    }
+  }, [stopAllStreams]);
 
   const startRecording = useCallback(async () => {
     try {
@@ -310,7 +242,7 @@ export function PresentationRecorder() {
       console.error('Failed to start recording:', error);
       setRecordingState('idle');
     }
-  }, [settings, selectedDevices]);
+  }, [settings, selectedDevices, processRecording, stopRecording]);
 
   const pauseRecording = useCallback(() => {
     if (mediaRecorderRef.current?.state === 'recording') {
@@ -330,44 +262,112 @@ export function PresentationRecorder() {
     }
   }, []);
 
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.stop();
-      stopAllStreams();
-      if (timerRef.current) clearInterval(timerRef.current);
-      setRecordingState('processing');
+  // Load available devices
+  useEffect(() => {
+    const loadDevices = async () => {
+      try {
+        // Request permission first
+        await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+
+        const deviceList = await navigator.mediaDevices.enumerateDevices();
+        const cameras = deviceList.filter((d) => d.kind === 'videoinput');
+        const microphones = deviceList.filter((d) => d.kind === 'audioinput');
+
+        setDevices({ cameras, microphones });
+
+        if (cameras.length > 0) {
+          setSelectedDevices((prev) => ({ ...prev, camera: cameras[0].deviceId }));
+        }
+        if (microphones.length > 0) {
+          setSelectedDevices((prev) => ({ ...prev, microphone: microphones[0].deviceId }));
+        }
+      } catch (error) {
+        console.error('Failed to load devices:', error);
+      }
+    };
+
+    if (isOpen) {
+      loadDevices();
     }
-  }, [stopAllStreams]);
 
-  const processRecording = useCallback(() => {
-    const blob = new Blob(chunksRef.current, {
-      type: settings.format === 'webm' ? 'video/webm' : 'video/mp4',
-    });
+    return () => {
+      stopAllStreams();
+    };
+  }, [isOpen, stopAllStreams]);
 
-    const recording: Recording = {
-      id: `rec_${Date.now()}`,
-      name: `Recording ${recordings.length + 1}`,
-      duration,
-      size: blob.size,
-      createdAt: new Date(),
-      blob,
+  // Start webcam preview
+  useEffect(() => {
+    const startWebcamPreview = async () => {
+      if (!settings.includeWebcam || !selectedDevices.camera || recordingState !== 'idle') {
+        return;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { deviceId: selectedDevices.camera },
+          audio: false,
+        });
+
+        webcamStreamRef.current = stream;
+        if (webcamRef.current) {
+          webcamRef.current.srcObject = stream;
+        }
+      } catch (error) {
+        console.error('Failed to start webcam preview:', error);
+      }
     };
 
-    // Generate thumbnail
-    const video = document.createElement('video');
-    video.src = URL.createObjectURL(blob);
-    video.onloadeddata = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 160;
-      canvas.height = 90;
-      const ctx = canvas.getContext('2d');
-      ctx?.drawImage(video, 0, 0, 160, 90);
-      recording.thumbnailUrl = canvas.toDataURL();
-      setRecordings((prev) => [...prev, recording]);
-      setCurrentRecording(recording);
-      setRecordingState('complete');
+    startWebcamPreview();
+
+    return () => {
+      if (webcamStreamRef.current) {
+        webcamStreamRef.current.getTracks().forEach((track) => track.stop());
+      }
     };
-  }, [duration, recordings.length, settings.format]);
+  }, [settings.includeWebcam, selectedDevices.camera, recordingState]);
+
+  // Audio level monitoring
+  useEffect(() => {
+    if (!settings.includeAudio || !selectedDevices.microphone) return;
+
+    let animationFrame: number;
+
+    const startAudioMonitoring = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: { deviceId: selectedDevices.microphone },
+        });
+
+        audioContextRef.current = new AudioContext();
+        analyserRef.current = audioContextRef.current.createAnalyser();
+        const source = audioContextRef.current.createMediaStreamSource(stream);
+        source.connect(analyserRef.current);
+        analyserRef.current.fftSize = 256;
+
+        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+
+        const updateLevel = () => {
+          if (analyserRef.current) {
+            analyserRef.current.getByteFrequencyData(dataArray);
+            const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+            setAudioLevel(Math.min(100, (average / 128) * 100));
+          }
+          animationFrame = requestAnimationFrame(updateLevel);
+        };
+
+        updateLevel();
+      } catch (error) {
+        console.error('Failed to start audio monitoring:', error);
+      }
+    };
+
+    startAudioMonitoring();
+
+    return () => {
+      cancelAnimationFrame(animationFrame);
+      audioContextRef.current?.close();
+    };
+  }, [settings.includeAudio, selectedDevices.microphone]);
 
   const downloadRecording = useCallback((recording: Recording) => {
     const url = URL.createObjectURL(recording.blob);

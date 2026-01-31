@@ -4,7 +4,13 @@ import OpenAI from 'openai';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface PresentationInsight {
-  category: 'content' | 'engagement' | 'structure' | 'design' | 'timing' | 'audience';
+  category:
+    | 'content'
+    | 'engagement'
+    | 'structure'
+    | 'design'
+    | 'timing'
+    | 'audience';
   type: 'strength' | 'improvement' | 'suggestion' | 'warning';
   title: string;
   description: string;
@@ -88,19 +94,26 @@ export class PresentationInsightsService {
     }
 
     const slides = project.slides;
-    const allContent = slides.map((s: any) => 
-      this.extractText(s.blocks?.map((b: any) => b.content).join('\n') || '')
-    ).join('\n\n');
+    const allContent = slides
+      .map((s: any) =>
+        this.extractText(s.blocks?.map((b: any) => b.content).join('\n') || ''),
+      )
+      .join('\n\n');
 
     // Run analyses in parallel
-    const [contentAnalysis, structureAnalysis, timingAnalysis, audienceAnalysis, aiInsights] =
-      await Promise.all([
-        this.analyzeContent(slides),
-        this.analyzeStructure(slides),
-        this.analyzeTiming(slides),
-        this.analyzeAudience(slides),
-        this.getAIInsights(project.title || '', allContent, slides.length),
-      ]);
+    const [
+      contentAnalysis,
+      structureAnalysis,
+      timingAnalysis,
+      audienceAnalysis,
+      aiInsights,
+    ] = await Promise.all([
+      this.analyzeContent(slides),
+      this.analyzeStructure(slides),
+      this.analyzeTiming(slides),
+      this.analyzeAudience(slides),
+      this.getAIInsights(project.title || '', allContent, slides.length),
+    ]);
 
     // Calculate overall score
     const overallScore = this.calculateOverallScore({
@@ -127,8 +140,20 @@ export class PresentationInsightsService {
     const jargonSet = new Set<string>();
 
     const actionVerbs = [
-      'achieve', 'build', 'create', 'develop', 'drive', 'enable', 'grow',
-      'improve', 'increase', 'launch', 'lead', 'optimize', 'reduce', 'transform',
+      'achieve',
+      'build',
+      'create',
+      'develop',
+      'drive',
+      'enable',
+      'grow',
+      'improve',
+      'increase',
+      'launch',
+      'lead',
+      'optimize',
+      'reduce',
+      'transform',
     ];
 
     for (const slide of slides) {
@@ -145,17 +170,23 @@ export class PresentationInsightsService {
 
       // Extract potential topics (simple noun extraction)
       const potentialTopics = words.filter(
-        (w) => w.length > 5 && !['their', 'which', 'would', 'could', 'should'].includes(w)
+        (w) =>
+          w.length > 5 &&
+          !['their', 'which', 'would', 'could', 'should'].includes(w),
       );
       for (const topic of potentialTopics) {
         topicCounts.set(topic, (topicCounts.get(topic) || 0) + 1);
       }
     }
 
-    const averageWordsPerSlide = slides.length > 0 ? totalWords / slides.length : 0;
-    
+    const averageWordsPerSlide =
+      slides.length > 0 ? totalWords / slides.length : 0;
+
     // Calculate readability (simplified Flesch-Kincaid)
-    const readabilityScore = Math.max(0, Math.min(100, 100 - (averageWordsPerSlide - 30)));
+    const readabilityScore = Math.max(
+      0,
+      Math.min(100, 100 - (averageWordsPerSlide - 30)),
+    );
     const readingLevel = this.getReadingLevel(readabilityScore);
 
     return {
@@ -176,7 +207,9 @@ export class PresentationInsightsService {
   }
 
   private async analyzeStructure(slides: any[]): Promise<StructureAnalysis> {
-    const slideTexts = slides.map((s) => this.extractText(s.content).toLowerCase());
+    const slideTexts = slides.map((s) =>
+      this.extractText(s.content).toLowerCase(),
+    );
 
     const hasIntroduction =
       slideTexts.length > 0 &&
@@ -192,7 +225,10 @@ export class PresentationInsightsService {
         slideTexts[slideTexts.length - 1].includes('questions'));
 
     const hasAgenda = slideTexts.some(
-      (t) => t.includes('agenda') || t.includes('outline') || t.includes('today we will')
+      (t) =>
+        t.includes('agenda') ||
+        t.includes('outline') ||
+        t.includes('today we will'),
     );
 
     // Detect sections based on content patterns
@@ -236,7 +272,10 @@ export class PresentationInsightsService {
       const wordCount = text.split(/\s+/).filter(Boolean).length;
 
       // Estimate 150 words per minute speaking rate
-      const estimatedSeconds = Math.max(30, Math.ceil((wordCount / 150) * 60) + 10);
+      const estimatedSeconds = Math.max(
+        30,
+        Math.ceil((wordCount / 150) * 60) + 10,
+      );
       perSlideTime.push({ slideId: slide.id, estimatedSeconds });
       totalTime += estimatedSeconds;
 
@@ -273,9 +312,22 @@ export class PresentationInsightsService {
 
     // Technical word detection
     const technicalTerms = [
-      'algorithm', 'api', 'architecture', 'bandwidth', 'blockchain', 'cloud',
-      'database', 'encryption', 'framework', 'infrastructure', 'kubernetes',
-      'machine learning', 'microservice', 'neural', 'optimization', 'protocol',
+      'algorithm',
+      'api',
+      'architecture',
+      'bandwidth',
+      'blockchain',
+      'cloud',
+      'database',
+      'encryption',
+      'framework',
+      'infrastructure',
+      'kubernetes',
+      'machine learning',
+      'microservice',
+      'neural',
+      'optimization',
+      'protocol',
     ];
 
     let technicalCount = 0;
@@ -285,9 +337,16 @@ export class PresentationInsightsService {
       }
     }
 
-    const technicalLevel = Math.min(100, (technicalCount / words.length) * 1000);
+    const technicalLevel = Math.min(
+      100,
+      (technicalCount / words.length) * 1000,
+    );
     const complexity =
-      technicalLevel > 30 ? 'advanced' : technicalLevel > 15 ? 'intermediate' : 'beginner';
+      technicalLevel > 30
+        ? 'advanced'
+        : technicalLevel > 15
+          ? 'intermediate'
+          : 'beginner';
 
     // Accessibility check
     const accessibilityIssues: { slideId: string; issue: string }[] = [];
@@ -295,7 +354,7 @@ export class PresentationInsightsService {
 
     for (const slide of slides) {
       const content = slide.content;
-      
+
       // Check for images without alt text
       if (content?.images?.some((img: any) => !img.alt)) {
         accessibilityIssues.push({
@@ -326,7 +385,7 @@ export class PresentationInsightsService {
   private async getAIInsights(
     title: string,
     content: string,
-    slideCount: number
+    slideCount: number,
   ): Promise<PresentationInsight[]> {
     const prompt = `Analyze this presentation and provide insights:
 
@@ -360,14 +419,17 @@ Format as JSON array:
         messages: [
           {
             role: 'system',
-            content: 'You are a presentation expert providing actionable feedback.',
+            content:
+              'You are a presentation expert providing actionable feedback.',
           },
           { role: 'user', content: prompt },
         ],
         temperature: 0.7,
       });
 
-      return this.parseJsonResponse(response.choices[0].message.content || '[]');
+      return this.parseJsonResponse(
+        response.choices[0].message.content || '[]',
+      );
     } catch (error) {
       console.error('AI insights error:', error);
       return [];
@@ -403,17 +465,17 @@ Format as JSON array:
 
     // Weighted scoring
     let score = 0;
-    
+
     // Content (30%)
     score += (content.readabilityScore / 100) * 30;
-    
+
     // Structure (25%)
     score += (structure.flowScore / 100) * 25;
-    
+
     // Timing (20%)
     const pacingScore = Math.max(0, 100 - timing.pacingIssues.length * 10);
     score += (pacingScore / 100) * 20;
-    
+
     // Audience (25%)
     score += (audience.accessibilityScore / 100) * 25;
 

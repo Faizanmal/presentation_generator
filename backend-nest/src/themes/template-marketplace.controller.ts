@@ -13,7 +13,9 @@ import { TemplateMarketplaceService } from './template-marketplace.service';
 
 @Controller('templates')
 export class TemplateMarketplaceController {
-  constructor(private readonly marketplaceService: TemplateMarketplaceService) {}
+  constructor(
+    private readonly marketplaceService: TemplateMarketplaceService,
+  ) {}
 
   @Get('categories')
   async getCategories() {
@@ -99,6 +101,10 @@ export class TemplateMarketplaceController {
     },
     @CurrentUser() user: { id: string },
   ) {
-    return this.marketplaceService.publishTemplate(user.id, body.projectId, body);
+    return this.marketplaceService.publishTemplate(
+      user.id,
+      body.projectId,
+      body,
+    );
   }
 }

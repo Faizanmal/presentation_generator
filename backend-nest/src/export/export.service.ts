@@ -177,7 +177,7 @@ export class ExportService {
     }
 
     const exportData = project as unknown as ExportProject;
-    const result = this.exportToPptx(exportData, options || {});
+    const result = await this.exportToPptx(exportData, options || {});
     return result.data as Buffer;
   }
 
@@ -401,7 +401,10 @@ export class ExportService {
    * Export to PDF format
    * In production, use a proper PDF generation library like Puppeteer or wkhtmltopdf
    */
-  private exportToPdf(project: ExportProject, options: ExportOptions): ExportResult {
+  private exportToPdf(
+    project: ExportProject,
+    options: ExportOptions,
+  ): ExportResult {
     // Generate HTML first
     const htmlExport = this.exportToHtml(project);
 
@@ -422,13 +425,16 @@ export class ExportService {
    * Export to PowerPoint (PPTX) format
    * Production-ready implementation using pptxgenjs
    */
-  private async exportToPptx(project: ExportProject, options: ExportOptions): Promise<ExportResult> {
+  private async exportToPptx(
+    project: ExportProject,
+    options: ExportOptions,
+  ): Promise<ExportResult> {
     // Note: In production, install pptxgenjs: npm install pptxgenjs
     // For now, we'll create a detailed PPTX-like structure that can be used
     // by a frontend library or converted server-side
-    
+
     const theme = project.theme || this.getDefaultTheme();
-    
+
     const pptxData = {
       title: project.title,
       description: project.description,
@@ -436,13 +442,15 @@ export class ExportService {
         colors: theme.colors,
         fonts: theme.fonts,
       },
-      slides: (project.slides || []).map((slide: ExportSlide, index: number) => ({
-        slideNumber: index + 1,
-        layout: slide.layout,
-        elements: (slide.blocks || []).map((block: ExportBlock) => 
-          this.convertBlockToPptxElement(block, theme)
-        ),
-      })),
+      slides: (project.slides || []).map(
+        (slide: ExportSlide, index: number) => ({
+          slideNumber: index + 1,
+          layout: slide.layout,
+          elements: (slide.blocks || []).map((block: ExportBlock) =>
+            this.convertBlockToPptxElement(block, theme),
+          ),
+        }),
+      ),
       metadata: {
         creator: 'Presentation Designer',
         lastModifiedBy: 'Presentation Designer',
@@ -457,7 +465,8 @@ export class ExportService {
 
     return {
       filename: `${this.sanitizeFilename(project.title)}.pptx`,
-      mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      mimeType:
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
       data: pptxBuffer,
     };
   }
@@ -465,9 +474,12 @@ export class ExportService {
   /**
    * Convert block to PPTX element format
    */
-  private convertBlockToPptxElement(block: ExportBlock, theme: ExportTheme): any {
+  private convertBlockToPptxElement(
+    block: ExportBlock,
+    theme: ExportTheme,
+  ): any {
     const content = block.content?.text || block.content || '';
-    
+
     const baseElement = {
       type: block.blockType,
       order: block.order,
@@ -617,63 +629,81 @@ export class ExportService {
    * Generate actual PPTX buffer using Office Open XML
    * This creates a valid PPTX file structure
    */
-  private async generatePptxBuffer(pptxData: any, theme: ExportTheme): Promise<Buffer> {
+  private async generatePptxBuffer(
+    pptxData: any,
+    theme: ExportTheme,
+  ): Promise<Buffer> {
     // Create PPTX structure - Office Open XML format
     // PPTX is a ZIP file containing XML files
-    
+
     // @ts-ignore - jszip is optional dependency
     const JSZip = require('jszip');
     const zip = new JSZip();
 
     // [Content_Types].xml
-    zip.file('[Content_Types].xml', this.generateContentTypes(pptxData.slides.length));
-    
+    zip.file(
+      '[Content_Types].xml',
+      this.generateContentTypes(pptxData.slides.length),
+    );
+
     // _rels/.rels
     zip.folder('_rels')!.file('.rels', this.generateRootRels());
-    
+
     // docProps/
     const docProps = zip.folder('docProps')!;
     docProps.file('app.xml', this.generateAppXml(pptxData));
     docProps.file('core.xml', this.generateCoreXml(pptxData));
-    
+
     // ppt/
     const ppt = zip.folder('ppt')!;
-    ppt.file('presentation.xml', this.generatePresentationXml(pptxData.slides.length));
+    ppt.file(
+      'presentation.xml',
+      this.generatePresentationXml(pptxData.slides.length),
+    );
     ppt.file('presProps.xml', this.generatePresPropsXml());
     ppt.file('tableStyles.xml', this.generateTableStylesXml());
     ppt.file('viewProps.xml', this.generateViewPropsXml());
-    
+
     // ppt/_rels/
     const pptRels = ppt.folder('_rels')!;
-    pptRels.file('presentation.xml.rels', this.generatePresentationRels(pptxData.slides.length));
-    
+    pptRels.file(
+      'presentation.xml.rels',
+      this.generatePresentationRels(pptxData.slides.length),
+    );
+
     // ppt/slideLayouts/
     const slideLayouts = ppt.folder('slideLayouts')!;
     slideLayouts.file('slideLayout1.xml', this.generateSlideLayout());
     const slideLayoutRels = slideLayouts.folder('_rels')!;
-    slideLayoutRels.file('slideLayout1.xml.rels', this.generateSlideLayoutRels());
-    
+    slideLayoutRels.file(
+      'slideLayout1.xml.rels',
+      this.generateSlideLayoutRels(),
+    );
+
     // ppt/slideMasters/
     const slideMasters = ppt.folder('slideMasters')!;
     slideMasters.file('slideMaster1.xml', this.generateSlideMaster(theme));
     const slideMasterRels = slideMasters.folder('_rels')!;
-    slideMasterRels.file('slideMaster1.xml.rels', this.generateSlideMasterRels());
-    
+    slideMasterRels.file(
+      'slideMaster1.xml.rels',
+      this.generateSlideMasterRels(),
+    );
+
     // ppt/theme/
     const themeFolder = ppt.folder('theme')!;
     themeFolder.file('theme1.xml', this.generateThemeXml(theme));
-    
+
     // ppt/slides/
     const slides = ppt.folder('slides')!;
     const slidesRels = slides.folder('_rels')!;
-    
+
     pptxData.slides.forEach((slide: any, index: number) => {
       slides.file(`slide${index + 1}.xml`, this.generateSlideXml(slide, theme));
       slidesRels.file(`slide${index + 1}.xml.rels`, this.generateSlideRels());
     });
 
     // Generate the PPTX file
-    const buffer = await zip.generateAsync({ 
+    const buffer = await zip.generateAsync({
       type: 'nodebuffer',
       compression: 'DEFLATE',
       compressionOptions: { level: 9 },
@@ -685,8 +715,10 @@ export class ExportService {
   // PPTX XML Generation Methods
 
   private generateContentTypes(slideCount: number): string {
-    const slideEntries = Array.from({ length: slideCount }, (_, i) => 
-      `<Override PartName="/ppt/slides/slide${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`
+    const slideEntries = Array.from(
+      { length: slideCount },
+      (_, i) =>
+        `<Override PartName="/ppt/slides/slide${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`,
     ).join('\n');
 
     return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -740,8 +772,9 @@ export class ExportService {
   }
 
   private generatePresentationXml(slideCount: number): string {
-    const slideIdList = Array.from({ length: slideCount }, (_, i) => 
-      `<p:sldId id="${256 + i}" r:id="rId${2 + i}"/>`
+    const slideIdList = Array.from(
+      { length: slideCount },
+      (_, i) => `<p:sldId id="${256 + i}" r:id="rId${2 + i}"/>`,
     ).join('\n');
 
     return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -760,8 +793,10 @@ export class ExportService {
   }
 
   private generatePresentationRels(slideCount: number): string {
-    const slideRels = Array.from({ length: slideCount }, (_, i) => 
-      `<Relationship Id="rId${2 + i}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${i + 1}.xml"/>`
+    const slideRels = Array.from(
+      { length: slideCount },
+      (_, i) =>
+        `<Relationship Id="rId${2 + i}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${i + 1}.xml"/>`,
     ).join('\n');
 
     return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -873,9 +908,11 @@ export class ExportService {
   }
 
   private generateSlideXml(slide: any, theme: ExportTheme): string {
-    const elements = slide.elements.map((el: any, idx: number) => 
-      this.generateSlideElement(el, idx + 2, theme)
-    ).join('\n');
+    const elements = slide.elements
+      .map((el: any, idx: number) =>
+        this.generateSlideElement(el, idx + 2, theme),
+      )
+      .join('\n');
 
     return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" 
@@ -891,16 +928,21 @@ export class ExportService {
 </p:sld>`;
   }
 
-  private generateSlideElement(element: any, id: number, theme: ExportTheme): string {
+  private generateSlideElement(
+    element: any,
+    id: number,
+    theme: ExportTheme,
+  ): string {
     if (element.elementType === 'image') {
       return ''; // Images require additional handling with relationships
     }
 
-    const text = typeof element.text === 'string' 
-      ? element.text 
-      : Array.isArray(element.text) 
-        ? element.text.map((t: any) => t.text || t).join('\n')
-        : '';
+    const text =
+      typeof element.text === 'string'
+        ? element.text
+        : Array.isArray(element.text)
+          ? element.text.map((t: any) => t.text || t).join('\n')
+          : '';
 
     const opts = element.options || {};
     const x = Math.round((opts.x || 0.5) * 914400);
@@ -909,7 +951,8 @@ export class ExportService {
     const h = Math.round((opts.h || 1) * 914400);
     const fontSize = (opts.fontSize || 18) * 100;
     const fontFace = opts.fontFace || theme.fonts?.body || 'Arial';
-    const color = opts.color || (theme.colors?.text || '#1e293b').replace('#', '');
+    const color =
+      opts.color || (theme.colors?.text || '#1e293b').replace('#', '');
     const bold = opts.bold ? '<a:b val="true"/>' : '';
     const italic = opts.italic ? '<a:i val="true"/>' : '';
 

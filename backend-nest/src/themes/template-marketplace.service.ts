@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface TemplateCategory {
@@ -137,7 +142,14 @@ export class TemplateMarketplaceService {
     page?: number;
     limit?: number;
   }): Promise<{ templates: TemplatePreview[]; total: number; pages: number }> {
-    const { query, category, isPremium, sortBy = 'popular', page = 1, limit = 20 } = params;
+    const {
+      query,
+      category,
+      isPremium,
+      sortBy = 'popular',
+      page = 1,
+      limit = 20,
+    } = params;
 
     // This would be a database query in production
     // For now, return mock data
@@ -145,10 +157,15 @@ export class TemplateMarketplaceService {
       {
         id: 'tpl-1',
         title: 'Modern Business Pitch',
-        description: 'A clean, professional template perfect for business pitches and investor presentations.',
+        description:
+          'A clean, professional template perfect for business pitches and investor presentations.',
         thumbnail: '/templates/modern-business.png',
         category: 'business',
-        author: { id: 'user-1', name: 'Design Studio', avatar: '/avatars/studio.png' },
+        author: {
+          id: 'user-1',
+          name: 'Design Studio',
+          avatar: '/avatars/studio.png',
+        },
         stats: { uses: 12500, likes: 890, rating: 4.8, reviews: 156 },
         isPremium: false,
         tags: ['business', 'pitch', 'professional', 'clean'],
@@ -157,10 +174,15 @@ export class TemplateMarketplaceService {
       {
         id: 'tpl-2',
         title: 'Startup Pitch Deck',
-        description: 'The perfect pitch deck template for startups seeking funding.',
+        description:
+          'The perfect pitch deck template for startups seeking funding.',
         thumbnail: '/templates/startup-pitch.png',
         category: 'startup',
-        author: { id: 'user-2', name: 'Pitch Perfect', avatar: '/avatars/pitch.png' },
+        author: {
+          id: 'user-2',
+          name: 'Pitch Perfect',
+          avatar: '/avatars/pitch.png',
+        },
         stats: { uses: 8900, likes: 670, rating: 4.9, reviews: 98 },
         isPremium: true,
         price: 29,
@@ -170,7 +192,8 @@ export class TemplateMarketplaceService {
       {
         id: 'tpl-3',
         title: 'Educational Workshop',
-        description: 'Engaging template for educational presentations and workshops.',
+        description:
+          'Engaging template for educational presentations and workshops.',
         thumbnail: '/templates/education.png',
         category: 'education',
         author: { id: 'user-3', name: 'EduDesign', avatar: '/avatars/edu.png' },
@@ -182,10 +205,15 @@ export class TemplateMarketplaceService {
       {
         id: 'tpl-4',
         title: 'Creative Portfolio',
-        description: 'Showcase your creative work with this stunning portfolio template.',
+        description:
+          'Showcase your creative work with this stunning portfolio template.',
         thumbnail: '/templates/portfolio.png',
         category: 'portfolio',
-        author: { id: 'user-4', name: 'Creative Co', avatar: '/avatars/creative.png' },
+        author: {
+          id: 'user-4',
+          name: 'Creative Co',
+          avatar: '/avatars/creative.png',
+        },
         stats: { uses: 6700, likes: 520, rating: 4.6, reviews: 87 },
         isPremium: true,
         price: 19,
@@ -195,10 +223,15 @@ export class TemplateMarketplaceService {
       {
         id: 'tpl-5',
         title: 'Tech Product Launch',
-        description: 'Modern template for technology product launches and demos.',
+        description:
+          'Modern template for technology product launches and demos.',
         thumbnail: '/templates/tech-launch.png',
         category: 'technology',
-        author: { id: 'user-5', name: 'TechDesigns', avatar: '/avatars/tech.png' },
+        author: {
+          id: 'user-5',
+          name: 'TechDesigns',
+          avatar: '/avatars/tech.png',
+        },
         stats: { uses: 9400, likes: 780, rating: 4.8, reviews: 145 },
         isPremium: false,
         tags: ['technology', 'product', 'launch', 'modern'],
@@ -211,19 +244,19 @@ export class TemplateMarketplaceService {
     if (query) {
       const q = query.toLowerCase();
       filtered = filtered.filter(
-        t =>
+        (t) =>
           t.title.toLowerCase().includes(q) ||
           t.description.toLowerCase().includes(q) ||
-          t.tags.some(tag => tag.includes(q))
+          t.tags.some((tag) => tag.includes(q)),
       );
     }
 
     if (category) {
-      filtered = filtered.filter(t => t.category === category);
+      filtered = filtered.filter((t) => t.category === category);
     }
 
     if (isPremium !== undefined) {
-      filtered = filtered.filter(t => t.isPremium === isPremium);
+      filtered = filtered.filter((t) => t.isPremium === isPremium);
     }
 
     // Sort
@@ -252,18 +285,31 @@ export class TemplateMarketplaceService {
     const template: TemplateDetails = {
       id: templateId,
       title: 'Modern Business Pitch',
-      description: 'A clean, professional template perfect for business pitches and investor presentations. Features modern design elements and easy customization.',
+      description:
+        'A clean, professional template perfect for business pitches and investor presentations. Features modern design elements and easy customization.',
       thumbnail: '/templates/modern-business.png',
       category: 'business',
-      author: { id: 'user-1', name: 'Design Studio', avatar: '/avatars/studio.png' },
+      author: {
+        id: 'user-1',
+        name: 'Design Studio',
+        avatar: '/avatars/studio.png',
+      },
       stats: { uses: 12500, likes: 890, rating: 4.8, reviews: 156 },
       isPremium: false,
       tags: ['business', 'pitch', 'professional', 'clean'],
       createdAt: new Date('2025-10-15'),
       slides: [
         { order: 1, layout: 'title', thumbnail: '/templates/slides/1.png' },
-        { order: 2, layout: 'text-image', thumbnail: '/templates/slides/2.png' },
-        { order: 3, layout: 'bullet-points', thumbnail: '/templates/slides/3.png' },
+        {
+          order: 2,
+          layout: 'text-image',
+          thumbnail: '/templates/slides/2.png',
+        },
+        {
+          order: 3,
+          layout: 'bullet-points',
+          thumbnail: '/templates/slides/3.png',
+        },
         { order: 4, layout: 'chart', thumbnail: '/templates/slides/4.png' },
         { order: 5, layout: 'team', thumbnail: '/templates/slides/5.png' },
         { order: 6, layout: 'closing', thumbnail: '/templates/slides/6.png' },
@@ -294,7 +340,10 @@ export class TemplateMarketplaceService {
     return template;
   }
 
-  async useTemplate(userId: string, templateId: string): Promise<{ projectId: string }> {
+  async useTemplate(
+    userId: string,
+    templateId: string,
+  ): Promise<{ projectId: string }> {
     const template = await this.getTemplateById(templateId);
 
     if (template.isPremium) {
@@ -305,7 +354,9 @@ export class TemplateMarketplaceService {
       });
 
       if (!user?.subscription || user.subscription.status !== 'ACTIVE') {
-        throw new ForbiddenException('Premium subscription required for this template');
+        throw new ForbiddenException(
+          'Premium subscription required for this template',
+        );
       }
     }
 
@@ -344,14 +395,16 @@ export class TemplateMarketplaceService {
   async reviewTemplate(
     userId: string,
     templateId: string,
-    data: { rating: number; comment: string }
+    data: { rating: number; comment: string },
   ): Promise<void> {
     if (data.rating < 1 || data.rating > 5) {
       throw new Error('Rating must be between 1 and 5');
     }
 
     // In production, store in database
-    this.logger.log(`User ${userId} reviewed template ${templateId}: ${data.rating} stars`);
+    this.logger.log(
+      `User ${userId} reviewed template ${templateId}: ${data.rating} stars`,
+    );
   }
 
   async publishTemplate(
@@ -364,7 +417,7 @@ export class TemplateMarketplaceService {
       tags: string[];
       isPremium: boolean;
       price?: number;
-    }
+    },
   ): Promise<{ templateId: string }> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
@@ -376,23 +429,33 @@ export class TemplateMarketplaceService {
     }
 
     if (project.ownerId !== userId) {
-      throw new ForbiddenException('You can only publish your own projects as templates');
+      throw new ForbiddenException(
+        'You can only publish your own projects as templates',
+      );
     }
 
     // In production, create template in database
     const templateId = `tpl-${Date.now()}`;
-    this.logger.log(`User ${userId} published template ${templateId} from project ${projectId}`);
+    this.logger.log(
+      `User ${userId} published template ${templateId} from project ${projectId}`,
+    );
 
     return { templateId };
   }
 
   async getFeaturedTemplates(): Promise<TemplatePreview[]> {
-    const { templates } = await this.searchTemplates({ sortBy: 'popular', limit: 8 });
+    const { templates } = await this.searchTemplates({
+      sortBy: 'popular',
+      limit: 8,
+    });
     return templates;
   }
 
   async getTrendingTemplates(): Promise<TemplatePreview[]> {
-    const { templates } = await this.searchTemplates({ sortBy: 'newest', limit: 6 });
+    const { templates } = await this.searchTemplates({
+      sortBy: 'newest',
+      limit: 6,
+    });
     return templates;
   }
 }

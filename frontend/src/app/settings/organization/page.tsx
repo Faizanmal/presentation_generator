@@ -1,6 +1,6 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+// import { useSearchParams } from 'next/navigation';
 import { OrganizationSettings } from '@/components/settings/organization-settings';
 
 export default function OrganizationPage() {

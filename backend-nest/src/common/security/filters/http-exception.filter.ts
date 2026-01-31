@@ -30,8 +30,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
-    
-    const requestId = response.getHeader('X-Request-ID')?.toString() || uuidv4();
+
+    const requestId =
+      response.getHeader('X-Request-ID')?.toString() || uuidv4();
     const timestamp = new Date().toISOString();
     const path = request.url;
 
@@ -100,7 +101,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
         exception instanceof Error ? exception.stack : undefined,
       );
     } else if (statusCode >= 400) {
-      this.logger.warn(`[${requestId}] ${statusCode} ${error}: ${message} - ${path}`);
+      this.logger.warn(
+        `[${requestId}] ${statusCode} ${error}: ${message} - ${path}`,
+      );
     }
 
     response.status(statusCode).json(errorResponse);

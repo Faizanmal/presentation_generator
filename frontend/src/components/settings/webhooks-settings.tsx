@@ -413,7 +413,7 @@ export function WebhooksSettings() {
               <CardContent className="space-y-4">
                 {/* Events */}
                 <div className="flex flex-wrap gap-1">
-                  {webhook.events.slice(0, 5).map((event) => (
+                  {webhook.events.slice(0, 5).map((event: string) => (
                     <Badge key={event} variant="secondary" className="text-xs">
                       {WEBHOOK_EVENTS.find((e) => e.id === event)?.label || event}
                     </Badge>

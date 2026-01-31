@@ -150,7 +150,7 @@ export function BrandKitManager() {
     mutationFn: (data: { name: string }) => api.post('/themes/brand-kits', data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['brand-kits'] });
-      setSelectedKit(data as BrandKit | null);
+      setSelectedKit(data as unknown as BrandKit | null);
       setIsCreating(false);
       setNewKitName('');
       toast.success('Brand kit created');
@@ -212,7 +212,7 @@ export function BrandKitManager() {
   };
 
   // Mock data for initial render
-  const mockBrandKits: BrandKit[] = brandKits || [
+  const mockBrandKits: BrandKit[] = brandKits?.data || [
     {
       id: 'brand-1',
       name: 'Corporate Brand',

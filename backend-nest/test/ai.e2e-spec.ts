@@ -129,7 +129,8 @@ describe('AI Generation (e2e)', () => {
         .post('/api/ai/suggest-layout')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          content: 'Introduction to our new product with key features and benefits',
+          content:
+            'Introduction to our new product with key features and benefits',
           slideType: 'content',
         })
         .expect(201);

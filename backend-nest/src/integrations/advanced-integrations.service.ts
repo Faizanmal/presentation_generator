@@ -2,6 +2,7 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import axios from 'axios';
+import { IntegrationProvider } from '@prisma/client';
 
 interface WebhookPayload {
   event: string;
@@ -10,7 +11,7 @@ interface WebhookPayload {
   projectId?: string;
 }
 
-interface WebhookConfig {
+export interface WebhookConfig {
   id: string;
   userId: string;
   url: string;
@@ -74,7 +75,9 @@ export class AdvancedIntegrationsService {
     );
 
     await this.prisma.integration.upsert({
-      where: { userId_provider: { userId, provider: 'CANVA' } },
+      where: {
+        userId_provider: { userId, provider: 'CANVA' as IntegrationProvider },
+      },
       update: {
         accessToken: response.data.access_token,
         refreshToken: response.data.refresh_token,
@@ -83,7 +86,7 @@ export class AdvancedIntegrationsService {
       },
       create: {
         userId,
-        provider: 'CANVA',
+        provider: 'CANVA' as IntegrationProvider,
         accessToken: response.data.access_token,
         refreshToken: response.data.refresh_token,
         expiresAt: new Date(Date.now() + response.data.expires_in * 1000),
@@ -98,7 +101,9 @@ export class AdvancedIntegrationsService {
    */
   async getCanvaDesigns(userId: string) {
     const integration = await this.prisma.integration.findUnique({
-      where: { userId_provider: { userId, provider: 'CANVA' } },
+      where: {
+        userId_provider: { userId, provider: 'CANVA' as IntegrationProvider },
+      },
     });
 
     if (!integration) {
@@ -123,7 +128,9 @@ export class AdvancedIntegrationsService {
    */
   async importCanvaDesign(userId: string, designId: string) {
     const integration = await this.prisma.integration.findUnique({
-      where: { userId_provider: { userId, provider: 'CANVA' } },
+      where: {
+        userId_provider: { userId, provider: 'CANVA' as IntegrationProvider },
+      },
     });
 
     if (!integration) {
@@ -201,7 +208,9 @@ export class AdvancedIntegrationsService {
     );
 
     await this.prisma.integration.upsert({
-      where: { userId_provider: { userId, provider: 'MIRO' } },
+      where: {
+        userId_provider: { userId, provider: 'MIRO' as IntegrationProvider },
+      },
       update: {
         accessToken: response.data.access_token,
         refreshToken: response.data.refresh_token,
@@ -212,7 +221,7 @@ export class AdvancedIntegrationsService {
       },
       create: {
         userId,
-        provider: 'MIRO',
+        provider: 'MIRO' as IntegrationProvider,
         accessToken: response.data.access_token,
         refreshToken: response.data.refresh_token,
         expiresAt: response.data.expires_in
@@ -229,7 +238,9 @@ export class AdvancedIntegrationsService {
    */
   async getMiroBoards(userId: string) {
     const integration = await this.prisma.integration.findUnique({
-      where: { userId_provider: { userId, provider: 'MIRO' } },
+      where: {
+        userId_provider: { userId, provider: 'MIRO' as IntegrationProvider },
+      },
     });
 
     if (!integration) {
@@ -255,7 +266,9 @@ export class AdvancedIntegrationsService {
    */
   async importMiroBoard(userId: string, boardId: string) {
     const integration = await this.prisma.integration.findUnique({
-      where: { userId_provider: { userId, provider: 'MIRO' } },
+      where: {
+        userId_provider: { userId, provider: 'MIRO' as IntegrationProvider },
+      },
     });
 
     if (!integration) {
@@ -324,7 +337,9 @@ export class AdvancedIntegrationsService {
    */
   async exportToMiro(userId: string, projectId: string) {
     const integration = await this.prisma.integration.findUnique({
-      where: { userId_provider: { userId, provider: 'MIRO' } },
+      where: {
+        userId_provider: { userId, provider: 'MIRO' as IntegrationProvider },
+      },
     });
 
     if (!integration) {
@@ -350,7 +365,8 @@ export class AdvancedIntegrationsService {
       'https://api.miro.com/v2/boards',
       {
         name: project.title,
-        description: project.description || 'Exported from Presentation Designer',
+        description:
+          project.description || 'Exported from Presentation Designer',
       },
       {
         headers: { Authorization: `Bearer ${integration.accessToken}` },
@@ -366,7 +382,7 @@ export class AdvancedIntegrationsService {
         `https://api.miro.com/v2/boards/${boardId}/frames`,
         {
           data: {
-            title: slide.title || `Slide ${i + 1}`,
+            title: `Slide ${i + 1}`,
           },
           position: {
             x: i * 1200,
@@ -452,7 +468,11 @@ export class AdvancedIntegrationsService {
   /**
    * Trigger webhooks for an event
    */
-  async triggerWebhooks(userId: string, event: string, data: any): Promise<void> {
+  async triggerWebhooks(
+    userId: string,
+    event: string,
+    data: any,
+  ): Promise<void> {
     const userWebhooks = this.webhooks.get(userId) || [];
     const applicableWebhooks = userWebhooks.filter(
       (w) => w.isActive && w.events.includes(event),

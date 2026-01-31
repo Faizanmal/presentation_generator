@@ -18,7 +18,7 @@ interface CreateAccountDto {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Find user by ID

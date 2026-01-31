@@ -82,6 +82,38 @@ export function PresentationMode({
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const autoPlayRef = useRef<NodeJS.Timeout | null>(null);
 
+    const goToSlide = useCallback((index: number) => {
+        const newIndex = Math.max(0, Math.min(index, slides.length - 1));
+        setCurrentSlide(newIndex);
+        onSlideChange?.(newIndex);
+    }, [slides.length, onSlideChange]);
+
+    const goToNextSlide = useCallback(() => {
+        if (currentSlide < slides.length - 1) {
+            goToSlide(currentSlide + 1);
+        } else if (isPlaying) {
+            setIsPlaying(false); // Stop at end
+        }
+    }, [currentSlide, slides.length, isPlaying, goToSlide]);
+
+    const goToPrevSlide = useCallback(() => {
+        goToSlide(currentSlide - 1);
+    }, [currentSlide, goToSlide]);
+
+    const toggleFullscreen = useCallback(async () => {
+        try {
+            if (!document.fullscreenElement) {
+                await containerRef.current?.requestFullscreen();
+                setIsFullscreen(true);
+            } else {
+                await document.exitFullscreen();
+                setIsFullscreen(false);
+            }
+        } catch (err) {
+            console.error("Fullscreen error:", err);
+        }
+    }, []);
+
     // Start presentation timer
     useEffect(() => {
         timerRef.current = setInterval(() => {
@@ -106,7 +138,7 @@ export function PresentationMode({
         return () => {
             if (autoPlayRef.current) clearInterval(autoPlayRef.current);
         };
-    }, [isPlaying, autoPlayInterval]);
+    }, [isPlaying, autoPlayInterval, goToNextSlide]);
 
     // Keyboard navigation
     useEffect(() => {
@@ -155,7 +187,7 @@ export function PresentationMode({
 
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [showNotes, showThumbnails]);
+    }, [showNotes, showThumbnails, goToNextSlide, goToPrevSlide, goToSlide, onExit, toggleFullscreen, slides.length]);
 
     // Hide controls after inactivity
     useEffect(() => {
@@ -176,38 +208,6 @@ export function PresentationMode({
             window.removeEventListener("mousemove", handleMouseMove);
             if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
         };
-    }, []);
-
-    const goToSlide = useCallback((index: number) => {
-        const newIndex = Math.max(0, Math.min(index, slides.length - 1));
-        setCurrentSlide(newIndex);
-        onSlideChange?.(newIndex);
-    }, [slides.length, onSlideChange]);
-
-    const goToNextSlide = useCallback(() => {
-        if (currentSlide < slides.length - 1) {
-            goToSlide(currentSlide + 1);
-        } else if (isPlaying) {
-            setIsPlaying(false); // Stop at end
-        }
-    }, [currentSlide, slides.length, isPlaying, goToSlide]);
-
-    const goToPrevSlide = useCallback(() => {
-        goToSlide(currentSlide - 1);
-    }, [currentSlide, goToSlide]);
-
-    const toggleFullscreen = useCallback(async () => {
-        try {
-            if (!document.fullscreenElement) {
-                await containerRef.current?.requestFullscreen();
-                setIsFullscreen(true);
-            } else {
-                await document.exitFullscreen();
-                setIsFullscreen(false);
-            }
-        } catch (err) {
-            console.error("Fullscreen error:", err);
-        }
     }, []);
 
     const formatTime = (seconds: number) => {

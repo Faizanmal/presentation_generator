@@ -15,7 +15,7 @@ import { CollaborationService } from './collaboration.service';
 @Controller('collaboration')
 @UseGuards(JwtAuthGuard)
 export class CollaborationController {
-  constructor(private readonly collaborationService: CollaborationService) { }
+  constructor(private readonly collaborationService: CollaborationService) {}
 
   // ============================================
   // COLLABORATORS
@@ -30,7 +30,6 @@ export class CollaborationController {
   async getActiveCollaborators(@Param('projectId') projectId: string) {
     return this.collaborationService.getActiveCollaborators(projectId);
   }
-
 
   @Post(':projectId/collaborators')
   async addCollaborator(

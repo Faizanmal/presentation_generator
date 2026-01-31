@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface PresentationVersion {
@@ -19,7 +23,12 @@ export interface PresentationVersion {
 }
 
 export interface VersionChange {
-  type: 'slide_added' | 'slide_deleted' | 'slide_modified' | 'theme_changed' | 'settings_changed';
+  type:
+    | 'slide_added'
+    | 'slide_deleted'
+    | 'slide_modified'
+    | 'theme_changed'
+    | 'settings_changed';
   slideId?: string;
   description: string;
 }
@@ -61,7 +70,7 @@ export class VersionControlService {
       description?: string;
       isAutoSave?: boolean;
       isMilestone?: boolean;
-    } = {}
+    } = {},
   ): Promise<PresentationVersion> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
@@ -122,16 +131,16 @@ export class VersionControlService {
       offset?: number;
       includeAutoSaves?: boolean;
       milestonesOnly?: boolean;
-    } = {}
+    } = {},
   ): Promise<{ versions: PresentationVersion[]; total: number }> {
     let versions = this.versions.get(projectId) || [];
 
     if (!options.includeAutoSaves) {
-      versions = versions.filter(v => !v.isAutoSave);
+      versions = versions.filter((v) => !v.isAutoSave);
     }
 
     if (options.milestonesOnly) {
-      versions = versions.filter(v => v.isMilestone);
+      versions = versions.filter((v) => v.isMilestone);
     }
 
     const total = versions.length;
@@ -144,9 +153,12 @@ export class VersionControlService {
     };
   }
 
-  async getVersion(projectId: string, versionId: string): Promise<PresentationVersion> {
+  async getVersion(
+    projectId: string,
+    versionId: string,
+  ): Promise<PresentationVersion> {
     const versions = this.versions.get(projectId) || [];
-    const version = versions.find(v => v.id === versionId);
+    const version = versions.find((v) => v.id === versionId);
 
     if (!version) {
       throw new NotFoundException('Version not found');
@@ -155,7 +167,11 @@ export class VersionControlService {
     return version;
   }
 
-  async restoreVersion(projectId: string, versionId: string, userId: string): Promise<void> {
+  async restoreVersion(
+    projectId: string,
+    versionId: string,
+    userId: string,
+  ): Promise<void> {
     const version = await this.getVersion(projectId, versionId);
 
     // Create a backup of current state before restore
@@ -191,13 +207,17 @@ export class VersionControlService {
   async compareVersions(
     projectId: string,
     versionAId: string,
-    versionBId: string
+    versionBId: string,
   ): Promise<VersionComparison> {
     const versionA = await this.getVersion(projectId, versionAId);
     const versionB = await this.getVersion(projectId, versionBId);
 
-    const slidesA = new Map((versionA.snapshot.slides as any[]).map((s: any) => [s.id, s]));
-    const slidesB = new Map((versionB.snapshot.slides as any[]).map((s: any) => [s.id, s]));
+    const slidesA = new Map(
+      (versionA.snapshot.slides as any[]).map((s: any) => [s.id, s]),
+    );
+    const slidesB = new Map(
+      (versionB.snapshot.slides as any[]).map((s: any) => [s.id, s]),
+    );
 
     const differences: SlideDifference[] = [];
     let slidesAdded = 0;
@@ -207,7 +227,7 @@ export class VersionControlService {
     // Check for deleted and modified slides
     for (const [slideId, slideA] of slidesA) {
       const slideB = slidesB.get(slideId);
-      
+
       if (!slideB) {
         differences.push({ slideId, status: 'deleted' });
         slidesDeleted++;
@@ -247,10 +267,10 @@ export class VersionControlService {
     projectId: string,
     versionId: string,
     name: string,
-    description?: string
+    description?: string,
   ): Promise<PresentationVersion> {
     const versions = this.versions.get(projectId) || [];
-    const versionIndex = versions.findIndex(v => v.id === versionId);
+    const versionIndex = versions.findIndex((v) => v.id === versionId);
 
     if (versionIndex === -1) {
       throw new NotFoundException('Version not found');
@@ -271,17 +291,16 @@ export class VersionControlService {
     projectId: string,
     versionId: string,
     userId: string,
-    branchName: string
+    branchName: string,
   ): Promise<{ branchId: string; projectId: string }> {
     const version = await this.getVersion(projectId, versionId);
 
     // Create a new project from this version
     const newProject = await this.prisma.project.create({
       data: {
-        name: `${version.snapshot.settings.title} (${branchName})`,
+        title: `${version.snapshot.settings.title} (${branchName})`,
         description: `Branch from ${version.name}`,
         ownerId: userId,
-        isTemplate: false,
       },
     });
 
@@ -308,7 +327,7 @@ export class VersionControlService {
     options: {
       strategy: 'source-wins' | 'target-wins' | 'manual';
       selectedSlides?: string[];
-    }
+    },
   ): Promise<{ mergedSlides: number; conflicts: number }> {
     const sourceProject = await this.prisma.project.findUnique({
       where: { id: sourceProjectId },
@@ -328,10 +347,13 @@ export class VersionControlService {
     const conflicts = 0;
 
     // Simple merge strategy - add unique slides from source
-    const targetSlideIds = new Set(targetProject.slides.map(s => s.id));
-    
+    const targetSlideIds = new Set(targetProject.slides.map((s) => s.id));
+
     for (const slide of sourceProject.slides) {
-      if (options.selectedSlides && !options.selectedSlides.includes(slide.id)) {
+      if (
+        options.selectedSlides &&
+        !options.selectedSlides.includes(slide.id)
+      ) {
         continue;
       }
 
@@ -352,7 +374,7 @@ export class VersionControlService {
 
   private detectChanges(
     previousVersions: PresentationVersion[],
-    currentProject: any
+    currentProject: any,
   ): VersionChange[] {
     const changes: VersionChange[] = [];
 
@@ -365,15 +387,19 @@ export class VersionControlService {
     }
 
     const lastVersion = previousVersions[previousVersions.length - 1];
-    const previousSlides = new Map(lastVersion.snapshot.slides.map((s: any) => [s.id, s]));
-    const currentSlides = new Map(currentProject.slides.map((s: any) => [s.id, s]));
+    const previousSlides = new Map(
+      lastVersion.snapshot.slides.map((s: any) => [s.id, s]),
+    );
+    const currentSlides = new Map(
+      currentProject.slides.map((s: any) => [s.id, s]),
+    );
 
     // Check for added slides
     for (const [slideId] of currentSlides) {
       if (!previousSlides.has(slideId)) {
         changes.push({
           type: 'slide_added',
-          slideId,
+          slideId: slideId as string,
           description: 'New slide added',
         });
       }
@@ -384,7 +410,7 @@ export class VersionControlService {
       if (!currentSlides.has(slideId)) {
         changes.push({
           type: 'slide_deleted',
-          slideId,
+          slideId: slideId as string,
           description: 'Slide removed',
         });
       }
@@ -393,10 +419,13 @@ export class VersionControlService {
     // Check for modified slides
     for (const [slideId, currentSlide] of currentSlides) {
       const previousSlide = previousSlides.get(slideId);
-      if (previousSlide && JSON.stringify(previousSlide) !== JSON.stringify(currentSlide)) {
+      if (
+        previousSlide &&
+        JSON.stringify(previousSlide) !== JSON.stringify(currentSlide)
+      ) {
         changes.push({
           type: 'slide_modified',
-          slideId,
+          slideId: slideId as string,
           description: 'Slide content modified',
         });
       }
@@ -405,7 +434,10 @@ export class VersionControlService {
     return changes;
   }
 
-  private compareSlides(slideA: any, slideB: any): { field: string; oldValue: any; newValue: any }[] {
+  private compareSlides(
+    slideA: any,
+    slideB: any,
+  ): { field: string; oldValue: any; newValue: any }[] {
     const changes: { field: string; oldValue: any; newValue: any }[] = [];
     const fields = ['content', 'layout', 'style', 'notes', 'order'];
 
@@ -424,17 +456,20 @@ export class VersionControlService {
 
   private pruneVersions(projectId: string): void {
     const versions = this.versions.get(projectId) || [];
-    
+
     if (versions.length <= 100) {
       return;
     }
 
     // Keep all milestones and last 50 regular versions
-    const milestones = versions.filter(v => v.isMilestone);
-    const regular = versions.filter(v => !v.isMilestone).slice(-50);
-    
-    this.versions.set(projectId, [...milestones, ...regular].sort((a, b) => 
-      a.versionNumber - b.versionNumber
-    ));
+    const milestones = versions.filter((v) => v.isMilestone);
+    const regular = versions.filter((v) => !v.isMilestone).slice(-50);
+
+    this.versions.set(
+      projectId,
+      [...milestones, ...regular].sort(
+        (a, b) => a.versionNumber - b.versionNumber,
+      ),
+    );
   }
 }

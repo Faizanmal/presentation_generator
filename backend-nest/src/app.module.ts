@@ -88,7 +88,7 @@ import { ThemesService } from './themes/themes.service';
     OrganizationsModule,
     SyncModule,
     TagsModule,
-    
+
     // Production modules
     CacheModule,
     SecurityModule,

@@ -32,7 +32,11 @@ export class PresentationCoachController {
     body: {
       transcript: string;
       duration: number;
-      slideTimings: { slideIndex: number; startTime: number; endTime: number }[];
+      slideTimings: {
+        slideIndex: number;
+        startTime: number;
+        endTime: number;
+      }[];
       suggestedDurationPerSlide: number;
     },
   ) {

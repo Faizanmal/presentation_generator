@@ -275,7 +275,7 @@ export function PresentationScheduler({
   };
 
   // Mock data
-  const mockPresentations: ScheduledPresentation[] = presentations || [
+  const mockPresentations: ScheduledPresentation[] = presentations?.data || [
     {
       id: 'sched-1',
       projectId,

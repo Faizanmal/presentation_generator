@@ -74,7 +74,9 @@ describe('Export (e2e)', () => {
   afterAll(async () => {
     // Clean up test data
     if (testProjectId) {
-      await prisma.project.delete({ where: { id: testProjectId } }).catch(() => {});
+      await prisma.project
+        .delete({ where: { id: testProjectId } })
+        .catch(() => {});
     }
     if (testUserId) {
       await prisma.user.delete({ where: { id: testUserId } }).catch(() => {});

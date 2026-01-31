@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Sparkles,
@@ -14,7 +14,6 @@ import {
   Crown,
   Zap,
   Building2,
-  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
@@ -78,7 +77,7 @@ const PLANS = [
 
 export default function BillingPage() {
   const router = useRouter();
-  const { user, subscription, isAuthenticated, isLoading: authLoading, fetchSubscription } = useAuthStore();
+  const { subscription, isAuthenticated, isLoading: authLoading } = useAuthStore();
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -160,7 +159,7 @@ export default function BillingPage() {
             Plans & Billing
           </h1>
           <p className="text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
-            Choose the plan that's right for you. Upgrade anytime to unlock more features.
+            Choose the plan that&apos;s right for you. Upgrade anytime to unlock more features.
           </p>
         </div>
 
@@ -241,11 +240,10 @@ export default function BillingPage() {
             return (
               <div
                 key={plan.id}
-                className={`relative bg-white dark:bg-slate-950 rounded-xl border-2 overflow-hidden transition-all ${
-                  plan.popular
-                    ? "border-blue-500 shadow-lg shadow-blue-500/10"
-                    : "border-slate-200 dark:border-slate-800"
-                } ${isCurrentPlan ? "ring-2 ring-green-500 ring-offset-2" : ""}`}
+                className={`relative bg-white dark:bg-slate-950 rounded-xl border-2 overflow-hidden transition-all ${plan.popular
+                  ? "border-blue-500 shadow-lg shadow-blue-500/10"
+                  : "border-slate-200 dark:border-slate-800"
+                  } ${isCurrentPlan ? "ring-2 ring-green-500 ring-offset-2" : ""}`}
               >
                 {plan.popular && (
                   <div className="absolute top-0 left-0 right-0 bg-blue-500 text-white text-center text-sm py-1">
@@ -256,22 +254,20 @@ export default function BillingPage() {
                 <div className={`p-6 ${plan.popular ? "pt-10" : ""}`}>
                   <div className="flex items-center gap-3 mb-4">
                     <div
-                      className={`h-10 w-10 rounded-lg flex items-center justify-center ${
-                        plan.id === "FREE"
-                          ? "bg-slate-100 dark:bg-slate-800"
-                          : plan.id === "PRO"
+                      className={`h-10 w-10 rounded-lg flex items-center justify-center ${plan.id === "FREE"
+                        ? "bg-slate-100 dark:bg-slate-800"
+                        : plan.id === "PRO"
                           ? "bg-blue-100 dark:bg-blue-900"
                           : "bg-purple-100 dark:bg-purple-900"
-                      }`}
+                        }`}
                     >
                       <Icon
-                        className={`h-5 w-5 ${
-                          plan.id === "FREE"
-                            ? "text-slate-600"
-                            : plan.id === "PRO"
+                        className={`h-5 w-5 ${plan.id === "FREE"
+                          ? "text-slate-600"
+                          : plan.id === "PRO"
                             ? "text-blue-600"
                             : "text-purple-600"
-                        }`}
+                          }`}
                       />
                     </div>
                     <div>

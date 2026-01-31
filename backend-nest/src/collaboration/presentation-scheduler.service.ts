@@ -87,7 +87,9 @@ export class PresentationSchedulerService {
       updatedAt: new Date(),
     };
 
-    this.logger.log(`Scheduled presentation ${scheduled.id} for ${data.scheduledAt}`);
+    this.logger.log(
+      `Scheduled presentation ${scheduled.id} for ${data.scheduledAt}`,
+    );
     return scheduled;
   }
 
@@ -130,7 +132,9 @@ export class PresentationSchedulerService {
     ];
   }
 
-  async getScheduledPresentationById(id: string): Promise<ScheduledPresentation | null> {
+  async getScheduledPresentationById(
+    id: string,
+  ): Promise<ScheduledPresentation | null> {
     const all = await this.getScheduledPresentations('');
     return all.find((p) => p.id === id) || null;
   }
@@ -183,9 +187,9 @@ export class PresentationSchedulerService {
     presenterUrl: string;
   }> {
     const sessionId = `session-${Date.now()}`;
-    
+
     this.logger.log(`Started presentation ${id} as session ${sessionId}`);
-    
+
     return {
       sessionId,
       joinUrl: `/live/${sessionId}`,
@@ -195,7 +199,7 @@ export class PresentationSchedulerService {
 
   async endPresentation(id: string): Promise<PresentationStats> {
     this.logger.log(`Ended presentation ${id}`);
-    
+
     return {
       totalAttendees: 25,
       peakAttendees: 22,
@@ -206,7 +210,9 @@ export class PresentationSchedulerService {
     };
   }
 
-  async getRecording(id: string): Promise<{ url: string; duration: number } | null> {
+  async getRecording(
+    id: string,
+  ): Promise<{ url: string; duration: number } | null> {
     // In production, return actual recording URL
     return {
       url: `/recordings/${id}.mp4`,
@@ -226,7 +232,7 @@ export class PresentationSchedulerService {
         if (reminder.sent) continue;
 
         const reminderTime = new Date(
-          presentation.scheduledAt.getTime() - reminder.beforeMinutes * 60000
+          presentation.scheduledAt.getTime() - reminder.beforeMinutes * 60000,
         );
 
         if (now >= reminderTime) {
@@ -236,10 +242,7 @@ export class PresentationSchedulerService {
       }
 
       // Auto-start if enabled
-      if (
-        presentation.settings.autoStart &&
-        now >= presentation.scheduledAt
-      ) {
+      if (presentation.settings.autoStart && now >= presentation.scheduledAt) {
         await this.startPresentation(presentation.id);
       }
     }
@@ -250,7 +253,7 @@ export class PresentationSchedulerService {
     reminder: ScheduledPresentation['reminders'][0],
   ): Promise<void> {
     this.logger.log(
-      `Sending ${reminder.type} reminder for presentation ${presentation.id}`
+      `Sending ${reminder.type} reminder for presentation ${presentation.id}`,
     );
     // Send email or push notification
   }
@@ -270,7 +273,7 @@ export class PresentationSchedulerService {
 
     const startTime = presentation.scheduledAt.toISOString();
     const endTime = new Date(
-      presentation.scheduledAt.getTime() + presentation.duration * 60000
+      presentation.scheduledAt.getTime() + presentation.duration * 60000,
     ).toISOString();
 
     switch (type) {

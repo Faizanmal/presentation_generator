@@ -89,7 +89,7 @@ export class PresentationCoachService {
     const { slides } = presentation;
     const totalWords = slides.reduce(
       (acc, s) => acc + s.content.split(/\s+/).length,
-      0
+      0,
     );
     const slideCount = slides.length;
 
@@ -101,12 +101,16 @@ Audience: ${presentation.audience || 'General'}
 Purpose: ${presentation.purpose || 'Inform'}
 
 Slides:
-${slides.map((s, i) => `
+${slides
+  .map(
+    (s, i) => `
 Slide ${i + 1} (${s.layout}):
 Content: ${s.content}
 Speaker Notes: ${s.speakerNotes || 'None'}
 Has Image: ${s.hasImage}
-`).join('\n')}
+`,
+  )
+  .join('\n')}
 
 Provide analysis in JSON format:
 {
@@ -151,7 +155,8 @@ Provide analysis in JSON format:
         messages: [
           {
             role: 'system',
-            content: 'You are an expert presentation coach. Analyze presentations and provide actionable feedback. Return only valid JSON.',
+            content:
+              'You are an expert presentation coach. Analyze presentations and provide actionable feedback. Return only valid JSON.',
           },
           { role: 'user', content: prompt },
         ],
@@ -179,7 +184,8 @@ Provide analysis in JSON format:
           engagement: {
             score: analysis.engagement?.score || 18,
             maxScore: 25,
-            feedback: analysis.engagement?.feedback || 'Engagement analysis pending',
+            feedback:
+              analysis.engagement?.feedback || 'Engagement analysis pending',
             tips: analysis.engagement?.tips || [],
           },
           clarity: {
@@ -210,16 +216,28 @@ Provide analysis in JSON format:
     slideTimings: { slideIndex: number; startTime: number; endTime: number }[];
     suggestedDurationPerSlide: number;
   }): Promise<RehearsalFeedback> {
-    const { transcript, duration, slideTimings, suggestedDurationPerSlide } = rehearsalData;
-    const words = transcript.split(/\s+/).filter(w => w.length > 0);
+    const { transcript, duration, slideTimings, suggestedDurationPerSlide } =
+      rehearsalData;
+    const words = transcript.split(/\s+/).filter((w) => w.length > 0);
     const wordCount = words.length;
     const wpm = Math.round((wordCount / duration) * 60);
 
     // Detect filler words
-    const fillerWordsList = ['um', 'uh', 'like', 'you know', 'basically', 'actually', 'literally', 'so', 'right', 'okay'];
+    const fillerWordsList = [
+      'um',
+      'uh',
+      'like',
+      'you know',
+      'basically',
+      'actually',
+      'literally',
+      'so',
+      'right',
+      'okay',
+    ];
     const fillerCounts: Record<string, number> = {};
-    
-    fillerWordsList.forEach(filler => {
+
+    fillerWordsList.forEach((filler) => {
       const regex = new RegExp(`\\b${filler}\\b`, 'gi');
       const matches = transcript.match(regex);
       if (matches && matches.length > 0) {
@@ -252,7 +270,8 @@ Provide analysis in JSON format:
         messages: [
           {
             role: 'system',
-            content: 'You are a presentation coach analyzing rehearsal performance. Return only valid JSON.',
+            content:
+              'You are a presentation coach analyzing rehearsal performance. Return only valid JSON.',
           },
           { role: 'user', content: prompt },
         ],
@@ -266,18 +285,23 @@ Provide analysis in JSON format:
         pace: {
           wordsPerMinute: wpm,
           rating: wpm < 100 ? 'too-slow' : wpm > 160 ? 'too-fast' : 'good',
-          suggestion: wpm < 100 
-            ? 'Try to speak a bit faster to maintain audience engagement.'
-            : wpm > 160 
-              ? 'Slow down slightly to ensure your audience can follow along.'
-              : 'Great pace! Your speaking speed is ideal for presentations.',
+          suggestion:
+            wpm < 100
+              ? 'Try to speak a bit faster to maintain audience engagement.'
+              : wpm > 160
+                ? 'Slow down slightly to ensure your audience can follow along.'
+                : 'Great pace! Your speaking speed is ideal for presentations.',
         },
         fillerWords: {
           count: totalFillers,
-          words: Object.entries(fillerCounts).map(([word, count]) => ({ word, count })),
-          suggestion: totalFillers > 10 
-            ? 'Practice pausing instead of using filler words. This will make you sound more confident.'
-            : 'Good job minimizing filler words!',
+          words: Object.entries(fillerCounts).map(([word, count]) => ({
+            word,
+            count,
+          })),
+          suggestion:
+            totalFillers > 10
+              ? 'Practice pausing instead of using filler words. This will make you sound more confident.'
+              : 'Good job minimizing filler words!',
         },
         clarity: {
           score: analysis.clarityScore || 80,
@@ -285,17 +309,22 @@ Provide analysis in JSON format:
         },
         timing: {
           totalDuration: duration,
-          perSlide: slideTimings.map(st => ({
+          perSlide: slideTimings.map((st) => ({
             slideIndex: st.slideIndex,
             duration: st.endTime - st.startTime,
             suggested: suggestedDurationPerSlide,
           })),
-          suggestion: this.getTimingSuggestion(slideTimings, suggestedDurationPerSlide),
+          suggestion: this.getTimingSuggestion(
+            slideTimings,
+            suggestedDurationPerSlide,
+          ),
         },
         confidence: {
           score: analysis.confidenceScore || 75,
           indicators: analysis.confidenceIndicators || [],
-          tips: analysis.confidenceTips || ['Practice more to build confidence'],
+          tips: analysis.confidenceTips || [
+            'Practice more to build confidence',
+          ],
         },
       };
     } catch (error) {
@@ -331,7 +360,8 @@ Provide improvements in JSON format:
       messages: [
         {
           role: 'system',
-          content: 'You are a presentation expert. Improve content to be more engaging and clear. Return only valid JSON.',
+          content:
+            'You are a presentation expert. Improve content to be more engaging and clear. Return only valid JSON.',
         },
         { role: 'user', content: prompt },
       ],
@@ -371,7 +401,8 @@ Provide in JSON format:
       messages: [
         {
           role: 'system',
-          content: 'You are a presentation coach. Generate helpful speaker notes. Return only valid JSON.',
+          content:
+            'You are a presentation coach. Generate helpful speaker notes. Return only valid JSON.',
         },
         { role: 'user', content: prompt },
       ],
@@ -382,12 +413,14 @@ Provide in JSON format:
     return JSON.parse(response.choices[0].message.content || '{}');
   }
 
-  private async checkAccessibility(slides: Array<{ content: string; hasImage: boolean }>): Promise<CategoryScore> {
+  private async checkAccessibility(
+    slides: Array<{ content: string; hasImage: boolean }>,
+  ): Promise<CategoryScore> {
     let score = 25;
     const tips: string[] = [];
 
     // Check for image alt text (simplified check)
-    const slidesWithImages = slides.filter(s => s.hasImage).length;
+    const slidesWithImages = slides.filter((s) => s.hasImage).length;
     if (slidesWithImages > 0) {
       tips.push('Ensure all images have descriptive alt text');
       score -= 3;
@@ -400,7 +433,9 @@ Provide in JSON format:
     tips.push('Use minimum 24pt font for body text for readability');
 
     // Check for content density
-    const avgWordsPerSlide = slides.reduce((acc, s) => acc + s.content.split(/\s+/).length, 0) / slides.length;
+    const avgWordsPerSlide =
+      slides.reduce((acc, s) => acc + s.content.split(/\s+/).length, 0) /
+      slides.length;
     if (avgWordsPerSlide > 75) {
       tips.push('Consider reducing text per slide for better readability');
       score -= 5;
@@ -409,21 +444,27 @@ Provide in JSON format:
     return {
       score,
       maxScore: 25,
-      feedback: score >= 20 ? 'Good accessibility practices' : 'Some accessibility improvements needed',
+      feedback:
+        score >= 20
+          ? 'Good accessibility practices'
+          : 'Some accessibility improvements needed',
       tips,
     };
   }
 
   private calculateReadability(slides: Array<{ content: string }>): number {
     // Simplified Flesch-Kincaid readability score
-    const text = slides.map(s => s.content).join(' ');
-    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0).length;
-    const words = text.split(/\s+/).filter(w => w.length > 0).length;
+    const text = slides.map((s) => s.content).join(' ');
+    const sentences = text
+      .split(/[.!?]+/)
+      .filter((s) => s.trim().length > 0).length;
+    const words = text.split(/\s+/).filter((w) => w.length > 0).length;
     const syllables = this.countSyllables(text);
 
     if (sentences === 0 || words === 0) return 80;
 
-    const fleschScore = 206.835 - 1.015 * (words / sentences) - 84.6 * (syllables / words);
+    const fleschScore =
+      206.835 - 1.015 * (words / sentences) - 84.6 * (syllables / words);
     return Math.max(0, Math.min(100, Math.round(fleschScore)));
   }
 
@@ -432,10 +473,10 @@ Provide in JSON format:
     return words.reduce((count, word) => {
       word = word.replace(/[^a-z]/g, '');
       if (word.length <= 3) return count + 1;
-      
+
       word = word.replace(/(?:[^laeiouy]es|ed|[^laeiouy]e)$/, '');
       word = word.replace(/^y/, '');
-      
+
       const syllables = word.match(/[aeiouy]{1,2}/g);
       return count + (syllables ? syllables.length : 1);
     }, 0);
@@ -443,11 +484,11 @@ Provide in JSON format:
 
   private getTimingSuggestion(
     slideTimings: { slideIndex: number; startTime: number; endTime: number }[],
-    suggested: number
+    suggested: number,
   ): string {
     const issues: string[] = [];
-    
-    slideTimings.forEach(st => {
+
+    slideTimings.forEach((st) => {
       const duration = st.endTime - st.startTime;
       if (duration < suggested * 0.5) {
         issues.push(`Slide ${st.slideIndex + 1} was too quick`);
@@ -459,7 +500,7 @@ Provide in JSON format:
     if (issues.length === 0) {
       return 'Great pacing across all slides!';
     }
-    
+
     return `Consider adjusting timing: ${issues.slice(0, 3).join(', ')}${issues.length > 3 ? ` and ${issues.length - 3} more` : ''}.`;
   }
 }

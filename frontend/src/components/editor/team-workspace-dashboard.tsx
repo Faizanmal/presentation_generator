@@ -66,6 +66,7 @@ import {
   AlertCircle,
   Send,
   RefreshCw,
+  FileText,
 } from 'lucide-react';
 
 interface TeamMember {
@@ -299,7 +300,7 @@ export function TeamWorkspaceDashboard() {
   const getActivityIcon = (type: TeamActivity['type']) => {
     switch (type) {
       case 'created':
-        return <FilePresentation className="h-4 w-4 text-green-500" />;
+        return <FileText className="h-4 w-4 text-green-500" />;
       case 'edited':
         return <Edit3 className="h-4 w-4 text-blue-500" />;
       case 'shared':
@@ -392,7 +393,7 @@ export function TeamWorkspaceDashboard() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-green-100">
-                  <FilePresentation className="h-5 w-5 text-green-600" />
+                  <FileText className="h-5 w-5 text-green-600" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{stats.totalPresentations}</p>
@@ -501,7 +502,7 @@ export function TeamWorkspaceDashboard() {
                         {/* Thumbnail */}
                         <div className="aspect-video bg-gradient-to-br from-primary/20 to-primary/5 rounded-t-lg relative">
                           <div className="absolute inset-0 flex items-center justify-center">
-                            <FilePresentation className="h-12 w-12 text-primary/40" />
+                            <FileText className="h-12 w-12 text-primary/40" />
                           </div>
                           <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <Button
@@ -565,7 +566,7 @@ export function TeamWorkspaceDashboard() {
                     <Card key={presentation.id} className="cursor-pointer hover:bg-muted/50 transition-colors">
                       <CardContent className="p-4 flex items-center gap-4">
                         <div className="w-24 aspect-video bg-gradient-to-br from-primary/20 to-primary/5 rounded flex items-center justify-center">
-                          <FilePresentation className="h-8 w-8 text-primary/40" />
+                          <FileText className="h-8 w-8 text-primary/40" />
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
@@ -679,7 +680,7 @@ export function TeamWorkspaceDashboard() {
                             Active {member.lastActive}
                           </span>
                           <span className="flex items-center gap-1">
-                            <FilePresentation className="h-3 w-3" />
+                            <FileText className="h-3 w-3" />
                             {member.presentationsCount} presentations
                           </span>
                         </div>

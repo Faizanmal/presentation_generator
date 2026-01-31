@@ -335,7 +335,7 @@ export function AdvancedAnalyticsDashboard({
               </div>
               <div>
                 <p className="font-medium text-orange-900">
-                  High Drop-off at Slide {(analytics.dropOffSlide || 0) + 1}
+                  High Drop-off at Slide {(analytics?.dropOffSlide || 0) + 1}
                 </p>
                 <p className="text-sm text-orange-700">
                   Consider reviewing the content on this slide to improve engagement

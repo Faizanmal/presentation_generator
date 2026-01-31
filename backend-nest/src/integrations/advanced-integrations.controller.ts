@@ -10,7 +10,7 @@ import {
   Request,
   Res,
 } from '@nestjs/common';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdvancedIntegrationsService } from './advanced-integrations.service';
