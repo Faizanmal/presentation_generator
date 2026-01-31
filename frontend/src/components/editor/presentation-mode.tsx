@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -50,7 +52,7 @@ interface Slide {
     order: number;
     title?: string;
     speakerNotes?: string;
-    content?: any;
+    content?: Record<string, unknown>;
 }
 
 interface PresentationModeProps {

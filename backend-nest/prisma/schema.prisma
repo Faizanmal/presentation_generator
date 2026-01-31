@@ -17,18 +17,20 @@ model User {
   id            String    @id @default(cuid())
   email         String    @unique
   name          String?
-  password      String?   // null for OAuth users
+  password      String? // null for OAuth users
   emailVerified DateTime?
   image         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   // Relations
-  accounts     Account[]
-  sessions     Session[]
-  projects     Project[]
-  subscription Subscription?
-  tags         Tag[]
+  accounts            Account[]
+  sessions            Session[]
+  projects            Project[]
+  subscription        Subscription?
+  tags                Tag[]
+  activityLogs        ActivityLog[]
+  organizationMembers OrganizationMember[]
 
   @@map("users")
 }
@@ -93,30 +95,30 @@ model Project {
   description String?
   type        ProjectType   @default(PRESENTATION)
   status      ProjectStatus @default(DRAFT)
-  
+
   // Theme settings
-  themeId     String?
-  theme       Theme?        @relation(fields: [themeId], references: [id])
-  
+  themeId String?
+  theme   Theme?  @relation(fields: [themeId], references: [id])
+
   // Sharing settings
-  isPublic    Boolean       @default(false)
-  shareToken  String?       @unique
-  
+  isPublic   Boolean @default(false)
+  shareToken String? @unique
+
   // AI generation metadata
   generatedFromPrompt String? @db.Text
   tone                String?
   audience            String?
-  
+
   // Timestamps
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  ownerId     String
-  owner       User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  slides      Slide[]
-  blocks      Block[]
-  tags        Tag[]
+  ownerId String
+  owner   User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  slides  Slide[]
+  blocks  Block[]
+  tags    Tag[]
 
   @@index([ownerId])
   @@index([shareToken])
@@ -124,16 +126,16 @@ model Project {
 }
 
 model Slide {
-  id        String   @id @default(cuid())
+  id        String @id @default(cuid())
   projectId String
   order     Int
-  layout    String   @default("default") // layout template name
-  
+  layout    String @default("default") // layout template name
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  blocks    Block[]
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  blocks  Block[]
 
   @@index([projectId])
   @@map("slides")
@@ -165,17 +167,17 @@ model Block {
   projectId String
   slideId   String?
   blockType BlockType
-  content   Json      // Flexible content storage
+  content   Json // Flexible content storage
   order     Int
-  
-  // Styling overrides
-  style     Json?     // Custom styling for this block
-  
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
 
-  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  slide     Slide?    @relation(fields: [slideId], references: [id], onDelete: Cascade)
+  // Styling overrides
+  style Json? // Custom styling for this block
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  slide   Slide?  @relation(fields: [slideId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
   @@index([slideId])
@@ -187,21 +189,21 @@ model Block {
 // ============================================
 
 model Theme {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   name        String
   description String?
-  isDefault   Boolean  @default(false)
-  isPremium   Boolean  @default(false)
-  
-  // Theme configuration
-  colors      Json     // { primary, secondary, background, text, accent }
-  fonts       Json     // { heading, body }
-  spacing     Json     // { base, scale }
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isDefault   Boolean @default(false)
+  isPremium   Boolean @default(false)
 
-  projects    Project[]
+  // Theme configuration
+  colors  Json // { primary, secondary, background, text, accent }
+  fonts   Json // { heading, body }
+  spacing Json // { base, scale }
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projects Project[]
 
   @@map("themes")
 }
@@ -225,30 +227,30 @@ enum SubscriptionStatus {
 }
 
 model Subscription {
-  id                   String             @id @default(cuid())
-  userId               String             @unique
-  plan                 SubscriptionPlan   @default(FREE)
-  status               SubscriptionStatus @default(ACTIVE)
-  
-  // Stripe integration
-  stripeCustomerId     String?            @unique
-  stripeSubscriptionId String?            @unique
-  stripePriceId        String?
-  
-  // Usage limits
-  projectsLimit        Int                @default(3)
-  aiGenerationsLimit   Int                @default(10)
-  aiGenerationsUsed    Int                @default(0)
-  
-  // Billing period
-  currentPeriodStart   DateTime?
-  currentPeriodEnd     DateTime?
-  cancelAtPeriodEnd    Boolean            @default(false)
-  
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
+  id     String             @id @default(cuid())
+  userId String             @unique
+  plan   SubscriptionPlan   @default(FREE)
+  status SubscriptionStatus @default(ACTIVE)
 
-  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Stripe integration
+  stripeCustomerId     String? @unique
+  stripeSubscriptionId String? @unique
+  stripePriceId        String?
+
+  // Usage limits
+  projectsLimit      Int @default(3)
+  aiGenerationsLimit Int @default(10)
+  aiGenerationsUsed  Int @default(0)
+
+  // Billing period
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  cancelAtPeriodEnd  Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("subscriptions")
 }
@@ -258,15 +260,15 @@ model Subscription {
 // ============================================
 
 model AIGeneration {
-  id        String   @id @default(cuid())
+  id        String  @id @default(cuid())
   userId    String
   projectId String?
-  
-  prompt    String   @db.Text
-  response  Json
-  tokens    Int
-  model     String
-  
+
+  prompt   String @db.Text
+  response Json
+  tokens   Int
+  model    String
+
   createdAt DateTime @default(now())
 
   @@index([userId])
@@ -274,13 +276,13 @@ model AIGeneration {
 }
 
 model Asset {
-  id        String   @id @default(cuid())
-  userId    String
-  filename  String
-  url       String
-  mimeType  String
-  size      Int
-  
+  id       String @id @default(cuid())
+  userId   String
+  filename String
+  url      String
+  mimeType String
+  size     Int
+
   createdAt DateTime @default(now())
 
   @@index([userId])
@@ -292,18 +294,18 @@ model Asset {
 // ============================================
 
 model CollaborationSession {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   projectId   String
   userId      String
   socketId    String
   cursorX     Float?
   cursorY     Float?
   cursorSlide Int?
-  isActive    Boolean  @default(true)
-  color       String   // User's cursor color
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isActive    Boolean @default(true)
+  color       String // User's cursor color
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([projectId])
   @@index([userId])
@@ -311,14 +313,14 @@ model CollaborationSession {
 }
 
 model ProjectCollaborator {
-  id          String   @id @default(cuid())
-  projectId   String
-  userId      String
-  role        CollaboratorRole @default(VIEWER)
-  invitedBy   String?
-  invitedAt   DateTime @default(now())
-  acceptedAt  DateTime?
-  
+  id         String           @id @default(cuid())
+  projectId  String
+  userId     String
+  role       CollaboratorRole @default(VIEWER)
+  invitedBy  String?
+  invitedAt  DateTime         @default(now())
+  acceptedAt DateTime?
+
   @@unique([projectId, userId])
   @@index([projectId])
   @@index([userId])
@@ -333,34 +335,33 @@ enum CollaboratorRole {
 }
 
 model Comment {
-  id          String   @id @default(cuid())
-  projectId   String
-  slideId     String?
-  blockId     String?
-  userId      String
-  content     String   @db.Text
-  resolved    Boolean  @default(false)
-  pinned      Boolean  @default(false)
-  parentId    String?  // For reply threads
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String  @id @default(cuid())
+  projectId String
+  slideId   String?
+  blockId   String?
+  userId    String
+  content   String  @db.Text
+  resolved  Boolean @default(false)
+  pinned    Boolean @default(false)
+  parentId  String? // For reply threads
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([projectId])
   @@index([slideId])
   @@map("comments")
 }
 
-
 model ProjectVersion {
-  id          String   @id @default(cuid())
-  projectId   String
-  version     Int
-  snapshot    Json     // Full project snapshot
-  message     String?  // Version message/description
-  createdBy   String
-  
-  createdAt   DateTime @default(now())
+  id        String  @id @default(cuid())
+  projectId String
+  version   Int
+  snapshot  Json // Full project snapshot
+  message   String? // Version message/description
+  createdBy String
+
+  createdAt DateTime @default(now())
 
   @@unique([projectId, version])
   @@index([projectId])
@@ -372,17 +373,17 @@ model ProjectVersion {
 // ============================================
 
 model VoiceRecording {
-  id           String   @id @default(cuid())
-  userId       String
-  projectId    String?
-  filename     String
-  url          String
-  duration     Float    // Duration in seconds
-  transcription String? @db.Text
-  status       VoiceProcessingStatus @default(UPLOADING)
-  
-  createdAt    DateTime @default(now())
-  processedAt  DateTime?
+  id            String                @id @default(cuid())
+  userId        String
+  projectId     String?
+  filename      String
+  url           String
+  duration      Float // Duration in seconds
+  transcription String?               @db.Text
+  status        VoiceProcessingStatus @default(UPLOADING)
+
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
 
   @@index([userId])
   @@index([projectId])
@@ -402,19 +403,19 @@ enum VoiceProcessingStatus {
 // ============================================
 
 model PresentationView {
-  id           String   @id @default(cuid())
-  projectId    String
-  viewerId     String?  // Anonymous if null
-  sessionId    String   // Unique session identifier
-  ipAddress    String?
-  userAgent    String?
-  referrer     String?
-  
-  startedAt    DateTime @default(now())
-  endedAt      DateTime?
-  totalDuration Int?    // Total time in seconds
+  id        String  @id @default(cuid())
+  projectId String
+  viewerId  String? // Anonymous if null
+  sessionId String // Unique session identifier
+  ipAddress String?
+  userAgent String?
+  referrer  String?
 
-  slideViews   SlideView[]
+  startedAt     DateTime  @default(now())
+  endedAt       DateTime?
+  totalDuration Int? // Total time in seconds
+
+  slideViews SlideView[]
 
   @@index([projectId])
   @@index([sessionId])
@@ -422,17 +423,17 @@ model PresentationView {
 }
 
 model SlideView {
-  id                 String   @id @default(cuid())
+  id                 String @id @default(cuid())
   presentationViewId String
   slideId            String
   slideIndex         Int
-  
-  enterTime          DateTime @default(now())
-  exitTime           DateTime?
-  duration           Int?     // Time spent in seconds
-  interactions       Int      @default(0) // Click count
-  
-  presentationView   PresentationView @relation(fields: [presentationViewId], references: [id], onDelete: Cascade)
+
+  enterTime    DateTime  @default(now())
+  exitTime     DateTime?
+  duration     Int? // Time spent in seconds
+  interactions Int       @default(0) // Click count
+
+  presentationView PresentationView @relation(fields: [presentationViewId], references: [id], onDelete: Cascade)
 
   @@index([presentationViewId])
   @@index([slideId])
@@ -440,14 +441,14 @@ model SlideView {
 }
 
 model EngagementHeatmap {
-  id          String   @id @default(cuid())
-  projectId   String
-  slideId     String
-  x           Float    // Percentage position
-  y           Float
-  clickCount  Int      @default(1)
-  
-  updatedAt   DateTime @updatedAt
+  id         String @id @default(cuid())
+  projectId  String
+  slideId    String
+  x          Float // Percentage position
+  y          Float
+  clickCount Int    @default(1)
+
+  updatedAt DateTime @updatedAt
 
   @@unique([projectId, slideId, x, y])
   @@index([projectId])
@@ -455,14 +456,14 @@ model EngagementHeatmap {
 }
 
 model AnalyticsSnapshot {
-  id          String   @id @default(cuid())
-  projectId   String
-  date        DateTime @db.Date
-  views       Int      @default(0)
-  uniqueViews Int      @default(0)
-  avgDuration Float    @default(0)
-  dropOffSlide Int?    // Slide where most viewers left
-  
+  id           String   @id @default(cuid())
+  projectId    String
+  date         DateTime @db.Date
+  views        Int      @default(0)
+  uniqueViews  Int      @default(0)
+  avgDuration  Float    @default(0)
+  dropOffSlide Int? // Slide where most viewers left
+
   @@unique([projectId, date])
   @@index([projectId])
   @@map("analytics_snapshots")
@@ -473,17 +474,17 @@ model AnalyticsSnapshot {
 // ============================================
 
 model Integration {
-  id           String   @id @default(cuid())
+  id           String              @id @default(cuid())
   userId       String
   provider     IntegrationProvider
-  accessToken  String   @db.Text
-  refreshToken String?  @db.Text
+  accessToken  String              @db.Text
+  refreshToken String?             @db.Text
   expiresAt    DateTime?
-  metadata     Json?    // Provider-specific data
-  isActive     Boolean  @default(true)
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  metadata     Json? // Provider-specific data
+  isActive     Boolean             @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([userId, provider])
   @@index([userId])
@@ -501,14 +502,14 @@ enum IntegrationProvider {
 }
 
 model IntegrationWebhook {
-  id           String   @id @default(cuid())
+  id            String        @id @default(cuid())
   integrationId String
-  eventType    String
-  payload      Json
-  status       WebhookStatus @default(PENDING)
-  
-  createdAt    DateTime @default(now())
-  processedAt  DateTime?
+  eventType     String
+  payload       Json
+  status        WebhookStatus @default(PENDING)
+
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
 
   @@index([integrationId])
   @@map("integration_webhooks")
@@ -525,33 +526,33 @@ enum WebhookStatus {
 // ============================================
 
 model BrandProfile {
-  id           String   @id @default(cuid())
-  userId       String   @unique
-  companyName  String?
-  brandVoice   String?  @db.Text // Tone/style description
-  industry     String?
-  targetAudience String? @db.Text
-  keywords     String[] // Brand-specific terms
-  colorPalette Json?    // Brand colors
-  logoUrl      String?
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  companyName    String?
+  brandVoice     String?  @db.Text // Tone/style description
+  industry       String?
+  targetAudience String?  @db.Text
+  keywords       String[] // Brand-specific terms
+  colorPalette   Json? // Brand colors
+  logoUrl        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("brand_profiles")
 }
 
 model TrainingDocument {
-  id           String   @id @default(cuid())
-  userId       String
-  filename     String
-  url          String
-  content      String?  @db.Text // Extracted text
-  embeddings   Json?    // Vector embeddings for RAG
-  status       DocumentStatus @default(UPLOADING)
-  
-  createdAt    DateTime @default(now())
-  processedAt  DateTime?
+  id         String         @id @default(cuid())
+  userId     String
+  filename   String
+  url        String
+  content    String?        @db.Text // Extracted text
+  embeddings Json? // Vector embeddings for RAG
+  status     DocumentStatus @default(UPLOADING)
+
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
 
   @@index([userId])
   @@map("training_documents")
@@ -565,15 +566,15 @@ enum DocumentStatus {
 }
 
 model AIPersonalization {
-  id           String   @id @default(cuid())
-  userId       String
-  projectId    String?
+  id             String  @id @default(cuid())
+  userId         String
+  projectId      String?
   promptTemplate String? @db.Text // Custom system prompt
-  examples     Json?    // Few-shot examples
-  preferences  Json?    // Style preferences
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  examples       Json? // Few-shot examples
+  preferences    Json? // Style preferences
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
   @@map("ai_personalizations")
@@ -584,40 +585,41 @@ model AIPersonalization {
 // ============================================
 
 model Organization {
-  id           String   @id @default(cuid())
-  name         String
-  slug         String   @unique
-  logo         String?
-  domain       String?  @unique // For SSO domain verification
-  
+  id     String  @id @default(cuid())
+  name   String
+  slug   String  @unique
+  logo   String?
+  domain String? @unique // For SSO domain verification
+
   // White-labeling
   brandingEnabled Boolean @default(false)
   primaryColor    String?
   secondaryColor  String?
   customCss       String? @db.Text
   customDomain    String? @unique
-  
-  // Settings
-  settings     Json?
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
 
-  members      OrganizationMember[]
-  ssoConfigs   SSOConfig[]
+  // Settings
+  settings Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members    OrganizationMember[]
+  ssoConfigs SSOConfig[]
 
   @@map("organizations")
 }
 
 model OrganizationMember {
-  id             String   @id @default(cuid())
+  id             String  @id @default(cuid())
   organizationId String
   userId         String
-  role           OrgRole  @default(MEMBER)
-  
-  createdAt      DateTime @default(now())
+  role           OrgRole @default(MEMBER)
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, userId])
   @@index([organizationId])
@@ -632,26 +634,26 @@ enum OrgRole {
 }
 
 model SSOConfig {
-  id             String   @id @default(cuid())
+  id             String      @id @default(cuid())
   organizationId String
   provider       SSOProvider
-  
-  // SAML Configuration
-  entityId       String?
-  ssoUrl         String?
-  certificate    String?  @db.Text
-  
-  // OIDC Configuration
-  clientId       String?
-  clientSecret   String?
-  issuerUrl      String?
-  
-  isActive       Boolean  @default(false)
-  
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // SAML Configuration
+  entityId    String?
+  ssoUrl      String?
+  certificate String? @db.Text
+
+  // OIDC Configuration
+  clientId     String?
+  clientSecret String?
+  issuerUrl    String?
+
+  isActive Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, provider])
   @@map("sso_configs")
@@ -666,7 +668,7 @@ enum SSOProvider {
 }
 
 model AuditLog {
-  id             String   @id @default(cuid())
+  id             String  @id @default(cuid())
   organizationId String?
   userId         String
   action         String
@@ -676,8 +678,8 @@ model AuditLog {
   newValue       Json?
   ipAddress      String?
   userAgent      String?
-  
-  createdAt      DateTime @default(now())
+
+  createdAt DateTime @default(now())
 
   @@index([organizationId])
   @@index([userId])
@@ -693,8 +695,8 @@ model TeamInvitation {
   token          String   @unique
   invitedBy      String
   expiresAt      DateTime
-  
-  createdAt      DateTime @default(now())
+
+  createdAt DateTime @default(now())
 
   @@index([organizationId])
   @@index([email])
@@ -706,32 +708,32 @@ model TeamInvitation {
 // ============================================
 
 model OfflineCache {
-  id           String   @id @default(cuid())
-  userId       String
-  projectId    String
-  version      Int
-  data         Json     // Cached project data
-  lastSynced   DateTime @default(now())
-  pendingSync  Boolean  @default(false)
-  
+  id          String   @id @default(cuid())
+  userId      String
+  projectId   String
+  version     Int
+  data        Json // Cached project data
+  lastSynced  DateTime @default(now())
+  pendingSync Boolean  @default(false)
+
   @@unique([userId, projectId])
   @@index([userId])
   @@map("offline_caches")
 }
 
 model SyncQueue {
-  id           String   @id @default(cuid())
-  userId       String
-  projectId    String
-  operation    SyncOperation
-  data         Json
-  priority     Int      @default(0)
-  attempts     Int      @default(0)
-  status       SyncStatus @default(PENDING)
-  error        String?
-  
-  createdAt    DateTime @default(now())
-  processedAt  DateTime?
+  id        String        @id @default(cuid())
+  userId    String
+  projectId String
+  operation SyncOperation
+  data      Json
+  priority  Int           @default(0)
+  attempts  Int           @default(0)
+  status    SyncStatus    @default(PENDING)
+  error     String?
+
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
 
   @@index([userId])
   @@index([projectId])
@@ -764,8 +766,8 @@ model Tag {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  projects  Project[]
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projects Project[]
 
   @@unique([userId, name])
   @@index([userId])
@@ -788,7 +790,7 @@ model Webhook {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  logs            WebhookLog[]
+  logs WebhookLog[]
 
   @@index([userId])
   @@index([active])
@@ -806,9 +808,498 @@ model WebhookLog {
   error      String?
   createdAt  DateTime @default(now())
 
-  webhook    Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
 
   @@index([webhookId])
   @@index([createdAt])
   @@map("webhook_logs")
+}
+
+// ============================================
+// INTERACTIVE EMBEDS (Polls, Q&A, Forms)
+// ============================================
+
+enum InteractiveEmbedType {
+  POLL
+  QA
+  FORM
+  QUIZ
+  WORD_CLOUD
+}
+
+model InteractiveEmbed {
+  id        String               @id @default(cuid())
+  projectId String
+  slideId   String?
+  type      InteractiveEmbedType
+  title     String
+  config    Json // Embed-specific configuration
+  isActive  Boolean              @default(true)
+  closedAt  DateTime?
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  responses InteractiveResponse[]
+
+  @@index([projectId])
+  @@index([slideId])
+  @@map("interactive_embeds")
+}
+
+model InteractiveResponse {
+  id        String   @id @default(cuid())
+  embedId   String
+  userId    String?
+  sessionId String?
+  response  Json
+  createdAt DateTime @default(now())
+
+  embed InteractiveEmbed @relation(fields: [embedId], references: [id], onDelete: Cascade)
+
+  @@index([embedId])
+  @@map("interactive_responses")
+}
+
+// ============================================
+// DATA-DRIVEN CHARTS
+// ============================================
+
+enum DataSourceType {
+  CSV
+  GOOGLE_SHEETS
+  API
+  MANUAL
+}
+
+model DataSource {
+  id          String         @id @default(cuid())
+  projectId   String
+  name        String
+  type        DataSourceType
+  config      Json // Source-specific config (URL, credentials, etc.)
+  lastSyncAt  DateTime?
+  refreshRate Int? // in minutes
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  charts DataChart[]
+
+  @@index([projectId])
+  @@map("data_sources")
+}
+
+model DataChart {
+  id           String   @id @default(cuid())
+  projectId    String
+  slideId      String?
+  dataSourceId String?
+  title        String?
+  chartType    String // bar, line, pie, scatter, etc.
+  config       Json // Chart configuration
+  data         Json? // Cached data
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  dataSource DataSource? @relation(fields: [dataSourceId], references: [id])
+
+  @@index([projectId])
+  @@index([slideId])
+  @@map("data_charts")
+}
+
+// ============================================
+// TEMPLATE MARKETPLACE
+// ============================================
+
+enum MarketplaceTemplateStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  PUBLISHED
+}
+
+model MarketplaceTemplate {
+  id            String                    @id @default(cuid())
+  authorId      String
+  title         String
+  description   String?                   @db.Text
+  thumbnail     String?
+  category      String
+  tags          String[]
+  price         Float                     @default(0)
+  isFree        Boolean                   @default(false)
+  status        MarketplaceTemplateStatus @default(DRAFT)
+  downloadCount Int                       @default(0)
+  templateData  Json // Full template structure
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+  publishedAt   DateTime?
+
+  reviews   TemplateReview[]
+  purchases TemplatePurchase[]
+
+  @@index([authorId])
+  @@index([category])
+  @@index([status])
+  @@map("marketplace_templates")
+}
+
+model TemplateReview {
+  id         String   @id @default(cuid())
+  templateId String
+  userId     String
+  rating     Int // 1-5
+  comment    String?  @db.Text
+  createdAt  DateTime @default(now())
+
+  template MarketplaceTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, userId])
+  @@index([templateId])
+  @@map("template_reviews")
+}
+
+model TemplatePurchase {
+  id         String   @id @default(cuid())
+  templateId String
+  userId     String
+  amount     Float
+  createdAt  DateTime @default(now())
+
+  template MarketplaceTemplate @relation(fields: [templateId], references: [id])
+
+  @@index([templateId])
+  @@index([userId])
+  @@map("template_purchases")
+}
+
+// ============================================
+// DESIGN SYSTEM TOKENS
+// ============================================
+
+model DesignSystem {
+  id             String   @id @default(cuid())
+  organizationId String?
+  userId         String?
+  name           String
+  isDefault      Boolean  @default(false)
+  colors         Json // Color tokens
+  typography     Json // Typography tokens
+  spacing        Json // Spacing tokens
+  shadows        Json? // Shadow tokens
+  borders        Json? // Border tokens
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([userId])
+  @@map("design_systems")
+}
+
+// ============================================
+// ACCESSIBILITY REPORTS
+// ============================================
+
+model AccessibilityReport {
+  id          String   @id @default(cuid())
+  projectId   String
+  score       Float // 0-100
+  issues      Json // Array of accessibility issues
+  suggestions Json // AI-generated suggestions
+  checkedAt   DateTime @default(now())
+
+  @@index([projectId])
+  @@map("accessibility_reports")
+}
+
+// ============================================
+// MULTILINGUAL TRANSLATIONS
+// ============================================
+
+enum TranslationStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+model ProjectTranslation {
+  id              String   @id @default(cuid())
+  projectId       String
+  sourceLanguage  String
+  targetLanguages String[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  slides SlideTranslation[]
+
+  @@index([projectId])
+  @@map("project_translations")
+}
+
+model SlideTranslation {
+  id                   String            @id @default(cuid())
+  projectTranslationId String
+  slideId              String
+  language             String
+  translations         Json // Block translations
+  status               TranslationStatus @default(PENDING)
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  projectTranslation ProjectTranslation @relation(fields: [projectTranslationId], references: [id], onDelete: Cascade)
+
+  @@index([projectTranslationId])
+  @@index([slideId])
+  @@map("slide_translations")
+}
+
+// ============================================
+// NARRATION & VIDEO EXPORT
+// ============================================
+
+enum ExportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model NarrationProject {
+  id        String   @id @default(cuid())
+  projectId String
+  voice     String // TTS voice ID
+  speed     Float    @default(1.0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  slides  NarrationSlide[]
+  exports VideoExportJob[]
+
+  @@index([projectId])
+  @@map("narration_projects")
+}
+
+model NarrationSlide {
+  id                 String   @id @default(cuid())
+  narrationProjectId String
+  slideId            String
+  speakerNotes       String?  @db.Text
+  audioUrl           String?
+  audioDuration      Float? // in seconds
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  narrationProject NarrationProject @relation(fields: [narrationProjectId], references: [id], onDelete: Cascade)
+
+  @@index([narrationProjectId])
+  @@index([slideId])
+  @@map("narration_slides")
+}
+
+model VideoExportJob {
+  id                 String       @id @default(cuid())
+  narrationProjectId String
+  format             String // mp4, webm, mp3
+  resolution         String? // 720p, 1080p, 4k
+  status             ExportStatus @default(PENDING)
+  progress           Float        @default(0)
+  outputUrl          String?
+  error              String?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime     @default(now())
+
+  narrationProject NarrationProject @relation(fields: [narrationProjectId], references: [id], onDelete: Cascade)
+
+  @@index([narrationProjectId])
+  @@map("video_export_jobs")
+}
+
+// ============================================
+// CONTENT GOVERNANCE
+// ============================================
+
+model ApprovalWorkflow {
+  id                String   @id @default(cuid())
+  organizationId    String
+  name              String
+  description       String?
+  stages            Json // Array of workflow stages
+  requiredApprovers Json // Stage requirements
+  autoPublish       Boolean  @default(false)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  requests ApprovalRequest[]
+
+  @@index([organizationId])
+  @@map("approval_workflows")
+}
+
+model ApprovalRequest {
+  id           String   @id @default(cuid())
+  projectId    String
+  workflowId   String
+  currentStage String
+  status       String // draft, pending_review, approved, rejected
+  requestedBy  String
+  requestedAt  DateTime @default(now())
+  approvals    Json // Array of approval records
+  comments     Json // Array of comments
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workflow ApprovalWorkflow @relation(fields: [workflowId], references: [id])
+
+  @@index([projectId])
+  @@index([workflowId])
+  @@map("approval_requests")
+}
+
+model RequiredDisclaimer {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  content        String   @db.Text
+  placement      String // first_slide, last_slide, all_slides, custom
+  categories     Json // Array of applicable categories
+  isRequired     Boolean  @default(true)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId])
+  @@map("required_disclaimers")
+}
+
+model ContentLock {
+  id        String    @id @default(cuid())
+  projectId String
+  slideId   String?
+  blockId   String?
+  lockType  String // full, partial, none
+  reason    String?
+  lockedBy  String
+  lockedAt  DateTime  @default(now())
+  expiresAt DateTime?
+
+  @@index([projectId])
+  @@map("content_locks")
+}
+
+model GovernancePolicy {
+  id               String   @id @default(cuid())
+  organizationId   String
+  name             String
+  rules            Json // Array of policy rules
+  enforcementLevel String // warn, block
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([organizationId])
+  @@map("governance_policies")
+}
+
+// ============================================
+// TEAM ANALYTICS
+// ============================================
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  userId     String
+  action     String
+  targetType String
+  targetId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
+
+// ============================================
+// TRANSLATION MODELS (Additional)
+// ============================================
+
+model TranslationJob {
+  id              String   @id @default(cuid())
+  projectId       String
+  targetLanguage  String
+  status          String   @default("pending") // pending, processing, completed, failed
+  progress        Int      @default(0)
+  error           String?
+  createdAt       DateTime @default(now())
+  completedAt     DateTime?
+
+  @@index([projectId])
+  @@index([status])
+  @@map("translation_jobs")
+}
+
+// ============================================
+// NARRATION & SPEAKER NOTES (Additional)
+// ============================================
+
+model SpeakerNote {
+  id        String   @id @default(cuid())
+  slideId   String
+  content   String   @db.Text
+  voice     String?
+  audioUrl  String?
+  duration  Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([slideId])
+  @@map("speaker_notes")
+}
+
+// ============================================
+// TEMPLATE MARKETPLACE (Additional)
+// ============================================
+
+model TemplateSubmission {
+  id          String   @id @default(cuid())
+  templateId  String
+  authorId    String
+  status      String   @default("pending") // pending, approved, rejected
+  reviewNotes String?  @db.Text
+  submittedAt DateTime @default(now())
+  reviewedAt  DateTime?
+
+  @@index([templateId])
+  @@index([authorId])
+  @@index([status])
+  @@map("template_submissions")
+}
+
+model TemplateDownload {
+  id           String   @id @default(cuid())
+  templateId   String
+  userId       String
+  downloadedAt DateTime @default(now())
+
+  @@index([templateId])
+  @@index([userId])
+  @@map("template_downloads")
+}
+
+model AuthorEarnings {
+  id         String   @id @default(cuid())
+  authorId   String
+  templateId String
+  amount     Float
+  earnedAt   DateTime @default(now())
+
+  @@index([authorId])
+  @@index([templateId])
+  @@map("author_earnings")
 }

@@ -27,6 +27,18 @@ import { OrganizationsModule } from './organizations/organizations.module';
 import { SyncModule } from './sync/sync.module';
 import { TagsModule } from './tags/tags.module';
 
+// Advanced feature modules
+import { AudienceAdaptationModule } from './audience-adaptation/audience-adaptation.module';
+import { InteractiveEmbedsModule } from './interactive-embeds/interactive-embeds.module';
+import { DataChartsModule } from './data-charts/data-charts.module';
+import { TemplateMarketplaceModule } from './template-marketplace/template-marketplace.module';
+import { DesignSystemModule } from './design-system/design-system.module';
+import { AccessibilityModule } from './accessibility/accessibility.module';
+import { MultilingualModule } from './multilingual/multilingual.module';
+import { NarrationExportModule } from './narration-export/narration-export.module';
+import { ContentGovernanceModule } from './content-governance/content-governance.module';
+import { TeamAnalyticsModule } from './team-analytics/team-analytics.module';
+
 // Common modules for production
 import { CacheModule } from './common/cache/cache.module';
 import { SecurityModule } from './common/security/security.module';
@@ -88,6 +100,18 @@ import { ThemesService } from './themes/themes.service';
     OrganizationsModule,
     SyncModule,
     TagsModule,
+
+    // Advanced feature modules
+    AudienceAdaptationModule,
+    InteractiveEmbedsModule,
+    DataChartsModule,
+    TemplateMarketplaceModule,
+    DesignSystemModule,
+    AccessibilityModule,
+    MultilingualModule,
+    NarrationExportModule,
+    ContentGovernanceModule,
+    TeamAnalyticsModule,
 
     // Production modules
     CacheModule,

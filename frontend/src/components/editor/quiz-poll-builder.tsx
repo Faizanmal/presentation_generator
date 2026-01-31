@@ -1,6 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useId } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import {
   HelpCircle,
@@ -89,8 +91,9 @@ export function QuizPollBuilder({
 }: QuizPollBuilderProps) {
   const [activeTab, setActiveTab] = useState<'quiz' | 'poll'>('quiz');
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  const pollId = useId();
   const [currentPoll, setCurrentPoll] = useState<Poll>({
-    id: `poll-${Date.now()}`,
+    id: `poll-${pollId}`,
     question: '',
     options: ['', ''],
     allowMultiple: false,

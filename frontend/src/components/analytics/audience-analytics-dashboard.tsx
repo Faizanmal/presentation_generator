@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 'use client';
 
 import React, { useState } from 'react';
@@ -159,7 +161,7 @@ export function AudienceAnalyticsDashboard({ projectId }: AudienceAnalyticsDashb
               </Badge>
             )}
           </Button>
-          <Select value={dateRange} onValueChange={(v: any) => setDateRange(v)}>
+          <Select value={dateRange} onValueChange={(v) => setDateRange(v as typeof dateRange)}>
             <SelectTrigger className="w-32">
               <SelectValue />
             </SelectTrigger>

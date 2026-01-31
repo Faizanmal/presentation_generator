@@ -150,7 +150,7 @@ export function LivePresentationPanel({
     try {
       const newPoll = await api.createPoll(session.sessionId, pollQuestion, validOptions);
       setPolls(prev => [...prev, { 
-        id: (newPoll as any).id || newPoll.pollId || `poll-${Date.now()}`,
+        id: String((newPoll as Record<string, unknown>).id || (newPoll as Record<string, unknown>).pollId || `poll-${Date.now()}`),
         question: pollQuestion,
         options: validOptions.map((text, idx) => ({ id: `opt-${idx}`, text, votes: 0 })),
         isOpen: true, 

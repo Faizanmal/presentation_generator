@@ -336,7 +336,7 @@ export function ChartBlock({
     if (showLegend) {
       drawLegend(ctx, width, height);
     }
-  }, [chartType, chartData, showLegend, showGrid]);
+  }, [chartType, chartData, showLegend, showGrid, drawBarChart, drawLineChart, drawPieChart, drawAreaChart, drawLegend]);
 
   useEffect(() => {
     drawChart();

@@ -105,7 +105,7 @@ export function AnalyticsDashboard({
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <Select value={timeRange} onValueChange={(v: any) => onTimeRangeChange(v)}>
+                    <Select value={timeRange} onValueChange={(v) => onTimeRangeChange(v as typeof timeRange)}>
                         <SelectTrigger className="w-32">
                             <SelectValue />
                         </SelectTrigger>
@@ -335,7 +335,7 @@ function ViewerActivityTable({ sessions }: { sessions: ViewerSession[] }) {
                     Recent Viewers
                 </CardTitle>
                 <CardDescription>
-                    Track who's viewing your presentation
+                    Track who&apos;s viewing your presentation
                 </CardDescription>
             </CardHeader>
             <CardContent>

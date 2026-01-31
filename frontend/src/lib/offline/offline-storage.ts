@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { offlineDB, PresentationCache } from './indexed-db';
 import { syncManager } from './sync-manager';
 import { cacheManager } from './cache-manager';

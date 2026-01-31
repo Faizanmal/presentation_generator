@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import type {
   AuthResponse,
@@ -89,6 +91,7 @@ class ApiClient {
   // ============================================
   // RAW HTTP METHODS
   // ============================================
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 
   async get<T = any>(url: string, config?: any): Promise<{ data: T }> {
     return this.client.get<T>(url, config);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import axios, { AxiosError } from 'axios';
 import {
   Wand2,
   Loader2,
@@ -115,8 +116,9 @@ export function AIImageGenerator({
       });
 
       setGeneratedImage(response.data.imageUrl);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to generate image');
+    } catch (err) {
+      const error = err as AxiosError<{message: string}>;
+      setError(error.response?.data?.message || 'Failed to generate image');
     } finally {
       setIsGenerating(false);
     }

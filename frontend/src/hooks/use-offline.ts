@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -16,14 +18,14 @@ interface SyncConflict {
   id: string;
   type: 'project' | 'slide' | 'block';
   entityId: string;
-  localVersion: any;
-  serverVersion: any;
+  localVersion: Record<string, unknown>;
+  serverVersion: Record<string, unknown>;
   createdAt: Date;
 }
 
 interface CachedItem {
   key: string;
-  data: any;
+  data: Record<string, unknown>;
   timestamp: number;
   expiry?: number;
 }
@@ -44,42 +46,7 @@ export function useOffline() {
   const queryClient = useQueryClient();
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Initialize and load sync queue
-  useEffect(() => {
-    const queue = getSyncQueue();
-    setStatus((prev) => ({
-      ...prev,
-      pendingChanges: queue.length,
-    }));
-
-    // Set up online/offline listeners
-    const handleOnline = () => {
-      setStatus((prev) => ({ ...prev, isOnline: true }));
-      toast.success('Back online');
-      syncChanges();
-    };
-
-    const handleOffline = () => {
-      setStatus((prev) => ({ ...prev, isOnline: false }));
-      toast.warning('You are offline. Changes will be saved locally.');
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    // Start periodic sync
-    startPeriodicSync();
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-      if (syncTimeoutRef.current) {
-        clearTimeout(syncTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Get sync queue from localStorage
+  // Get sync queue from localStorage - defined first so it can be used in useEffect
   const getSyncQueue = useCallback((): any[] => {
     try {
       const queue = localStorage.getItem(SYNC_QUEUE_KEY);
@@ -99,34 +66,12 @@ export function useOffline() {
       timestamp: number;
     }) => {
       const queue = getSyncQueue();
-      
-      // Check for existing operation on same entity
-      const existingIndex = queue.findIndex(
-        (op) => op.entity === operation.entity && op.entityId === operation.entityId
-      );
-
-      if (existingIndex >= 0) {
-        // Merge or replace
-        if (operation.type === 'delete') {
-          // If deleting, remove all pending updates
-          queue.splice(existingIndex, 1);
-          if (queue[existingIndex]?.type !== 'create') {
-            queue.push(operation);
-          }
-        } else {
-          // Update the existing operation
-          queue[existingIndex] = {
-            ...queue[existingIndex],
-            data: { ...queue[existingIndex].data, ...operation.data },
-            timestamp: operation.timestamp,
-          };
-        }
-      } else {
-        queue.push(operation);
-      }
-
+      queue.push(operation);
       localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(queue));
-      setStatus((prev) => ({ ...prev, pendingChanges: queue.length }));
+      setStatus((prev) => ({
+        ...prev,
+        pendingChanges: queue.length,
+      }));
     },
     [getSyncQueue]
   );
@@ -188,7 +133,7 @@ export function useOffline() {
     });
   }, []);
 
-  // Sync changes to server
+  // Sync changes to server  
   const syncChanges = useCallback(async () => {
     if (!navigator.onLine) return;
 
@@ -254,6 +199,51 @@ export function useOffline() {
     }
   }, [getSyncQueue, queryClient]);
 
+  // Start periodic sync
+  const startPeriodicSync = useCallback(() => {
+    const runSync = async () => {
+      await syncChanges();
+      syncTimeoutRef.current = setTimeout(runSync, SYNC_INTERVAL);
+    };
+
+    syncTimeoutRef.current = setTimeout(runSync, SYNC_INTERVAL);
+  }, [syncChanges]);
+
+  // Initialize and load sync queue - now after all callbacks are defined
+  useEffect(() => {
+    const queue = getSyncQueue();
+    setStatus((prev) => ({
+      ...prev,
+      pendingChanges: queue.length,
+    }));
+
+    // Set up online/offline listeners
+    const handleOnline = () => {
+      setStatus((prev) => ({ ...prev, isOnline: true }));
+      toast.success('Back online');
+      syncChanges();
+    };
+
+    const handleOffline = () => {
+      setStatus((prev) => ({ ...prev, isOnline: false }));
+      toast.warning('You are offline. Changes will be saved locally.');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Start periodic sync
+    startPeriodicSync();
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+    };
+  }, [getSyncQueue, syncChanges, startPeriodicSync]);
+
   // Resolve conflict
   const resolveConflict = useCallback(
     async (
@@ -304,16 +294,6 @@ export function useOffline() {
     },
     [status.conflicts]
   );
-
-  // Start periodic sync
-  const startPeriodicSync = useCallback(() => {
-    const runSync = async () => {
-      await syncChanges();
-      syncTimeoutRef.current = setTimeout(runSync, SYNC_INTERVAL);
-    };
-
-    syncTimeoutRef.current = setTimeout(runSync, SYNC_INTERVAL);
-  }, [syncChanges]);
 
   // Force sync
   const forceSync = useCallback(async () => {

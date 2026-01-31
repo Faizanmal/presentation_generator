@@ -464,7 +464,7 @@ export function VersionHistoryPanel({ projectId }: VersionHistoryPanelProps) {
             <DialogHeader>
               <DialogTitle>Restore Version</DialogTitle>
               <DialogDescription>
-                Are you sure you want to restore to "{selectedVersion?.name}"? A backup of your current version will be created automatically.
+                Are you sure you want to restore to &quot;{selectedVersion?.name}&quot;? A backup of your current version will be created automatically.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>

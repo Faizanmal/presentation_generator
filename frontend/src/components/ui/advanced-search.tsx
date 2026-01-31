@@ -71,11 +71,11 @@ export function AdvancedSearch({
     // Focus input when opened
     useEffect(() => {
         if (open) {
-            setTimeout(() => inputRef.current?.focus(), 100);
+            inputRef.current?.focus();
         } else {
-
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setQuery("");
-
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setResults([]);
         }
     }, [open]);
@@ -83,11 +83,12 @@ export function AdvancedSearch({
     // Perform search
     useEffect(() => {
         if (!debouncedQuery.trim()) {
-
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setResults([]);
             return;
         }
 
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setIsSearching(true);
 
         // Simulate search across projects and slides

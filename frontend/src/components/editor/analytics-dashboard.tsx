@@ -64,7 +64,7 @@ export function AnalyticsDashboard({ projectId }: AnalyticsDashboardProps) {
           <p className="text-muted-foreground">Track how your presentation performs</p>
         </div>
         <div className="flex items-center gap-2">
-          <Select value={timeRange} onValueChange={(v: any) => setTimeRange(v)}>
+          <Select value={timeRange} onValueChange={(v) => setTimeRange(v as typeof timeRange)}>
             <SelectTrigger className="w-32">
               <SelectValue />
             </SelectTrigger>

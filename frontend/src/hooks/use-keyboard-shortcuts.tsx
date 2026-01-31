@@ -152,22 +152,26 @@ export function KeyboardShortcutsProvider({ children }: KeyboardShortcutsProvide
 
   // Register help shortcut
   useEffect(() => {
-    registerShortcut({
-      id: 'show-help',
-      keys: ['mod', '?'],
-      description: 'Show keyboard shortcuts',
-      category: 'general',
-      action: () => setIsHelpOpen(true),
-    });
+    const registerHelp = () => {
+      registerShortcut({
+        id: 'show-help',
+        keys: ['mod', '?'],
+        description: 'Show keyboard shortcuts',
+        category: 'general',
+        action: () => setIsHelpOpen(true),
+      });
 
-    registerShortcut({
-      id: 'close-help',
-      keys: ['escape'],
-      description: 'Close dialogs',
-      category: 'general',
-      action: () => setIsHelpOpen(false),
-    });
-  }, [registerShortcut]);
+      registerShortcut({
+        id: 'close-help',
+        keys: ['escape'],
+        description: 'Close dialogs',
+        category: 'general',
+        action: () => setIsHelpOpen(false),
+      });
+    };
+    
+    registerHelp();
+  }, [registerShortcut, setIsHelpOpen]);
 
   return (
     <KeyboardShortcutsContext.Provider

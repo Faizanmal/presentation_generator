@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 /**
  * Hook to debounce a value
@@ -30,6 +30,7 @@ export function useDebounce<T>(value: T, delay: number): T {
  * @param delay - Delay in milliseconds
  * @returns The debounced callback
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useDebouncedCallback<T extends (...args: any[]) => any>(
     callback: T,
     delay: number
@@ -69,6 +70,7 @@ export function useDebouncedCallback<T extends (...args: any[]) => any>(
  * @param delay - Minimum delay between calls in milliseconds
  * @returns The throttled callback
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useThrottle<T extends (...args: any[]) => any>(
     callback: T,
     delay: number
@@ -210,15 +212,22 @@ export function useSessionStorage<T>(
  */
 export function useMediaQuery(query: string): boolean {
     const [matches, setMatches] = useState(false);
+    const initializedRef = useRef(false);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
 
         const media = window.matchMedia(query);
-        setMatches(media.matches);
 
         const listener = (e: MediaQueryListEvent) => setMatches(e.matches);
         media.addEventListener("change", listener);
+
+        // Set initial state only once
+        if (!initializedRef.current) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setMatches(media.matches);
+            initializedRef.current = true;
+        }
 
         return () => media.removeEventListener("change", listener);
     }, [query]);

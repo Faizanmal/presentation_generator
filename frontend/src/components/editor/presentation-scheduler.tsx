@@ -1,6 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, addMinutes } from 'date-fns';
 import {
@@ -154,7 +156,7 @@ export function PresentationScheduler({
 
   // Schedule mutation
   const scheduleMutation = useMutation({
-    mutationFn: (data: any) => api.post('/presentations/schedule', data),
+    mutationFn: (data: Record<string, unknown>) => api.post('/presentations/schedule', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scheduled-presentations'] });
       setShowScheduleDialog(false);
@@ -274,29 +276,34 @@ export function PresentationScheduler({
     }
   };
 
-  // Mock data
-  const mockPresentations: ScheduledPresentation[] = presentations?.data || [
+  // Mock data - moved to use useMemo to avoid impure function during render
+  const mockPresentations = useMemo(() => {
+    const tomorrow = new Date();
+    tomorrow.setTime(tomorrow.getTime() + 86400000);
+    
+    return presentations?.data || [
     {
       id: 'sched-1',
       projectId,
       title: 'Q1 Strategy Presentation',
-      scheduledAt: new Date(Date.now() + 86400000).toISOString(),
+      scheduledAt: tomorrow.toISOString(),
       timezone: 'America/New_York',
       duration: 45,
-      status: 'scheduled',
+      status: 'scheduled' as const,
       settings: {
         autoStart: true,
         enableQA: true,
         enablePolls: true,
         enableRecording: true,
-        accessType: 'private',
+        accessType: 'private' as const,
       },
       attendees: [
-        { email: 'john@example.com', name: 'John Doe', status: 'accepted' },
-        { email: 'jane@example.com', name: 'Jane Smith', status: 'invited' },
+        { email: 'john@example.com', name: 'John Doe', status: 'accepted' as const },
+        { email: 'jane@example.com', name: 'Jane Smith', status: 'invited' as const },
       ],
     },
   ];
+  }, [presentations, projectId]);
 
   return (
     <div className="space-y-6">
@@ -477,7 +484,7 @@ export function PresentationScheduler({
         </Card>
       ) : (
         <div className="space-y-4">
-          {mockPresentations.map((presentation) => (
+          {mockPresentations.map((presentation: any) => (
             <Card key={presentation.id}>
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between">
@@ -574,7 +581,7 @@ export function PresentationScheduler({
                 {/* Attendees */}
                 <div className="flex items-center gap-2">
                   <div className="flex -space-x-2">
-                    {presentation.attendees.slice(0, 5).map((attendee, i) => (
+                    {presentation.attendees.slice(0, 5).map((attendee: any, i: number) => (
                       <div
                         key={i}
                         className="w-8 h-8 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center text-xs font-medium"

@@ -74,7 +74,7 @@ interface AccessibilityCheckerProps {
     blocks: Array<{
       id: string;
       type: string;
-      content: any;
+      content: Record<string, unknown>;
     }>;
   }>;
 }

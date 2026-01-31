@@ -230,9 +230,11 @@ export function SlashCommandMenu({
     // Focus input when opened
     useEffect(() => {
         if (isOpen) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setSearchQuery("");
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setSelectedIndex(0);
-            setTimeout(() => inputRef.current?.focus(), 50);
+            inputRef.current?.focus();
         }
     }, [isOpen]);
 

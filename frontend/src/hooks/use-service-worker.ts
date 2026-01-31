@@ -23,25 +23,7 @@ export function useServiceWorker(): UseServiceWorkerReturn {
     registration: null,
   });
 
-  useEffect(() => {
-    // Check if service workers are supported
-    if (!('serviceWorker' in navigator)) {
-      return;
-    }
-
-    setState((prev) => ({ ...prev, isSupported: true }));
-
-    // Register service worker
-    registerServiceWorker();
-
-    // Listen for controller changes
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      // Reload the page when a new service worker takes over
-      window.location.reload();
-    });
-  }, []);
-
-  const registerServiceWorker = async () => {
+  const registerServiceWorker = useCallback(async () => {
     try {
       const registration = await navigator.serviceWorker.register('/sw.js', {
         scope: '/',
@@ -71,7 +53,27 @@ export function useServiceWorker(): UseServiceWorkerReturn {
     } catch (error) {
       console.error('Service worker registration failed:', error);
     }
-  };
+  }, []);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => {
+    // Check if service workers are supported
+    if (!('serviceWorker' in navigator)) {
+      return;
+    }
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setState((prev) => ({ ...prev, isSupported: true }));
+
+    // Register service worker
+    registerServiceWorker();
+
+    // Listen for controller changes
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      // Reload the page when a new service worker takes over
+      window.location.reload();
+    });
+  }, [registerServiceWorker]);
 
   const update = useCallback(async () => {
     if (!state.registration) return;

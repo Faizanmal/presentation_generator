@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import {
   StickyNote,
@@ -39,7 +39,7 @@ import { cn } from '@/lib/utils';
 
 interface SlideNotesEditorProps {
   slideId: string;
-  slideContent: any;
+  slideContent: Record<string, unknown>;
   initialNotes?: string;
   onNotesChange: (notes: string) => void;
   presentationTopic?: string;
@@ -60,15 +60,13 @@ export function SlideNotesEditor({
 }: SlideNotesEditorProps) {
   const [notes, setNotes] = useState(initialNotes);
   const [isExpanded, setIsExpanded] = useState(true);
-  const [estimatedTime, setEstimatedTime] = useState(0);
   const [timingMarkers, setTimingMarkers] = useState<TimingMarker[]>([]);
   const [showTimingHelpers, setShowTimingHelpers] = useState(false);
 
-  // Calculate estimated speaking time (average 150 words per minute)
-  useEffect(() => {
-    const wordCount = notes.split(/\s+/).filter(Boolean).length;
-    const timeInSeconds = Math.ceil((wordCount / 150) * 60);
-    setEstimatedTime(timeInSeconds);
+  // Calculate estimated speaking time (average 150 words per minute) - moved to useMemo
+  const estimatedTime = useMemo(() => {
+    const wordCount = notes?.split(/\s+/).filter(Boolean).length ?? 0;
+    return Math.ceil((wordCount / 150) * 60);
   }, [notes]);
 
   const generateNotesMutation = useMutation({

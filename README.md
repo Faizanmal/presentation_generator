@@ -23,6 +23,18 @@ A Gamma-like SaaS application for creating beautiful AI-powered presentations. B
 - 🏢 **Enterprise Features**: Organization management, SSO (SAML/OIDC), white-labeling, audit logs
 - 📱 **PWA & Offline Support**: Install as app, work offline with background sync
 
+### 🆕 Latest Features (V2.0)
+- 🎯 **AI Audience Adaptation**: Automatically adapt presentations for different audiences (executives, sales, technical, investors, etc.) with tone, complexity, and length adjustments
+- 📊 **Interactive Embeds**: Live polls, Q&A sessions, forms, quizzes, and word clouds with real-time results via WebSocket
+- 📈 **Data-Driven Charts**: Connect live data from CSV, Google Sheets, or APIs with auto-refresh and AI-suggested chart types
+- 🛒 **Template Marketplace**: Browse, purchase, and sell presentation templates with reviews and revenue sharing (80% to creators)
+- 🎨 **Design System Tokens**: Unified color, typography, spacing tokens with CSS/Tailwind export and built-in presets
+- ♿ **Smart Accessibility Checks**: WCAG 2.1 compliance scanning with AI-powered alt-text generation and auto-fix suggestions
+- 🌍 **Multilingual Collaboration**: Translate presentations to 18+ languages with async translation jobs and RTL support
+- 🎙️ **AI Narration & Video Export**: Generate voiceovers with 6 TTS voices (OpenAI), AI speaker notes, and export to MP4/MP3/WebM
+- 📋 **Content Governance**: Approval workflows, required disclaimers, content locks, and policy enforcement for enterprise compliance
+- 📊 **Team Analytics**: Contribution tracking, revision heatmaps, productivity trends, and project attribution reports
+
 ### New Usability Features (Competitor-Matching)
 - ⌨️ **Command Palette (⌘K)**: Quick access to all actions and navigation via keyboard shortcut
 - ✨ **AI Text Enhancement**: Shorten, expand, simplify, change tone, fix grammar with one click
@@ -126,13 +138,21 @@ PresentationDesigner/
 │   ├── prisma/
 │   │   └── schema.prisma    # Database schema
 │   └── src/
+│       ├── accessibility/   # WCAG 2.1 accessibility checks & auto-fix
 │       ├── ai/              # AI generation service
 │       ├── analytics/       # Presentation analytics & tracking
+│       ├── audience-adaptation/ # AI audience adaptation
 │       ├── auth/            # Authentication module
 │       ├── blocks/          # Blocks CRUD
 │       ├── collaboration/   # Real-time collaboration (WebSocket)
+│       ├── content-governance/ # Approval workflows & compliance
+│       ├── data-charts/     # Live data charts & visualizations
+│       ├── design-system/   # Design tokens management
 │       ├── export/          # Export functionality
 │       ├── integrations/    # Third-party integrations (Zoom, Slack, etc.)
+│       ├── interactive-embeds/ # Polls, Q&A, forms with WebSocket
+│       ├── multilingual/    # Translation & localization
+│       ├── narration-export/ # AI voiceover & video export
 │       ├── organizations/   # Enterprise organization management
 │       ├── payments/        # Stripe integration
 │       ├── personalization/ # Brand profiles & AI customization
@@ -140,6 +160,9 @@ PresentationDesigner/
 │       ├── projects/        # Projects CRUD
 │       ├── slides/          # Slides CRUD
 │       ├── sync/            # Offline sync functionality
+│       ├── tags/            # Project tagging
+│       ├── team-analytics/  # Team performance & attribution
+│       ├── template-marketplace/ # Template buying/selling
 │       ├── themes/          # Themes management
 │       ├── upload/          # S3 upload service
 │       ├── users/           # User management

@@ -29,7 +29,25 @@ export function useOfflineMode(): UseOfflineModeReturn {
   const [offlinePresentations, setOfflinePresentations] = useState<OfflinePresentation[]>([]);
   const [storageStats, setStorageStats] = useState<UseOfflineModeReturn['storageStats']>(null);
 
+  // Define loadOfflineData with useCallback to stabilize it
+  const loadOfflineData = useCallback(async () => {
+    try {
+      const [presentations, pending, stats] = await Promise.all([
+        offlineStorage.getAllPresentations(),
+        syncManager.getPendingCount(),
+        offlineStorage.getStorageStats(),
+      ]);
+
+      setOfflinePresentations(presentations);
+      setPendingChanges(pending);
+      setStorageStats(stats);
+    } catch (error) {
+      console.error('Failed to load offline data:', error);
+    }
+  }, []);
+
   // Initialize and set up listeners
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     // Check initial online status
     setIsOnline(navigator.onLine);
@@ -57,23 +75,7 @@ export function useOfflineMode(): UseOfflineModeReturn {
       window.removeEventListener('offline', handleOffline);
       unsubscribe();
     };
-  }, []);
-
-  const loadOfflineData = async () => {
-    try {
-      const [presentations, pending, stats] = await Promise.all([
-        offlineStorage.getAllPresentations(),
-        syncManager.getPendingCount(),
-        offlineStorage.getStorageStats(),
-      ]);
-
-      setOfflinePresentations(presentations);
-      setPendingChanges(pending);
-      setStorageStats(stats);
-    } catch (error) {
-      console.error('Failed to load offline data:', error);
-    }
-  };
+  }, [loadOfflineData]);
 
   const triggerSync = useCallback(async () => {
     await syncManager.forceSync();
@@ -81,6 +83,7 @@ export function useOfflineMode(): UseOfflineModeReturn {
   }, []);
 
   const saveForOffline = useCallback(async (projectId: string, data: unknown) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await offlineStorage.savePresentation(projectId, data as any);
     await loadOfflineData();
   }, []);

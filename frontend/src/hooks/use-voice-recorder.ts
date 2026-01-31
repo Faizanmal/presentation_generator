@@ -6,7 +6,7 @@ import { api } from '@/lib/api';
 
 interface UseVoiceRecorderOptions {
   onTranscription?: (text: string) => void;
-  onRecordingComplete?: (recording: any) => void;
+  onRecordingComplete?: (recording: Record<string, unknown>) => void;
   maxDuration?: number; // Maximum recording duration in seconds
 }
 
@@ -43,6 +43,22 @@ export function useVoiceRecorder({
         streamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
+  }, []);
+
+  // Stop recording - declared before startRecording so it can be called there
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      setIsPaused(false);
+      
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+
+      toast.success('Recording stopped');
+    }
   }, []);
 
   // Start recording
@@ -93,7 +109,7 @@ export function useVoiceRecorder({
       console.error('Error starting recording:', error);
       toast.error('Failed to access microphone');
     }
-  }, [maxDuration]);
+  }, [maxDuration, stopRecording]);
 
   // Pause recording
   const pauseRecording = useCallback(() => {
@@ -122,23 +138,7 @@ export function useVoiceRecorder({
         });
       }, 1000);
     }
-  }, [maxDuration]);
-
-  // Stop recording
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      setIsPaused(false);
-      
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-
-      toast.success('Recording stopped');
-    }
-  }, []);
+  }, [maxDuration, stopRecording]);
 
   // Cancel recording
   const cancelRecording = useCallback(() => {

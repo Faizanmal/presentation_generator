@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import axios, { AxiosError } from 'axios';
 import {
   Download,
   FileJson,
@@ -191,8 +192,9 @@ export function ExportOptionsPanel({
         setExportProgress(100);
         toast.success(`Exported as ${filename}`);
       }
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Export failed');
+    } catch (error) {
+      const err = error as AxiosError<{message: string}>;
+      toast.error(err.response?.data?.message || 'Export failed');
     } finally {
       setIsExporting(false);
       setTimeout(() => setExportProgress(0), 1000);
