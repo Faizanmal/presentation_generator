@@ -15,7 +15,7 @@ import {
     Layout,
     LayoutGrid,
     LayoutList,
-    Image,
+    Image as ImageIcon,
     BarChart3,
     Quote,
     Users,
@@ -27,7 +27,7 @@ import {
     Search,
     Sparkles,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+
 
 // Slide Layout Templates
 export interface SlideTemplate {
@@ -142,7 +142,7 @@ const slideTemplates: SlideTemplate[] = [
         name: "Image + Text",
         description: "Visual content with description",
         category: "content",
-        icon: <Image className="h-5 w-5" />,
+        icon: <ImageIcon className="h-5 w-5" />,
         preview: "linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)",
         blocks: [
             {
@@ -401,7 +401,7 @@ const starterTemplates: StarterTemplate[] = [
         category: "creative",
         slides: 8,
         preview: "linear-gradient(135deg, #d299c2 0%, #fef9d7 100%)",
-        icon: <Image className="h-6 w-6" />,
+        icon: <ImageIcon className="h-6 w-6" />,
     },
 ];
 

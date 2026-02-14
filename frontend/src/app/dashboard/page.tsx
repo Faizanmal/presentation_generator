@@ -52,11 +52,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
-import { Project } from "@/types";
+import type { Project } from "@/types";
 
 // New usability components
 import { CommandPalette } from "@/components/ui/command-palette";
@@ -112,14 +113,17 @@ export default function DashboardPage() {
 
   // Generate project mutation
   const generateProjectMutation = useMutation({
-    mutationFn: (data: { topic: string; tone: string; audience: string; length: number; type: string }) =>
+    mutationFn: (data: { topic: string; tone: string; audience: string; length: number; type: string; generateImages?: boolean; imageSource?: 'ai' | 'stock' }) =>
       api.projects.generate(data),
-    onSuccess: (project) => {
+    onSuccess: (job) => {
+      // Backend enqueues the generation job. do NOT assume a project object is returned.
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       setIsCreateModalOpen(false);
       setIsGenerating(false);
-      toast.success("Presentation generated!");
-      router.push(`/editor/${project.id}`);
+      toast.success("Presentation generation started — we'll notify you when it's ready.", {
+        description: job?.message || `Job id: ${job?.jobId || 'unknown'}`,
+      });
+      // Do NOT redirect to `/editor/${undefined}` — user can open the project once generation completes
     },
     onError: () => {
       toast.error("Failed to generate presentation");
@@ -178,12 +182,22 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+      {/* New Design Banner */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-center py-2 px-4 shadow-sm">
+        <p className="text-sm font-medium flex items-center justify-center gap-2">
+          New: Try the redesigned Presentation Editor experience!
+          <Link href="/dashboard-v2" className="underline hover:text-blue-100 font-bold ml-1 flex items-center">
+            Switch to V2 <span className="material-symbols-outlined text-sm ml-1">arrow_forward</span>
+          </Link>
+        </p>
+      </div>
+
       {/* Header */}
       <header className="bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link href="/" className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+              <div className="h-8 w-8 rounded-lg bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center">
                 <Sparkles className="h-5 w-5 text-white" />
               </div>
               <span className="text-xl font-bold text-slate-900 dark:text-white">
@@ -210,7 +224,7 @@ export default function DashboardPage() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-medium">
+                    <div className="h-8 w-8 rounded-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-medium">
                       {user?.name?.charAt(0).toUpperCase() || "U"}
                     </div>
                     <span className="hidden sm:inline text-slate-700 dark:text-slate-300">
@@ -253,6 +267,46 @@ export default function DashboardPage() {
 
       {/* Main content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* V2 Experience Card */}
+        <div className="bg-white dark:bg-slate-950 rounded-xl border border-blue-200 dark:border-slate-800 p-6 mb-8 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+
+          <div className="relative z-10">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-blue-600" />
+              Try the New V2 Experience
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400 mb-6 max-w-2xl">
+              We've redesigned the interface to be more intuitive, powerful, and beautiful. Switch to the new views to experience the future of presentation design.
+            </p>
+
+            <div className="flex flex-wrap gap-4">
+              <Link href="/dashboard-v2">
+                <Button size="lg" className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white border-0">
+                  <LayoutGrid className="mr-2 h-5 w-5" />
+                  Go to Dashboard V2
+                </Button>
+              </Link>
+
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-blue-200 hover:bg-blue-50 dark:border-slate-700 dark:hover:bg-slate-800"
+                onClick={() => {
+                  if (projects && projects.length > 0) {
+                    router.push(`/editor-v2/${projects[0].id}`);
+                  } else {
+                    toast.error("Please create a project first to try the editor");
+                  }
+                }}
+              >
+                <Pencil className="mr-2 h-5 w-5 text-blue-600" />
+                Open Editor V2
+              </Button>
+            </div>
+          </div>
+        </div>
+
         {/* Favorites & Recent Panel */}
         {(favorites.length > 0 || recent.length > 0) && projects && (
           <div className="mb-8">
@@ -440,13 +494,13 @@ function ProjectCard({
   isFavorite: boolean;
   onToggleFavorite: () => void;
 }) {
-  const slideCount = project.slides?.length || 0;
+  const slideCount = project._count?.slides || project.slides?.length || 0;
 
   return (
     <div className="group bg-white dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden hover:shadow-lg transition-shadow">
       {/* Thumbnail */}
       <div
-        className="aspect-[16/10] bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 relative cursor-pointer"
+        className="aspect-[16/10] bg-linear-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 relative cursor-pointer"
         onClick={onEdit}
       >
         <div className="absolute inset-0 flex items-center justify-center">
@@ -539,11 +593,11 @@ function ProjectListItem({
   isFavorite: boolean;
   onToggleFavorite: () => void;
 }) {
-  const slideCount = project.slides?.length || 0;
+  const slideCount = project._count?.slides || project.slides?.length || 0;
 
   return (
     <div className="bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 p-4 flex items-center gap-4 hover:shadow-md transition-shadow">
-      <div className="h-16 w-24 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 rounded flex items-center justify-center flex-shrink-0 relative">
+      <div className="h-16 w-24 bg-linear-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 rounded flex items-center justify-center flex-shrink-0 relative">
         <FileText className="h-8 w-8 text-slate-300 dark:text-slate-600" />
       </div>
 
@@ -619,7 +673,7 @@ function CreateProjectModal({
   isOpen: boolean;
   onClose: () => void;
   onCreateBlank: () => void;
-  onGenerate: (data: { topic: string; tone: string; audience: string; length: number; type: string }) => void;
+  onGenerate: (data: { topic: string; tone: string; audience: string; length: number; type: string; generateImages?: boolean; imageSource?: 'ai' | 'stock' }) => void;
   isGenerating: boolean;
 }) {
   const [mode, setMode] = useState<"select" | "generate">("select");
@@ -627,13 +681,22 @@ function CreateProjectModal({
   const [tone, setTone] = useState("professional");
   const [audience, setAudience] = useState("general");
   const [length, setLength] = useState(5);
+  const [generateImages, setGenerateImages] = useState(false);
 
   const handleGenerate = () => {
     if (!topic.trim()) {
       toast.error("Please enter a topic");
       return;
     }
-    onGenerate({ topic, tone, audience, length, type: "PRESENTATION" });
+    onGenerate({
+      topic,
+      tone,
+      audience,
+      length,
+      type: "presentation",
+      generateImages,
+      imageSource: "ai"
+    });
   };
 
   const resetForm = () => {
@@ -642,6 +705,7 @@ function CreateProjectModal({
     setTone("professional");
     setAudience("general");
     setLength(5);
+    setGenerateImages(false);
   };
 
   return (
@@ -662,7 +726,7 @@ function CreateProjectModal({
               <DialogDescription>Choose how you want to start</DialogDescription>
             </DialogHeader>
 
-            <div className="grid grid-cols-2 gap-4 py-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 py-4">
               <button
                 onClick={onCreateBlank}
                 className="flex flex-col items-center gap-3 p-6 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/20 transition-colors"
@@ -680,14 +744,30 @@ function CreateProjectModal({
                 onClick={() => setMode("generate")}
                 className="flex flex-col items-center gap-3 p-6 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-950/20 transition-colors"
               >
-                <div className="h-12 w-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                <div className="h-12 w-12 rounded-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center">
                   <Wand2 className="h-6 w-6 text-white" />
                 </div>
                 <div className="text-center">
-                  <p className="font-medium text-slate-900 dark:text-white">AI Generate</p>
-                  <p className="text-sm text-slate-500">Create with AI</p>
+                  <p className="font-medium text-slate-900 dark:text-white">Quick AI</p>
+                  <p className="text-sm text-slate-500">Fast generation</p>
                 </div>
               </button>
+
+              <Link
+                href="/dashboard/ai-thinking"
+                className="flex flex-col items-center gap-3 p-6 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 transition-colors relative overflow-hidden"
+              >
+                <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-indigo-500 text-white text-[10px] font-medium">
+                  NEW
+                </div>
+                <div className="h-12 w-12 rounded-full bg-linear-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center animate-pulse">
+                  <Sparkles className="h-6 w-6 text-white" />
+                </div>
+                <div className="text-center">
+                  <p className="font-medium text-slate-900 dark:text-white">AI Thinking</p>
+                  <p className="text-sm text-slate-500">Premium quality</p>
+                </div>
+              </Link>
             </div>
           </>
         ) : (
@@ -760,6 +840,20 @@ function CreateProjectModal({
                   <span>3</span>
                   <span>15</span>
                 </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+                <div className="space-y-0.5">
+                  <Label className="text-base">Generate Images</Label>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    Use AI to generate relevant images for each slide
+                  </p>
+                </div>
+                <Switch
+                  checked={generateImages}
+
+                  onCheckedChange={setGenerateImages}
+                />
               </div>
             </div>
 

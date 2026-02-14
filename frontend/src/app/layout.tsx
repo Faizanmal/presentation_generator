@@ -4,6 +4,8 @@ import { Toaster } from "sonner";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
+import { NotificationProvider } from "@/components/ui/enhanced-ui";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
 const inter = Inter({
@@ -38,8 +40,12 @@ export default function RootLayout({
         >
           <QueryProvider>
             <AuthProvider>
-              {children}
-              <Toaster position="top-right" richColors />
+              <NotificationProvider>
+                <TooltipProvider>
+                  {children}
+                  <Toaster position="top-right" richColors />
+                </TooltipProvider>
+              </NotificationProvider>
             </AuthProvider>
           </QueryProvider>
         </ThemeProvider>

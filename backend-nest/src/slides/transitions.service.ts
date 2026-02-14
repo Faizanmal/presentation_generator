@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+
 import { PrismaService } from '../prisma/prisma.service';
 
 export type TransitionType =
@@ -404,40 +405,31 @@ export class TransitionsService {
     ];
   }
 
-  async setSlideTransition(
-    slideId: string,
-    config: TransitionConfig,
-  ): Promise<void> {
+  async setSlideTransition(slideId: string): Promise<void> {
     await this.prisma.slide.update({
       where: { id: slideId },
       data: {
         // Store in JSON field (would need to add to schema)
-        // transition: config,
+        // transition: config as Prisma.InputJsonValue,
       },
     });
   }
 
-  async setElementAnimation(
-    blockId: string,
-    config: AnimationConfig,
-  ): Promise<void> {
+  async setElementAnimation(blockId: string): Promise<void> {
     await this.prisma.block.update({
       where: { id: blockId },
       data: {
         // Store in JSON field
-        // animation: config,
+        // animation: config as Prisma.InputJsonValue,
       },
     });
   }
 
-  async applyTransitionToAll(
-    projectId: string,
-    config: TransitionConfig,
-  ): Promise<void> {
+  async applyTransitionToAll(projectId: string): Promise<void> {
     await this.prisma.slide.updateMany({
       where: { projectId },
       data: {
-        // transition: config,
+        // transition: config as Prisma.InputJsonValue,
       },
     });
   }

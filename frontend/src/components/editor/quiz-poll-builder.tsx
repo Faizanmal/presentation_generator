@@ -1,9 +1,7 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 'use client';
 
 import React, { useState, useId } from 'react';
-import { useMutation } from '@tanstack/react-query';
+// import { useMutation } from '@tanstack/react-query';
 import {
   HelpCircle,
   BarChart3,
@@ -19,13 +17,6 @@ import {
   ChevronDown,
   ChevronUp,
   Settings,
-  Copy,
-  Share,
-  Play,
-  Pause,
-  RotateCcw,
-  Image,
-  Type,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,7 +24,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Checkbox } from '@/components/ui/checkbox';
+// import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -49,7 +40,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -80,12 +70,11 @@ interface Poll {
 
 interface QuizPollBuilderProps {
   slideId: string;
-  onInsertQuiz: (quiz: { questions: QuizQuestion[]; settings: any }) => void;
+  onInsertQuiz: (quiz: { questions: QuizQuestion[]; settings: unknown }) => void;
   onInsertPoll: (poll: Poll) => void;
 }
 
 export function QuizPollBuilder({
-  slideId,
   onInsertQuiz,
   onInsertPoll,
 }: QuizPollBuilderProps) {
@@ -178,7 +167,7 @@ export function QuizPollBuilder({
 
   return (
     <div className="space-y-4">
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'quiz' | 'poll')}>
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="quiz">
             <HelpCircle className="mr-2 h-4 w-4" />
@@ -296,7 +285,8 @@ export function QuizPollBuilder({
                         <div className="space-y-2">
                           <Label>Answer Options</Label>
                           {question.options?.map((option, optIndex) => (
-                            <div key={optIndex} className="flex items-center gap-2">
+
+                            <div key={`${question.id}-${option}`} className="flex items-center gap-2">
                               <RadioGroup
                                 value={question.correctAnswer as string}
                                 onValueChange={(v) =>
@@ -504,7 +494,8 @@ export function QuizPollBuilder({
               <div className="space-y-2">
                 <Label>Options</Label>
                 {currentPoll.options.map((option, index) => (
-                  <div key={index} className="flex items-center gap-2">
+
+                  <div key={option} className="flex items-center gap-2">
                     <div className="flex h-8 w-8 items-center justify-center rounded bg-muted text-sm font-medium">
                       {String.fromCharCode(65 + index)}
                     </div>
@@ -568,7 +559,7 @@ export function QuizPollBuilder({
                   <Label>Show Results</Label>
                   <Select
                     value={currentPoll.showResults}
-                    onValueChange={(v: any) =>
+                    onValueChange={(v: 'immediately' | 'after-close' | 'never') =>
                       setCurrentPoll({ ...currentPoll, showResults: v })
                     }
                   >
@@ -680,7 +671,8 @@ function QuizPreview({ questions }: { questions: QuizQuestion[] }) {
           <div className="mt-4 space-y-2">
             {currentQuestion.options?.map((option, index) => (
               <button
-                key={index}
+
+                key={option}
                 onClick={() => handleAnswer(option)}
                 disabled={showResult}
                 className={cn(
@@ -780,11 +772,12 @@ export function LivePollDisplay({
       <h3 className="text-xl font-semibold">{poll.question}</h3>
 
       <div className="space-y-3">
-        {poll.options.map((option, index) => {
+        {poll.options.map((option, _index) => {
           const result = results?.find((r) => r.option === option);
           return (
             <button
-              key={index}
+
+              key={option}
               onClick={() => handleVote(option)}
               disabled={hasVoted || !isActive}
               className={cn(

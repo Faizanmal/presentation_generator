@@ -101,10 +101,6 @@ export class TemplateMarketplaceController {
     },
     @CurrentUser() user: { id: string },
   ) {
-    return this.marketplaceService.publishTemplate(
-      user.id,
-      body.projectId,
-      body,
-    );
+    return this.marketplaceService.publishTemplate(user.id, body.projectId);
   }
 }

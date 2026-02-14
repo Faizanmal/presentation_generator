@@ -6,7 +6,11 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
+import * as fs from 'fs';
+import { RealTimeDataService } from './realtime-data.service';
 
 // Types for AI generation
 export interface GenerationParams {
@@ -16,6 +20,7 @@ export interface GenerationParams {
   length?: number;
   type?: string;
   generateImages?: boolean;
+  imageSource?: 'ai' | 'stock';
   smartLayout?: boolean;
 }
 
@@ -36,7 +41,7 @@ export interface ChartData {
     backgroundColor?: string | string[];
     borderColor?: string | string[];
   }>;
-  options?: Record<string, any>;
+  options?: Record<string, unknown>;
 }
 
 export type LayoutType =
@@ -71,7 +76,7 @@ export interface GeneratedPresentation {
 }
 
 export interface ImageGenerationResult {
-  url: string;
+  imageUrl: string;
   revisedPrompt: string;
 }
 
@@ -92,14 +97,186 @@ export interface AIInsight {
 export class AIService {
   private readonly logger = new Logger(AIService.name);
   private openai: OpenAI;
+  private groq: OpenAI | null = null;
+  private google: GoogleGenerativeAI | null = null;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly realTimeDataService: RealTimeDataService,
   ) {
     this.openai = new OpenAI({
       apiKey: this.configService.get<string>('OPENAI_API_KEY'),
     });
+
+    const groqApiKey = this.configService.get<string>('GROQ_API_KEY');
+    if (groqApiKey) {
+      this.groq = new OpenAI({
+        apiKey: groqApiKey,
+        baseURL: 'https://api.groq.com/openai/v1',
+      });
+    }
+
+    const googleApiKey = this.configService.get<string>('GOOGLE_GENERATIVE_AI_API_KEY');
+    if (googleApiKey) {
+      this.google = new GoogleGenerativeAI(googleApiKey);
+    }
+  }
+
+  /**
+   * Helper to execute an operation with retry logic for 429/5xx errors
+   */
+  private async retryOperation<T>(
+    operation: () => Promise<T>,
+    providerName: string,
+    maxRetries = 3,
+    initialDelay = 1000,
+  ): Promise<T> {
+    let lastError: unknown;
+
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        return await operation();
+      } catch (error: unknown) {
+        lastError = error;
+        const status =
+          (error as { status?: number; statusCode?: number })?.status ||
+          (error as { status?: number; statusCode?: number })?.statusCode;
+
+        // Check for rate limit (429) or server error (5xx)
+        if (status && (status === 429 || (status >= 500 && status < 600))) {
+          const delay = initialDelay * Math.pow(2, i);
+          this.logger.warn(
+            `${providerName} API issue (Status: ${status}). Attempt ${i + 1}/${maxRetries}. Retrying in ${delay}ms...`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+
+        // If it's not a retryable error, throw immediately
+        throw error;
+      }
+    }
+
+    throw lastError;
+  }
+
+  /**
+   * Public method to call AI with fallback (Groq -> OpenAI) and retry logic
+   * Can be used by other services (AIChatService, etc.) to benefit from optimizations
+   */
+  public async chatCompletion(
+    options: Record<string, unknown>,
+  ): Promise<OpenAI.Chat.Completions.ChatCompletion> {
+    // 1. Try Groq first (if available) - Faster and cheaper
+    if (this.groq) {
+      try {
+        // Use a high-performance model on Groq
+        const groqOptions = {
+          ...options,
+          model: 'llama-3.3-70b-versatile',
+        };
+
+        return (await this.retryOperation(
+          () => this.groq!.chat.completions.create(groqOptions as any),
+          'Groq',
+          2, // Try twice then failover
+          1000,
+        )) as OpenAI.Chat.Completions.ChatCompletion;
+      } catch (error) {
+        this.logger.warn(
+          `Groq AI failed after retries: ${(error as Error).message}. Falling back to OpenAI.`,
+        );
+      }
+    }
+
+    // 2. Try Google next (if available) - Good balance of speed/quality
+    if (this.google) {
+      try {
+        return (await this.retryOperation(
+          () => this.callGoogleAI(options),
+          'Google AI',
+          2,
+          1000,
+        )) as OpenAI.Chat.Completions.ChatCompletion;
+      } catch (error) {
+        this.logger.warn(
+          `Google AI failed after retries: ${(error as Error).message}. Falling back to OpenAI.`,
+        );
+      }
+    }
+
+    // 3. Fallback to OpenAI - More reliable but slower/expensive
+    return (await this.retryOperation(
+      () => this.openai.chat.completions.create(options as any),
+      'OpenAI',
+      3, // Retry up to 3 times
+      1000, // Start with 1s delay
+    )) as OpenAI.Chat.Completions.ChatCompletion;
+  }
+
+  /**
+   * Generate speech using OpenAI's TTS API
+   */
+  public async generateSpeech(
+    input: string,
+    voice: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer',
+    speed: number = 1.0,
+  ): Promise<Buffer> {
+    return this.retryOperation(
+      async () => {
+        const mp3 = await this.openai.audio.speech.create({
+          model: 'tts-1-hd',
+          voice,
+          input,
+          speed,
+          response_format: 'mp3',
+        });
+        return Buffer.from(await mp3.arrayBuffer());
+      },
+      'OpenAI Audio',
+      3,
+      1000,
+    );
+  }
+
+  /**
+   * Transcribe audio using OpenAI Whisper
+   */
+  public async transcribeAudio(
+    file: fs.ReadStream,
+    language?: string,
+  ): Promise<unknown> {
+    return this.retryOperation(
+      () =>
+        this.openai.audio.transcriptions.create({
+          file,
+          model: 'whisper-1',
+          response_format: 'verbose_json',
+          language,
+        }),
+      'OpenAI Whisper',
+      3,
+      1000,
+    );
+  }
+
+  /**
+   * Generate embeddings using OpenAI
+   */
+  public async generateEmbedding(input: string): Promise<number[]> {
+    return this.retryOperation(
+      async () => {
+        const response = await this.openai.embeddings.create({
+          model: 'text-embedding-3-small',
+          input,
+        });
+        return response.data[0].embedding;
+      },
+      'OpenAI Embedding',
+      3,
+      1000,
+    );
   }
 
   /**
@@ -126,7 +303,7 @@ export class AIService {
     );
 
     try {
-      const response = await this.openai.chat.completions.create({
+      const response = await this.chatCompletion({
         model: 'gpt-4o',
         messages: [
           { role: 'system', content: systemPrompt },
@@ -211,11 +388,10 @@ AVAILABLE BLOCK TYPES:
 - "quote" - For impactful quotes or statistics
 - "numbered" - For numbered/ordered lists
 
-${
-  isPresentation
-    ? 'For presentations: Keep each section focused on ONE key idea. Use bullet points for easy scanning. Limit content per slide.'
-    : 'For documents: Provide more detailed content. Use paragraphs for explanations. Structure with clear headings.'
-}`;
+${isPresentation
+        ? 'For presentations: Keep each section focused on ONE key idea. Use bullet points for easy scanning. Limit content per slide.'
+        : 'For documents: Provide more detailed content. Use paragraphs for explanations. Structure with clear headings.'
+      }`;
   }
 
   /**
@@ -245,12 +421,6 @@ REQUIREMENTS:
 Generate the complete ${type} structure in JSON format.`;
   }
 
-  /**
-   * Parse and validate the AI response
-   */
-  /**
-   * Parse and validate the AI response
-   */
   /**
    * Parse and validate the AI response
    */
@@ -332,11 +502,23 @@ Generate the complete ${type} structure in JSON format.`;
     tokens: number,
   ) {
     try {
+      // Sanitized log - do not store full prompt or response PII
+      const sanitizedPrompt = {
+        topic: params.topic, // Topic might still be sensitive, but less than full context
+        type: params.type,
+        tokens,
+      };
+
       await this.prisma.aIGeneration.create({
         data: {
           userId: 'system', // Will be updated when called from service
-          prompt: JSON.stringify(params),
-          response: result as unknown as any, // Cast to any to satisfy Prisma InputJsonValue if needed, but prefer simpler object
+          prompt: JSON.stringify(sanitizedPrompt),
+          // Store minimal metadata or success indicator instead of full response
+          response: {
+            status: 'success',
+            sectionCount: result.sections.length,
+            title: result.title,
+          } as unknown as Prisma.InputJsonValue,
           tokens,
           model: 'gpt-4o',
         },
@@ -352,7 +534,7 @@ Generate the complete ${type} structure in JSON format.`;
    */
   async enhanceContent(content: string, instruction: string): Promise<string> {
     try {
-      const response = await this.openai.chat.completions.create({
+      const response = await this.chatCompletion({
         model: 'gpt-4o',
         messages: [
           {
@@ -383,7 +565,7 @@ Generate the complete ${type} structure in JSON format.`;
     presentation: GeneratedPresentation,
   ): Promise<string[]> {
     try {
-      const response = await this.openai.chat.completions.create({
+      const response = await this.chatCompletion({
         model: 'gpt-4o',
         messages: [
           {
@@ -410,6 +592,75 @@ Generate the complete ${type} structure in JSON format.`;
       this.logger.error('Failed to generate suggestions', error);
       return [];
     }
+  }
+
+  private async callGoogleAI(
+    options: any,
+  ): Promise<OpenAI.Chat.Completions.ChatCompletion> {
+    const generationConfig: any = {};
+    if (options.response_format?.type === 'json_object') {
+      generationConfig.responseMimeType = 'application/json';
+    }
+
+    // Use Gemini 1.5 Flash for speed/cost (comparable to Groq fallback)
+    const model = this.google!.getGenerativeModel({
+      model: 'gemini-1.5-flash',
+      generationConfig,
+    });
+
+    const messages = options.messages || [];
+    const systemMessage = messages.find((m: any) => m.role === 'system');
+
+    // Convert messages to Gemini history format
+    // Filter out system message as it's handled separately
+    const history = messages
+      .filter((m: any) => m.role !== 'system')
+      .map((m: any) => ({
+        role: m.role === 'user' ? 'user' : 'model',
+        parts: [{ text: m.content as string }],
+      }));
+
+    if (history.length === 0) {
+      throw new Error('No messages provided for Google AI');
+    }
+
+    const lastMessage = history[history.length - 1];
+    const previousHistory = history.slice(0, -1);
+
+    const chat = model.startChat({
+      history: previousHistory,
+      systemInstruction: systemMessage
+        ? { role: 'system', parts: [{ text: systemMessage.content }] }
+        : undefined,
+    });
+
+    const result = await chat.sendMessage(lastMessage.parts[0].text);
+    const responseText = result.response.text();
+
+    // Map Gemini response to OpenAI ChatCompletion format
+    return {
+      id: `google-${Date.now()}`,
+      object: 'chat.completion',
+      created: Math.floor(Date.now() / 1000),
+      model: 'gemini-1.5-flash',
+      choices: [
+        {
+          index: 0,
+          message: {
+            role: 'assistant',
+            content: responseText,
+            refusal: null,
+          },
+          finish_reason: 'stop',
+          logprobs: null,
+        },
+      ],
+      usage: {
+        prompt_tokens: 0, // Not easily available without tokenizer
+        completion_tokens: 0,
+        total_tokens: 0,
+      },
+    } as OpenAI.Chat.Completions.ChatCompletion;
   }
 
   // ============================================
@@ -448,7 +699,7 @@ No text overlays, clean composition, high quality.`;
       );
 
       return {
-        url: imageData.url,
+        imageUrl: imageData.url,
         revisedPrompt: imageData.revised_prompt || prompt,
       };
     } catch (error) {
@@ -533,7 +784,7 @@ No text overlays, clean composition, high quality.`;
     presentation: GeneratedPresentation,
   ): Promise<string[]> {
     try {
-      const response = await this.openai.chat.completions.create({
+      const response = await this.chatCompletion({
         model: 'gpt-4o',
         messages: [
           {
@@ -569,10 +820,7 @@ Return as JSON: { "notes": ["Note for slide 1", "Note for slide 2", ...] }`,
   /**
    * Smart layout recommendation based on content
    */
-  async recommendLayout(
-    content: GeneratedBlock[],
-    heading: string,
-  ): Promise<LayoutType> {
+  recommendLayout(content: GeneratedBlock[], heading: string): LayoutType {
     // Analyze content to recommend layout
     const hasImage = content.some((b) => b.type === 'image');
     const hasChart = content.some((b) => b.type === 'chart');
@@ -616,7 +864,7 @@ Return as JSON: { "notes": ["Note for slide 1", "Note for slide 2", ...] }`,
     chartType: ChartData['type'] = 'bar',
   ): Promise<ChartData> {
     try {
-      const response = await this.openai.chat.completions.create({
+      const response = await this.chatCompletion({
         model: 'gpt-4o',
         messages: [
           {
@@ -693,7 +941,7 @@ Generate realistic, plausible data that matches the description.`,
     );
 
     try {
-      const response = await this.openai.chat.completions.create({
+      const response = await this.chatCompletion({
         model: 'gpt-4o',
         messages: [
           { role: 'system', content: systemPrompt },
@@ -715,7 +963,7 @@ Generate realistic, plausible data that matches the description.`,
       if (smartLayout) {
         for (const section of parsed.sections) {
           if (!section.layout) {
-            section.layout = await this.recommendLayout(
+            section.layout = this.recommendLayout(
               section.blocks,
               section.heading,
             );
@@ -724,13 +972,23 @@ Generate realistic, plausible data that matches the description.`,
       }
 
       // Generate images if enabled
-      if (generateImages) {
-        const imageMap = await this.generatePresentationImages(parsed.sections);
+      if (generateImages || params.imageSource) {
+        let imageMap: Map<number, ImageGenerationResult> = new Map();
+
+        const source =
+          params.imageSource || (generateImages ? 'ai' : undefined);
+
+        if (source === 'ai') {
+          imageMap = await this.generatePresentationImages(parsed.sections);
+        } else if (source === 'stock') {
+          imageMap = await this.generateStockImages(parsed.sections);
+        }
+
         imageMap.forEach((image, index) => {
           if (parsed.sections[index]) {
             parsed.sections[index].blocks.unshift({
               type: 'image',
-              content: image.url,
+              content: image.imageUrl,
             });
           }
         });
@@ -847,7 +1105,7 @@ Generate the complete ${type} with all metadata.`;
    * Parse advanced AI response
    */
   private parseAdvancedResponse(content: string): GeneratedPresentation {
-    let parsed: any;
+    let parsed: unknown;
 
     try {
       parsed = JSON.parse(content);
@@ -858,34 +1116,78 @@ Generate the complete ${type} with all metadata.`;
       );
     }
 
-    if (!parsed.title || !Array.isArray(parsed.sections)) {
+    if (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      !('title' in parsed) ||
+      !('sections' in parsed) ||
+      !Array.isArray((parsed as Record<string, unknown>).sections)
+    ) {
       throw new BadRequestException('Invalid presentation structure');
     }
 
-    const sections: GeneratedSection[] = parsed.sections.map(
-      (section: any) => ({
-        heading: section.heading || 'Untitled',
-        layout: section.layout || 'title-content',
-        suggestedImage: section.suggestedImage,
-        speakerNotes: section.speakerNotes,
-        blocks: (section.blocks || []).map((block: any) => ({
-          type: block.type || 'paragraph',
-          content: block.content || '',
-          chartData: block.chartData,
-          embedUrl: block.embedUrl,
-          embedType: block.embedType,
-        })),
-      }),
+    const typedParsed = parsed as {
+      title: string;
+      sections: unknown[];
+      metadata?: unknown;
+    };
+
+    const sections: GeneratedSection[] = typedParsed.sections.map(
+      (section: unknown) => {
+        const s = section as Record<string, unknown>;
+        return {
+          heading: typeof s.heading === 'string' ? s.heading : 'Untitled',
+          layout: (typeof s.layout === 'string'
+            ? s.layout
+            : 'title-content') as LayoutType,
+          suggestedImage:
+            typeof s.suggestedImage === 'string' ? s.suggestedImage : undefined,
+          speakerNotes:
+            typeof s.speakerNotes === 'string' ? s.speakerNotes : undefined,
+          blocks: Array.isArray(s.blocks)
+            ? s.blocks.map((block: unknown) => {
+              const b = block as Record<string, unknown>;
+              return {
+                type: typeof b.type === 'string' ? b.type : 'paragraph',
+                content: typeof b.content === 'string' ? b.content : '',
+                chartData: b.chartData as ChartData | undefined,
+                embedUrl:
+                  typeof b.embedUrl === 'string' ? b.embedUrl : undefined,
+                embedType:
+                  typeof b.embedType === 'string'
+                    ? (b.embedType as GeneratedBlock['embedType'])
+                    : undefined,
+              };
+            })
+            : [],
+        };
+      },
     );
 
+    const metadata = typedParsed.metadata as
+      | Record<string, unknown>
+      | undefined;
+
     return {
-      title: parsed.title,
+      title: typedParsed.title,
       sections,
-      metadata: parsed.metadata || {
-        estimatedDuration: sections.length * 2,
-        keywords: [],
-        summary: '',
-      },
+      metadata: metadata
+        ? {
+          estimatedDuration:
+            typeof metadata.estimatedDuration === 'number'
+              ? metadata.estimatedDuration
+              : sections.length * 2,
+          keywords: Array.isArray(metadata.keywords)
+            ? (metadata.keywords as string[])
+            : [],
+          summary:
+            typeof metadata.summary === 'string' ? metadata.summary : '',
+        }
+        : {
+          estimatedDuration: sections.length * 2,
+          keywords: [],
+          summary: '',
+        },
     };
   }
 
@@ -1018,6 +1320,387 @@ Use the advanced presentation JSON format with layouts and image suggestions.`,
     } catch (error) {
       this.logger.error('Document extraction failed', error);
       throw new InternalServerErrorException('Failed to process document');
+    }
+  }
+  /**
+   * Generate stock images (using LoremFlickr as placeholder service for now)
+   */
+  async generateStockImages(
+    sections: GeneratedSection[],
+  ): Promise<Map<number, ImageGenerationResult>> {
+    const imageMap = new Map<number, ImageGenerationResult>();
+
+    // Generate images for sections that have suggestedImage
+    const imagePromises = sections
+      .map((section, index) => ({ section, index }))
+      .filter(({ section }) => section.suggestedImage)
+      .map(async ({ section, index }) => {
+        try {
+          // Extract keywords from the description to use for search
+          const keywords = await this.extractKeywords(section.suggestedImage!);
+          // Using LoremFlickr which supports keywords
+          const imageUrl = `https://loremflickr.com/1024/768/${encodeURIComponent(keywords.replace(/[^a-zA-Z0-9]/g, ','))}`;
+
+          imageMap.set(index, {
+            imageUrl,
+            revisedPrompt: section.suggestedImage!,
+          });
+        } catch (error) {
+          this.logger.warn(
+            `Failed to get stock image for section ${index}`,
+            error,
+          );
+        }
+      });
+
+    await Promise.allSettled(imagePromises);
+    return imageMap;
+  }
+
+  /**
+   * Extract keywords from image description for stock search
+   */
+  async extractKeywords(description: string): Promise<string> {
+    try {
+      const response = await this.chatCompletion({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Extract 1-2 main visual keywords from the image description. Return only keywords separated by comma, no extra text.',
+          },
+          {
+            role: 'user',
+            content: description,
+          },
+        ],
+        temperature: 0.3,
+        max_tokens: 20,
+      });
+
+      return response.choices[0]?.message?.content || 'business,technology';
+    } catch {
+      return 'business,technology';
+    }
+  }
+
+  // ============================================
+  // ENHANCED FEATURES: CHARTS, EMOJIS, REAL-TIME DATA
+  // ============================================
+
+  /**
+   * Generate chart data with real-time information
+   */
+  async generateChartWithRealData(
+    chartTitle: string,
+    topic: string,
+    chartType: 'bar' | 'line' | 'pie' | 'doughnut' = 'bar',
+  ): Promise<ChartData> {
+    try {
+      // First, get context for what data to search for
+      const searchQuery = await this.getChartDataSearchQuery(chartTitle, topic);
+
+      // Fetch real-time data
+      const chartDataPoints = await this.realTimeDataService.extractChartData(
+        searchQuery,
+        5,
+      );
+
+      if (chartDataPoints.length < 3) {
+        // Use fallback data if we couldn't extract enough
+        return this.generateFallbackChartData(chartTitle, chartType);
+      }
+
+      // Format data for Chart.js
+      const chartData: ChartData = {
+        type: chartType,
+        labels: chartDataPoints.map((d) => d.label),
+        datasets: [
+          {
+            label: chartTitle,
+            data: chartDataPoints.map((d) => d.value),
+            backgroundColor: this.getChartColors(chartDataPoints.length),
+            borderColor: '#1a73e8',
+          },
+        ],
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: true,
+              position: 'top',
+            },
+            title: {
+              display: true,
+              text: chartTitle,
+              font: {
+                size: 16,
+                weight: 'bold',
+              },
+            },
+          },
+        },
+      };
+
+      this.logger.log(`Generated chart with real-time data: ${chartTitle}`);
+      return chartData;
+    } catch (error) {
+      this.logger.error(`Chart generation failed: ${(error as Error).message}`);
+      return this.generateFallbackChartData(chartTitle, chartType);
+    }
+  }
+
+  /**
+   * Get search query for chart data
+   */
+  private async getChartDataSearchQuery(
+    chartTitle: string,
+    topic: string,
+  ): Promise<string> {
+    try {
+      const response = await this.chatCompletion({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: `Generate a search query to find numerical data and statistics. 
+Return ONLY the search query text, nothing else.`,
+          },
+          {
+            role: 'user',
+            content: `Chart title: "${chartTitle}"\nTopic: "${topic}"\n\nGenerate a search query to find relevant numerical data.`,
+          },
+        ],
+        temperature: 0.3,
+        max_tokens: 50,
+      });
+
+      const query = response.choices[0]?.message?.content?.trim();
+      return query || `${topic} statistics data`;
+    } catch {
+      return `${topic} statistics data`;
+    }
+  }
+
+  /**
+   * Generate fallback chart data when real data isn't available
+   */
+  private generateFallbackChartData(
+    title: string,
+    chartType: 'bar' | 'line' | 'pie' | 'doughnut',
+  ): ChartData {
+    const labels = ['Q1', 'Q2', 'Q3', 'Q4'];
+    const data = [65, 78, 82, 91];
+
+    return {
+      type: chartType,
+      labels,
+      datasets: [
+        {
+          label: title,
+          data,
+          backgroundColor: this.getChartColors(labels.length),
+          borderColor: '#1a73e8',
+        },
+      ],
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+      },
+    };
+  }
+
+  /**
+   * Get color palette for charts
+   */
+  private getChartColors(count: number): string[] {
+    const colors = [
+      '#1a73e8', // Blue
+      '#34a853', // Green
+      '#fbbc04', // Yellow
+      '#ea4335', // Red
+      '#9334e6', // Purple
+      '#00acc1', // Cyan
+      '#ff6f00', // Orange
+      '#7cb342', // Light Green
+    ];
+
+    return colors.slice(0, count);
+  }
+
+  /**
+   * Generate enhanced presentation with charts, emojis, and rich content
+   */
+  async generateEnhancedPresentation(
+    params: GenerationParams & {
+      includeCharts?: boolean;
+      includeRealTimeData?: boolean;
+      includeEmojis?: boolean;
+    },
+  ): Promise<GeneratedPresentation> {
+    const {
+      topic,
+      tone = 'professional',
+      audience = 'general',
+      length = 5,
+      includeCharts = true,
+      includeRealTimeData = true,
+      includeEmojis = true,
+    } = params;
+
+    try {
+      const systemPrompt = `You are an expert presentation designer. Create presentations with:
+- Rich, detailed content (6-10 blocks per slide)
+- Emojis for visual appeal ${includeEmojis ? '✓' : ''}
+- Charts and data visualizations ${includeCharts ? '📊' : ''}
+- Varied text styles with different colors
+- Card-style blocks for key information
+- Professional, engaging design
+
+CRITICAL: Return ONLY valid JSON, no markdown formatting.`;
+
+      const userPrompt = `Create a comprehensive presentation about: "${topic}"
+
+Specifications:
+- Audience: ${audience}
+- Tone: ${tone}
+- Slides: ${length}
+- Include charts: ${includeCharts}
+- Real-time data: ${includeRealTimeData}
+- Emojis: ${includeEmojis}
+
+For each slide, include:
+1. Heading with emoji
+2. Multiple detailed paragraphs
+3. Bullet or numbered lists with emojis
+4. Card-style callouts for key points
+5. Charts where data would be valuable
+6. Suggested logos/icons
+
+Use varied text colors:
+- Headings: #1a73e8
+- Paragraphs: #5f6368
+- Lists: #202124
+- Highlights: #ea4335
+- Callouts: #34a853
+
+Return JSON structure:
+{
+  "title": "Title with emoji 📊",
+  "sections": [
+    {
+      "heading": "Slide heading 🎯",
+      "layout": "rich-content",
+      "blocks": [
+        {"type": "heading", "content": "...", "style": {"color": "#1a73e8", "fontSize": "32px"}},
+        {"type": "paragraph", "content": "...", "style": {"color": "#5f6368", "cardStyle": true}},
+        {"type": "bullet-list", "items": ["Point 1 ✓", "Point 2 ⚡"], "style": {"color": "#202124"}},
+        {"type": "chart", "chartType": "bar", "title": "Chart Title", "dataQuery": "search query", "useRealTimeData": ${includeRealTimeData}}
+      ],
+      "speakerNotes": "Speaker notes..."
+    }
+  ]
+}`;
+
+      const response = await this.chatCompletion({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.7,
+        max_tokens: 6000,
+        response_format: { type: 'json_object' },
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        throw new InternalServerErrorException('No content generated');
+      }
+
+      const parsed = JSON.parse(content);
+
+      // Process charts if included
+      if (includeCharts && includeRealTimeData) {
+        await this.enrichPresentationWithCharts(parsed, topic);
+      }
+
+      return this.parseAndValidateResponse(JSON.stringify(parsed));
+    } catch (error) {
+      this.logger.error('Enhanced presentation generation failed', error);
+      throw new InternalServerErrorException('Failed to generate presentation');
+    }
+  }
+
+  /**
+   * Enrich presentation with real-time chart data
+   */
+  private async enrichPresentationWithCharts(
+    presentation: Record<string, unknown>,
+    topic: string,
+  ): Promise<void> {
+    if (!presentation.sections || !Array.isArray(presentation.sections)) {
+      return;
+    }
+
+    for (const section of presentation.sections) {
+      if (!section.blocks || !Array.isArray(section.blocks)) {
+        continue;
+      }
+
+      for (const block of section.blocks) {
+        if (
+          block.type === 'chart' &&
+          block.useRealTimeData &&
+          block.dataQuery
+        ) {
+          try {
+            const chartData = await this.generateChartWithRealData(
+              block.title || 'Data Chart',
+              block.dataQuery || topic,
+              block.chartType || 'bar',
+            );
+            block.chartData = chartData;
+          } catch (error) {
+            this.logger.warn(
+              `Failed to enrich chart: ${(error as Error).message}`,
+            );
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Add emojis to text content
+   */
+  async addEmojisToContent(
+    text: string,
+    context: string = '',
+  ): Promise<string> {
+    try {
+      const response = await this.chatCompletion({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Add relevant emojis to the text to make it more engaging. Keep the same meaning, just add emojis. Return only the enhanced text.',
+          },
+          {
+            role: 'user',
+            content: `Text: ${text}\nContext: ${context}`,
+          },
+        ],
+        temperature: 0.7,
+        max_tokens: 200,
+      });
+
+      return response.choices[0]?.message?.content?.trim() || text;
+    } catch {
+      return text;
     }
   }
 }

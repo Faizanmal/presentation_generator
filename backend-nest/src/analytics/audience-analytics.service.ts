@@ -61,7 +61,7 @@ export class AudienceAnalyticsService {
 
   constructor(private prisma: PrismaService) {}
 
-  async trackEvent(event: Omit<ViewEvent, 'timestamp'>): Promise<void> {
+  trackEvent(event: Omit<ViewEvent, 'timestamp'>): void {
     const fullEvent: ViewEvent = {
       ...event,
       timestamp: new Date(),
@@ -70,11 +70,11 @@ export class AudienceAnalyticsService {
     this.events.push(fullEvent);
 
     // Update session tracking
-    await this.updateSession(fullEvent);
+    this.updateSession(fullEvent);
 
     // Persist to database in batches
     if (this.events.length >= 100) {
-      await this.flushEvents();
+      this.flushEvents();
     }
   }
 
@@ -142,7 +142,6 @@ export class AudienceAnalyticsService {
     const slideEngagement = await this.calculateSlideEngagement(
       projectId,
       events,
-      sessions,
     );
 
     // Drop-off analysis
@@ -175,10 +174,10 @@ export class AudienceAnalyticsService {
     };
   }
 
-  async getSlideHeatmap(
+  getSlideHeatmap(
     projectId: string,
     slideId: string,
-  ): Promise<{ x: number; y: number; intensity: number }[]> {
+  ): { x: number; y: number; intensity: number }[] {
     const interactionEvents = this.events.filter(
       (e) =>
         e.projectId === projectId &&
@@ -215,13 +214,13 @@ export class AudienceAnalyticsService {
     }));
   }
 
-  async getViewerSessions(
+  getViewerSessions(
     projectId: string,
     options: {
       limit?: number;
       offset?: number;
     } = {},
-  ): Promise<{ sessions: ViewerSession[]; total: number }> {
+  ): { sessions: ViewerSession[]; total: number } {
     const projectEvents = this.events.filter((e) => e.projectId === projectId);
     const sessionIds = new Set(projectEvents.map((e) => e.sessionId));
 
@@ -244,7 +243,7 @@ export class AudienceAnalyticsService {
     format: 'csv' | 'json' | 'pdf',
   ): Promise<Buffer> {
     const insights = await this.getInsights(projectId);
-    const { sessions } = await this.getViewerSessions(projectId, {
+    const { sessions } = this.getViewerSessions(projectId, {
       limit: 1000,
     });
 
@@ -280,10 +279,10 @@ export class AudienceAnalyticsService {
     return Buffer.from(JSON.stringify(insights));
   }
 
-  async getRealtimeViewers(projectId: string): Promise<{
+  getRealtimeViewers(projectId: string): {
     count: number;
     viewers: { sessionId: string; currentSlide: string; duration: number }[];
-  }> {
+  } {
     const recentThreshold = new Date(Date.now() - 5 * 60 * 1000); // 5 minutes
 
     const recentEvents = this.events.filter(
@@ -311,7 +310,7 @@ export class AudienceAnalyticsService {
     };
   }
 
-  private async updateSession(event: ViewEvent): Promise<void> {
+  private updateSession(event: ViewEvent): void {
     let session = this.sessions.get(event.sessionId);
 
     if (!session) {
@@ -319,8 +318,10 @@ export class AudienceAnalyticsService {
         sessionId: event.sessionId,
         startTime: event.timestamp,
         userId: event.userId,
-        userAgent: event.metadata?.userAgent || 'Unknown',
-        location: event.metadata?.location,
+        userAgent:
+          ((event.metadata as Record<string, any>)?.userAgent as string) ||
+          'Unknown',
+        location: (event.metadata as Record<string, any>)?.location as string,
         slidesViewed: [],
         totalDuration: 0,
         completed: false,
@@ -328,21 +329,26 @@ export class AudienceAnalyticsService {
       this.sessions.set(event.sessionId, session);
     }
 
-    if (event.slideId && !session.slidesViewed.includes(event.slideId)) {
-      session.slidesViewed.push(event.slideId);
+    // At this point, session is guaranteed to be defined
+    const currentSession = session;
+
+    if (event.slideId && !currentSession.slidesViewed.includes(event.slideId)) {
+      currentSession.slidesViewed.push(event.slideId);
     }
 
     if (event.duration) {
-      session.totalDuration += event.duration;
+      currentSession.totalDuration += event.duration;
     }
 
     if (event.eventType === 'exit') {
-      session.endTime = event.timestamp;
-      session.completed = event.metadata?.completed || false;
+      currentSession.endTime = event.timestamp;
+      currentSession.completed =
+        ((event.metadata as Record<string, any>)?.completed as boolean) ||
+        false;
     }
   }
 
-  private async flushEvents(): Promise<void> {
+  private flushEvents(): void {
     // In a real implementation, batch insert to database
     // For now, just clear old events (keep last 10000)
     if (this.events.length > 10000) {
@@ -359,7 +365,6 @@ export class AudienceAnalyticsService {
   private async calculateSlideEngagement(
     projectId: string,
     events: ViewEvent[],
-    sessions: ViewerSession[],
   ): Promise<SlideEngagement[]> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
@@ -397,7 +402,7 @@ export class AudienceAnalyticsService {
       return {
         slideId: slide.id,
         slideNumber: index + 1,
-        title: (slide as any).title || `Slide ${index + 1}`,
+        title: (slide as { title?: string }).title || `Slide ${index + 1}`,
         views,
         averageTimeSpent: avgTimeSpent,
         dropOffRate,
@@ -450,11 +455,12 @@ export class AudienceAnalyticsService {
         case 'day':
           key = date.toISOString().substring(0, 10);
           break;
-        case 'week':
+        case 'week': {
           const weekStart = new Date(date);
           weekStart.setDate(date.getDate() - date.getDay());
           key = weekStart.toISOString().substring(0, 10);
           break;
+        }
         case 'month':
           key = date.toISOString().substring(0, 7);
           break;

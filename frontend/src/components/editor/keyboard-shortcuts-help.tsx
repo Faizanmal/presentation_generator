@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
-import { Keyboard, X } from 'lucide-react';
+// import { useEffect } from 'react';
+import { Keyboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -11,10 +11,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import type {
+  KeyboardShortcut} from '@/hooks/use-keyboard-shortcuts';
 import {
   useKeyboardShortcuts,
-  formatShortcut,
-  KeyboardShortcut,
+  formatShortcut
 } from '@/hooks/use-keyboard-shortcuts';
 import { cn } from '@/lib/utils';
 
@@ -57,7 +58,7 @@ export function KeyboardShortcutsHelp() {
           <div className="space-y-6">
             {categoryOrder.map((category) => {
               const categoryShortcuts = groupedShortcuts[category];
-              if (!categoryShortcuts?.length) return null;
+              if (!categoryShortcuts?.length) {return null;}
 
               const { label, color } = categoryLabels[category] || {
                 label: category,

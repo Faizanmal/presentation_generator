@@ -1,11 +1,11 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 'use client';
 
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { io, Socket } from 'socket.io-client';
+import type { Socket } from 'socket.io-client';
+import { io } from 'socket.io-client';
 import { useEditorStore } from '@/stores/editor-store';
 import { toast } from 'sonner';
+import type { Slide } from '@/types';
 
 interface Collaborator {
   userId: string;
@@ -47,7 +47,7 @@ export function useCollaboration({
 
   // Initialize socket connection
   useEffect(() => {
-    if (!projectId || !token) return;
+    if (!projectId || !token) {return;}
 
     const socket = io(`${process.env.NEXT_PUBLIC_API_URL}/collaboration`, {
       auth: { token },
@@ -108,33 +108,33 @@ export function useCollaboration({
     });
 
     // Content update events
-    socket.on('block:updated', (data: any) => {
+    socket.on('block:updated', (data: { slideId: string; blockId: string; data: Record<string, unknown> }) => {
       updateBlock(data.slideId, data.blockId, data.data);
     });
 
-    socket.on('slide:added', (data: any) => {
+    socket.on('slide:added', (data: { slide: Slide }) => {
       addSlide(data.slide);
     });
 
-    socket.on('slide:deleted', (data: any) => {
+    socket.on('slide:deleted', (data: { slideId: string }) => {
       deleteSlide(data.slideId);
     });
 
-    socket.on('slide:reordered', (data: any) => {
+    socket.on('slide:reordered', (data: { fromIndex: number; toIndex: number }) => {
       reorderSlides(data.fromIndex, data.toIndex);
     });
 
     // Comment events
-    socket.on('comment:added', (data: any) => {
+    socket.on('comment:added', (data: { userName: string }) => {
       toast.info(`${data.userName} added a comment`);
     });
 
-    socket.on('comment:resolved', (data: any) => {
+    socket.on('comment:resolved', () => {
       toast.info('Comment resolved');
     });
 
     // Version events
-    socket.on('version:saved', (data: any) => {
+    socket.on('version:saved', (data: { userName: string }) => {
       toast.success(`Version saved by ${data.userName}`);
     });
 
@@ -153,7 +153,7 @@ export function useCollaboration({
 
   // Send block update
   const sendBlockUpdate = useCallback(
-    (slideId: string, blockId: string, data: any) => {
+    (slideId: string, blockId: string, data: Record<string, unknown>) => {
       socketRef.current?.emit('block:update', {
         projectId,
         slideId,
@@ -166,7 +166,7 @@ export function useCollaboration({
 
   // Send slide update
   const sendSlideUpdate = useCallback(
-    (slideId: string, data: any) => {
+    (slideId: string, data: unknown) => {
       socketRef.current?.emit('slide:update', {
         projectId,
         slideId,
@@ -178,7 +178,7 @@ export function useCollaboration({
 
   // Send slide add
   const sendSlideAdd = useCallback(
-    (slide: any) => {
+    (slide: unknown) => {
       socketRef.current?.emit('slide:add', {
         projectId,
         slide,
@@ -217,7 +217,7 @@ export function useCollaboration({
         socketRef.current?.emit(
           'comment:add',
           { projectId, slideId, blockId, content },
-          (response: any) => resolve(response)
+          (response: unknown) => resolve(response)
         );
       });
     },
@@ -234,12 +234,12 @@ export function useCollaboration({
 
   // Save version
   const saveVersion = useCallback(
-    async (snapshot: any, message?: string) => {
+    async (snapshot: unknown, message?: string) => {
       return new Promise((resolve) => {
         socketRef.current?.emit(
           'version:save',
           { projectId, snapshot, message },
-          (response: any) => resolve(response)
+          (response: unknown) => resolve(response)
         );
       });
     },

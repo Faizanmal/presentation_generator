@@ -12,11 +12,10 @@ interface CursorOverlayProps {
 export function CursorOverlay({
   users,
   currentUserId,
-  containerRef,
 }: CursorOverlayProps) {
   const otherUsers = users.filter((user) => user.id !== currentUserId && user.cursor);
 
-  if (otherUsers.length === 0) return null;
+  if (otherUsers.length === 0) {return null;}
 
   return (
     <div className="pointer-events-none absolute inset-0 z-50 overflow-hidden">
@@ -32,7 +31,7 @@ interface UserCursorProps {
 }
 
 function UserCursor({ user }: UserCursorProps) {
-  if (!user.cursor) return null;
+  if (!user.cursor) {return null;}
 
   const { x, y } = user.cursor;
   const name = user.name || user.email.split('@')[0];
@@ -86,11 +85,11 @@ export function useCursorTracking(
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!container) return;
+    if (!container) {return;}
 
     const handleMouseMove = (e: MouseEvent) => {
       const now = Date.now();
-      if (now - lastBroadcast.current < throttleMs) return;
+      if (now - lastBroadcast.current < throttleMs) {return;}
 
       const rect = container.getBoundingClientRect();
       const x = e.clientX - rect.left;

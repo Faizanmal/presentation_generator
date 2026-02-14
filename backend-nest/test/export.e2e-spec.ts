@@ -1,8 +1,23 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
+import { Server } from 'http';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+
+interface AuthResponse {
+  access_token: string;
+  user: {
+    id: string;
+    email: string;
+  };
+}
+
+interface ProjectResponse {
+  id: string;
+  title: string;
+  slides?: any[];
+}
 
 describe('Export (e2e)', () => {
   let app: INestApplication;
@@ -31,7 +46,7 @@ describe('Export (e2e)', () => {
     prisma = app.get(PrismaService);
 
     // Create a test user and project
-    const registerResponse = await request(app.getHttpServer())
+    const registerResponse = await request(app.getHttpServer() as Server)
       .post('/api/auth/register')
       .send({
         email: 'export-test@test-e2e.com',
@@ -39,11 +54,12 @@ describe('Export (e2e)', () => {
         name: 'Export Test User',
       });
 
-    authToken = registerResponse.body.access_token;
-    testUserId = registerResponse.body.user.id;
+    const body = registerResponse.body as AuthResponse;
+    authToken = body.access_token;
+    testUserId = body.user.id;
 
     // Create a test project with slides
-    const projectResponse = await request(app.getHttpServer())
+    const projectResponse = await request(app.getHttpServer() as Server)
       .post('/api/projects')
       .set('Authorization', `Bearer ${authToken}`)
       .send({
@@ -51,10 +67,11 @@ describe('Export (e2e)', () => {
         description: 'Project for testing exports',
       });
 
-    testProjectId = projectResponse.body.id;
+    const projectBody = projectResponse.body as ProjectResponse;
+    testProjectId = projectBody.id;
 
     // Add some slides
-    await request(app.getHttpServer())
+    await request(app.getHttpServer() as Server)
       .post(`/api/projects/${testProjectId}/slides`)
       .set('Authorization', `Bearer ${authToken}`)
       .send({
@@ -62,7 +79,7 @@ describe('Export (e2e)', () => {
         order: 0,
       });
 
-    await request(app.getHttpServer())
+    await request(app.getHttpServer() as Server)
       .post(`/api/projects/${testProjectId}/slides`)
       .set('Authorization', `Bearer ${authToken}`)
       .send({
@@ -86,20 +103,21 @@ describe('Export (e2e)', () => {
 
   describe('POST /api/export/:projectId/json', () => {
     it('should export project as JSON', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(app.getHttpServer() as Server)
         .post(`/api/export/${testProjectId}/json`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
-      expect(response.body).toHaveProperty('title');
-      expect(response.body).toHaveProperty('slides');
-      expect(Array.isArray(response.body.slides)).toBe(true);
+      const body = response.body as ProjectResponse;
+      expect(body).toHaveProperty('title');
+      expect(body).toHaveProperty('slides');
+      expect(Array.isArray(body.slides)).toBe(true);
     });
   });
 
   describe('POST /api/export/:projectId/html', () => {
     it('should export project as HTML', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(app.getHttpServer() as Server)
         .post(`/api/export/${testProjectId}/html`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
@@ -112,7 +130,7 @@ describe('Export (e2e)', () => {
 
   describe('POST /api/export/:projectId/pdf', () => {
     it('should export project as PDF', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(app.getHttpServer() as Server)
         .post(`/api/export/${testProjectId}/pdf`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
@@ -124,7 +142,7 @@ describe('Export (e2e)', () => {
 
   describe('POST /api/export/:projectId/pptx', () => {
     it('should export project as PowerPoint', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(app.getHttpServer() as Server)
         .post(`/api/export/${testProjectId}/pptx`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
@@ -138,14 +156,14 @@ describe('Export (e2e)', () => {
 
   describe('Error handling', () => {
     it('should return 404 for non-existent project', async () => {
-      await request(app.getHttpServer())
+      await request(app.getHttpServer() as Server)
         .post('/api/export/non-existent-id/json')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(404);
     });
 
     it('should require authentication', async () => {
-      await request(app.getHttpServer())
+      await request(app.getHttpServer() as Server)
         .post(`/api/export/${testProjectId}/json`)
         .expect(401);
     });

@@ -9,6 +9,9 @@ import {
   Palette,
   Building2,
   Settings,
+  Eye,
+  Layers,
+  Bell,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -37,6 +40,21 @@ const settingsNav = [
     title: 'Organization',
     href: '/settings/organization',
     icon: Building2,
+  },
+  {
+    title: 'Design System',
+    href: '/settings/design-system',
+    icon: Layers,
+  },
+  {
+    title: 'Accessibility',
+    href: '/settings/accessibility',
+    icon: Eye,
+  },
+  {
+    title: 'Notifications',
+    href: '/settings/notifications',
+    icon: Bell,
   },
 ];
 

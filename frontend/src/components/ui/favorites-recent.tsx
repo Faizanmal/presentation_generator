@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 // import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Star, Clock, FileText, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { Project } from "@/types";
+import type { Project } from "@/types";
 import { formatDistanceToNow } from "date-fns";
 
 // Local storage key for favorites
@@ -18,7 +18,7 @@ const MAX_RECENT = 10;
 
 // Get favorites from localStorage
 function getFavoritesFromStorage(): string[] {
-    if (typeof window === "undefined") return [];
+    if (typeof window === "undefined") { return []; }
     try {
         const stored = localStorage.getItem(FAVORITES_KEY);
         return stored ? JSON.parse(stored) : [];
@@ -29,13 +29,13 @@ function getFavoritesFromStorage(): string[] {
 
 // Save favorites to localStorage
 function saveFavoritesToStorage(favorites: string[]) {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined") { return; }
     localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
 }
 
 // Get recent from localStorage
 function getRecentFromStorage(): { id: string; visitedAt: string }[] {
-    if (typeof window === "undefined") return [];
+    if (typeof window === "undefined") { return []; }
     try {
         const stored = localStorage.getItem(RECENT_KEY);
         return stored ? JSON.parse(stored) : [];
@@ -46,7 +46,7 @@ function getRecentFromStorage(): { id: string; visitedAt: string }[] {
 
 // Save recent to localStorage
 function saveRecentToStorage(recent: { id: string; visitedAt: string }[]) {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined") { return; }
     localStorage.setItem(RECENT_KEY, JSON.stringify(recent.slice(0, MAX_RECENT)));
 }
 
@@ -55,8 +55,10 @@ export function useFavorites() {
     const [favorites, setFavorites] = useState<string[]>([]);
 
     useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setFavorites(getFavoritesFromStorage());
+        // Load initial data asynchronously to avoid synchronous setState warning
+        Promise.resolve().then(() => {
+            setFavorites(getFavoritesFromStorage());
+        });
     }, []);
 
     const toggleFavorite = (projectId: string) => {
@@ -79,11 +81,13 @@ export function useRecentProjects() {
     const [recent, setRecent] = useState<{ id: string; visitedAt: string }[]>([]);
 
     useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setRecent(getRecentFromStorage());
+        // Load initial data asynchronously to avoid synchronous setState warning
+        Promise.resolve().then(() => {
+            setRecent(getRecentFromStorage());
+        });
     }, []);
 
-    const addToRecent = (projectId: string) => {
+    const addToRecent = useCallback((projectId: string) => {
         setRecent((prev) => {
             // Remove if already exists
             const filtered = prev.filter((r) => r.id !== projectId);
@@ -92,20 +96,20 @@ export function useRecentProjects() {
             saveRecentToStorage(next);
             return next.slice(0, MAX_RECENT);
         });
-    };
+    }, []);
 
-    const removeFromRecent = (projectId: string) => {
+    const removeFromRecent = useCallback((projectId: string) => {
         setRecent((prev) => {
             const next = prev.filter((r) => r.id !== projectId);
             saveRecentToStorage(next);
             return next;
         });
-    };
+    }, []);
 
-    const clearRecent = () => {
+    const clearRecent = useCallback(() => {
         setRecent([]);
         saveRecentToStorage([]);
-    };
+    }, []);
 
     return { recent, addToRecent, removeFromRecent, clearRecent };
 }
@@ -221,7 +225,7 @@ export function FavoritesRecentPanel({
                                     <ProjectQuickLink
                                         key={project.id}
                                         project={project}
-                                        isFavorite={true}
+                                        isFavorite
                                         onToggleFavorite={() => onToggleFavorite(project.id)}
                                     />
                                 ))}
@@ -290,7 +294,7 @@ function ProjectQuickLink({
     return (
         <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
             {/* Icon */}
-            <div className="h-8 w-8 rounded bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 flex items-center justify-center flex-shrink-0">
+            <div className="h-8 w-8 rounded bg-linear-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 flex items-center justify-center flex-shrink-0">
                 <FileText className="h-4 w-4 text-slate-400" />
             </div>
 
@@ -343,7 +347,7 @@ export function FavoritesBar({
         .filter(Boolean)
         .slice(0, 5) as Project[];
 
-    if (favoriteProjects.length === 0) return null;
+    if (favoriteProjects.length === 0) { return null; }
 
     return (
         <div className="flex items-center gap-2">

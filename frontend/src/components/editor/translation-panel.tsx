@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 'use client';
 
 import React, { useState } from 'react';
@@ -11,8 +9,6 @@ import {
   Check,
   AlertTriangle,
   Loader2,
-  FileDown,
-  Copy,
   ArrowRight,
   Settings,
   BookOpen,
@@ -41,8 +37,9 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+// import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import type { Slide } from '@/types';
 
 interface SupportedLanguage {
   code: string;
@@ -53,8 +50,8 @@ interface SupportedLanguage {
 
 interface TranslationPanelProps {
   projectId: string;
-  slides: any[];
-  onTranslationComplete: (translatedSlides: any[]) => void;
+  slides: Slide[];
+  onTranslationComplete: (translatedSlides: Slide[]) => void;
 }
 
 export function TranslationPanel({
@@ -84,7 +81,7 @@ export function TranslationPanel({
   const translateMutation = useMutation({
     mutationFn: async () => {
       const glossaryMap = glossary.reduce((acc, { term, translation }) => {
-        if (term && translation) acc[term] = translation;
+        if (term && translation) { acc[term] = translation; }
         return acc;
       }, {} as Record<string, string>);
 
@@ -114,7 +111,7 @@ export function TranslationPanel({
     },
     onSuccess: (data) => {
       if (data.translations) {
-        const translatedSlides = data.translations.map((t: any) => ({
+        const translatedSlides = data.translations.map((t: { slideId: string; translatedContent: string }) => ({
           ...slides.find((s) => s.id === t.slideId),
           content: t.translatedContent,
         }));
@@ -125,7 +122,7 @@ export function TranslationPanel({
 
   const detectLanguageMutation = useMutation({
     mutationFn: async () => {
-      const text = slides[0]?.content?.title || '';
+      const text = slides[0]?.title || '';
       const response = await fetch('/api/ai/translation/detect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -315,17 +312,18 @@ export function TranslationPanel({
                   <p className="text-xs text-muted-foreground">
                     Define specific translations for terms or phrases
                   </p>
-                  
+
                   {glossary.length > 0 && (
                     <div className="space-y-2">
                       {glossary.map((item, index) => (
-                        <div key={index} className="flex items-center gap-2">
+
+                        <div key={item.term} className="flex items-center gap-2">
                           <Input
                             placeholder="Original term"
                             value={item.term}
                             onChange={(e) => updateGlossaryTerm(index, 'term', e.target.value)}
                           />
-                          <ArrowRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                          <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                           <Input
                             placeholder="Translation"
                             value={item.translation}
@@ -371,8 +369,9 @@ export function TranslationPanel({
                 {translateMutation.data?.warnings?.length > 0 && (
                   <div className="mt-2">
                     <p className="text-sm font-medium text-orange-700">Warnings:</p>
-                    {translateMutation.data.warnings.map((warning: string, i: number) => (
-                      <p key={i} className="text-sm text-orange-600">
+                    {translateMutation.data.warnings.map((warning: string, _i: number) => (
+
+                      <p key={warning} className="text-sm text-orange-600">
                         • {warning}
                       </p>
                     ))}
@@ -403,16 +402,17 @@ export function TranslationPanel({
                   <ScrollArea className="h-64">
                     <div className="space-y-3">
                       {localizationSuggestionsMutation.data.suggestions.map(
-                        (suggestion: any, index: number) => (
+                        (suggestion: Record<string, unknown>, _index: number) => (
                           <div
-                            key={index}
+
+                            key={`${suggestion.message}`}
                             className={cn(
                               'rounded-lg border p-3',
                               suggestion.severity === 'high'
                                 ? 'border-red-200 bg-red-50'
                                 : suggestion.severity === 'medium'
-                                ? 'border-yellow-200 bg-yellow-50'
-                                : 'border-blue-200 bg-blue-50'
+                                  ? 'border-yellow-200 bg-yellow-50'
+                                  : 'border-blue-200 bg-blue-50'
                             )}
                           >
                             <div className="flex items-start gap-2">
@@ -422,14 +422,14 @@ export function TranslationPanel({
                                   suggestion.severity === 'high'
                                     ? 'text-red-500'
                                     : suggestion.severity === 'medium'
-                                    ? 'text-yellow-500'
-                                    : 'text-blue-500'
+                                      ? 'text-yellow-500'
+                                      : 'text-blue-500'
                                 )}
                               />
                               <div>
-                                <p className="text-sm font-medium">{suggestion.issue}</p>
+                                <p className="text-sm font-medium">{suggestion.issue as string}</p>
                                 <p className="mt-1 text-sm text-muted-foreground">
-                                  {suggestion.suggestion}
+                                  {suggestion.suggestion as string}
                                 </p>
                               </div>
                             </div>

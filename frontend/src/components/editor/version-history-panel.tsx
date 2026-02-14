@@ -6,13 +6,9 @@ import { format, formatDistanceToNow } from 'date-fns';
 import {
   History,
   GitBranch,
-  GitMerge,
   Flag,
   RotateCcw,
-  Eye,
-  ChevronRight,
   Clock,
-  User,
   Plus,
   Minus,
   Edit3,
@@ -260,8 +256,8 @@ export function VersionHistoryPanel({ projectId }: VersionHistoryPanelProps) {
                 {!compareVersionA
                   ? 'Select the first version to compare'
                   : !compareVersionB
-                  ? 'Select the second version to compare'
-                  : 'Comparing versions'}
+                    ? 'Select the second version to compare'
+                    : 'Comparing versions'}
               </p>
             </div>
           )}
@@ -339,9 +335,10 @@ export function VersionHistoryPanel({ projectId }: VersionHistoryPanelProps) {
 
                         {version.changes.length > 0 && (
                           <div className="mt-2 flex flex-wrap gap-1">
-                            {version.changes.slice(0, 3).map((change, i) => (
+                            {version.changes.slice(0, 3).map((change, _i) => (
                               <span
-                                key={i}
+
+                                key={change.description}
                                 className="flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-xs"
                               >
                                 {getChangeIcon(change.type)}

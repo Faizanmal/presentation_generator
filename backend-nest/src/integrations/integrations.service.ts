@@ -1,11 +1,7 @@
-import {
-  Injectable,
-  Logger,
-  BadRequestException,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import axios from 'axios';
 
 type IntegrationProvider =
@@ -27,6 +23,34 @@ interface IntegrationConfig {
   clientSecret: string;
   redirectUri: string;
   scopes: string[];
+}
+
+interface LocalIntegration {
+  id: string;
+  provider: IntegrationProvider;
+  accessToken: string;
+  refreshToken?: string | null;
+  expiresAt?: string | Date | null;
+  [key: string]: unknown;
+}
+
+interface NotionRichText {
+  plain_text: string;
+  [key: string]: unknown;
+}
+
+interface NotionBlock {
+  type: string;
+  heading_1?: { rich_text: NotionRichText[] };
+  heading_2?: { rich_text: NotionRichText[] };
+  paragraph?: { rich_text: NotionRichText[] };
+  bulleted_list_item?: { rich_text: NotionRichText[] };
+  numbered_list_item?: { rich_text: NotionRichText[] };
+  image?: {
+    file?: { url: string };
+    external?: { url: string };
+  };
+  [key: string]: unknown;
 }
 
 @Injectable()
@@ -162,10 +186,20 @@ export class IntegrationsService {
     }
 
     // Decode state to get userId
-    const stateData = JSON.parse(
-      Buffer.from(data.state || '', 'base64').toString(),
-    );
-    const userId = stateData.userId;
+    const stateRaw = Buffer.from(data.state || '', 'base64').toString();
+    let stateData: unknown;
+    try {
+      stateData = JSON.parse(stateRaw) as Record<string, unknown>;
+    } catch {
+      throw new BadRequestException('Invalid state parameter');
+    }
+
+    const userId =
+      stateData &&
+      typeof stateData === 'object' &&
+      typeof (stateData as Record<string, unknown>).userId === 'string'
+        ? ((stateData as Record<string, unknown>).userId as string)
+        : undefined;
 
     if (!userId) {
       throw new BadRequestException('Invalid state parameter');
@@ -176,7 +210,7 @@ export class IntegrationsService {
       accessToken: string;
       refreshToken?: string;
       expiresIn?: number;
-      metadata?: any;
+      metadata?: Record<string, unknown> | undefined;
     };
 
     switch (provider) {
@@ -209,6 +243,11 @@ export class IntegrationsService {
       ? new Date(Date.now() + tokens.expiresIn * 1000)
       : null;
 
+    const safeMetadata =
+      tokens.metadata && typeof tokens.metadata === 'object'
+        ? tokens.metadata
+        : undefined;
+
     await this.prisma.integration.upsert({
       where: {
         userId_provider: { userId, provider },
@@ -217,7 +256,7 @@ export class IntegrationsService {
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
         expiresAt,
-        metadata: tokens.metadata,
+        metadata: safeMetadata as unknown as Prisma.InputJsonValue,
         isActive: true,
       },
       create: {
@@ -226,7 +265,7 @@ export class IntegrationsService {
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
         expiresAt,
-        metadata: tokens.metadata,
+        metadata: safeMetadata as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -253,10 +292,26 @@ export class IntegrationsService {
       },
     );
 
+    const data = response.data as Record<string, unknown>;
+
+    const accessToken =
+      typeof data.access_token === 'string' ? data.access_token : undefined;
+    const refreshToken =
+      typeof data.refresh_token === 'string' ? data.refresh_token : undefined;
+    const expiresIn =
+      typeof data.expires_in === 'number'
+        ? data.expires_in
+        : typeof data.expires_in === 'string'
+          ? parseInt(data.expires_in, 10)
+          : undefined;
+
+    if (!accessToken)
+      throw new BadRequestException('Invalid Zoom token response');
+
     return {
-      accessToken: response.data.access_token,
-      refreshToken: response.data.refresh_token,
-      expiresIn: response.data.expires_in,
+      accessToken,
+      refreshToken,
+      expiresIn,
     };
   }
 
@@ -271,11 +326,23 @@ export class IntegrationsService {
       }),
     );
 
+    const data = response.data as Record<string, unknown>;
+
+    const accessToken =
+      typeof data.access_token === 'string' ? data.access_token : undefined;
+    const team =
+      data.team && typeof data.team === 'object' ? data.team : undefined;
+    const botUserId =
+      typeof data.bot_user_id === 'string' ? data.bot_user_id : undefined;
+
+    if (!accessToken)
+      throw new BadRequestException('Invalid Slack token response');
+
     return {
-      accessToken: response.data.access_token,
+      accessToken,
       metadata: {
-        team: response.data.team,
-        botUserId: response.data.bot_user_id,
+        team,
+        botUserId,
       },
     };
   }
@@ -293,10 +360,26 @@ export class IntegrationsService {
       }),
     );
 
+    const data = response.data as Record<string, unknown>;
+
+    const accessToken =
+      typeof data.access_token === 'string' ? data.access_token : undefined;
+    const refreshToken =
+      typeof data.refresh_token === 'string' ? data.refresh_token : undefined;
+    const expiresIn =
+      typeof data.expires_in === 'number'
+        ? data.expires_in
+        : typeof data.expires_in === 'string'
+          ? parseInt(data.expires_in, 10)
+          : undefined;
+
+    if (!accessToken)
+      throw new BadRequestException('Invalid Teams token response');
+
     return {
-      accessToken: response.data.access_token,
-      refreshToken: response.data.refresh_token,
-      expiresIn: response.data.expires_in,
+      accessToken,
+      refreshToken,
+      expiresIn,
     };
   }
 
@@ -309,10 +392,26 @@ export class IntegrationsService {
       grant_type: 'authorization_code',
     });
 
+    const data = response.data as Record<string, unknown>;
+
+    const accessToken =
+      typeof data.access_token === 'string' ? data.access_token : undefined;
+    const refreshToken =
+      typeof data.refresh_token === 'string' ? data.refresh_token : undefined;
+    const expiresIn =
+      typeof data.expires_in === 'number'
+        ? data.expires_in
+        : typeof data.expires_in === 'string'
+          ? parseInt(data.expires_in, 10)
+          : undefined;
+
+    if (!accessToken)
+      throw new BadRequestException('Invalid Google token response');
+
     return {
-      accessToken: response.data.access_token,
-      refreshToken: response.data.refresh_token,
-      expiresIn: response.data.expires_in,
+      accessToken,
+      refreshToken,
+      expiresIn,
     };
   }
 
@@ -328,10 +427,26 @@ export class IntegrationsService {
       }),
     );
 
+    const data = response.data as Record<string, unknown>;
+
+    const accessToken =
+      typeof data.access_token === 'string' ? data.access_token : undefined;
+    const refreshToken =
+      typeof data.refresh_token === 'string' ? data.refresh_token : undefined;
+    const expiresIn =
+      typeof data.expires_in === 'number'
+        ? data.expires_in
+        : typeof data.expires_in === 'string'
+          ? parseInt(data.expires_in, 10)
+          : undefined;
+
+    if (!accessToken)
+      throw new BadRequestException('Invalid Figma token response');
+
     return {
-      accessToken: response.data.access_token,
-      refreshToken: response.data.refresh_token,
-      expiresIn: response.data.expires_in,
+      accessToken,
+      refreshToken,
+      expiresIn,
     };
   }
 
@@ -351,11 +466,23 @@ export class IntegrationsService {
       },
     );
 
+    const data = response.data as Record<string, unknown>;
+
+    const accessToken =
+      typeof data.access_token === 'string' ? data.access_token : undefined;
+    const workspace =
+      typeof data.workspace_name === 'string' ? data.workspace_name : undefined;
+    const workspaceId =
+      typeof data.workspace_id === 'string' ? data.workspace_id : undefined;
+
+    if (!accessToken)
+      throw new BadRequestException('Invalid Notion token response');
+
     return {
-      accessToken: response.data.access_token,
+      accessToken,
       metadata: {
-        workspace: response.data.workspace_name,
-        workspaceId: response.data.workspace_id,
+        workspace,
+        workspaceId,
       },
     };
   }
@@ -407,10 +534,12 @@ export class IntegrationsService {
     topic: string,
     startTime?: Date,
   ) {
-    const integration = await this.getIntegration(userId, 'ZOOM');
-    if (!integration) {
+    const integrationRaw = await this.getIntegration(userId, 'ZOOM');
+    if (!integrationRaw) {
       throw new BadRequestException('Zoom not connected');
     }
+    this.assertIntegration(integrationRaw);
+    const integration = integrationRaw as LocalIntegration;
 
     const accessToken = await this.ensureValidToken(integration);
 
@@ -434,11 +563,15 @@ export class IntegrationsService {
       },
     );
 
+    const d = response.data as Record<string, unknown>;
     return {
-      meetingId: response.data.id,
-      joinUrl: response.data.join_url,
-      startUrl: response.data.start_url,
-      password: response.data.password,
+      meetingId:
+        typeof d.id === 'string' || typeof d.id === 'number'
+          ? String(d.id)
+          : undefined,
+      joinUrl: typeof d.join_url === 'string' ? d.join_url : undefined,
+      startUrl: typeof d.start_url === 'string' ? d.start_url : undefined,
+      password: typeof d.password === 'string' ? d.password : undefined,
     };
   }
 
@@ -493,17 +626,23 @@ export class IntegrationsService {
       },
     );
 
-    return { success: response.data.ok, messageTs: response.data.ts };
+    const d = response.data as Record<string, unknown>;
+    return {
+      success: Boolean(d.ok),
+      messageTs: typeof d.ts === 'string' ? d.ts : undefined,
+    };
   }
 
   /**
    * Get Slack channels for selection
    */
   async getSlackChannels(userId: string) {
-    const integration = await this.getIntegration(userId, 'SLACK');
-    if (!integration) {
+    const integrationRaw = await this.getIntegration(userId, 'SLACK');
+    if (!integrationRaw) {
       throw new BadRequestException('Slack not connected');
     }
+    this.assertIntegration(integrationRaw);
+    const integration = integrationRaw as LocalIntegration;
 
     const response = await axios.get(
       'https://slack.com/api/conversations.list',
@@ -518,13 +657,23 @@ export class IntegrationsService {
       },
     );
 
-    return (
-      response.data.channels?.map((c: any) => ({
-        id: c.id,
-        name: c.name,
-        isPrivate: c.is_private,
-      })) || []
-    );
+    const data = response.data as Record<string, unknown>;
+    const channelsRaw = data.channels;
+    if (!Array.isArray(channelsRaw)) return [];
+
+    const channels: Array<{ id: string; name: string; isPrivate: boolean }> =
+      [];
+    channelsRaw.forEach((ch) => {
+      if (!ch || typeof ch !== 'object') return;
+      const obj = ch as Record<string, unknown>;
+      const id = typeof obj.id === 'string' ? obj.id : undefined;
+      const name = typeof obj.name === 'string' ? obj.name : undefined;
+      const isPrivate = obj.is_private ?? obj.isPrivate ?? false;
+      if (id && name)
+        channels.push({ id, name, isPrivate: Boolean(isPrivate) });
+    });
+
+    return channels;
   }
 
   /**
@@ -547,17 +696,20 @@ export class IntegrationsService {
     );
 
     // Parse Notion blocks to presentation format
-    return this.parseNotionBlocks(response.data.results);
+    const results = (response.data as Record<string, unknown>).results;
+    return Array.isArray(results) ? this.parseNotionBlocks(results) : [];
   }
 
   /**
    * Get Figma file data for import
    */
   async getFigmaFile(userId: string, fileKey: string) {
-    const integration = await this.getIntegration(userId, 'FIGMA');
-    if (!integration) {
+    const integrationRaw = await this.getIntegration(userId, 'FIGMA');
+    if (!integrationRaw) {
       throw new BadRequestException('Figma not connected');
     }
+    this.assertIntegration(integrationRaw);
+    const integration = integrationRaw as LocalIntegration;
 
     const response = await axios.get(
       `https://api.figma.com/v1/files/${fileKey}`,
@@ -568,15 +720,28 @@ export class IntegrationsService {
       },
     );
 
+    const data = response.data as Record<string, unknown>;
+    const pagesRaw =
+      data.document && (data.document as Record<string, unknown>).children;
+    const pages: Array<{ id: string; name: string; type: string }> = [];
+    if (Array.isArray(pagesRaw)) {
+      pagesRaw.forEach((p) => {
+        if (!p || typeof p !== 'object') return;
+        const page = p as Record<string, unknown>;
+        const id = typeof page.id === 'string' ? page.id : undefined;
+        const name = typeof page.name === 'string' ? page.name : undefined;
+        const type = typeof page.type === 'string' ? page.type : undefined;
+        if (id && name && type) pages.push({ id, name, type });
+      });
+    }
+
     return {
-      name: response.data.name,
-      lastModified: response.data.lastModified,
-      thumbnailUrl: response.data.thumbnailUrl,
-      pages: response.data.document.children.map((page: any) => ({
-        id: page.id,
-        name: page.name,
-        type: page.type,
-      })),
+      name: typeof data.name === 'string' ? data.name : undefined,
+      lastModified:
+        typeof data.lastModified === 'string' ? data.lastModified : undefined,
+      thumbnailUrl:
+        typeof data.thumbnailUrl === 'string' ? data.thumbnailUrl : undefined,
+      pages,
     };
   }
 
@@ -603,21 +768,46 @@ export class IntegrationsService {
       },
     );
 
-    return response.data.images;
+    const data = response.data as Record<string, unknown>;
+    const images =
+      data.images && typeof data.images === 'object'
+        ? (data.images as Record<string, unknown>)
+        : {};
+    const result: Record<string, string> = {};
+    Object.keys(images).forEach((k) => {
+      const v = images[k];
+      if (typeof v === 'string') result[k] = v;
+    });
+
+    return result;
   }
 
   // ============================================
   // HELPER METHODS
   // ============================================
 
-  private async ensureValidToken(integration: any): Promise<string> {
+  private assertIntegration(
+    integration: unknown,
+  ): asserts integration is LocalIntegration {
+    if (!integration || typeof integration !== 'object') {
+      throw new BadRequestException('Integration not found');
+    }
+    const i = integration as Record<string, unknown>;
+    if (typeof i.accessToken !== 'string') {
+      throw new BadRequestException('Integration access token missing');
+    }
+  }
+
+  private async ensureValidToken(
+    integration: LocalIntegration,
+  ): Promise<string> {
     // Check if token is expired
     if (integration.expiresAt && new Date(integration.expiresAt) < new Date()) {
       // Refresh token
       if (integration.refreshToken) {
         const newTokens = await this.refreshToken(
           integration.provider,
-          integration.refreshToken,
+          String(integration.refreshToken),
         );
 
         await this.prisma.integration.update({
@@ -640,7 +830,11 @@ export class IntegrationsService {
   private async refreshToken(
     provider: IntegrationProvider,
     refreshToken: string,
-  ) {
+  ): Promise<{
+    accessToken: string;
+    refreshToken?: string;
+    expiresAt?: Date | undefined;
+  }> {
     const config = this.integrationConfigs.get(provider);
     if (!config) {
       throw new BadRequestException(`Unknown provider: ${provider}`);
@@ -661,10 +855,27 @@ export class IntegrationsService {
             },
           },
         );
+        const data = response.data as Record<string, unknown>;
+        const accessToken =
+          typeof data.access_token === 'string' ? data.access_token : undefined;
+        const refreshTok =
+          typeof data.refresh_token === 'string'
+            ? data.refresh_token
+            : undefined;
+        const expiresIn =
+          typeof data.expires_in === 'number'
+            ? data.expires_in
+            : typeof data.expires_in === 'string'
+              ? parseInt(data.expires_in, 10)
+              : undefined;
+        if (!accessToken)
+          throw new BadRequestException('Invalid Zoom refresh response');
         return {
-          accessToken: response.data.access_token,
-          refreshToken: response.data.refresh_token,
-          expiresAt: new Date(Date.now() + response.data.expires_in * 1000),
+          accessToken,
+          refreshToken: refreshTok,
+          expiresAt: expiresIn
+            ? new Date(Date.now() + expiresIn * 1000)
+            : undefined,
         };
       }
       // Add other provider refresh implementations as needed
@@ -675,44 +886,52 @@ export class IntegrationsService {
     }
   }
 
-  private parseNotionBlocks(blocks: any[]) {
+  private parseNotionBlocks(blocks: unknown[]) {
+    if (!Array.isArray(blocks)) return [];
+
     return blocks
       .map((block) => {
-        switch (block.type) {
-          case 'heading_1':
-            return {
-              type: 'HEADING',
-              content: this.extractNotionText(block.heading_1.rich_text),
-            };
-          case 'heading_2':
+        if (!block || typeof block !== 'object') return null;
+        const b = block as NotionBlock;
+
+        switch (b.type) {
+          case 'heading_1': {
+            const rich = b.heading_1?.rich_text;
+            return { type: 'HEADING', content: this.extractNotionText(rich) };
+          }
+          case 'heading_2': {
+            const rich = b.heading_2?.rich_text;
             return {
               type: 'SUBHEADING',
-              content: this.extractNotionText(block.heading_2.rich_text),
+              content: this.extractNotionText(rich),
             };
-          case 'paragraph':
-            return {
-              type: 'PARAGRAPH',
-              content: this.extractNotionText(block.paragraph.rich_text),
-            };
-          case 'bulleted_list_item':
+          }
+          case 'paragraph': {
+            const rich = b.paragraph?.rich_text;
+            return { type: 'PARAGRAPH', content: this.extractNotionText(rich) };
+          }
+          case 'bulleted_list_item': {
+            const rich = b.bulleted_list_item?.rich_text;
             return {
               type: 'BULLET_LIST',
-              content: this.extractNotionText(
-                block.bulleted_list_item.rich_text,
-              ),
+              content: this.extractNotionText(rich),
             };
-          case 'numbered_list_item':
+          }
+          case 'numbered_list_item': {
+            const rich = b.numbered_list_item?.rich_text;
             return {
               type: 'NUMBERED_LIST',
-              content: this.extractNotionText(
-                block.numbered_list_item.rich_text,
-              ),
+              content: this.extractNotionText(rich),
             };
-          case 'image':
+          }
+          case 'image': {
+            const img = b.image;
+            const url = img?.file?.url || img?.external?.url;
             return {
               type: 'IMAGE',
-              content: block.image.file?.url || block.image.external?.url,
+              content: typeof url === 'string' ? url : undefined,
             };
+          }
           default:
             return null;
         }
@@ -720,7 +939,8 @@ export class IntegrationsService {
       .filter(Boolean);
   }
 
-  private extractNotionText(richText: any[]) {
-    return richText.map((t: any) => t.plain_text).join('');
+  private extractNotionText(richText: NotionRichText[] | undefined) {
+    if (!Array.isArray(richText)) return '';
+    return richText.map((t) => t.plain_text || '').join('');
   }
 }

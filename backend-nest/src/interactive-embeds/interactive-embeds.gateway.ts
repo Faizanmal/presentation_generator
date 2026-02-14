@@ -35,7 +35,7 @@ export class InteractiveEmbedsGateway
 
   handleDisconnect(client: Socket) {
     this.logger.log(`Client disconnected: ${client.id}`);
-    
+
     // Remove from all rooms
     this.embedRooms.forEach((clients, embedId) => {
       clients.delete(client.id);
@@ -50,18 +50,18 @@ export class InteractiveEmbedsGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { embedId: string },
   ) {
-    client.join(`embed:${data.embedId}`);
-    
+    void client.join(`embed:${data.embedId}`);
+
     if (!this.embedRooms.has(data.embedId)) {
       this.embedRooms.set(data.embedId, new Set());
     }
     this.embedRooms.get(data.embedId)!.add(client.id);
-    
+
     // Notify participants count
     this.server.to(`embed:${data.embedId}`).emit('participants-updated', {
       count: this.embedRooms.get(data.embedId)!.size,
     });
-    
+
     return { success: true };
   }
 
@@ -70,8 +70,8 @@ export class InteractiveEmbedsGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { embedId: string },
   ) {
-    client.leave(`embed:${data.embedId}`);
-    
+    void client.leave(`embed:${data.embedId}`);
+
     const room = this.embedRooms.get(data.embedId);
     if (room) {
       room.delete(client.id);
@@ -79,14 +79,15 @@ export class InteractiveEmbedsGateway
         count: room.size,
       });
     }
-    
+
     return { success: true };
   }
 
   @SubscribeMessage('poll-vote')
   async handlePollVote(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { embedId: string; optionIds: string[]; voterId?: string },
+    @MessageBody()
+    data: { embedId: string; optionIds: string[]; voterId?: string },
   ) {
     try {
       const poll = await this.embedsService.votePoll(
@@ -94,22 +95,25 @@ export class InteractiveEmbedsGateway
         data.optionIds,
         data.voterId,
       );
-      
+
       // Broadcast updated poll to all participants
       this.server.to(`embed:${data.embedId}`).emit('poll-updated', poll);
-      
+
       return { success: true, poll };
-    } catch (error) {
-      return { success: false, error: error.message };
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: errorMessage };
     }
   }
 
   @SubscribeMessage('qa-question')
   async handleQAQuestion(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { 
-      embedId: string; 
-      question: string; 
+    @MessageBody()
+    data: {
+      embedId: string;
+      question: string;
       authorName?: string;
       authorId?: string;
     },
@@ -121,41 +125,46 @@ export class InteractiveEmbedsGateway
         data.authorName,
         data.authorId,
       );
-      
+
       // Broadcast new question
       this.server.to(`embed:${data.embedId}`).emit('question-added', question);
-      
+
       return { success: true, question };
-    } catch (error) {
-      return { success: false, error: error.message };
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: errorMessage };
     }
   }
 
   @SubscribeMessage('qa-upvote')
   async handleQAUpvote(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { embedId: string; questionId: string; voterId?: string },
+    @MessageBody()
+    data: { embedId: string; questionId: string; voterId?: string },
   ) {
     try {
       const qa = await this.embedsService.upvoteQuestion(
         data.embedId,
         data.questionId,
-        data.voterId,
       );
-      
+
       // Broadcast updated Q&A
       this.server.to(`embed:${data.embedId}`).emit('qa-updated', qa);
-      
+
       return { success: true };
-    } catch (error) {
-      return { success: false, error: error.message };
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: errorMessage };
     }
   }
 
   @SubscribeMessage('wordcloud-submit')
   async handleWordCloudSubmit(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { embedId: string; words: string[]; responderId?: string },
+    @MessageBody()
+    data: { embedId: string; words: string[]; responderId?: string },
   ) {
     try {
       const words = await this.embedsService.submitWords(
@@ -163,13 +172,17 @@ export class InteractiveEmbedsGateway
         data.words,
         data.responderId,
       );
-      
+
       // Broadcast updated word cloud
-      this.server.to(`embed:${data.embedId}`).emit('wordcloud-updated', { words });
-      
+      this.server
+        .to(`embed:${data.embedId}`)
+        .emit('wordcloud-updated', { words });
+
       return { success: true, words };
-    } catch (error) {
-      return { success: false, error: error.message };
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: errorMessage };
     }
   }
 
@@ -183,7 +196,7 @@ export class InteractiveEmbedsGateway
       reaction: data.reaction,
       clientId: client.id,
     });
-    
+
     return { success: true };
   }
 }

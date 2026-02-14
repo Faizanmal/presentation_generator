@@ -21,6 +21,45 @@ export interface WebhookConfig {
   createdAt: Date;
 }
 
+interface CanvaTokenResponse {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+}
+
+interface CanvaDesign {
+  id: string;
+  title: string;
+  thumbnail: {
+    url: string;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+interface CanvaDesignListResponse {
+  designs: CanvaDesign[];
+}
+
+interface MiroTokenResponse {
+  access_token: string;
+  refresh_token: string;
+  expires_in?: number;
+}
+
+interface MiroBoard {
+  id: string;
+  name: string;
+  description: string;
+  viewLink: string;
+  createdAt: string;
+  modifiedAt: string;
+}
+
+interface MiroBoardListResponse {
+  data: MiroBoard[];
+}
+
 /**
  * Advanced integrations service for Canva, Miro, and Webhooks
  */
@@ -57,7 +96,9 @@ export class AdvancedIntegrationsService {
     const clientSecret = this.configService.get<string>('CANVA_CLIENT_SECRET');
     const redirectUri = `${this.configService.get('API_URL')}/api/integrations/canva/callback`;
 
-    const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
+    const stateData = JSON.parse(Buffer.from(state, 'base64').toString()) as {
+      userId: string;
+    };
     const userId = stateData.userId;
 
     const response = await axios.post(
@@ -74,22 +115,24 @@ export class AdvancedIntegrationsService {
       },
     );
 
+    const data = response.data as CanvaTokenResponse;
+
     await this.prisma.integration.upsert({
       where: {
         userId_provider: { userId, provider: 'CANVA' as IntegrationProvider },
       },
       update: {
-        accessToken: response.data.access_token,
-        refreshToken: response.data.refresh_token,
-        expiresAt: new Date(Date.now() + response.data.expires_in * 1000),
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+        expiresAt: new Date(Date.now() + data.expires_in * 1000),
         isActive: true,
       },
       create: {
         userId,
         provider: 'CANVA' as IntegrationProvider,
-        accessToken: response.data.access_token,
-        refreshToken: response.data.refresh_token,
-        expiresAt: new Date(Date.now() + response.data.expires_in * 1000),
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+        expiresAt: new Date(Date.now() + data.expires_in * 1000),
       },
     });
 
@@ -114,10 +157,10 @@ export class AdvancedIntegrationsService {
       headers: { Authorization: `Bearer ${integration.accessToken}` },
     });
 
-    return response.data.designs.map((design: any) => ({
+    return (response.data as CanvaDesignListResponse).designs.map((design) => ({
       id: design.id,
       title: design.title,
-      thumbnailUrl: design.thumbnail?.url,
+      thumbnailUrl: design.thumbnail.url,
       createdAt: design.created_at,
       updatedAt: design.updated_at,
     }));
@@ -154,12 +197,12 @@ export class AdvancedIntegrationsService {
       },
     );
 
-    const design = designResponse.data;
-    const pages = exportResponse.data.urls || [];
+    const design = designResponse.data as { title: string };
+    const pages = (exportResponse.data as { urls: string[] }).urls || [];
 
     return {
       title: design.title,
-      slides: pages.map((url: string, index: number) => ({
+      slides: pages.map((url, index) => ({
         order: index,
         content: {
           type: 'imported',
@@ -193,7 +236,9 @@ export class AdvancedIntegrationsService {
     const clientSecret = this.configService.get<string>('MIRO_CLIENT_SECRET');
     const redirectUri = `${this.configService.get('API_URL')}/api/integrations/miro/callback`;
 
-    const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
+    const stateData = JSON.parse(Buffer.from(state, 'base64').toString()) as {
+      userId: string;
+    };
     const userId = stateData.userId;
 
     const response = await axios.post(
@@ -207,25 +252,27 @@ export class AdvancedIntegrationsService {
       }),
     );
 
+    const data = response.data as MiroTokenResponse;
+
     await this.prisma.integration.upsert({
       where: {
         userId_provider: { userId, provider: 'MIRO' as IntegrationProvider },
       },
       update: {
-        accessToken: response.data.access_token,
-        refreshToken: response.data.refresh_token,
-        expiresAt: response.data.expires_in
-          ? new Date(Date.now() + response.data.expires_in * 1000)
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+        expiresAt: data.expires_in
+          ? new Date(Date.now() + data.expires_in * 1000)
           : null,
         isActive: true,
       },
       create: {
         userId,
         provider: 'MIRO' as IntegrationProvider,
-        accessToken: response.data.access_token,
-        refreshToken: response.data.refresh_token,
-        expiresAt: response.data.expires_in
-          ? new Date(Date.now() + response.data.expires_in * 1000)
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+        expiresAt: data.expires_in
+          ? new Date(Date.now() + data.expires_in * 1000)
           : null,
       },
     });
@@ -251,7 +298,7 @@ export class AdvancedIntegrationsService {
       headers: { Authorization: `Bearer ${integration.accessToken}` },
     });
 
-    return response.data.data.map((board: any) => ({
+    return (response.data as MiroBoardListResponse).data.map((board) => ({
       id: board.id,
       name: board.name,
       description: board.description,
@@ -283,7 +330,7 @@ export class AdvancedIntegrationsService {
       },
     );
 
-    const items = itemsResponse.data.data;
+    const items = (itemsResponse.data as { data: Record<string, any>[] }).data;
 
     // Group items by frames or create slides from sticky notes
     const slides = this.convertMiroItemsToSlides(items);
@@ -294,18 +341,25 @@ export class AdvancedIntegrationsService {
     };
   }
 
-  private convertMiroItemsToSlides(items: any[]) {
-    const slides: any[] = [];
+  private convertMiroItemsToSlides(items: Record<string, any>[]) {
+    const slides: Array<{
+      order: number;
+      content: {
+        title: string;
+        blocks: any[];
+      };
+    }> = [];
     const frames = items.filter((i) => i.type === 'frame');
     const stickyNotes = items.filter((i) => i.type === 'sticky_note');
-    const textItems = items.filter((i) => i.type === 'text');
+    // const textItems = items.filter((i) => i.type === 'text');
 
     // Convert frames to slides
     frames.forEach((frame, index) => {
+      const data = frame.data as { title?: string } | undefined;
       slides.push({
         order: index,
         content: {
-          title: frame.data?.title || `Slide ${index + 1}`,
+          title: data?.title || `Slide ${index + 1}`,
           blocks: [],
         },
       });
@@ -314,14 +368,15 @@ export class AdvancedIntegrationsService {
     // If no frames, create slides from sticky notes
     if (frames.length === 0 && stickyNotes.length > 0) {
       stickyNotes.forEach((note, index) => {
+        const data = note.data as { content?: string } | undefined;
         slides.push({
           order: index,
           content: {
-            title: note.data?.content?.substring(0, 50) || `Note ${index + 1}`,
+            title: data?.content?.substring(0, 50) || `Note ${index + 1}`,
             blocks: [
               {
                 type: 'PARAGRAPH',
-                content: { text: note.data?.content || '' },
+                content: { text: data?.content || '' },
               },
             ],
           },
@@ -373,11 +428,12 @@ export class AdvancedIntegrationsService {
       },
     );
 
-    const boardId = boardResponse.data.id;
+    const data = boardResponse.data as { id: string; viewLink: string };
+    const boardId = data.id;
 
     // Create frames for each slide
     for (let i = 0; i < project.slides.length; i++) {
-      const slide = project.slides[i];
+      // const slide = project.slides[i];
       await axios.post(
         `https://api.miro.com/v2/boards/${boardId}/frames`,
         {
@@ -402,7 +458,7 @@ export class AdvancedIntegrationsService {
     return {
       success: true,
       boardId,
-      boardUrl: boardResponse.data.viewLink,
+      boardUrl: data.viewLink,
     };
   }
 
@@ -445,24 +501,26 @@ export class AdvancedIntegrationsService {
   /**
    * List user's webhooks
    */
-  async listWebhooks(userId: string): Promise<Omit<WebhookConfig, 'secret'>[]> {
+  listWebhooks(userId: string): Promise<Omit<WebhookConfig, 'secret'>[]> {
     const webhooks = this.webhooks.get(userId) || [];
-    return webhooks.map(({ secret, ...rest }) => rest);
+    return Promise.resolve(
+      webhooks.map(({ secret: _secret, ...rest }) => rest),
+    );
   }
 
   /**
    * Delete a webhook
    */
-  async deleteWebhook(userId: string, webhookId: string): Promise<boolean> {
+  deleteWebhook(userId: string, webhookId: string): Promise<boolean> {
     const userWebhooks = this.webhooks.get(userId) || [];
     const index = userWebhooks.findIndex((w) => w.id === webhookId);
 
-    if (index === -1) return false;
+    if (index === -1) return Promise.resolve(false);
 
     userWebhooks.splice(index, 1);
     this.webhooks.set(userId, userWebhooks);
 
-    return true;
+    return Promise.resolve(true);
   }
 
   /**
@@ -471,7 +529,7 @@ export class AdvancedIntegrationsService {
   async triggerWebhooks(
     userId: string,
     event: string,
-    data: any,
+    data: unknown,
   ): Promise<void> {
     const userWebhooks = this.webhooks.get(userId) || [];
     const applicableWebhooks = userWebhooks.filter(

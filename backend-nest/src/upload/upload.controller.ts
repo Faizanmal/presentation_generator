@@ -42,7 +42,7 @@ export class UploadController {
   @UseInterceptors(FileInterceptor('file'))
   @HttpCode(HttpStatus.CREATED)
   async uploadFile(
-    @CurrentUser() user: any,
+    @CurrentUser() user: { id: string },
     @UploadedFile() file: Express.Multer.File,
   ): Promise<UploadResult> {
     return this.uploadService.uploadFile(file, user.id);
@@ -55,7 +55,7 @@ export class UploadController {
   @UseInterceptors(FileInterceptor('file'))
   @HttpCode(HttpStatus.CREATED)
   async uploadFileDirect(
-    @CurrentUser() user: any,
+    @CurrentUser() user: { id: string },
     @UploadedFile() file: Express.Multer.File,
   ): Promise<UploadResult> {
     return this.uploadService.uploadFile(file, user.id);
@@ -67,7 +67,7 @@ export class UploadController {
   @Post('presigned')
   @HttpCode(HttpStatus.OK)
   async getPresignedUrl(
-    @CurrentUser() user: any,
+    @CurrentUser() user: { id: string },
     @Body() body: GetPresignedUrlDto,
   ) {
     return this.uploadService.getPresignedUploadUrl(
@@ -83,7 +83,7 @@ export class UploadController {
   @Post('confirm')
   @HttpCode(HttpStatus.CREATED)
   async confirmUpload(
-    @CurrentUser() user: any,
+    @CurrentUser() user: { id: string },
     @Body() body: ConfirmUploadDto,
   ): Promise<UploadResult> {
     return this.uploadService.confirmUpload(
@@ -100,7 +100,7 @@ export class UploadController {
    */
   @Get('assets')
   async getUserAssets(
-    @CurrentUser() user: any,
+    @CurrentUser() user: { id: string },
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
@@ -117,7 +117,7 @@ export class UploadController {
   @Delete(':assetId')
   @HttpCode(HttpStatus.OK)
   async deleteFile(
-    @CurrentUser() user: any,
+    @CurrentUser() user: { id: string },
     @Param('assetId') assetId: string,
   ) {
     await this.uploadService.deleteFile(assetId);

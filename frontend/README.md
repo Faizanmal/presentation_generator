@@ -1,36 +1,101 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Presentation Designer Frontend
 
-## Getting Started
+This is the frontend application for the Presentation Designer SaaS, built with [Next.js](https://nextjs.org/) and modern React technologies. It delivers a fast, responsive, and collaborative user experience for creating stunning presentations.
 
-First, run the development server:
+## 🎨 Key Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Intuitive Editor**: Block-based editor with real-time preview and drag-and-drop functionality.
+- **AI Integration**: Seamlessly generate slides, refine text, and create images directly within the editor.
+- **Real-time Collaboration**: WebSocket-powered multi-user editing with live cursors and comments.
+- **Responsive Design**: Optimized for desktop, tablet, and mobile devices.
+- **Themes & Templates**: Browse and apply professional themes and templates instantly.
+- **Dashboard**: Project management, analytics, and team collaboration hub.
+- **Accessibility**: WCAG 2.1 compliant UI components and features.
+
+## 🛠️ Tech Stack
+
+- **Framework**: Next.js 16 (App Router)
+- **Library**: React 19
+- **Typing**: TypeScript
+- **Styling**: Tailwind CSS 4
+- **State Management**: Zustand
+- **Data Fetching**: TanStack React Query
+- **UI Components**: Radix UI
+- **Components Library**: shadcn/ui
+- **Icons**: Lucide React
+- **Rich Text Editor**: TipTap (ProseMirror based)
+- **Animations**: Framer Motion
+
+## 📦 Project Structure
+
+```
+src/
+├── app/                # App Router pages and layouts
+├── components/         # Reusable UI components
+│   ├── ai/             # AI-specific components
+│   ├── editor/         # Presentation editor components
+│   ├── ui/             # Generic UI components (shadcn/ui)
+│   └── ...             # Other feature-specific components
+├── hooks/              # Custom React hooks (useAuth, useProject, useSocket)
+├── lib/                # Utilities and API client
+├── stores/             # Global state stores (Zustand)
+├── types/              # TypeScript interfaces and types
+└── styles/             # Global CSS and Tailwind config
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## ⚡ Getting Started
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Prerequisites
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Node.js (v20+)
+- npm or pnpm
 
-## Learn More
+### Installation
 
-To learn more about Next.js, take a look at the following resources:
+1.  **Install dependencies**:
+    ```bash
+    npm install
+    ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2.  **Environment Setup**:
+    Create `.env.local` and add the backend API URL.
+    ```bash
+    echo "NEXT_PUBLIC_API_URL=http://localhost:3001/api" > .env.local
+    ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+3.  **Running the Server**:
+    ```bash
+    # Development mode
+    npm run dev
 
-## Deploy on Vercel
+    # Production build
+    npm run build
+    npm start
+    ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+    The application will be available at `http://localhost:3000`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 🧪 Testing
+
+```bash
+# Unit tests (Jest + React Testing Library)
+npm run test
+
+# Integration tests
+npm run test:integration
+
+# Accessibility tests
+npm run test:a11y
+```
+
+## 🎨 Styling
+
+We use Tailwind CSS for styling. Custom components are built on top of Radix UI primitives for accessibility and flexibility. Check out `src/components/ui` for our component library.
+
+## 🤝 Contributing
+
+Before adding new components, please check if a similar component already exists in `src/components/ui`. Follow the existing patterns for consistency.
+
+```bash
+npm run lint
+```

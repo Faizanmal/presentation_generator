@@ -15,7 +15,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -36,15 +35,11 @@ import { Progress } from '@/components/ui/progress';
 import {
   Users,
   UserPlus,
-  Settings,
   MoreHorizontal,
   Crown,
   Shield,
-  User,
-  Mail,
   Calendar,
   Clock,
-  Presentation,
   Eye,
   Edit3,
   Trash2,
@@ -58,14 +53,9 @@ import {
   StarOff,
   Share2,
   Download,
-  BarChart2,
   Activity,
-  TrendingUp,
   CheckCircle,
-  XCircle,
-  AlertCircle,
   Send,
-  RefreshCw,
   FileText,
 } from 'lucide-react';
 
@@ -333,7 +323,7 @@ export function TeamWorkspaceDashboard() {
   };
 
   const handleInvite = () => {
-    if (!inviteEmail) return;
+    if (!inviteEmail) {return;}
     
     const newMember: TeamMember = {
       id: `new_${Date.now()}`,
@@ -500,7 +490,7 @@ export function TeamWorkspaceDashboard() {
                     <Card key={presentation.id} className="group cursor-pointer hover:shadow-md transition-shadow">
                       <CardContent className="p-0">
                         {/* Thumbnail */}
-                        <div className="aspect-video bg-gradient-to-br from-primary/20 to-primary/5 rounded-t-lg relative">
+                        <div className="aspect-video bg-linear-to-br from-primary/20 to-primary/5 rounded-t-lg relative">
                           <div className="absolute inset-0 flex items-center justify-center">
                             <FileText className="h-12 w-12 text-primary/40" />
                           </div>
@@ -565,7 +555,7 @@ export function TeamWorkspaceDashboard() {
                   {filteredPresentations.map((presentation) => (
                     <Card key={presentation.id} className="cursor-pointer hover:bg-muted/50 transition-colors">
                       <CardContent className="p-4 flex items-center gap-4">
-                        <div className="w-24 aspect-video bg-gradient-to-br from-primary/20 to-primary/5 rounded flex items-center justify-center">
+                        <div className="w-24 aspect-video bg-linear-to-br from-primary/20 to-primary/5 rounded flex items-center justify-center">
                           <FileText className="h-8 w-8 text-primary/40" />
                         </div>
                         <div className="flex-1">

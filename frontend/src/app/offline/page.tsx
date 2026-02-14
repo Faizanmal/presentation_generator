@@ -5,7 +5,7 @@ import { Wifi, Home, RefreshCw } from 'lucide-react';
 
 export default function OfflinePage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-50 to-slate-100">
       <div className="text-center max-w-md px-6">
         {/* Offline Icon */}
         <div className="relative inline-block mb-8">

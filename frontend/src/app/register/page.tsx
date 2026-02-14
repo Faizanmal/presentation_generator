@@ -44,6 +44,7 @@ export default function RegisterPage() {
   const password = watch("password", "");
 
   const onSubmit = async (data: RegisterForm) => {
+    if (isLoading) { return; }
     setIsLoading(true);
     try {
       await registerUser(data.email, data.name, data.password);
@@ -63,13 +64,13 @@ export default function RegisterPage() {
 
   // Password strength indicator
   const getPasswordStrength = () => {
-    if (!password) return 0;
+    if (!password) { return 0; }
     let strength = 0;
-    if (password.length >= 8) strength++;
-    if (/[a-z]/.test(password)) strength++;
-    if (/[A-Z]/.test(password)) strength++;
-    if (/[0-9]/.test(password)) strength++;
-    if (/[^a-zA-Z0-9]/.test(password)) strength++;
+    if (password.length >= 8) { strength++; }
+    if (/[a-z]/.test(password)) { strength++; }
+    if (/[A-Z]/.test(password)) { strength++; }
+    if (/[0-9]/.test(password)) { strength++; }
+    if (/[^a-zA-Z0-9]/.test(password)) { strength++; }
     return strength;
   };
 
@@ -79,7 +80,7 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex">
       {/* Left side - Gradient */}
-      <div className="hidden lg:flex flex-1 items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600 p-12">
+      <div className="hidden lg:flex flex-1 items-center justify-center bg-linear-to-br from-blue-500 to-purple-600 p-12">
         <div className="max-w-md text-white">
           <h2 className="text-4xl font-bold mb-6">
             Start creating for free
@@ -109,7 +110,7 @@ export default function RegisterPage() {
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           <Link href="/" className="flex items-center gap-2 mb-8">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+            <div className="h-8 w-8 rounded-lg bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center">
               <Sparkles className="h-5 w-5 text-white" />
             </div>
             <span className="text-xl font-bold text-slate-900 dark:text-white">
@@ -220,19 +221,18 @@ export default function RegisterPage() {
               {errors.password && (
                 <p className="text-sm text-red-500 mt-1">{errors.password.message}</p>
               )}
-              
+
               {/* Password strength indicator */}
               {password && (
                 <div className="mt-2">
                   <div className="flex gap-1 mb-1">
-                    {[...Array(5)].map((_, i) => (
+                    {[1, 2, 3, 4, 5].map((step) => (
                       <div
-                        key={i}
-                        className={`h-1 flex-1 rounded-full ${
-                          i < getPasswordStrength()
-                            ? strengthColors[getPasswordStrength() - 1]
-                            : "bg-slate-200"
-                        }`}
+                        key={step}
+                        className={`h-1 flex-1 rounded-full ${step <= getPasswordStrength()
+                          ? strengthColors[getPasswordStrength() - 1]
+                          : "bg-slate-200"
+                          }`}
                       />
                     ))}
                   </div>

@@ -3,17 +3,16 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import type { VoiceRecording } from '@/types';
 
 interface UseVoiceRecorderOptions {
   onTranscription?: (text: string) => void;
-  onRecordingComplete?: (recording: Record<string, unknown>) => void;
+  onRecordingComplete?: (recording: VoiceRecording) => void;
   maxDuration?: number; // Maximum recording duration in seconds
 }
 
 interface TranscriptionResult {
-  text: string;
-  duration: number;
-  language: string;
+  transcription: string;
 }
 
 export function useVoiceRecorder({
@@ -228,8 +227,8 @@ export function useVoiceRecorder({
 
       const result: TranscriptionResult = await api.transcribeAudio(formData);
       
-      setTranscription(result.text);
-      onTranscription?.(result.text);
+      setTranscription(result.transcription);
+      onTranscription?.(result.transcription);
       setIsProcessing(false);
       
       return result;

@@ -7,22 +7,23 @@ import {
   UseGuards,
   Request,
   Patch,
-  Delete,
-  UploadedFile,
   UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { DataChartsService, ChartConfig, ChartType } from './data-charts.service';
+import { DataChartsService, ChartConfig } from './data-charts.service';
 
 // DTOs
 class CreateCSVDataSourceDto {
+  projectId: string;
   name: string;
   csvContent: string;
   delimiter?: string;
 }
 
 class ConnectGoogleSheetsDto {
+  projectId: string;
   name: string;
   sheetId: string;
   range: string;
@@ -30,11 +31,18 @@ class ConnectGoogleSheetsDto {
 }
 
 class ConnectAPIDataSourceDto {
+  projectId: string;
   name: string;
   apiEndpoint: string;
   headers?: Record<string, string>;
   refreshInterval?: number;
   dataPath?: string;
+}
+
+class CreateJSONDataSourceDto {
+  projectId: string;
+  name: string;
+  jsonContent: string | any[];
 }
 
 class CreateChartDto {
@@ -61,13 +69,14 @@ export class DataChartsController {
   @Post('datasource/csv')
   async createCSVDataSource(
     @Body() dto: CreateCSVDataSourceDto,
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
   ) {
     return this.chartsService.createDataSourceFromCSV(
       req.user.id,
+      dto.projectId,
       dto.name,
       dto.csvContent,
-      dto.delimiter,
+      dto.delimiter || ',',
     );
   }
 
@@ -77,7 +86,7 @@ export class DataChartsController {
     @UploadedFile() file: Express.Multer.File,
     @Body('name') name: string,
     @Body('delimiter') delimiter: string,
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
   ) {
     const csvContent = file.buffer.toString('utf-8');
     return this.chartsService.createDataSourceFromCSV(
@@ -91,10 +100,11 @@ export class DataChartsController {
   @Post('datasource/google-sheets')
   async connectGoogleSheets(
     @Body() dto: ConnectGoogleSheetsDto,
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
   ) {
     return this.chartsService.connectGoogleSheets(
       req.user.id,
+      dto.projectId,
       dto.name,
       dto.sheetId,
       dto.range,
@@ -105,10 +115,11 @@ export class DataChartsController {
   @Post('datasource/api')
   async connectAPIDataSource(
     @Body() dto: ConnectAPIDataSourceDto,
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
   ) {
     return this.chartsService.connectAPIDataSource(
       req.user.id,
+      dto.projectId,
       dto.name,
       dto.apiEndpoint,
       dto.headers,
@@ -140,6 +151,19 @@ export class DataChartsController {
   @Get('chart/:chartId')
   async getChartData(@Param('chartId') chartId: string) {
     return this.chartsService.getChartData(chartId);
+  }
+
+  @Post('datasource/json')
+  async createJSONDataSource(
+    @Body() dto: CreateJSONDataSourceDto,
+    @Request() req: { user: { id: string } },
+  ) {
+    return this.chartsService.createDataSourceFromJSON(
+      req.user.id,
+      dto.projectId,
+      dto.name,
+      dto.jsonContent,
+    );
   }
 
   @Patch('chart/:chartId')

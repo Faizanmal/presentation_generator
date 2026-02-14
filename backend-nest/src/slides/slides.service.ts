@@ -5,6 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 
 interface CreateSlideDto {
   projectId: string;
@@ -288,8 +289,8 @@ export class SlidesService {
           projectId: slide.projectId,
           slideId: newSlide.id,
           blockType: block.blockType,
-          content: block.content as any,
-          style: block.style as any,
+          content: block.content as Prisma.InputJsonValue,
+          style: block.style as Prisma.InputJsonValue,
           order: block.order,
         },
       });

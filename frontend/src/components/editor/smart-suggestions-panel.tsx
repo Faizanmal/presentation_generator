@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -7,7 +5,7 @@ import { useMutation } from '@tanstack/react-query';
 import {
   Sparkles,
   Lightbulb,
-  Image,
+  Image as ImageIcon,
   BarChart3,
   Quote,
   Hash,
@@ -15,19 +13,17 @@ import {
   Layout,
   Wand2,
   RefreshCw,
-  ChevronRight,
   Plus,
   X,
   Zap,
   Type,
-  Palette,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+// import {
+//   Popover,
+//   PopoverContent,
+//   PopoverTrigger,
+// } from '@/components/ui/popover';
 import {
   Tooltip,
   TooltipContent,
@@ -37,12 +33,13 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import type { BlockContent } from "@/types";
 import { cn } from '@/lib/utils';
 
 interface Suggestion {
   id: string;
   type: 'text' | 'image' | 'icon' | 'chart' | 'quote' | 'statistic' | 'bullet' | 'layout';
-  content: string | any;
+  content: string | Record<string, unknown>;
   confidence: number;
   reason: string;
   preview?: string;
@@ -51,15 +48,13 @@ interface Suggestion {
 interface SmartSuggestionsPanelProps {
   projectId: string;
   slideId: string;
-  slideContent: any;
+  slideContent: BlockContent;
   presentationTopic: string;
   onApplySuggestion: (suggestion: Suggestion) => void;
-  onInsertContent: (content: any) => void;
+  onInsertContent: (content: Record<string, unknown>) => void;
 }
 
 export function SmartSuggestionsPanel({
-  projectId,
-  slideId,
   slideContent,
   presentationTopic,
   onApplySuggestion,
@@ -90,21 +85,21 @@ export function SmartSuggestionsPanel({
     },
   });
 
-  const smartCompleteMutation = useMutation({
-    mutationFn: async (partialText: string) => {
-      const response = await fetch('/api/ai/smart-complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          partialText,
-          context: {
-            presentationTopic,
-          },
-        }),
-      });
-      return response.json();
-    },
-  });
+  // const smartCompleteMutation = useMutation({
+  //   mutationFn: async (partialText: string) => {
+  //     const response = await fetch('/api/ai/smart-complete', {
+  //       method: 'POST',
+  //       headers: { 'Content-Type': 'application/json' },
+  //       body: JSON.stringify({
+  //         partialText,
+  //         context: {
+  //           presentationTopic,
+  //         },
+  //       }),
+  //     });
+  //     return response.json();
+  //   },
+  // });
 
   const rewriteMutation = useMutation({
     mutationFn: async ({ content, style }: { content: string; style: string }) => {
@@ -121,14 +116,14 @@ export function SmartSuggestionsPanel({
     if (isExpanded && suggestions.length === 0) {
       getSuggestionsMutation.mutate();
     }
-  }, [isExpanded]);
+  }, [isExpanded, getSuggestionsMutation, suggestions.length]);
 
   const getTypeIcon = (type: Suggestion['type']) => {
     switch (type) {
       case 'text':
         return <Type className="h-4 w-4" />;
       case 'image':
-        return <Image className="h-4 w-4" />;
+        return <ImageIcon className="h-4 w-4" />;
       case 'chart':
         return <BarChart3 className="h-4 w-4" />;
       case 'quote':
@@ -166,10 +161,10 @@ export function SmartSuggestionsPanel({
   };
 
   const filteredSuggestions = suggestions.filter((s) => {
-    if (activeTab === 'all') return true;
-    if (activeTab === 'content') return ['text', 'bullet', 'quote', 'statistic'].includes(s.type);
-    if (activeTab === 'visual') return ['image', 'chart', 'icon'].includes(s.type);
-    if (activeTab === 'style') return ['layout'].includes(s.type);
+    if (activeTab === 'all') { return true; }
+    if (activeTab === 'content') { return ['text', 'bullet', 'quote', 'statistic'].includes(s.type); }
+    if (activeTab === 'visual') { return ['image', 'chart', 'icon'].includes(s.type); }
+    if (activeTab === 'style') { return ['layout'].includes(s.type); }
     return true;
   });
 
@@ -178,19 +173,19 @@ export function SmartSuggestionsPanel({
       id: 'professional',
       label: 'Make Professional',
       icon: Wand2,
-      action: () => rewriteMutation.mutate({ content: slideContent, style: 'professional' }),
+      action: () => rewriteMutation.mutate({ content: slideContent.text || '', style: 'professional' }),
     },
     {
       id: 'concise',
       label: 'Make Concise',
       icon: Zap,
-      action: () => rewriteMutation.mutate({ content: slideContent, style: 'concise' }),
+      action: () => rewriteMutation.mutate({ content: slideContent.text || '', style: 'concise' }),
     },
     {
       id: 'persuasive',
       label: 'Make Persuasive',
       icon: Sparkles,
-      action: () => rewriteMutation.mutate({ content: slideContent, style: 'persuasive' }),
+      action: () => rewriteMutation.mutate({ content: slideContent.text || '', style: 'persuasive' }),
     },
   ];
 
@@ -265,7 +260,7 @@ export function SmartSuggestionsPanel({
           </div>
 
           {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'all' | 'content' | 'visual' | 'style')}>
             <TabsList className="w-full rounded-none border-b bg-transparent p-0">
               <TabsTrigger
                 value="all"
@@ -459,13 +454,18 @@ export function InlineSuggestion({
     return () => clearTimeout(debounce);
   }, [fetchCompletions]);
 
-  if (!isVisible || completions.length === 0) return null;
+  if (!isVisible || completions.length === 0) { return null; }
 
   return (
     <div className="absolute left-0 top-full z-50 mt-1 w-full rounded-lg border bg-background shadow-lg">
-      {completions.map((completion, index) => (
+      {completions.map((completion) => (
+         
+         
+         
+         
+         
         <button
-          key={index}
+          key={completion}
           className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
           onClick={() => {
             onAccept(completion);

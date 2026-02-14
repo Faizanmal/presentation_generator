@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 'use client';
 
 import { useState } from 'react';
@@ -26,10 +24,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useVoiceRecorder } from '@/hooks/use-voice-recorder';
 import { cn } from '@/lib/utils';
+import type { Slide } from '@/types';
 
 interface VoiceRecorderProps {
   projectId?: string;
-  onSlidesGenerated?: (slides: any[]) => void;
+  onSlidesGenerated?: (slides: Slide[]) => void;
   className?: string;
 }
 
@@ -40,7 +39,11 @@ export function VoiceRecorder({
 }: VoiceRecorderProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [step, setStep] = useState<'record' | 'transcription' | 'generate'>('record');
-  const [options, setOptions] = useState({
+  const [options, setOptions] = useState<{
+    tone: string;
+    audience: string;
+    length: number;
+  }>({
     tone: 'professional',
     audience: 'general',
     length: 10,
@@ -63,7 +66,7 @@ export function VoiceRecorder({
     generateSlides,
   } = useVoiceRecorder({
     maxDuration: 600, // 10 minutes
-    onTranscription: (text) => {
+    onTranscription: () => {
       setStep('transcription');
     },
   });
@@ -205,7 +208,6 @@ interface RecordingStepProps {
 function RecordingStep({
   isRecording,
   isPaused,
-  isProcessing,
   duration,
   formattedDuration,
   audioBlob,
@@ -312,7 +314,7 @@ interface TranscriptionStepProps {
     audience: string;
     length: number;
   };
-  onOptionsChange: (options: any) => void;
+  onOptionsChange: (options: { tone: string; audience: string; length: number }) => void;
   onBack: () => void;
 }
 

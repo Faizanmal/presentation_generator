@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { cn } from "@/lib/utils";
+// import { cn } from "@/lib/utils";
 
 interface SpeakerNotesProps {
     slideId: string;
@@ -35,7 +35,6 @@ interface SpeakerNotesProps {
 }
 
 export function SpeakerNotesPanel({
-    slideId,
     slideContent,
     initialNotes = "",
     onSave,
@@ -309,7 +308,7 @@ export function SpeakerNotesIndicator({
     hasNotes: boolean;
     onClick: () => void;
 }) {
-    if (!hasNotes) return null;
+    if (!hasNotes) {return null;}
 
     return (
         <button

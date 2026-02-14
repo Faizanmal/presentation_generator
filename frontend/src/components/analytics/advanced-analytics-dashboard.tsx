@@ -1,15 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Eye,
   Clock,
-  TrendingUp,
   TrendingDown,
   Users,
   BarChart3,
-  PieChart,
   Activity,
   ArrowUpRight,
   ArrowDownRight,
@@ -71,7 +69,7 @@ export function AdvancedAnalyticsDashboard({
   className,
 }: AdvancedAnalyticsDashboardProps) {
   const [dateRange, setDateRange] = useState('30d');
-  const [showAIInsights, setShowAIInsights] = useState(true);
+  const [showAIInsights,] = useState(true);
 
   // Fetch analytics summary
   const { data: analytics, isLoading: isLoadingAnalytics, refetch: refetchAnalytics } = useQuery({
@@ -80,7 +78,7 @@ export function AdvancedAnalyticsDashboard({
       const endDate = new Date().toISOString();
       const days = dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 90;
       const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-      
+
       const response = await api.get(`/analytics/${projectId}/summary`, {
         params: { startDate, endDate },
       });
@@ -98,28 +96,13 @@ export function AdvancedAnalyticsDashboard({
     enabled: showAIInsights,
   });
 
-  // Fetch slide performance
-  const { data: slidePerformance } = useQuery({
-    queryKey: ['slide-performance', projectId, dateRange],
-    queryFn: async () => {
-      const response = await api.get(`/analytics/${projectId}/slides/performance`);
-      return response.data;
-    },
-  });
 
   // Format duration
   const formatDuration = (seconds: number) => {
-    if (seconds < 60) return `${Math.round(seconds)}s`;
+    if (seconds < 60) { return `${Math.round(seconds)}s`; }
     const mins = Math.floor(seconds / 60);
     const secs = Math.round(seconds % 60);
     return `${mins}m ${secs}s`;
-  };
-
-  // Calculate trend
-  const getTrend = (current: number, previous: number) => {
-    if (previous === 0) return { value: 0, isPositive: true };
-    const change = ((current - previous) / previous) * 100;
-    return { value: Math.abs(change), isPositive: change >= 0 };
   };
 
   if (isLoadingAnalytics) {
@@ -221,7 +204,7 @@ export function AdvancedAnalyticsDashboard({
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {analytics?.topSlides?.slice(0, 5).map((slide, index) => (
+              {analytics?.topSlides?.slice(0, 5).map((slide) => (
                 <div key={slide.slideIndex} className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded bg-slate-100 flex items-center justify-center text-sm font-medium">
                     {slide.slideIndex + 1}
@@ -261,16 +244,15 @@ export function AdvancedAnalyticsDashboard({
               </div>
             ) : (
               <div className="space-y-3">
-                {recommendations?.recommendations?.slice(0, 4).map((rec, index) => (
-                  <div
-                    key={index}
+                {recommendations?.recommendations?.slice(0, 4).map((rec, _index) => (
+                  <div key={rec.title}
                     className={cn(
                       'p-3 rounded-lg border-l-4',
                       rec.priority === 'high'
                         ? 'bg-red-50 border-red-500'
                         : rec.priority === 'medium'
-                        ? 'bg-yellow-50 border-yellow-500'
-                        : 'bg-green-50 border-green-500',
+                          ? 'bg-yellow-50 border-yellow-500'
+                          : 'bg-green-50 border-green-500',
                     )}
                   >
                     <div className="flex items-center gap-2 mb-1">
@@ -283,8 +265,8 @@ export function AdvancedAnalyticsDashboard({
                           rec.priority === 'high'
                             ? 'bg-red-100 text-red-700'
                             : rec.priority === 'medium'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-green-100 text-green-700',
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-green-100 text-green-700',
                         )}
                       >
                         {rec.priority}
@@ -311,12 +293,11 @@ export function AdvancedAnalyticsDashboard({
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {analytics.insights.map((insight, index) => (
-                <div
-                  key={index}
+              {analytics.insights.map((insight, _index) => (
+                <div key={insight}
                   className="p-3 bg-blue-50 rounded-lg flex items-start gap-2"
                 >
-                  <Lightbulb className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                  <Lightbulb className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
                   <p className="text-sm text-blue-900">{insight}</p>
                 </div>
               ))}
@@ -351,7 +332,6 @@ export function AdvancedAnalyticsDashboard({
 
 // Metric Card Component
 function MetricCard({
-  title,
   value,
   icon,
   trend,
@@ -460,11 +440,12 @@ function SimpleLineChart({
       />
 
       {/* Points */}
-      {data.map((point, index) => {
-        const x = padding + (index / (data.length - 1)) * (800 - padding * 2);
+      {data.map((point, _index) => {
+        const x = padding + (_index / (data.length - 1)) * (800 - padding * 2);
         const y = 256 - padding - (point.views / maxValue) * (256 - padding * 2);
         return (
-          <circle key={index} cx={x} cy={y} r="4" fill="#3b82f6" />
+
+          <circle key={point.views} cx={x} cy={y} r="4" fill="#3b82f6" />
         );
       })}
 

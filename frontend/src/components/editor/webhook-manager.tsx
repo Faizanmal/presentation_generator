@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -31,19 +31,16 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+// import { Textarea } from '@/components/ui/textarea';
 import {
   Webhook,
   Plus,
   MoreHorizontal,
-  Play,
-  Pause,
   Trash2,
   Copy,
   RefreshCw,
   Check,
   X,
-  AlertCircle,
   CheckCircle,
   Clock,
   ArrowRight,
@@ -51,14 +48,7 @@ import {
   Eye,
   EyeOff,
   Send,
-  History,
-  Settings2,
-  Filter,
   Zap,
-  FileJson,
-  ExternalLink,
-  Shield,
-  Key,
 } from 'lucide-react';
 
 interface WebhookEvent {
@@ -272,12 +262,12 @@ export function WebhookManager() {
     }));
   };
 
-  const testWebhook = async (webhook: WebhookConfig) => {
+  const testWebhook = async (_webhook?: WebhookConfig) => {
     setTestResult({ status: 'loading' });
-    
+
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 1500));
-    
+
     // Random success/failure for demo
     const success = Math.random() > 0.3;
     setTestResult({
@@ -286,7 +276,7 @@ export function WebhookManager() {
         ? 'Webhook test successful! Response received in 234ms'
         : 'Webhook test failed: Connection timeout',
     });
-    
+
     setTimeout(() => setTestResult({ status: 'idle' }), 5000);
   };
 
@@ -307,7 +297,7 @@ export function WebhookManager() {
         retryDelay: newWebhook.retryDelay,
       },
     };
-    
+
     setWebhooks((prev) => [...prev, webhook]);
     setNewWebhook({
       name: '',
@@ -373,11 +363,10 @@ export function WebhookManager() {
                     {webhooks.map((webhook) => (
                       <Card
                         key={webhook.id}
-                        className={`cursor-pointer transition-all ${
-                          selectedWebhook?.id === webhook.id
-                            ? 'ring-2 ring-primary'
-                            : 'hover:shadow-md'
-                        }`}
+                        className={`cursor-pointer transition-all ${selectedWebhook?.id === webhook.id
+                          ? 'ring-2 ring-primary'
+                          : 'hover:shadow-md'
+                          }`}
                         onClick={() => setSelectedWebhook(webhook)}
                       >
                         <CardContent className="p-4">
@@ -455,11 +444,10 @@ export function WebhookManager() {
                               <div
                                 className="h-full bg-green-500"
                                 style={{
-                                  width: `${
-                                    (webhook.successCount /
-                                      (webhook.successCount + webhook.failureCount)) *
+                                  width: `${(webhook.successCount /
+                                    (webhook.successCount + webhook.failureCount)) *
                                     100
-                                  }%`,
+                                    }%`,
                                 }}
                               />
                             </div>
@@ -494,11 +482,10 @@ export function WebhookManager() {
                       </div>
                       {testResult.status !== 'idle' && testResult.status !== 'loading' && (
                         <div
-                          className={`p-2 rounded text-sm ${
-                            testResult.status === 'success'
-                              ? 'bg-green-50 text-green-700'
-                              : 'bg-red-50 text-red-700'
-                          }`}
+                          className={`p-2 rounded text-sm ${testResult.status === 'success'
+                            ? 'bg-green-50 text-green-700'
+                            : 'bg-red-50 text-red-700'
+                            }`}
                         >
                           {testResult.message}
                         </div>
@@ -561,7 +548,7 @@ export function WebhookManager() {
                                   size="icon"
                                   className="shrink-0"
                                   onClick={() =>
-                                    copyToClipboard(selectedWebhook.secret!, 'secret')
+                                    copyToClipboard(selectedWebhook.secret || '', 'secret')
                                   }
                                 >
                                   {copied === 'secret' ? (

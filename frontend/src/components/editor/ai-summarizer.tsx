@@ -30,7 +30,6 @@ import {
   List,
   Target,
   Users,
-  Share2,
   Twitter,
   Linkedin,
   Hash,
@@ -76,7 +75,7 @@ interface AISummarizerProps {
   slideCount: number;
 }
 
-export function AISummarizer({ presentationId, presentationTitle, slideCount }: AISummarizerProps) {
+export function AISummarizer({ presentationTitle, slideCount }: AISummarizerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [summary, setSummary] = useState<PresentationSummary | null>(null);
@@ -393,8 +392,9 @@ export function AISummarizer({ presentationId, presentationTitle, slideCount }: 
                   <CardContent>
                     <ul className="space-y-2">
                       {summary.keyPoints.map((point, index) => (
-                        <li key={index} className="flex items-start gap-2">
-                          <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
+
+                        <li key={point} className="flex items-start gap-2">
+                          <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center shrink-0 mt-0.5">
                             {index + 1}
                           </span>
                           <span className="text-muted-foreground">{point}</span>
@@ -414,9 +414,10 @@ export function AISummarizer({ presentationId, presentationTitle, slideCount }: 
                   </CardHeader>
                   <CardContent>
                     <ul className="space-y-2">
-                      {summary.talkingPoints.map((point, index) => (
-                        <li key={index} className="flex items-start gap-2">
-                          <Lightbulb className="h-4 w-4 text-yellow-500 flex-shrink-0 mt-0.5" />
+                      {summary.talkingPoints.map((point, _index) => (
+
+                        <li key={point} className="flex items-start gap-2">
+                          <Lightbulb className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
                           <span className="text-muted-foreground">{point}</span>
                         </li>
                       ))}
@@ -446,7 +447,7 @@ export function AISummarizer({ presentationId, presentationTitle, slideCount }: 
                   <Card key={slide.slideNumber}>
                     <CardContent className="p-4">
                       <div className="flex items-start gap-3">
-                        <span className="w-8 h-8 rounded bg-primary/10 text-primary text-sm flex items-center justify-center flex-shrink-0">
+                        <span className="w-8 h-8 rounded bg-primary/10 text-primary text-sm flex items-center justify-center shrink-0">
                           {slide.slideNumber}
                         </span>
                         <div className="flex-1">
@@ -478,8 +479,9 @@ export function AISummarizer({ presentationId, presentationTitle, slideCount }: 
                   </CardHeader>
                   <CardContent>
                     <ul className="space-y-3">
-                      {summary.actionItems.map((item, index) => (
-                        <li key={index} className="flex items-start gap-3">
+                      {summary.actionItems.map((item, _index) => (
+
+                        <li key={item} className="flex items-start gap-3">
                           <input type="checkbox" className="mt-1" />
                           <span>{item}</span>
                         </li>

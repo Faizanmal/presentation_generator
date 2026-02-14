@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import OpenAI from 'openai';
+import { AIService } from './ai.service';
 
 interface SlideContent {
   id: string;
@@ -60,13 +60,11 @@ interface SummaryOptions {
 @Injectable()
 export class PresentationSummarizerService {
   private readonly logger = new Logger(PresentationSummarizerService.name);
-  private readonly openai: OpenAI;
 
-  constructor(private readonly configService: ConfigService) {
-    this.openai = new OpenAI({
-      apiKey: this.configService.get<string>('OPENAI_API_KEY'),
-    });
-  }
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly aiService: AIService,
+  ) {}
 
   async summarizePresentation(
     presentation: PresentationData,
@@ -91,7 +89,6 @@ export class PresentationSummarizerService {
       actionItems,
       socialPosts,
       talkingPoints,
-      wordCloud,
     ] = await Promise.all([
       this.generateExecutiveSummary(presentationText, defaultOptions),
       this.extractKeyPoints(presentationText, defaultOptions),
@@ -103,8 +100,9 @@ export class PresentationSummarizerService {
         ? this.generateSocialPosts(presentation.title, presentationText)
         : Promise.resolve({ twitter: '', linkedin: '' }),
       this.generateTalkingPoints(presentationText),
-      this.generateWordCloud(presentationText),
     ]);
+
+    const wordCloud = this.generateWordCloud(presentationText);
 
     const audienceNotes = await this.generateAudienceNotes(
       presentationText,
@@ -178,7 +176,7 @@ export class PresentationSummarizerService {
       narrative: 'flowing narrative style, telling a story',
     };
 
-    const response = await this.openai.chat.completions.create({
+    const response = await this.aiService.chatCompletion({
       model: 'gpt-4o',
       messages: [
         {
@@ -204,7 +202,7 @@ export class PresentationSummarizerService {
     const count =
       options.length === 'short' ? 3 : options.length === 'medium' ? 5 : 8;
 
-    const response = await this.openai.chat.completions.create({
+    const response = await this.aiService.chatCompletion({
       model: 'gpt-4o',
       messages: [
         {
@@ -221,7 +219,13 @@ export class PresentationSummarizerService {
     });
 
     try {
-      const result = JSON.parse(response.choices[0]?.message?.content || '{}');
+      const result = JSON.parse(
+        response.choices[0]?.message?.content || '{}',
+      ) as {
+        keyPoints?: string[];
+        points?: string[];
+      };
+
       return result.keyPoints || result.points || [];
     } catch {
       return [];
@@ -256,7 +260,7 @@ export class PresentationSummarizerService {
         continue;
       }
 
-      const response = await this.openai.chat.completions.create({
+      const response = await this.aiService.chatCompletion({
         model: 'gpt-4o',
         messages: [
           {
@@ -277,11 +281,13 @@ export class PresentationSummarizerService {
       try {
         const result = JSON.parse(
           response.choices[0]?.message?.content || '{}',
-        );
+        ) as { summary?: string; keyTakeaway?: string };
         overviews.push({
           slideNumber: i + 1,
           title: slide.title || `Slide ${i + 1}`,
+
           summary: result.summary || '',
+
           keyTakeaway: result.keyTakeaway || '',
         });
       } catch {
@@ -298,7 +304,7 @@ export class PresentationSummarizerService {
   }
 
   private async extractActionItems(text: string): Promise<string[]> {
-    const response = await this.openai.chat.completions.create({
+    const response = await this.aiService.chatCompletion({
       model: 'gpt-4o',
       messages: [
         {
@@ -316,7 +322,12 @@ export class PresentationSummarizerService {
     });
 
     try {
-      const result = JSON.parse(response.choices[0]?.message?.content || '{}');
+      const result = JSON.parse(
+        response.choices[0]?.message?.content || '{}',
+      ) as {
+        actionItems?: string[];
+      };
+
       return result.actionItems || [];
     } catch {
       return [];
@@ -327,7 +338,7 @@ export class PresentationSummarizerService {
     text: string,
     audience: string,
   ): Promise<string> {
-    const response = await this.openai.chat.completions.create({
+    const response = await this.aiService.chatCompletion({
       model: 'gpt-4o',
       messages: [
         {
@@ -347,7 +358,7 @@ export class PresentationSummarizerService {
   }
 
   private async generateTalkingPoints(text: string): Promise<string[]> {
-    const response = await this.openai.chat.completions.create({
+    const response = await this.aiService.chatCompletion({
       model: 'gpt-4o',
       messages: [
         {
@@ -365,7 +376,12 @@ export class PresentationSummarizerService {
     });
 
     try {
-      const result = JSON.parse(response.choices[0]?.message?.content || '{}');
+      const result = JSON.parse(
+        response.choices[0]?.message?.content || '{}',
+      ) as {
+        talkingPoints?: string[];
+      };
+
       return result.talkingPoints || [];
     } catch {
       return [];
@@ -376,7 +392,7 @@ export class PresentationSummarizerService {
     title: string,
     text: string,
   ): Promise<{ twitter: string; linkedin: string }> {
-    const response = await this.openai.chat.completions.create({
+    const response = await this.aiService.chatCompletion({
       model: 'gpt-4o',
       messages: [
         {
@@ -394,15 +410,18 @@ export class PresentationSummarizerService {
     });
 
     try {
-      return JSON.parse(response.choices[0]?.message?.content || '{}');
+      return JSON.parse(response.choices[0]?.message?.content || '{}') as {
+        twitter: string;
+        linkedin: string;
+      };
     } catch {
       return { twitter: '', linkedin: '' };
     }
   }
 
-  private async generateWordCloud(
+  private generateWordCloud(
     text: string,
-  ): Promise<Array<{ word: string; weight: number }>> {
+  ): Array<{ word: string; weight: number }> {
     // Simple word frequency analysis
     const words = text
       .toLowerCase()
@@ -540,7 +559,7 @@ export class PresentationSummarizerService {
   }
 
   async generateQuickSummary(text: string): Promise<string> {
-    const response = await this.openai.chat.completions.create({
+    const response = await this.aiService.chatCompletion({
       model: 'gpt-4o',
       messages: [
         {

@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
@@ -13,7 +11,6 @@ import {
   Download,
   Loader2,
   Wand2,
-  Settings,
   RefreshCw,
   Check,
 } from 'lucide-react';
@@ -69,7 +66,6 @@ const VOICES: Array<{ id: Voice; name: string; description: string }> = [
 export function VoiceNarrationPlayer({
   slideContent,
   slideId,
-  projectId,
   existingAudioUrl,
   onAudioGenerated,
   className,
@@ -83,7 +79,7 @@ export function VoiceNarrationPlayer({
   const [isMuted, setIsMuted] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [selectedVoice, setSelectedVoice] = useState<Voice>('nova');
-  const [showSettings, setShowSettings] = useState(false);
+  const [] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -116,15 +112,16 @@ export function VoiceNarrationPlayer({
       setDuration(response.duration);
       onAudioGenerated?.(response.audioUrl);
       toast.success('Narration generated successfully');
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to generate narration');
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      toast.error(axiosError.response?.data?.message || 'Failed to generate narration');
     } finally {
       setIsGenerating(false);
     }
   };
 
   const handlePlayPause = () => {
-    if (!audioRef.current) return;
+    if (!audioRef.current) {return;}
 
     if (isPlaying) {
       audioRef.current.pause();
@@ -381,7 +378,6 @@ interface BatchNarrationGeneratorProps {
 }
 
 export function BatchNarrationGenerator({
-  projectId,
   slides,
   onComplete,
 }: BatchNarrationGeneratorProps) {
@@ -390,7 +386,7 @@ export function BatchNarrationGenerator({
   const [currentSlide, setCurrentSlide] = useState<string | null>(null);
   const [completedSlides, setCompletedSlides] = useState<Set<string>>(new Set());
   const [selectedVoice, setSelectedVoice] = useState<Voice>('nova');
-  const [audioUrls, setAudioUrls] = useState<Map<string, string>>(new Map());
+  const [ , setAudioUrls] = useState<Map<string, string>>(new Map());
 
   const generateAll = async () => {
     setIsGenerating(true);

@@ -1,21 +1,15 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Webhook,
   Plus,
   Trash2,
   Edit,
-  Check,
-  X,
   Copy,
-  ExternalLink,
   RefreshCw,
   AlertCircle,
-  CheckCircle,
   Loader2,
   Eye,
   EyeOff,
@@ -41,29 +35,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+// import {
+//   Select,
+//   SelectContent,
+//   SelectItem,
+//   SelectTrigger,
+//   SelectValue,
+// } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
-
-interface WebhookConfig {
-  id: string;
-  url: string;
-  events: string[];
-  secret: string;
-  active: boolean;
-  failureCount: number;
-  createdAt: string;
-  lastTriggeredAt?: string;
-}
+import type { WebhookConfig } from '@/types';
 
 const WEBHOOK_EVENTS = [
   { id: 'project.created', label: 'Project Created', category: 'Projects' },
@@ -95,38 +79,46 @@ export function WebhooksSettings() {
   const [customSecret, setCustomSecret] = useState('');
 
   // Fetch webhooks
-  const { data: webhooks, isLoading } = useQuery({
+  const { data: webhooks, isLoading } = useQuery<WebhookConfig[]>({
     queryKey: ['webhooks'],
-    queryFn: () => api.getWebhooks(),
+    queryFn: async () => {
+      const response = await api.getWebhooks();
+      return response as WebhookConfig[];
+    },
   });
 
   // Create webhook mutation
   const createMutation = useMutation({
-    mutationFn: (data: { url: string; events: string[]; secret?: string }) =>
-      api.createWebhook(data.url, data.events, data.secret),
+    mutationFn: async (data: { url: string; events: string[]; secret?: string }) => {
+      const response = await api.createWebhook(data.url, data.events, data.secret);
+      return response;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['webhooks'] });
       setShowCreateDialog(false);
       resetForm();
       toast.success('Webhook created successfully');
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to create webhook');
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Failed to create webhook');
     },
   });
 
   // Update webhook mutation
   const updateMutation = useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: any }) =>
-      api.updateWebhook(id, updates),
+    mutationFn: async ({ id, updates }: { id: string; updates: { url?: string; events?: string[]; active?: boolean } }) => {
+      await api.updateWebhook(id, updates);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['webhooks'] });
       setEditingWebhook(null);
       resetForm();
       toast.success('Webhook updated successfully');
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to update webhook');
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Failed to update webhook');
     },
   });
 
@@ -137,8 +129,9 @@ export function WebhooksSettings() {
       queryClient.invalidateQueries({ queryKey: ['webhooks'] });
       toast.success('Webhook deleted');
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to delete webhook');
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Failed to delete webhook');
     },
   });
 
@@ -152,8 +145,9 @@ export function WebhooksSettings() {
         toast.error(`Webhook test failed: ${data.error}`);
       }
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to test webhook');
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Failed to test webhook');
     },
   });
 
@@ -181,7 +175,7 @@ export function WebhooksSettings() {
   };
 
   const handleUpdate = () => {
-    if (!editingWebhook) return;
+    if (!editingWebhook) {return;}
 
     updateMutation.mutate({
       id: editingWebhook.id,
@@ -381,7 +375,7 @@ export function WebhooksSettings() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {webhooks?.map((webhook: any) => (
+          {webhooks?.map((webhook: WebhookConfig) => (
             <Card key={webhook.id}>
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between">
@@ -397,9 +391,9 @@ export function WebhooksSettings() {
                         {webhook.url}
                       </CardTitle>
                       <CardDescription>
-                        Created {formatDate(webhook.createdAt)}
+                        Created {formatDate(webhook.createdAt.toISOString())}
                         {webhook.lastTriggeredAt && (
-                          <> • Last triggered {formatDate(webhook.lastTriggeredAt)}</>
+                          <> • Last triggered {formatDate(webhook.lastTriggeredAt.toISOString())}</>
                         )}
                       </CardDescription>
                     </div>

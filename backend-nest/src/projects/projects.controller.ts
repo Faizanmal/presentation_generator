@@ -30,7 +30,7 @@ export class ProjectsController {
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.CREATED)
   async create(
-    @CurrentUser() user: any,
+    @CurrentUser() user: { id: string },
     @Body() createProjectDto: CreateProjectDto,
   ) {
     return this.projectsService.create(user.id, createProjectDto);
@@ -43,7 +43,7 @@ export class ProjectsController {
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.CREATED)
   async generate(
-    @CurrentUser() user: any,
+    @CurrentUser() user: { id: string },
     @Body() generateProjectDto: GenerateProjectDto,
   ) {
     return this.projectsService.generate(user.id, generateProjectDto);
@@ -55,7 +55,7 @@ export class ProjectsController {
   @Get()
   @UseGuards(JwtAuthGuard)
   async findAll(
-    @CurrentUser() user: any,
+    @CurrentUser() user: { id: string },
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
@@ -71,7 +71,7 @@ export class ProjectsController {
    */
   @Get(':id')
   @UseGuards(JwtAuthGuard)
-  async findOne(@CurrentUser() user: any, @Param('id') id: string) {
+  async findOne(@CurrentUser() user: { id: string }, @Param('id') id: string) {
     return this.projectsService.findOne(id, user.id);
   }
 
@@ -90,7 +90,7 @@ export class ProjectsController {
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
   async update(
-    @CurrentUser() user: any,
+    @CurrentUser() user: { id: string },
     @Param('id') id: string,
     @Body() updateProjectDto: UpdateProjectDto,
   ) {
@@ -103,7 +103,7 @@ export class ProjectsController {
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  async remove(@CurrentUser() user: any, @Param('id') id: string) {
+  async remove(@CurrentUser() user: { id: string }, @Param('id') id: string) {
     return this.projectsService.remove(id, user.id);
   }
 
@@ -113,7 +113,10 @@ export class ProjectsController {
   @Post(':id/duplicate')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.CREATED)
-  async duplicate(@CurrentUser() user: any, @Param('id') id: string) {
+  async duplicate(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+  ) {
     return this.projectsService.duplicate(id, user.id);
   }
 }

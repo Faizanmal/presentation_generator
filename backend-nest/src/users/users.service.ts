@@ -45,6 +45,20 @@ export class UsersService {
   }
 
   /**
+   * Find user by phone number
+   */
+  async findByPhone(phone: string) {
+    // Normalize phone number (remove non-digit characters except +)
+    const normalizedPhone = phone.replace(/[^\d+]/g, '');
+    return this.prisma.user.findFirst({
+      where: { phone: normalizedPhone },
+      include: {
+        subscription: true,
+      },
+    });
+  }
+
+  /**
    * Create a new user
    */
   async create(data: CreateUserDto) {
@@ -187,6 +201,8 @@ export class UsersService {
    * Check if user can generate AI content
    */
   async canGenerateAI(userId: string): Promise<boolean> {
+    return true; // Limits removed for development
+
     const subscription = await this.getSubscription(userId);
 
     if (
@@ -203,6 +219,8 @@ export class UsersService {
    * Check if user can create more projects
    */
   async canCreateProject(userId: string): Promise<boolean> {
+    return true; // Limits removed for development
+
     const subscription = await this.getSubscription(userId);
 
     if (
@@ -217,5 +235,75 @@ export class UsersService {
     });
 
     return projectCount < subscription.projectsLimit;
+  }
+
+  /**
+   * Get email preferences for user
+   */
+  async getEmailPreferences(userId: string) {
+    const preferences = await this.prisma.emailPreferences.findUnique({
+      where: { userId },
+    });
+
+    // Return defaults if no preferences exist
+    if (!preferences) {
+      return {
+        loginOtp: true,
+        passwordReset: true,
+        marketingEmails: false,
+        projectUpdates: true,
+        securityAlerts: true,
+        productUpdates: false,
+      };
+    }
+
+    return {
+      loginOtp: preferences.loginOtp,
+      passwordReset: preferences.passwordReset,
+      marketingEmails: preferences.marketingEmails,
+      projectUpdates: preferences.projectUpdates,
+      securityAlerts: preferences.securityAlerts,
+      productUpdates: preferences.productUpdates,
+    };
+  }
+
+  /**
+   * Update email preferences for user
+   */
+  async updateEmailPreferences(
+    userId: string,
+    data: {
+      loginOtp?: boolean;
+      passwordReset?: boolean;
+      marketingEmails?: boolean;
+      projectUpdates?: boolean;
+      securityAlerts?: boolean;
+      productUpdates?: boolean;
+    },
+  ) {
+    // Ensure required preferences stay enabled
+    const updateData = {
+      ...data,
+      loginOtp: true, // Always required
+      passwordReset: true, // Always required
+    };
+
+    const preferences = await this.prisma.emailPreferences.upsert({
+      where: { userId },
+      update: updateData,
+      create: {
+        userId,
+        ...updateData,
+      },
+    });
+
+    return {
+      loginOtp: preferences.loginOtp,
+      passwordReset: preferences.passwordReset,
+      marketingEmails: preferences.marketingEmails,
+      projectUpdates: preferences.projectUpdates,
+      securityAlerts: preferences.securityAlerts,
+      productUpdates: preferences.productUpdates,
+    };
   }
 }

@@ -6,11 +6,9 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import { UploadService } from '../upload/upload.service';
-import OpenAI from 'openai';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import { AIService } from '../ai/ai.service';
 
 interface BrandProfileDto {
   companyName?: string;
@@ -22,7 +20,7 @@ interface BrandProfileDto {
   logoUrl?: string;
 }
 
-interface PersonalizationPreferences {
+export interface PersonalizationPreferences {
   defaultTone?: string;
   defaultAudience?: string;
   preferredLength?: number;
@@ -41,17 +39,13 @@ interface TrainingExample {
 @Injectable()
 export class PersonalizationService {
   private readonly logger = new Logger(PersonalizationService.name);
-  private openai: OpenAI;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly uploadService: UploadService,
-  ) {
-    this.openai = new OpenAI({
-      apiKey: this.configService.get<string>('OPENAI_API_KEY'),
-    });
-  }
+    private readonly aiService: AIService,
+  ) {}
 
   // ============================================
   // BRAND PROFILE
@@ -142,9 +136,9 @@ export class PersonalizationService {
     });
 
     // Process document asynchronously
-    this.processDocument(document.id, file).catch((error) => {
+    void this.processDocument(document.id, file).catch((error) => {
       this.logger.error(`Failed to process document ${document.id}`, error);
-      this.updateDocumentStatus(document.id, 'FAILED');
+      void this.updateDocumentStatus(document.id, 'FAILED');
     });
 
     return document;
@@ -172,12 +166,9 @@ export class PersonalizationService {
       }
 
       // Generate embeddings using OpenAI
-      const embeddingResponse = await this.openai.embeddings.create({
-        model: 'text-embedding-3-small',
-        input: content.slice(0, 8000), // Limit input length
-      });
-
-      const embeddings = embeddingResponse.data[0].embedding;
+      const embeddings = await this.aiService.generateEmbedding(
+        content.slice(0, 8000), // Limit input length
+      );
 
       // Update document with content and embeddings
       await this.prisma.trainingDocument.update({
@@ -270,9 +261,9 @@ export class PersonalizationService {
       return this.prisma.aIPersonalization.update({
         where: { id: existing.id },
         data: {
-          preferences: preferences as any,
+          preferences: preferences as unknown as Prisma.InputJsonValue,
           promptTemplate,
-          examples: examples as any,
+          examples: examples as unknown as Prisma.InputJsonValue,
         },
       });
     }
@@ -280,9 +271,9 @@ export class PersonalizationService {
     return this.prisma.aIPersonalization.create({
       data: {
         userId,
-        preferences: preferences as any,
+        preferences: preferences as unknown as Prisma.InputJsonValue,
         promptTemplate,
-        examples: examples as any,
+        examples: examples as unknown as Prisma.InputJsonValue,
       },
     });
   }
@@ -313,7 +304,7 @@ export class PersonalizationService {
       return this.prisma.aIPersonalization.update({
         where: { id: existing.id },
         data: {
-          preferences: preferences as any,
+          preferences: preferences as unknown as Prisma.InputJsonValue,
           promptTemplate,
         },
       });
@@ -323,7 +314,8 @@ export class PersonalizationService {
       data: {
         userId,
         projectId,
-        preferences: preferences as any,
+
+        preferences: preferences as unknown as Prisma.InputJsonValue,
         promptTemplate,
       },
     });
@@ -336,10 +328,7 @@ export class PersonalizationService {
   /**
    * Build a personalized system prompt based on user's brand and preferences
    */
-  async buildPersonalizedPrompt(
-    userId: string,
-    projectId?: string,
-  ): Promise<string> {
+  async buildPersonalizedPrompt(userId: string): Promise<string> {
     const [brandProfile, personalization, documents] = await Promise.all([
       this.getBrandProfile(userId),
       this.getPersonalizationSettings(userId),
@@ -417,6 +406,8 @@ export class PersonalizationService {
 
   /**
    * Find relevant content from training documents using semantic search
+  /**
+   * Find relevant content from training documents using semantic search
    */
   async findRelevantContent(
     userId: string,
@@ -424,12 +415,7 @@ export class PersonalizationService {
     limit = 3,
   ): Promise<string[]> {
     // Generate embedding for the query
-    const queryEmbedding = await this.openai.embeddings.create({
-      model: 'text-embedding-3-small',
-      input: query,
-    });
-
-    const queryVector = queryEmbedding.data[0].embedding;
+    const queryVector = await this.aiService.generateEmbedding(query);
 
     // Get all user's ready documents
     const documents = await this.prisma.trainingDocument.findMany({
@@ -516,6 +502,7 @@ export class PersonalizationService {
       const complementaryColors = await this.generateComplementaryColors(
         colors.primary,
       );
+
       theme.colors = { ...theme.colors, ...complementaryColors };
     }
 
@@ -524,7 +511,7 @@ export class PersonalizationService {
 
   private async generateComplementaryColors(primaryColor: string) {
     try {
-      const response = await this.openai.chat.completions.create({
+      const response = await this.aiService.chatCompletion({
         model: 'gpt-4o-mini',
         messages: [
           {
@@ -537,7 +524,10 @@ export class PersonalizationService {
       });
 
       const content = response.choices[0]?.message?.content || '{}';
-      return JSON.parse(content);
+
+      const result = JSON.parse(content) as Record<string, string>;
+
+      return result;
     } catch (error) {
       this.logger.error('Failed to generate complementary colors', error);
       return {};

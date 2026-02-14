@@ -4,13 +4,14 @@ import {
   Get,
   Body,
   Param,
-  Query,
   UseGuards,
   Request,
   Patch,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { MultilingualService, LanguageCode } from './multilingual.service';
+import { Prisma } from '@prisma/client';
+import type { LanguageCode } from './multilingual.service';
+import { MultilingualService } from './multilingual.service';
 
 // DTOs
 class InitializeProjectDto {
@@ -26,7 +27,7 @@ class TranslateSlideDto {
 }
 
 class UpdateTranslationDto {
-  translatedContent: any;
+  translatedContent: Prisma.InputJsonValue;
 }
 
 class DetectLanguageDto {
@@ -47,7 +48,7 @@ export class MultilingualController {
   async initializeProject(
     @Param('projectId') projectId: string,
     @Body() dto: InitializeProjectDto,
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
   ) {
     return this.multilingualService.initializeProject(
       projectId,
@@ -61,7 +62,7 @@ export class MultilingualController {
   async translateProject(
     @Param('projectId') projectId: string,
     @Body() dto: TranslateProjectDto,
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
   ) {
     return this.multilingualService.translateProject(
       projectId,
@@ -76,7 +77,7 @@ export class MultilingualController {
     @Param('projectId') projectId: string,
     @Param('slideId') slideId: string,
     @Body() dto: TranslateSlideDto,
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
   ) {
     return this.multilingualService.translateSlide(
       projectId,
@@ -102,7 +103,7 @@ export class MultilingualController {
     @Param('blockId') blockId: string,
     @Param('language') language: LanguageCode,
     @Body() dto: UpdateTranslationDto,
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
   ) {
     return this.multilingualService.updateBlockTranslation(
       projectId,

@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -7,12 +5,9 @@ import {
   History,
   Clock,
   User,
-  ArrowLeft,
-  ArrowRight,
   Download,
   Eye,
   RotateCcw,
-  ChevronDown,
   Loader2,
   CheckCircle,
   AlertCircle,
@@ -63,7 +58,6 @@ interface VersionHistoryProps {
 }
 
 export function VersionHistory({
-  projectId,
   versions,
   onRestore,
   onPreview,
@@ -71,8 +65,8 @@ export function VersionHistory({
   isLoading = false,
 }: VersionHistoryProps) {
   const [selectedVersion, setSelectedVersion] = useState<string | null>(null);
-  const [isComparing, setIsComparing] = useState(false);
-  const [compareVersions, setCompareVersions] = useState<[string, string] | null>(null);
+  const [] = useState(false);
+
 
   const currentVersion = versions.find((v) => v.isCurrent);
 
@@ -334,8 +328,8 @@ export function AutoSaveStatus({ status, lastSaved, onRetry }: AutoSaveStatusPro
 
 // Hook for auto-save
 export function useAutoSave(
-  data: any,
-  saveFunction: (data: any) => Promise<void>,
+  data: unknown,
+  saveFunction: (data: unknown) => Promise<void>,
   options: {
     interval?: number; // ms between saves
     onError?: (error: Error) => void;
@@ -355,13 +349,13 @@ export function useAutoSave(
 
   // Auto-save effect
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {return;}
 
     const save = async () => {
       const currentData = JSON.stringify(dataRef.current);
 
       // Skip if data hasn't changed
-      if (currentData === lastSavedDataRef.current) return;
+      if (currentData === lastSavedDataRef.current) {return;}
 
       // Check online status
       if (!navigator.onLine) {

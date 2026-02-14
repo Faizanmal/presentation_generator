@@ -1,15 +1,28 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
+import { Server } from 'http';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+
+interface AuthResponse {
+  access_token: string;
+  user: {
+    id: string;
+    email: string;
+  };
+}
+
+interface ProjectResponse {
+  id: string;
+  title: string;
+}
 
 describe('Collaboration (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let authToken: string;
   let testUserId: string;
-  let collaboratorToken: string;
   let collaboratorUserId: string;
   let testProjectId: string;
 
@@ -33,7 +46,7 @@ describe('Collaboration (e2e)', () => {
     prisma = app.get(PrismaService);
 
     // Create test owner
-    const ownerResponse = await request(app.getHttpServer())
+    const ownerResponse = await request(app.getHttpServer() as Server)
       .post('/api/auth/register')
       .send({
         email: 'collab-owner@test-e2e.com',
@@ -41,11 +54,12 @@ describe('Collaboration (e2e)', () => {
         name: 'Collab Owner',
       });
 
-    authToken = ownerResponse.body.access_token;
-    testUserId = ownerResponse.body.user.id;
+    const ownerBody = ownerResponse.body as AuthResponse;
+    authToken = ownerBody.access_token;
+    testUserId = ownerBody.user.id;
 
     // Create test collaborator
-    const collabResponse = await request(app.getHttpServer())
+    const collabResponse = await request(app.getHttpServer() as Server)
       .post('/api/auth/register')
       .send({
         email: 'collaborator@test-e2e.com',
@@ -53,11 +67,11 @@ describe('Collaboration (e2e)', () => {
         name: 'Test Collaborator',
       });
 
-    collaboratorToken = collabResponse.body.access_token;
-    collaboratorUserId = collabResponse.body.user.id;
+    const collabBody = collabResponse.body as AuthResponse;
+    collaboratorUserId = collabBody.user.id;
 
     // Create a test project
-    const projectResponse = await request(app.getHttpServer())
+    const projectResponse = await request(app.getHttpServer() as Server)
       .post('/api/projects')
       .set('Authorization', `Bearer ${authToken}`)
       .send({
@@ -65,7 +79,8 @@ describe('Collaboration (e2e)', () => {
         description: 'A project for testing collaboration features',
       });
 
-    testProjectId = projectResponse.body.id;
+    const projectBody = projectResponse.body as ProjectResponse;
+    testProjectId = projectBody.id;
   }, 30000);
 
   afterAll(async () => {
@@ -91,7 +106,7 @@ describe('Collaboration (e2e)', () => {
 
     describe('POST /api/collaboration/:projectId/collaborators', () => {
       it('should add a collaborator', async () => {
-        const response = await request(app.getHttpServer())
+        const response = await request(app.getHttpServer() as Server)
           .post(`/api/collaboration/${testProjectId}/collaborators`)
           .set('Authorization', `Bearer ${authToken}`)
           .send({
@@ -100,13 +115,14 @@ describe('Collaboration (e2e)', () => {
           })
           .expect(201);
 
-        expect(response.body).toHaveProperty('id');
-        expect(response.body.role).toBe('EDITOR');
-        collaboratorId = response.body.id;
+        const body = response.body as { id: string; role: string };
+        expect(body).toHaveProperty('id');
+        expect(body.role).toBe('EDITOR');
+        collaboratorId = body.id;
       });
 
       it('should reject duplicate collaborator', async () => {
-        await request(app.getHttpServer())
+        await request(app.getHttpServer() as Server)
           .post(`/api/collaboration/${testProjectId}/collaborators`)
           .set('Authorization', `Bearer ${authToken}`)
           .send({
@@ -117,7 +133,7 @@ describe('Collaboration (e2e)', () => {
       });
 
       it('should reject invalid email', async () => {
-        await request(app.getHttpServer())
+        await request(app.getHttpServer() as Server)
           .post(`/api/collaboration/${testProjectId}/collaborators`)
           .set('Authorization', `Bearer ${authToken}`)
           .send({
@@ -130,19 +146,20 @@ describe('Collaboration (e2e)', () => {
 
     describe('GET /api/collaboration/:projectId/collaborators', () => {
       it('should list collaborators', async () => {
-        const response = await request(app.getHttpServer())
+        const response = await request(app.getHttpServer() as Server)
           .get(`/api/collaboration/${testProjectId}/collaborators`)
           .set('Authorization', `Bearer ${authToken}`)
           .expect(200);
 
-        expect(Array.isArray(response.body)).toBe(true);
-        expect(response.body.length).toBeGreaterThan(0);
+        const body = response.body as any[];
+        expect(Array.isArray(body)).toBe(true);
+        expect(body.length).toBeGreaterThan(0);
       });
     });
 
     describe('PATCH /api/collaboration/:projectId/collaborators/:id', () => {
       it('should update collaborator role', async () => {
-        const response = await request(app.getHttpServer())
+        const response = await request(app.getHttpServer() as Server)
           .patch(
             `/api/collaboration/${testProjectId}/collaborators/${collaboratorId}`,
           )
@@ -152,13 +169,14 @@ describe('Collaboration (e2e)', () => {
           })
           .expect(200);
 
-        expect(response.body.role).toBe('VIEWER');
+        const body = response.body as { role: string };
+        expect(body.role).toBe('VIEWER');
       });
     });
 
     describe('DELETE /api/collaboration/:projectId/collaborators/:id', () => {
       it('should remove collaborator', async () => {
-        await request(app.getHttpServer())
+        await request(app.getHttpServer() as Server)
           .delete(
             `/api/collaboration/${testProjectId}/collaborators/${collaboratorId}`,
           )
@@ -173,7 +191,7 @@ describe('Collaboration (e2e)', () => {
 
     describe('POST /api/collaboration/:projectId/comments', () => {
       it('should create a comment', async () => {
-        const response = await request(app.getHttpServer())
+        const response = await request(app.getHttpServer() as Server)
           .post(`/api/collaboration/${testProjectId}/comments`)
           .set('Authorization', `Bearer ${authToken}`)
           .send({
@@ -181,40 +199,43 @@ describe('Collaboration (e2e)', () => {
           })
           .expect(201);
 
-        expect(response.body).toHaveProperty('id');
-        expect(response.body.content).toBe('This is a test comment');
-        commentId = response.body.id;
+        const body = response.body as { id: string; content: string };
+        expect(body).toHaveProperty('id');
+        expect(body.content).toBe('This is a test comment');
+        commentId = body.id;
       });
     });
 
     describe('GET /api/collaboration/:projectId/comments', () => {
       it('should list comments', async () => {
-        const response = await request(app.getHttpServer())
+        const response = await request(app.getHttpServer() as Server)
           .get(`/api/collaboration/${testProjectId}/comments`)
           .set('Authorization', `Bearer ${authToken}`)
           .expect(200);
 
-        expect(Array.isArray(response.body)).toBe(true);
-        expect(response.body.length).toBeGreaterThan(0);
+        const body = response.body as any[];
+        expect(Array.isArray(body)).toBe(true);
+        expect(body.length).toBeGreaterThan(0);
       });
     });
 
     describe('POST /api/collaboration/:projectId/comments/:id/resolve', () => {
       it('should resolve a comment', async () => {
-        const response = await request(app.getHttpServer())
+        const response = await request(app.getHttpServer() as Server)
           .post(
             `/api/collaboration/${testProjectId}/comments/${commentId}/resolve`,
           )
           .set('Authorization', `Bearer ${authToken}`)
           .expect(200);
 
-        expect(response.body.resolved).toBe(true);
+        const body = response.body as { resolved: boolean };
+        expect(body.resolved).toBe(true);
       });
     });
 
     describe('DELETE /api/collaboration/:projectId/comments/:id', () => {
       it('should delete a comment', async () => {
-        await request(app.getHttpServer())
+        await request(app.getHttpServer() as Server)
           .delete(`/api/collaboration/${testProjectId}/comments/${commentId}`)
           .set('Authorization', `Bearer ${authToken}`)
           .expect(200);
@@ -227,7 +248,7 @@ describe('Collaboration (e2e)', () => {
 
     describe('POST /api/collaboration/:projectId/versions', () => {
       it('should create a version', async () => {
-        const response = await request(app.getHttpServer())
+        const response = await request(app.getHttpServer() as Server)
           .post(`/api/collaboration/${testProjectId}/versions`)
           .set('Authorization', `Bearer ${authToken}`)
           .send({
@@ -236,31 +257,34 @@ describe('Collaboration (e2e)', () => {
           })
           .expect(201);
 
-        expect(response.body).toHaveProperty('version');
-        versionNumber = response.body.version;
+        const body = response.body as { version: number };
+        expect(body).toHaveProperty('version');
+        versionNumber = body.version;
       });
     });
 
     describe('GET /api/collaboration/:projectId/versions', () => {
       it('should list versions', async () => {
-        const response = await request(app.getHttpServer())
+        const response = await request(app.getHttpServer() as Server)
           .get(`/api/collaboration/${testProjectId}/versions`)
           .set('Authorization', `Bearer ${authToken}`)
           .expect(200);
 
-        expect(Array.isArray(response.body)).toBe(true);
-        expect(response.body.length).toBeGreaterThan(0);
+        const body = response.body as any[];
+        expect(Array.isArray(body)).toBe(true);
+        expect(body.length).toBeGreaterThan(0);
       });
     });
 
     describe('GET /api/collaboration/:projectId/versions/:version', () => {
       it('should get a specific version', async () => {
-        const response = await request(app.getHttpServer())
+        const response = await request(app.getHttpServer() as Server)
           .get(`/api/collaboration/${testProjectId}/versions/${versionNumber}`)
           .set('Authorization', `Bearer ${authToken}`)
           .expect(200);
 
-        expect(response.body.version).toBe(versionNumber);
+        const body = response.body as { version: number };
+        expect(body.version).toBe(versionNumber);
       });
     });
   });

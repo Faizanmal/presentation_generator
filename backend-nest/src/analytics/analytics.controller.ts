@@ -218,6 +218,64 @@ export class AnalyticsController {
   }
 
   /**
+   * Get structured AI insights with full detail including type, priority, and actionable recommendations
+   */
+  @Get(':projectId/ai-insights/structured')
+  @UseGuards(JwtAuthGuard)
+  async getStructuredInsights(@Param('projectId') projectId: string) {
+    const insights = await this.analyticsService.getStructuredInsights(projectId);
+    return {
+      insights,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Get predictive analytics - forecast future performance
+   */
+  @Get(':projectId/predictive')
+  @UseGuards(JwtAuthGuard)
+  async getPredictiveAnalytics(
+    @Param('projectId') projectId: string,
+    @Query('days') days?: string,
+  ) {
+    return this.analyticsService.getPredictiveAnalytics(
+      projectId,
+      parseInt(days || '30', 10),
+    );
+  }
+
+  /**
+   * Get real-time engagement metrics
+   */
+  @Get(':projectId/real-time')
+  @UseGuards(JwtAuthGuard)
+  async getRealTimeMetrics(@Param('projectId') projectId: string) {
+    return this.analyticsService.getRealTimeMetrics(projectId);
+  }
+
+  /**
+   * Get audience segmentation insights
+   */
+  @Get(':projectId/audience-segments')
+  @UseGuards(JwtAuthGuard)
+  async getAudienceSegments(@Param('projectId') projectId: string) {
+    return this.analyticsService.getAudienceSegments(projectId);
+  }
+
+  /**
+   * Get content optimization suggestions with AI
+   */
+  @Post(':projectId/optimize-content')
+  @UseGuards(JwtAuthGuard)
+  async getContentOptimization(
+    @Param('projectId') projectId: string,
+    @Body() body: { slideId?: string },
+  ) {
+    return this.analyticsService.getContentOptimization(projectId, body.slideId);
+  }
+
+  /**
    * Get detailed AI recommendations for improving presentation
    */
   @Post(':projectId/ai-recommendations')

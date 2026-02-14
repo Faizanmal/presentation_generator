@@ -99,6 +99,7 @@ async function networkFirst(request) {
     
     return networkResponse;
   } catch (error) {
+    console.error(error);
     // Return cached response if network fails
     const cachedResponse = await caches.match(request);
     if (cachedResponse) {
@@ -142,6 +143,7 @@ async function cacheFirst(request) {
     
     return networkResponse;
   } catch (error) {
+    console.error(error);
     return new Response('Asset not available offline', { status: 503 });
   }
 }
@@ -172,7 +174,7 @@ async function navigationHandler(request) {
     
     const networkResponse = await fetch(request);
     return networkResponse;
-  } catch (error) {
+  } catch {
     // Return offline page
     const cachedResponse = await caches.match(OFFLINE_URL);
     if (cachedResponse) {
@@ -249,7 +251,7 @@ async function syncPresentations() {
 
 // Handle push notifications
 self.addEventListener('push', (event) => {
-  if (!event.data) return;
+  if (!event.data) {return;}
   
   const data = event.data.json();
   
@@ -347,7 +349,7 @@ async function cacheProject(projectId, data) {
               const response = await fetch(block.content.url);
               await cache.put(block.content.url, response);
             } catch (error) {
-              console.log('Failed to cache image:', block.content.url);
+              console.error(error);
             }
           }
         }

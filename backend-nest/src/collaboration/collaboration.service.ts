@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 
 interface CreateSessionDto {
   projectId: string;
@@ -19,7 +20,7 @@ interface CreateCommentDto {
 
 interface CreateVersionDto {
   projectId: string;
-  snapshot: any;
+  snapshot: unknown;
   message?: string;
   createdBy: string;
 }
@@ -28,7 +29,7 @@ interface BlockChangeDto {
   projectId: string;
   slideId: string;
   blockId: string;
-  data: any;
+  data: unknown;
   userId: string;
 }
 
@@ -124,14 +125,33 @@ export class CollaborationService {
     role: 'VIEWER' | 'COMMENTER' | 'EDITOR',
     invitedBy: string,
   ) {
-    return this.prisma.projectCollaborator.upsert({
-      where: {
-        projectId_userId: { projectId, userId },
-      },
-      update: { role },
-      create: {
+    // Check if user exists (handles both ID and Email)
+    const userRecord = await this.prisma.user.findUnique({
+      where: userId.includes('@') ? { email: userId } : { id: userId },
+    });
+
+    if (!userRecord) {
+      throw new NotFoundException('User not found');
+    }
+
+    const targetUserId = userRecord.id;
+
+    const existingCollaborator =
+      await this.prisma.projectCollaborator.findFirst({
+        where: {
+          projectId,
+          userId: targetUserId,
+        },
+      });
+
+    if (existingCollaborator) {
+      throw new Error('User is already a collaborator');
+    }
+
+    return this.prisma.projectCollaborator.create({
+      data: {
         projectId,
-        userId,
+        userId: targetUserId,
         role,
         invitedBy,
       },
@@ -360,7 +380,7 @@ export class CollaborationService {
       data: {
         projectId: dto.projectId,
         version: nextVersion,
-        snapshot: dto.snapshot,
+        snapshot: dto.snapshot as Prisma.InputJsonValue,
         message: dto.message,
         createdBy: dto.createdBy,
       },
@@ -404,6 +424,10 @@ export class CollaborationService {
     }
 
     // The snapshot contains the full project state
+    await this.prisma.project.update({
+      where: { id: projectId },
+      data: versionData.snapshot as any,
+    });
     return versionData.snapshot;
   }
 
@@ -411,7 +435,7 @@ export class CollaborationService {
   // CHANGE LOGGING
   // ============================================
 
-  async logBlockChange(dto: BlockChangeDto) {
+  logBlockChange(dto: BlockChangeDto) {
     // This can be used for conflict resolution and audit trail
     // For now, we just log it
     this.logger.debug(

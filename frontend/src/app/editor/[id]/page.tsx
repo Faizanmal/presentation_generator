@@ -4,9 +4,11 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import type {
+  DragEndEvent
+} from "@dnd-kit/core";
 import {
   DndContext,
-  DragEndEvent,
   PointerSensor,
   useSensor,
   useSensors,
@@ -50,7 +52,7 @@ import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useEditorStore } from "@/stores/editor-store";
-import { Project, Theme, Slide } from "@/types";
+import type { Project, Theme, Slide } from "@/types";
 import SlidePanel from "@/components/editor/SlidePanel";
 import SlideCanvas from "@/components/editor/SlideCanvas";
 import ThemeSelector from "@/components/editor/ThemeSelector";
@@ -135,12 +137,13 @@ export default function EditorPage() {
   }, [projectData, loadProject, addToRecent]);
 
   // Sync title input with project title
-  useEffect(() => {
-    if (projectData?.title && projectData.title !== titleInput) {
+  const [prevProjectTitle, setPrevProjectTitle] = useState(projectData?.title);
+  if (projectData?.title !== prevProjectTitle) {
+    setPrevProjectTitle(projectData?.title);
+    if (projectData?.title) {
       setTitleInput(projectData.title);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectData?.title]);
+  }
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -185,7 +188,7 @@ export default function EditorPage() {
   // Handle slide reorder
   const handleSlideReorder = (event: DragEndEvent) => {
     const { active, over } = event;
-    if (!over || active.id === over.id || !project?.slides) return;
+    if (!over || active.id === over.id || !project?.slides) { return; }
 
     const oldIndex = project.slides.findIndex((s) => s.id === active.id);
     const newIndex = project.slides.findIndex((s) => s.id === over.id);
@@ -271,14 +274,16 @@ export default function EditorPage() {
     try {
       const data = await api.export.export(projectId, format);
       if (format === "json") {
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+        const blobData = typeof data === 'string' ? data : data.blob;
+        const blob = new Blob([JSON.stringify(blobData, null, 2)], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
         a.download = `${project?.title || "presentation"}.json`;
         a.click();
       } else {
-        const blob = new Blob([data], { type: format === "pdf" ? "application/pdf" : "text/html" });
+        const blobData = typeof data === 'string' ? data : data.blob;
+        const blob = new Blob([blobData], { type: format === "pdf" ? "application/pdf" : "text/html" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
@@ -323,7 +328,12 @@ export default function EditorPage() {
   return (
     <div className="h-screen flex flex-col bg-slate-100 dark:bg-slate-900">
       {/* Header */}
-      <header className="h-14 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 flex-shrink-0">
+      <header className="h-14 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 flex-shrink-0 relative">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-3 py-0.5 rounded-b-md text-xs font-medium z-50">
+          <Link href={`/editor-v2/${projectId}`} className="hover:underline flex items-center gap-1">
+            Try New Editor <span className="material-symbols-outlined text-[10px]">open_in_new</span>
+          </Link>
+        </div>
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
             <Link href="/dashboard">
@@ -386,12 +396,12 @@ export default function EditorPage() {
             currentSlideId={currentSlide?.id}
             onSlideSelect={(slideId) => {
               const index = project.slides?.findIndex((s) => s.id === slideId) ?? -1;
-              if (index !== -1) setCurrentSlideIndex(index);
+              if (index !== -1) { setCurrentSlideIndex(index); }
             }}
             onSlideDelete={handleDeleteSlide}
             onSlideDuplicate={(slideId) => {
               const slide = project.slides?.find((s) => s.id === slideId);
-              if (slide) handleDuplicateSlide(slide);
+              if (slide) { handleDuplicateSlide(slide); }
             }}
           />
 
@@ -412,7 +422,7 @@ export default function EditorPage() {
                 Theme
               </Button>
             </SheetTrigger>
-            <SheetContent>
+            <SheetContent className="overflow-y-auto">
               <SheetHeader>
                 <SheetTitle>Choose Theme</SheetTitle>
                 <SheetDescription>
@@ -559,7 +569,7 @@ export default function EditorPage() {
       {/* Command Palette - Global keyboard command handler */}
       <CommandPalette
         projectId={projectId}
-        isEditorMode={true}
+        isEditorMode
         onUndo={undo}
         onRedo={redo}
         onShowKeyboardShortcuts={() => setShowKeyboardShortcuts(true)}

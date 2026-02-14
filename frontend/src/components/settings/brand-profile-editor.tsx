@@ -4,13 +4,10 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Palette,
-  Upload,
   Plus,
   Trash2,
-  Check,
   Star,
   Loader2,
-  Eye,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
+// import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -48,6 +45,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { api } from '@/lib/api';
 import type { BrandProfile } from '@/types';
+import Image from 'next/image';
 
 const fontOptions = [
   { value: 'Inter', label: 'Inter' },
@@ -148,7 +146,7 @@ export function BrandProfileEditor() {
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
                   {profile.logo ? (
-                    <img
+                    <Image
                       src={profile.logo}
                       alt={profile.name}
                       className="w-12 h-12 rounded-lg object-contain bg-muted"

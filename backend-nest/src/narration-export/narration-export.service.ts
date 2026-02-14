@@ -1,6 +1,6 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import OpenAI from 'openai';
+import { AIService } from '../ai/ai.service';
 import { PrismaService } from '../prisma/prisma.service';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -53,25 +53,57 @@ export interface VideoExportJob {
 @Injectable()
 export class NarrationExportService {
   private readonly logger = new Logger(NarrationExportService.name);
-  private openai: OpenAI;
 
   readonly voiceOptions: VoiceOption[] = [
-    { id: 'alloy', name: 'Alloy', description: 'Neutral and balanced', gender: 'neutral', style: 'professional' },
-    { id: 'echo', name: 'Echo', description: 'Warm and engaging', gender: 'male', style: 'conversational' },
-    { id: 'fable', name: 'Fable', description: 'Expressive and dynamic', gender: 'neutral', style: 'storytelling' },
-    { id: 'onyx', name: 'Onyx', description: 'Deep and authoritative', gender: 'male', style: 'formal' },
-    { id: 'nova', name: 'Nova', description: 'Friendly and upbeat', gender: 'female', style: 'casual' },
-    { id: 'shimmer', name: 'Shimmer', description: 'Clear and professional', gender: 'female', style: 'business' },
+    {
+      id: 'alloy',
+      name: 'Alloy',
+      description: 'Neutral and balanced',
+      gender: 'neutral',
+      style: 'professional',
+    },
+    {
+      id: 'echo',
+      name: 'Echo',
+      description: 'Warm and engaging',
+      gender: 'male',
+      style: 'conversational',
+    },
+    {
+      id: 'fable',
+      name: 'Fable',
+      description: 'Expressive and dynamic',
+      gender: 'neutral',
+      style: 'storytelling',
+    },
+    {
+      id: 'onyx',
+      name: 'Onyx',
+      description: 'Deep and authoritative',
+      gender: 'male',
+      style: 'formal',
+    },
+    {
+      id: 'nova',
+      name: 'Nova',
+      description: 'Friendly and upbeat',
+      gender: 'female',
+      style: 'casual',
+    },
+    {
+      id: 'shimmer',
+      name: 'Shimmer',
+      description: 'Clear and professional',
+      gender: 'female',
+      style: 'business',
+    },
   ];
 
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
-  ) {
-    this.openai = new OpenAI({
-      apiKey: this.configService.get<string>('OPENAI_API_KEY'),
-    });
-  }
+    private readonly aiService: AIService,
+  ) {}
 
   /**
    * Get available voice options
@@ -138,12 +170,13 @@ Return only the speaker notes, ready to be read aloud.
       `.trim();
 
       try {
-        const response = await this.openai.chat.completions.create({
+        const response = await this.aiService.chatCompletion({
           model: 'gpt-4o',
           messages: [
             {
               role: 'system',
-              content: 'You are an expert presentation coach. Generate engaging speaker notes that sound natural when spoken aloud.',
+              content:
+                'You are an expert presentation coach. Generate engaging speaker notes that sound natural when spoken aloud.',
             },
             { role: 'user', content: prompt },
           ],
@@ -151,7 +184,8 @@ Return only the speaker notes, ready to be read aloud.
           max_tokens: 500,
         });
 
-        const speakerNotes = response.choices[0]?.message?.content?.trim() || '';
+        const speakerNotes =
+          response.choices[0]?.message?.content?.trim() || '';
 
         // Save to database
         await this.prisma.speakerNote.upsert({
@@ -173,7 +207,10 @@ Return only the speaker notes, ready to be read aloud.
           speakerNotes,
         });
       } catch (error) {
-        this.logger.error(`Failed to generate notes for slide ${slide.id}:`, error);
+        this.logger.error(
+          `Failed to generate notes for slide ${slide.id}:`,
+          error,
+        );
         narrationSlides.push({
           slideId: slide.id,
           slideNumber: i + 1,
@@ -213,7 +250,7 @@ Return only the speaker notes, ready to be read aloud.
 
     const speed = Math.max(0.25, Math.min(4.0, options.speed || 1.0));
     const slidesToProcess = options.slideIds
-      ? project.slides.filter(s => options.slideIds!.includes(s.id))
+      ? project.slides.filter((s) => options.slideIds!.includes(s.id))
       : project.slides;
 
     // Create narration project record
@@ -228,7 +265,12 @@ Return only the speaker notes, ready to be read aloud.
     });
 
     // Process asynchronously
-    this.processNarration(narrationProject.id, slidesToProcess, options.voice, speed);
+    void this.processNarration(
+      narrationProject.id,
+      slidesToProcess,
+      options.voice,
+      speed,
+    );
 
     return {
       id: narrationProject.id,
@@ -252,25 +294,21 @@ Return only the speaker notes, ready to be read aloud.
     speed: number = 1.0,
   ): Promise<{ audioUrl: string; duration: number }> {
     try {
-      const mp3 = await this.openai.audio.speech.create({
-        model: 'tts-1-hd',
+      const buffer = await this.aiService.generateSpeech(
+        speakerNotes,
         voice,
-        input: speakerNotes,
         speed,
-        response_format: 'mp3',
-      });
+      );
 
-      const buffer = Buffer.from(await mp3.arrayBuffer());
-      
       // Estimate duration (approximate: ~150 words per minute at speed 1.0)
       const wordCount = speakerNotes.split(/\s+/).length;
-      const estimatedDuration = (wordCount / 150) * 60 / speed;
+      const estimatedDuration = ((wordCount / 150) * 60) / speed;
 
       // In production, upload to S3
       // For now, save locally and return path
       const filename = `narration_${slideId}_${Date.now()}.mp3`;
       const uploadsDir = path.join(process.cwd(), 'uploads', 'narrations');
-      
+
       if (!fs.existsSync(uploadsDir)) {
         fs.mkdirSync(uploadsDir, { recursive: true });
       }
@@ -286,7 +324,10 @@ Return only the speaker notes, ready to be read aloud.
         duration: Math.round(estimatedDuration),
       };
     } catch (error) {
-      this.logger.error(`Failed to generate audio for slide ${slideId}:`, error);
+      this.logger.error(
+        `Failed to generate audio for slide ${slideId}:`,
+        error,
+      );
       throw error;
     }
   }
@@ -324,13 +365,13 @@ Return only the speaker notes, ready to be read aloud.
         slideTransition: options.slideTransition || 'fade',
         slideDuration: options.slideDuration || 5,
         narrationProjectId: options.narrationProjectId,
-        status: 'pending',
+        status: 'PENDING',
         progress: 0,
       },
     });
 
     // Process async
-    this.processVideoExport(job.id);
+    void this.processVideoExport(job.id);
 
     return {
       id: job.id,
@@ -349,7 +390,9 @@ Return only the speaker notes, ready to be read aloud.
   /**
    * Get narration project status
    */
-  async getNarrationProject(narrationProjectId: string): Promise<NarrationProject | null> {
+  async getNarrationProject(
+    narrationProjectId: string,
+  ): Promise<NarrationProject | null> {
     const project = await this.prisma.narrationProject.findUnique({
       where: { id: narrationProjectId },
       include: {
@@ -364,12 +407,12 @@ Return only the speaker notes, ready to be read aloud.
       projectId: project.projectId,
       voice: project.voice as VoiceId,
       speed: project.speed,
-      slides: project.slides.map(s => ({
+      slides: project.slides.map((s) => ({
         slideId: s.slideId,
         slideNumber: s.slideNumber,
         speakerNotes: s.speakerNotes,
         audioUrl: s.audioUrl || undefined,
-        duration: s.duration || undefined,
+        duration: s.audioDuration || undefined,
       })),
       totalDuration: project.totalDuration,
       status: project.status as NarrationProject['status'],
@@ -389,7 +432,7 @@ Return only the speaker notes, ready to be read aloud.
 
     return {
       id: job.id,
-      projectId: job.projectId,
+      projectId: job.projectId || '',
       format: job.format as ExportFormat,
       resolution: job.resolution as '720p' | '1080p' | '4k',
       includeNarration: job.includeNarration,
@@ -441,7 +484,7 @@ Return only the speaker notes, ready to be read aloud.
   // Private methods
   private async processNarration(
     narrationProjectId: string,
-    slides: any[],
+    slides: { id: string; blocks?: { content: unknown }[] }[],
     voice: VoiceId,
     speed: number,
   ) {
@@ -489,7 +532,10 @@ Return only the speaker notes, ready to be read aloud.
             data: { totalDuration },
           });
         } catch (error) {
-          this.logger.error(`Failed to generate audio for slide ${slide.id}:`, error);
+          this.logger.error(
+            `Failed to generate audio for slide ${slide.id}:`,
+            error,
+          );
         }
       }
 
@@ -500,8 +546,12 @@ Return only the speaker notes, ready to be read aloud.
           totalDuration,
         },
       });
-    } catch (error) {
-      this.logger.error(`Narration project ${narrationProjectId} failed:`, error);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Narration project ${narrationProjectId} failed: ${message}`,
+        error,
+      );
       await this.prisma.narrationProject.update({
         where: { id: narrationProjectId },
         data: { status: 'failed' },
@@ -513,13 +563,13 @@ Return only the speaker notes, ready to be read aloud.
     try {
       await this.prisma.videoExportJob.update({
         where: { id: jobId },
-        data: { status: 'processing' },
+        data: { status: 'PROCESSING' },
       });
 
       const job = await this.prisma.videoExportJob.findUnique({
         where: { id: jobId },
         include: {
-          project: {
+          narrationProject: {
             include: {
               slides: {
                 include: { blocks: true },
@@ -530,16 +580,16 @@ Return only the speaker notes, ready to be read aloud.
         },
       });
 
-      if (!job) return;
+      if (!job || !job.narrationProject) return;
 
       // In production, this would use FFmpeg or a video generation service
       // For now, we'll simulate the progress
-      const totalSlides = job.project.slides.length;
-      
+      const totalSlides = job.narrationProject.slides.length;
+
       for (let i = 0; i < totalSlides; i++) {
         // Simulate processing time
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
         await this.prisma.videoExportJob.update({
           where: { id: jobId },
           data: {
@@ -549,29 +599,32 @@ Return only the speaker notes, ready to be read aloud.
       }
 
       // In production, this would be the actual video URL
-      const outputUrl = `/exports/video_${job.projectId}_${Date.now()}.${job.format}`;
+      const outputUrl = `/exports/video_${job.narrationProject.projectId}_${Date.now()}.${job.format}`;
 
       await this.prisma.videoExportJob.update({
         where: { id: jobId },
         data: {
-          status: 'completed',
+          status: 'COMPLETED',
           progress: 100,
           outputUrl,
         },
       });
-    } catch (error) {
-      this.logger.error(`Video export job ${jobId} failed:`, error);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Video export job ${jobId} failed:`, err);
       await this.prisma.videoExportJob.update({
         where: { id: jobId },
         data: {
-          status: 'failed',
-          error: error.message,
+          status: 'FAILED',
+          error: err.message,
         },
       });
     }
   }
 
-  private extractSlideContent(slide: any): string {
+  private extractSlideContent(slide: {
+    blocks?: Array<{ content: unknown }>;
+  }): string {
     const blocks = slide.blocks || [];
     const textParts: string[] = [];
 
@@ -579,12 +632,15 @@ Return only the speaker notes, ready to be read aloud.
       const content = block.content;
       if (typeof content === 'string') {
         textParts.push(content);
-      } else if (content?.text) {
-        textParts.push(content.text);
-      } else if (content?.content) {
-        textParts.push(content.content);
-      } else if (Array.isArray(content?.items)) {
-        textParts.push(content.items.join('. '));
+      } else if (typeof content === 'object' && content !== null) {
+        const anyContent = content as Record<string, unknown>;
+        if (typeof anyContent.text === 'string') {
+          textParts.push(anyContent.text);
+        } else if (typeof anyContent.content === 'string') {
+          textParts.push(anyContent.content);
+        } else if (Array.isArray(anyContent.items)) {
+          textParts.push((anyContent.items as string[]).join('. '));
+        }
       }
     }
 

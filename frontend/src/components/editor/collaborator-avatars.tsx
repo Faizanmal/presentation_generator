@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo } from 'react';
+// import { useMemo } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { ActiveUser } from '@/types';
+import Image from 'next/image';
 
 interface CollaboratorAvatarsProps {
   users: ActiveUser[];
@@ -56,7 +57,7 @@ export function CollaboratorAvatars({
                 style={{ backgroundColor: user.color }}
               >
                 {user.image ? (
-                  <img
+                  <Image
                     src={user.image}
                     alt={user.name || user.email}
                     className="w-full h-full rounded-full object-cover"

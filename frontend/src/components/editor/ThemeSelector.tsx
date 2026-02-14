@@ -1,6 +1,6 @@
 "use client";
 
-import { Theme } from "@/types";
+import type { Theme } from "@/types";
 import { Check, Lock } from "lucide-react";
 
 interface ThemeSelectorProps {
@@ -74,7 +74,7 @@ function ThemeCard({
   const colors = theme.colors as unknown as Record<string, string>;
   const bgColor = colors?.background || "#ffffff";
   const primaryColor = colors?.primary || "#3b82f6";
-  const secondaryColor = colors?.secondary || "#8b5cf6";
+  // const secondaryColor = colors?.secondary || "#8b5cf6";
   const textColor = colors?.text || "#1f2937";
 
   return (

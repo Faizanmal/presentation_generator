@@ -22,25 +22,28 @@ export class TagsController {
   constructor(private readonly tagsService: TagsService) {}
 
   @Get()
-  async findAll(@CurrentUser() user: any) {
+  async findAll(@CurrentUser() user: { id: string }) {
     return this.tagsService.findAll(user.id);
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string, @CurrentUser() user: any) {
+  async findOne(@Param('id') id: string, @CurrentUser() user: { id: string }) {
     return this.tagsService.findOne(id, user.id);
   }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async create(@CurrentUser() user: any, @Body() createTagDto: CreateTagDto) {
+  async create(
+    @CurrentUser() user: { id: string },
+    @Body() createTagDto: CreateTagDto,
+  ) {
     return this.tagsService.create(user.id, createTagDto);
   }
 
   @Patch(':id')
   async update(
     @Param('id') id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: { id: string },
     @Body() updateTagDto: UpdateTagDto,
   ) {
     return this.tagsService.update(id, user.id, updateTagDto);
@@ -48,7 +51,7 @@ export class TagsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id') id: string, @CurrentUser() user: any) {
+  async remove(@Param('id') id: string, @CurrentUser() user: { id: string }) {
     return this.tagsService.remove(id, user.id);
   }
 
@@ -57,7 +60,7 @@ export class TagsController {
   async addToProject(
     @Param('tagId') tagId: string,
     @Param('projectId') projectId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: { id: string },
   ) {
     return this.tagsService.addToProject(tagId, projectId, user.id);
   }
@@ -67,7 +70,7 @@ export class TagsController {
   async removeFromProject(
     @Param('tagId') tagId: string,
     @Param('projectId') projectId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: { id: string },
   ) {
     return this.tagsService.removeFromProject(tagId, projectId, user.id);
   }

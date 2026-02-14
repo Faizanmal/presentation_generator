@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import OpenAI from 'openai';
+import { AIService } from '../ai/ai.service';
 
 interface TrackViewDto {
   projectId: string;
@@ -26,6 +26,27 @@ interface TrackHeatmapDto {
   y: number;
 }
 
+export interface SlideMetrics {
+  slideId: string;
+  slideNumber: number;
+  views: number;
+  avgDuration: number;
+  dropOffRate: number;
+  clicks: number;
+}
+
+interface AIRecommendationsResponse {
+  recommendations: Array<{
+    category: string;
+    title: string;
+    description: string;
+    priority: 'high' | 'medium' | 'low';
+    impact: string;
+    implementation: string;
+  }>;
+  overallScore: number;
+}
+
 export interface AnalyticsSummary {
   totalViews: number;
   uniqueViews: number;
@@ -43,21 +64,32 @@ export interface AnalyticsSummary {
     uniqueViews: number;
   }>;
   insights: string[];
+  recommendations?: AIRecommendationsResponse['recommendations'];
+  overallScore?: number;
+}
+
+interface CSVData {
+  summary: AnalyticsSummary;
+  slidePerformance: SlideMetrics[];
+  sessions: Array<{
+    id: string;
+    startTime: string;
+    duration: number;
+    slidesViewed: number;
+    device: string;
+    completionRate: number;
+  }>;
 }
 
 @Injectable()
 export class AnalyticsService {
   private readonly logger = new Logger(AnalyticsService.name);
-  private openai: OpenAI;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
-  ) {
-    this.openai = new OpenAI({
-      apiKey: this.configService.get<string>('OPENAI_API_KEY'),
-    });
-  }
+    private readonly aiService: AIService,
+  ) {}
 
   // ============================================
   // VIEW TRACKING
@@ -361,7 +393,7 @@ export class AnalyticsService {
     projectId: string,
     startDate?: Date,
     endDate?: Date,
-  ) {
+  ): Promise<SlideMetrics[]> {
     const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const end = endDate || new Date();
 
@@ -558,39 +590,47 @@ export class AnalyticsService {
     averageDuration: number;
     completionRate: number;
     dropOffSlide: number | null;
-    topSlides: Array<{ slideIndex: number; averageDuration: number }>;
+    topSlides: Array<{ slideIndex: number; averageDuration: number; viewCount: number }>;
     totalSlides: number;
   }): Promise<string[]> {
     try {
-      const prompt = `Analyze this presentation analytics data and provide 3-5 actionable insights:
-
-Total Views: ${data.totalViews}
-Unique Viewers: ${data.uniqueViews}
-Average View Duration: ${data.averageDuration} seconds
-Completion Rate: ${Math.round(data.completionRate * 100)}%
-Total Slides: ${data.totalSlides}
-${data.dropOffSlide !== null ? `Biggest Drop-off: Slide ${data.dropOffSlide + 1}` : ''}
-Top Engaged Slides: ${data.topSlides.map((s) => `Slide ${s.slideIndex + 1} (${Math.round(s.averageDuration)}s avg)`).join(', ')}
-
-Provide insights in JSON array format: ["insight 1", "insight 2", ...]
-Focus on:
-- Engagement patterns
-- Potential improvements
-- Content optimization suggestions`;
-
-      const response = await this.openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.7,
-        max_tokens: 500,
+      // Use the AIService generateAnalyticsInsights method for structured insights
+      const structuredInsights = await this.aiService.generateAnalyticsInsights({
+        totalViews: data.totalViews,
+        uniqueViews: data.uniqueViews,
+        averageDuration: data.averageDuration,
+        completionRate: data.completionRate,
+        dropOffSlide: data.dropOffSlide,
+        topSlides: data.topSlides,
+        totalSlides: data.totalSlides,
       });
 
-      const content = response.choices[0]?.message?.content || '[]';
-      return JSON.parse(content) as string[];
+      // Convert structured insights to strings for backward compatibility
+      return structuredInsights.map(
+        (insight) => `${insight.title}: ${insight.description}`,
+      );
     } catch (error) {
       this.logger.error('Failed to generate insights', error);
       return this.generateFallbackInsights(data);
     }
+  }
+  
+  /**
+   * Get structured AI insights with full detail
+   */
+  async getStructuredInsights(projectId: string) {
+    const summary = await this.getAnalyticsSummary(projectId);
+    const slidePerformance = await this.getSlidePerformance(projectId);
+    
+    return this.aiService.generateAnalyticsInsights({
+      totalViews: summary.totalViews,
+      uniqueViews: summary.uniqueViews,
+      averageDuration: summary.averageDuration,
+      completionRate: summary.completionRate,
+      dropOffSlide: summary.dropOffSlide,
+      topSlides: summary.topSlides,
+      totalSlides: slidePerformance.length,
+    });
   }
 
   private generateFallbackInsights(data: {
@@ -774,7 +814,7 @@ ANALYTICS DATA:
 - Drop-off Slide: ${summary.dropOffSlide !== null ? `Slide ${summary.dropOffSlide + 1}` : 'None identified'}
 
 SLIDE PERFORMANCE:
-${slidePerformance.map((s: any) => `Slide ${s.slideNumber}: ${s.views} views, ${s.avgDuration}s avg, ${s.dropOffRate}% drop-off`).join('\n')}
+${slidePerformance.map((s: SlideMetrics) => `Slide ${s.slideNumber}: ${s.views} views, ${s.avgDuration}s avg, ${s.dropOffRate}% drop-off`).join('\n')}
 
 ${presentationContent ? `CONTENT OVERVIEW:\n${JSON.stringify(presentationContent).substring(0, 2000)}` : ''}
 
@@ -795,7 +835,7 @@ Provide recommendations in JSON format:
 
 Provide 5-8 specific, actionable recommendations based on the data patterns.`;
 
-      const response = await this.openai.chat.completions.create({
+      const response = await this.aiService.chatCompletion({
         model: 'gpt-4o',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
@@ -808,7 +848,9 @@ Provide 5-8 specific, actionable recommendations based on the data patterns.`;
         return this.getDefaultRecommendations(summary);
       }
 
-      const parsed = JSON.parse(content);
+      const parsed = JSON.parse(
+        content,
+      ) as unknown as AIRecommendationsResponse;
       return {
         recommendations: parsed.recommendations || [],
         overallScore: parsed.overallScore || 70,
@@ -816,9 +858,17 @@ Provide 5-8 specific, actionable recommendations based on the data patterns.`;
       };
     } catch (error) {
       this.logger.error('Failed to generate detailed recommendations', error);
-      return this.getDefaultRecommendations(
-        await this.getAnalyticsSummary(projectId),
-      );
+      // Return default recommendations with a basic summary
+      return this.getDefaultRecommendations({
+        totalViews: 0,
+        uniqueViews: 0,
+        averageDuration: 0,
+        completionRate: 0,
+        dropOffSlide: null,
+        topSlides: [],
+        viewsByDay: [],
+        insights: [],
+      });
     }
   }
 
@@ -912,7 +962,11 @@ Provide 5-8 specific, actionable recommendations based on the data patterns.`;
     };
 
     if (format === 'csv') {
-      const csvData = this.convertToCSV(exportData);
+      const csvData = this.convertToCSV({
+        summary,
+        slidePerformance,
+        sessions,
+      });
       return {
         data: csvData,
         filename: `analytics-${projectId}-${Date.now()}.csv`,
@@ -927,7 +981,7 @@ Provide 5-8 specific, actionable recommendations based on the data patterns.`;
     };
   }
 
-  private convertToCSV(data: any): string {
+  private convertToCSV(data: CSVData): string {
     const lines: string[] = [];
 
     // Summary section
@@ -940,9 +994,8 @@ Provide 5-8 specific, actionable recommendations based on the data patterns.`;
     lines.push('');
 
     // Slide Performance section
-    lines.push('SLIDE PERFORMANCE');
     lines.push('Slide,Views,Avg Duration (s),Drop-off Rate (%),Clicks');
-    data.slidePerformance.forEach((slide: any) => {
+    data.slidePerformance.forEach((slide: SlideMetrics) => {
       lines.push(
         `${slide.slideNumber},${slide.views},${slide.avgDuration},${slide.dropOffRate},${slide.clicks}`,
       );
@@ -954,12 +1007,383 @@ Provide 5-8 specific, actionable recommendations based on the data patterns.`;
     lines.push(
       'ID,Start Time,Duration (s),Slides Viewed,Device,Completion Rate (%)',
     );
-    data.sessions.forEach((session: any) => {
+    data.sessions.forEach((session) => {
       lines.push(
         `${session.id},${session.startTime},${session.duration},${session.slidesViewed},${session.device},${session.completionRate}`,
       );
     });
 
     return lines.join('\n');
+  }
+
+  // ============================================
+  // PREDICTIVE ANALYTICS
+  // ============================================
+
+  /**
+   * Generate predictive analytics for future performance
+   */
+  async getPredictiveAnalytics(projectId: string, forecastDays: number = 30) {
+    // Get historical data (last 90 days)
+    const startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const endDate = new Date();
+
+    const views = await this.prisma.presentationView.findMany({
+      where: {
+        projectId,
+        startedAt: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      orderBy: { startedAt: 'asc' },
+    });
+
+    // Aggregate views by day
+    const dailyViews = new Map<string, number>();
+    views.forEach((v) => {
+      const dateKey = v.startedAt.toISOString().split('T')[0];
+      dailyViews.set(dateKey, (dailyViews.get(dateKey) || 0) + 1);
+    });
+
+    // Simple linear regression for trend
+    const entries = Array.from(dailyViews.entries()).sort((a, b) =>
+      a[0].localeCompare(b[0]),
+    );
+    const n = entries.length;
+
+    if (n < 7) {
+      return {
+        forecast: [],
+        trend: 'insufficient_data',
+        confidence: 0,
+        projectedGrowth: 0,
+      };
+    }
+
+    // Calculate trend
+    let sumX = 0,
+      sumY = 0,
+      sumXY = 0,
+      sumX2 = 0;
+    entries.forEach(([_, views], index) => {
+      sumX += index;
+      sumY += views;
+      sumXY += index * views;
+      sumX2 += index * index;
+    });
+
+    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / n;
+
+    // Generate forecast
+    const forecast: Array<{ date: string; predictedViews: number }> = [];
+    const lastDate = new Date(entries[entries.length - 1][0]);
+
+    for (let i = 1; i <= forecastDays; i++) {
+      const futureDate = new Date(lastDate);
+      futureDate.setDate(futureDate.getDate() + i);
+      const predictedViews = Math.max(0, Math.round(slope * (n + i) + intercept));
+
+      forecast.push({
+        date: futureDate.toISOString().split('T')[0],
+        predictedViews,
+      });
+    }
+
+    // Calculate trend direction and confidence
+    const avgViews = sumY / n;
+    const trend = slope > 0.5 ? 'growing' : slope < -0.5 ? 'declining' : 'stable';
+    const projectedGrowth = ((slope * forecastDays) / avgViews) * 100;
+
+    return {
+      forecast,
+      trend,
+      confidence: Math.min(95, Math.max(50, 70 + n)), // Simple confidence based on data points
+      projectedGrowth: Math.round(projectedGrowth * 10) / 10,
+      insights: this.generatePredictiveInsights(trend, projectedGrowth),
+    };
+  }
+
+  private generatePredictiveInsights(
+    trend: string,
+    growth: number,
+  ): string[] {
+    const insights: string[] = [];
+
+    if (trend === 'growing') {
+      insights.push(
+        `📈 Your presentation is trending upward with ${Math.abs(growth).toFixed(1)}% projected growth`,
+      );
+      insights.push(
+        '💡 Consider promoting your presentation more to capitalize on this momentum',
+      );
+    } else if (trend === 'declining') {
+      insights.push(
+        `📉 Views are declining by approximately ${Math.abs(growth).toFixed(1)}%`,
+      );
+      insights.push(
+        '💡 Consider refreshing content or increasing promotion',
+      );
+    } else {
+      insights.push('📊 Viewership is stable');
+      insights.push(
+        '💡 Try new distribution channels to increase reach',
+      );
+    }
+
+    return insights;
+  }
+
+  // ============================================
+  // REAL-TIME METRICS
+  // ============================================
+
+  /**
+   * Get real-time engagement metrics
+   */
+  async getRealTimeMetrics(projectId: string) {
+    const lastHour = new Date(Date.now() - 60 * 60 * 1000);
+    const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const [activeViewers, recentViews, hourlyViews] = await Promise.all([
+      // Active viewers (last 5 minutes)
+      this.getActiveViewers(projectId),
+      // Views in last hour
+      this.prisma.presentationView.count({
+        where: {
+          projectId,
+          startedAt: { gte: lastHour },
+        },
+      }),
+      // Views in last 24 hours
+      this.prisma.presentationView.count({
+        where: {
+          projectId,
+          startedAt: { gte: last24Hours },
+        },
+      }),
+    ]);
+
+    // Calculate engagement rate
+    const totalViews = await this.prisma.presentationView.count({
+      where: { projectId },
+    });
+    const engagementRate =
+      totalViews > 0 ? (hourlyViews / totalViews) * 100 : 0;
+
+    return {
+      activeViewers: activeViewers.length,
+      viewsLastHour: recentViews,
+      viewsLast24Hours: hourlyViews,
+      engagementRate: Math.round(engagementRate * 10) / 10,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  // ============================================
+  // AUDIENCE SEGMENTATION
+  // ============================================
+
+  /**
+   * Get audience segmentation insights
+   */
+  async getAudienceSegments(projectId: string) {
+    const views = await this.prisma.presentationView.findMany({
+      where: { projectId },
+      include: { slideViews: true },
+    });
+
+    // Parse user agents for device/browser info
+    const deviceSegments = new Map<string, number>();
+    const browserSegments = new Map<string, number>();
+    const engagementSegments = {
+      high: 0,
+      medium: 0,
+      low: 0,
+    };
+
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: { slides: true },
+    });
+    const totalSlides = project?.slides.length || 1;
+
+    views.forEach((view) => {
+      // Device segmentation
+      const ua = view.userAgent || '';
+      let device = 'desktop';
+      if (/mobile/i.test(ua)) device = 'mobile';
+      else if (/tablet|ipad/i.test(ua)) device = 'tablet';
+      deviceSegments.set(device, (deviceSegments.get(device) || 0) + 1);
+
+      // Browser segmentation (simplified)
+      let browser = 'other';
+      if (/chrome/i.test(ua)) browser = 'chrome';
+      else if (/firefox/i.test(ua)) browser = 'firefox';
+      else if (/safari/i.test(ua)) browser = 'safari';
+      else if (/edge/i.test(ua)) browser = 'edge';
+      browserSegments.set(browser, (browserSegments.get(browser) || 0) + 1);
+
+      // Engagement segmentation
+      const completionRate = view.slideViews.length / totalSlides;
+      if (completionRate > 0.8) engagementSegments.high++;
+      else if (completionRate > 0.4) engagementSegments.medium++;
+      else engagementSegments.low++;
+    });
+
+    return {
+      devices: Object.fromEntries(deviceSegments),
+      browsers: Object.fromEntries(browserSegments),
+      engagement: engagementSegments,
+      totalAudience: views.length,
+      insights: await this.generateAudienceInsights(
+        deviceSegments,
+        engagementSegments,
+        views.length,
+      ),
+    };
+  }
+
+  private async generateAudienceInsights(
+    devices: Map<string, number>,
+    engagement: { high: number; medium: number; low: number },
+    total: number,
+  ): Promise<string[]> {
+    const insights: string[] = [];
+
+    const mobilePercent = ((devices.get('mobile') || 0) / total) * 100;
+    if (mobilePercent > 40) {
+      insights.push(
+        `📱 ${mobilePercent.toFixed(0)}% of viewers use mobile - ensure mobile optimization`,
+      );
+    }
+
+    const highEngagement = (engagement.high / total) * 100;
+    if (highEngagement > 60) {
+      insights.push(
+        `✨ ${highEngagement.toFixed(0)}% high engagement rate - content is resonating well`,
+      );
+    } else if (highEngagement < 30) {
+      insights.push(
+        `⚠️ Only ${highEngagement.toFixed(0)}% high engagement - consider improving content`,
+      );
+    }
+
+    return insights;
+  }
+
+  // ============================================
+  // CONTENT OPTIMIZATION
+  // ============================================
+
+  /**
+   * Get AI-powered content optimization suggestions
+   */
+  async getContentOptimization(projectId: string, slideId?: string) {
+    const slidePerformance = await this.getSlidePerformance(projectId);
+    const summary = await this.getAnalyticsSummary(projectId);
+
+    let targetSlides = slidePerformance;
+    if (slideId) {
+      targetSlides = slidePerformance.filter((s) => s.slideId === slideId);
+    }
+
+    // Get project content
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        slides: {
+          include: { blocks: true },
+          orderBy: { order: 'asc' },
+        },
+      },
+    });
+
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    const prompt = `Analyze this presentation data and provide specific content optimization suggestions:
+
+PERFORMANCE DATA:
+${targetSlides.map((s) => `Slide ${s.slideNumber}: ${s.views} views, ${s.avgDuration}s avg, ${s.dropOffRate}% drop-off`).join('\n')}
+
+OVERALL METRICS:
+- Completion Rate: ${Math.round(summary.completionRate * 100)}%
+- Average Duration: ${summary.averageDuration}s
+
+CONTENT STRUCTURE:
+${project.slides.slice(0, 10).map((slide, idx) => `Slide ${idx + 1}: ${slide.blocks.length} blocks`).join('\n')}
+
+Provide 5-8 specific, actionable optimization suggestions in JSON format:
+{
+  "suggestions": [
+    {
+      "slideNumber": 1,
+      "type": "content|design|engagement|pacing",
+      "issue": "Description of the issue",
+      "suggestion": "Specific improvement suggestion",
+      "priority": "high|medium|low",
+      "expectedImpact": "Expected improvement"
+    }
+  ]
+}`;
+
+    try {
+      const response = await this.aiService.chatCompletion({
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        max_tokens: 2000,
+        response_format: { type: 'json_object' },
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        return { suggestions: [] };
+      }
+
+      return JSON.parse(content);
+    } catch (error) {
+      this.logger.error('Failed to generate optimization suggestions', error);
+      return {
+        suggestions: this.getDefaultOptimizations(targetSlides),
+      };
+    }
+  }
+
+  private getDefaultOptimizations(slides: SlideMetrics[]) {
+    const suggestions: any[] = [];
+
+    const highDropoffSlides = slides.filter((s) => s.dropOffRate > 30);
+    highDropoffSlides.forEach((slide) => {
+      suggestions.push({
+        slideNumber: slide.slideNumber,
+        type: 'engagement',
+        issue: `High drop-off rate of ${slide.dropOffRate}%`,
+        suggestion:
+          'Add engaging visuals, reduce text density, or split into multiple slides',
+        priority: 'high',
+        expectedImpact: 'Could reduce drop-off by 15-25%',
+      });
+    });
+
+    const lowEngagementSlides = slides.filter(
+      (s) => s.avgDuration < 10 && s.views > 0,
+    );
+    lowEngagementSlides.forEach((slide) => {
+      suggestions.push({
+        slideNumber: slide.slideNumber,
+        type: 'content',
+        issue: `Very short view time (${slide.avgDuration}s)`,
+        suggestion:
+          'Add more engaging content or interactive elements',
+        priority: 'medium',
+        expectedImpact: 'Could increase engagement time by 50%',
+      });
+    });
+
+    return suggestions;
   }
 }

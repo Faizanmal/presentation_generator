@@ -8,6 +8,11 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import * as crypto from 'crypto';
 import axios from 'axios';
+import {
+  Webhook as PrismaWebhook,
+  WebhookLog as PrismaWebhookLog,
+  Prisma,
+} from '@prisma/client';
 
 export interface WebhookPayload {
   event: string;
@@ -69,7 +74,8 @@ export class WebhooksService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return webhooks.map(this.mapWebhook);
+    // avoid unbound-method issues by using an inline mapper
+    return webhooks.map((w) => this.mapWebhook(w));
   }
 
   /**
@@ -230,10 +236,11 @@ export class WebhooksService {
         statusCode: result.statusCode,
         response: result.response,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errMsg = error instanceof Error ? error.message : String(error);
       return {
         success: false,
-        error: error.message,
+        error: errMsg,
       };
     }
   }
@@ -279,7 +286,7 @@ export class WebhooksService {
    * Deliver a webhook with retries
    */
   private async deliverWebhook(
-    webhook: any,
+    webhook: PrismaWebhook,
     payload: WebhookPayload,
   ): Promise<void> {
     let lastError: Error | null = null;
@@ -302,10 +309,12 @@ export class WebhooksService {
           });
           return;
         }
-      } catch (error: any) {
-        lastError = error;
+      } catch (error: unknown) {
+        lastError = error instanceof Error ? error : new Error(String(error));
         this.logger.warn(
-          `Webhook ${webhook.id} delivery attempt ${attempt + 1} failed: ${error.message}`,
+          `Webhook ${webhook.id} delivery attempt ${attempt + 1} failed: ${
+            lastError.message
+          }`,
         );
 
         // Wait before retry
@@ -347,9 +356,9 @@ export class WebhooksService {
       data: {
         webhookId: webhook.id,
         event: payload.event,
-        payload: payload as any,
+        payload: payload as unknown as Prisma.InputJsonValue,
         success: false,
-        error: lastError?.message || 'Unknown error',
+        error: (lastError as Error)?.message || 'Unknown error',
       },
     });
   }
@@ -383,7 +392,7 @@ export class WebhooksService {
         data: {
           webhookId: webhook.id,
           event: payload.event,
-          payload: payload as any,
+          payload: payload as unknown as Prisma.InputJsonValue,
           success,
           statusCode: response.status,
           response:
@@ -401,8 +410,9 @@ export class WebhooksService {
             ? response.data
             : JSON.stringify(response.data),
       };
-    } catch (error: any) {
-      throw new Error(`Request failed: ${error.message}`);
+    } catch (error: unknown) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Request failed: ${errMsg}`);
     }
   }
 
@@ -431,7 +441,7 @@ export class WebhooksService {
     userId: string,
     webhookId: string,
     limit = 50,
-  ): Promise<any[]> {
+  ): Promise<PrismaWebhookLog[]> {
     const webhook = await this.prisma.webhook.findFirst({
       where: { id: webhookId, userId },
     });
@@ -450,7 +460,7 @@ export class WebhooksService {
   /**
    * Map database webhook to config interface
    */
-  private mapWebhook(webhook: any): WebhookConfig {
+  private mapWebhook(webhook: PrismaWebhook): WebhookConfig {
     return {
       id: webhook.id,
       url: webhook.url,
@@ -458,7 +468,7 @@ export class WebhooksService {
       secret: webhook.secret,
       active: webhook.active,
       createdAt: webhook.createdAt,
-      lastTriggeredAt: webhook.lastTriggeredAt,
+      lastTriggeredAt: webhook.lastTriggeredAt ?? undefined,
       failureCount: webhook.failureCount,
     };
   }

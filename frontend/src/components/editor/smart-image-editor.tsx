@@ -9,13 +9,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+// import {
+//   Select,
+//   SelectContent,
+//   SelectItem,
+//   SelectTrigger,
+//   SelectValue,
+// } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -32,18 +32,13 @@ import {
   Sparkles,
   Palette,
   Eraser,
-  Download,
   Undo2,
   Redo2,
   ZoomIn,
-  ZoomOut,
   Move,
   Square,
-  Circle,
   Type,
   Paintbrush,
-  Layers,
-  Wand2,
   Image as ImageIcon,
   Check,
   X,
@@ -141,10 +136,10 @@ export function SmartImageEditor({ imageUrl, isOpen, onClose, onSave }: ImageEdi
 
   const saveToHistory = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) {return;}
 
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {return;}
 
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     setHistory((prev) => [...prev.slice(0, historyIndex + 1), imageData]);
@@ -153,10 +148,10 @@ export function SmartImageEditor({ imageUrl, isOpen, onClose, onSave }: ImageEdi
 
   const initCanvas = useCallback((img: HTMLImageElement) => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) {return;}
 
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {return;}
 
     canvas.width = img.width;
     canvas.height = img.height;
@@ -168,7 +163,7 @@ export function SmartImageEditor({ imageUrl, isOpen, onClose, onSave }: ImageEdi
 
   // Load image
   useEffect(() => {
-    if (!imageUrl) return;
+    if (!imageUrl) {return;}
 
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -180,13 +175,13 @@ export function SmartImageEditor({ imageUrl, isOpen, onClose, onSave }: ImageEdi
   }, [imageUrl, initCanvas]);
 
   const undo = useCallback(() => {
-    if (historyIndex <= 0) return;
+    if (historyIndex <= 0) {return;}
 
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) {return;}
 
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {return;}
 
     const newIndex = historyIndex - 1;
     ctx.putImageData(history[newIndex], 0, 0);
@@ -194,13 +189,13 @@ export function SmartImageEditor({ imageUrl, isOpen, onClose, onSave }: ImageEdi
   }, [history, historyIndex]);
 
   const redo = useCallback(() => {
-    if (historyIndex >= history.length - 1) return;
+    if (historyIndex >= history.length - 1) {return;}
 
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) {return;}
 
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {return;}
 
     const newIndex = historyIndex + 1;
     ctx.putImageData(history[newIndex], 0, 0);
@@ -215,14 +210,14 @@ export function SmartImageEditor({ imageUrl, isOpen, onClose, onSave }: ImageEdi
     const adj = adjustments;
     let filter = selectedFilter.filter !== 'none' ? selectedFilter.filter : '';
 
-    if (adj.brightness !== 100) filter += ` brightness(${adj.brightness / 100})`;
-    if (adj.contrast !== 100) filter += ` contrast(${adj.contrast / 100})`;
-    if (adj.saturation !== 100) filter += ` saturate(${adj.saturation / 100})`;
-    if (adj.blur > 0) filter += ` blur(${adj.blur}px)`;
-    if (adj.opacity !== 100) filter += ` opacity(${adj.opacity / 100})`;
-    if (adj.hue !== 0) filter += ` hue-rotate(${adj.hue}deg)`;
-    if (adj.sepia > 0) filter += ` sepia(${adj.sepia / 100})`;
-    if (adj.grayscale > 0) filter += ` grayscale(${adj.grayscale / 100})`;
+    if (adj.brightness !== 100) {filter += ` brightness(${adj.brightness / 100})`;}
+    if (adj.contrast !== 100) {filter += ` contrast(${adj.contrast / 100})`;}
+    if (adj.saturation !== 100) {filter += ` saturate(${adj.saturation / 100})`;}
+    if (adj.blur > 0) {filter += ` blur(${adj.blur}px)`;}
+    if (adj.opacity !== 100) {filter += ` opacity(${adj.opacity / 100})`;}
+    if (adj.hue !== 0) {filter += ` hue-rotate(${adj.hue}deg)`;}
+    if (adj.sepia > 0) {filter += ` sepia(${adj.sepia / 100})`;}
+    if (adj.grayscale > 0) {filter += ` grayscale(${adj.grayscale / 100})`;}
 
     return filter.trim() || 'none';
   }, [adjustments, selectedFilter]);
@@ -241,7 +236,7 @@ export function SmartImageEditor({ imageUrl, isOpen, onClose, onSave }: ImageEdi
 
   const handleCropStart = useCallback(
     (e: React.MouseEvent) => {
-      if (activeTool !== 'crop' || !containerRef.current) return;
+      if (activeTool !== 'crop' || !containerRef.current) {return;}
 
       const rect = containerRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left;
@@ -255,7 +250,7 @@ export function SmartImageEditor({ imageUrl, isOpen, onClose, onSave }: ImageEdi
 
   const handleCropMove = useCallback(
     (e: React.MouseEvent) => {
-      if (!isCropping || !cropArea || !containerRef.current) return;
+      if (!isCropping || !cropArea || !containerRef.current) {return;}
 
       const rect = containerRef.current.getBoundingClientRect();
       const width = e.clientX - rect.left - cropArea.x;
@@ -275,11 +270,11 @@ export function SmartImageEditor({ imageUrl, isOpen, onClose, onSave }: ImageEdi
   }, []);
 
   const applyCrop = useCallback(() => {
-    if (!cropArea || !canvasRef.current || !image) return;
+    if (!cropArea || !canvasRef.current || !image) {return;}
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {return;}
 
     // Calculate actual crop dimensions based on canvas/display ratio
     const displayWidth = canvas.offsetWidth;
@@ -312,11 +307,11 @@ export function SmartImageEditor({ imageUrl, isOpen, onClose, onSave }: ImageEdi
 
   const handleDrawStart = useCallback(
     (e: React.MouseEvent) => {
-      if (activeTool !== 'draw' || !canvasRef.current) return;
+      if (activeTool !== 'draw' || !canvasRef.current) {return;}
 
       const canvas = canvasRef.current;
       const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+      if (!ctx) {return;}
 
       const rect = canvas.getBoundingClientRect();
       const scaleX = canvas.width / rect.width;
@@ -338,11 +333,11 @@ export function SmartImageEditor({ imageUrl, isOpen, onClose, onSave }: ImageEdi
 
   const handleDrawMove = useCallback(
     (e: React.MouseEvent) => {
-      if (!isDrawing || activeTool !== 'draw' || !canvasRef.current) return;
+      if (!isDrawing || activeTool !== 'draw' || !canvasRef.current) {return;}
 
       const canvas = canvasRef.current;
       const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+      if (!ctx) {return;}
 
       const rect = canvas.getBoundingClientRect();
       const scaleX = canvas.width / rect.width;
@@ -381,19 +376,19 @@ export function SmartImageEditor({ imageUrl, isOpen, onClose, onSave }: ImageEdi
   }, []);
 
   const handleSave = useCallback(() => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current) {return;}
 
     // Apply visual transformations to canvas
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {return;}
 
     // Create a temporary canvas with all effects applied
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = canvas.width;
     tempCanvas.height = canvas.height;
     const tempCtx = tempCanvas.getContext('2d');
-    if (!tempCtx) return;
+    if (!tempCtx) {return;}
 
     tempCtx.filter = getFilterString();
 
@@ -712,7 +707,7 @@ export function SmartImageEditor({ imageUrl, isOpen, onClose, onSave }: ImageEdi
                             }`}
                         >
                           <div
-                            className="w-full h-full bg-gradient-to-br from-slate-300 to-slate-500"
+                            className="w-full h-full bg-linear-to-br from-slate-300 to-slate-500"
                             style={{ filter: filter.filter }}
                           />
                           <span className="block text-xs mt-1 text-center">{filter.name}</span>

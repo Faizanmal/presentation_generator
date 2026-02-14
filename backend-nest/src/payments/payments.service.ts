@@ -23,7 +23,7 @@ export class PaymentsService {
     this.stripe = new Stripe(
       this.configService.get<string>('STRIPE_SECRET_KEY')!,
       {
-        apiVersion: '2025-12-15.clover',
+        apiVersion: '2026-01-28.clover',
       },
     );
   }
@@ -169,7 +169,7 @@ export class PaymentsService {
 
       case 'customer.subscription.created':
       case 'customer.subscription.updated':
-        await this.handleSubscriptionUpdate(event.data.object as any);
+        await this.handleSubscriptionUpdate(event.data.object);
         break;
 
       case 'customer.subscription.deleted':
@@ -200,9 +200,9 @@ export class PaymentsService {
     }
 
     // Get subscription details
-    const subscription = (await this.stripe.subscriptions.retrieve(
+    const subscription = await this.stripe.subscriptions.retrieve(
       session.subscription as string,
-    )) as any;
+    );
 
     const planEnum =
       plan === 'pro' ? SubscriptionPlan.PRO : SubscriptionPlan.ENTERPRISE;
@@ -212,8 +212,14 @@ export class PaymentsService {
       status: SubscriptionStatus.ACTIVE,
       stripeSubscriptionId: subscription.id,
       stripePriceId: subscription.items.data[0]?.price.id,
-      currentPeriodStart: new Date(subscription.current_period_start * 1000),
-      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+      currentPeriodStart: new Date(
+        (subscription as unknown as { current_period_start: number })
+          .current_period_start * 1000,
+      ),
+      currentPeriodEnd: new Date(
+        (subscription as unknown as { current_period_end: number })
+          .current_period_end * 1000,
+      ),
       projectsLimit: plan === 'enterprise' ? 1000 : 50,
       aiGenerationsLimit: plan === 'enterprise' ? 10000 : 500,
     });
@@ -224,7 +230,7 @@ export class PaymentsService {
   /**
    * Handle subscription updates
    */
-  private async handleSubscriptionUpdate(subscription: any) {
+  private async handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     const customerId = subscription.customer as string;
     const userSubscription = await this.prisma.subscription.findFirst({
       where: { stripeCustomerId: customerId },
@@ -255,8 +261,14 @@ export class PaymentsService {
 
     await this.usersService.updateSubscription(userSubscription.userId, {
       status,
-      currentPeriodStart: new Date(subscription.current_period_start * 1000),
-      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+      currentPeriodStart: new Date(
+        (subscription as unknown as { current_period_start: number })
+          .current_period_start * 1000,
+      ),
+      currentPeriodEnd: new Date(
+        (subscription as unknown as { current_period_end: number })
+          .current_period_end * 1000,
+      ),
       cancelAtPeriodEnd: subscription.cancel_at_period_end,
     });
 

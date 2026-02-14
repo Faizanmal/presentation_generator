@@ -16,12 +16,8 @@ import {
     Undo,
     Redo,
     FileText,
-    Image,
-    Type,
+    Image as ImageIcon,
     List,
-    Code,
-    Quote,
-    Table,
     Trash2,
     Plus,
     Pencil,
@@ -90,7 +86,7 @@ export function useUndoHistory(maxLength = 50) {
 
     const undo = useCallback(() => {
         setState((prev) => {
-            if (prev.past.length === 0) return prev;
+            if (prev.past.length === 0) {return prev;}
 
             const lastEntry = prev.past[prev.past.length - 1];
             return {
@@ -106,7 +102,7 @@ export function useUndoHistory(maxLength = 50) {
 
     const redo = useCallback(() => {
         setState((prev) => {
-            if (prev.future.length === 0) return prev;
+            if (prev.future.length === 0) {return prev;}
 
             const nextEntry = prev.future[0];
             return {
@@ -188,7 +184,7 @@ function getActionIcon(actionType: HistoryActionType) {
         case "delete_block":
             return <Trash2 className="h-3 w-3" />;
         case "update_theme":
-            return <Image className="h-3 w-3" />;
+            return <ImageIcon className="h-3 w-3" />;
         case "batch_update":
             return <List className="h-3 w-3" />;
         default:
@@ -259,7 +255,7 @@ export function UndoHistoryPanel({
         ...future.slice().reverse().map((e) => ({ ...e, isPast: false, isFuture: true })),
     ];
 
-    const currentPosition = history.length;
+    // const currentPosition = history.length;
 
     return (
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -355,8 +351,8 @@ export function UndoHistoryPanel({
                                     )}
 
                                     {/* History entries */}
-                                    {allEntries.map((entry, index) => {
-                                        const isCurrentBoundary = entry.isPast && index === history.length - 1;
+                                    {allEntries.map((entry) => {
+                                        // const isCurrentBoundary = entry.isPast && index === history.length - 1;
 
                                         return (
                                             <button

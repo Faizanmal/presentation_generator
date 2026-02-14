@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: presentation-designer
+data:
+  NODE_ENV: "production"
+  PORT: "3001"
+  LOG_LEVEL: "info"
+  FRONTEND_URL: "https://yourdomain.com"
+  # Add other non-sensitive configuration
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secrets
+  namespace: presentation-designer
+type: Opaque
+stringData:
+  DATABASE_URL: "postgresql://user:password@postgres:5432/presentation_db"
+  REDIS_PASSWORD: "redis_password_here"
+  JWT_SECRET: "jwt_secret_here"
+  OPENAI_API_KEY: "openai_key_here"
+  # Add other sensitive data

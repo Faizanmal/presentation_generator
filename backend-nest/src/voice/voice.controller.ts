@@ -28,7 +28,7 @@ export class VoiceController {
   async uploadRecording(
     @UploadedFile() file: Express.Multer.File,
     @Body() body: { projectId?: string },
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
   ) {
     return this.voiceService.uploadVoiceRecording(
       req.user.id,
@@ -42,7 +42,7 @@ export class VoiceController {
    */
   @Get('recordings')
   async getRecordings(
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
     @Query('projectId') projectId?: string,
   ) {
     return this.voiceService.getUserRecordings(req.user.id, projectId);
@@ -52,7 +52,10 @@ export class VoiceController {
    * Get a specific recording
    */
   @Get('recordings/:id')
-  async getRecording(@Param('id') id: string, @Request() req: any) {
+  async getRecording(
+    @Param('id') id: string,
+    @Request() req: { user: { id: string } },
+  ) {
     return this.voiceService.getRecording(id, req.user.id);
   }
 
@@ -63,7 +66,7 @@ export class VoiceController {
   async generateFromRecording(
     @Param('id') id: string,
     @Body() body: { tone?: string; audience?: string; length?: number },
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
   ) {
     return this.voiceService.generateSlidesFromVoice(id, req.user.id, body);
   }
@@ -72,7 +75,10 @@ export class VoiceController {
    * Delete a recording
    */
   @Delete('recordings/:id')
-  async deleteRecording(@Param('id') id: string, @Request() req: any) {
+  async deleteRecording(
+    @Param('id') id: string,
+    @Request() req: { user: { id: string } },
+  ) {
     return this.voiceService.deleteRecording(id, req.user.id);
   }
 

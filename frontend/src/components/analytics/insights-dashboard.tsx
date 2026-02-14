@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+// import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Brain,
@@ -16,13 +16,12 @@ import {
   Zap,
   Eye,
   RefreshCw,
-  ChevronRight,
   ArrowUp,
   ArrowDown,
   Minus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -139,7 +138,7 @@ export function InsightsDashboard({ projectId }: InsightsDashboardProps) {
 
   const groupedInsights = (insights?.insights || []).reduce(
     (acc: Record<string, PresentationInsight[]>, insight: PresentationInsight) => {
-      if (!acc[insight.category]) acc[insight.category] = [];
+      if (!acc[insight.category]) { acc[insight.category] = []; }
       acc[insight.category].push(insight);
       return acc;
     },
@@ -185,8 +184,8 @@ export function InsightsDashboard({ projectId }: InsightsDashboardProps) {
                 {overallScore >= 80
                   ? 'Excellent! Your presentation is well-crafted.'
                   : overallScore >= 60
-                  ? 'Good, but there are areas for improvement.'
-                  : 'Consider addressing the suggested improvements.'}
+                    ? 'Good, but there are areas for improvement.'
+                    : 'Consider addressing the suggested improvements.'}
               </p>
             </div>
           </div>
@@ -287,9 +286,8 @@ export function InsightsDashboard({ projectId }: InsightsDashboardProps) {
                   </AccordionTrigger>
                   <AccordionContent className="px-4 pb-4">
                     <div className="space-y-3">
-                      {(categoryInsights as PresentationInsight[]).map((insight, index) => (
-                        <div
-                          key={index}
+                      {(categoryInsights as PresentationInsight[]).map((insight, _index) => (
+                        <div key={insight.title}
                           className="rounded-lg border p-4"
                         >
                           <div className="flex items-start justify-between">
@@ -331,8 +329,8 @@ export function InsightsDashboard({ projectId }: InsightsDashboardProps) {
               <CardContent>
                 <div className="flex flex-wrap gap-2">
                   {(insights?.content?.keyTopics || []).slice(0, 10).map(
-                    (topic: { topic: string; frequency: number }, index: number) => (
-                      <Badge key={index} variant="secondary">
+                    (topic: { topic: string; frequency: number }, _index: number) => (
+                      <Badge key={topic.topic} variant="secondary">
                         {topic.topic} ({topic.frequency})
                       </Badge>
                     )
@@ -348,8 +346,8 @@ export function InsightsDashboard({ projectId }: InsightsDashboardProps) {
               <CardContent>
                 <div className="flex flex-wrap gap-2">
                   {(insights?.content?.actionWords || []).map(
-                    (action: { word: string; count: number }, index: number) => (
-                      <Badge key={index} variant="outline">
+                    (action: { word: string; count: number }) => (
+                      <Badge key={action.word} variant="outline">
                         {action.word} ({action.count})
                       </Badge>
                     )
@@ -454,8 +452,7 @@ export function InsightsDashboard({ projectId }: InsightsDashboardProps) {
                 <div className="space-y-2">
                   {(insights?.timing?.perSlideTime || []).map(
                     (slide: { slideId: string; estimatedSeconds: number }, index: number) => (
-                      <div
-                        key={slide.slideId}
+                      <div key={`timing-slide-${slide.slideId}`}
                         className="flex items-center justify-between rounded border p-2"
                       >
                         <span>Slide {index + 1}</span>
@@ -487,8 +484,9 @@ export function InsightsDashboard({ projectId }: InsightsDashboardProps) {
               <CardContent>
                 <div className="space-y-2">
                   {insights?.timing?.pacingIssues?.map(
-                    (issue: { slideId: string; issue: string }, index: number) => (
-                      <div key={index} className="text-sm text-muted-foreground">
+                    (issue: { slideId: string; issue: string }, _index: number) => (
+
+                      <div key={issue.slideId} className="text-sm text-muted-foreground">
                         • {issue.issue}
                       </div>
                     )
@@ -543,8 +541,9 @@ export function InsightsDashboard({ projectId }: InsightsDashboardProps) {
               <CardContent>
                 <div className="space-y-2">
                   {insights?.audience?.accessibilityIssues?.map(
-                    (issue: { slideId: string; issue: string }, index: number) => (
-                      <div key={index} className="flex items-center gap-2 text-sm">
+                    (issue: { slideId: string; issue: string }) => (
+
+                      <div key={issue.slideId} className="flex items-center gap-2 text-sm">
                         <AlertTriangle className="h-4 w-4 text-yellow-500" />
                         <span>{issue.issue}</span>
                       </div>

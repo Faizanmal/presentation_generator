@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 'use client';
 
 import React, { useState } from 'react';
@@ -7,8 +5,6 @@ import { useQuery } from '@tanstack/react-query';
 import {
   BarChart,
   Bar,
-  LineChart,
-  Line,
   PieChart,
   Pie,
   Cell,
@@ -25,7 +21,6 @@ import {
   Eye,
   Clock,
   TrendingUp,
-  MonitorSmartphone,
   Globe,
   Activity,
   Download,
@@ -34,7 +29,6 @@ import {
   BarChart3,
   Flame,
   Target,
-  Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -281,13 +275,14 @@ export function AudienceAnalyticsDashboard({ projectId }: AudienceAnalyticsDashb
                         outerRadius={80}
                         dataKey="count"
                         nameKey="device"
-                        label={({ device, percentage }) =>
-                          `${device}: ${percentage.toFixed(1)}%`
+                        label={({ payload, percent }: { payload?: { device: string }; percent?: number }) =>
+                          `${payload?.device || 'Unknown'}: ${((percent || 0) * 100).toFixed(1)}%`
                         }
                       >
-                        {(insights?.deviceBreakdown || []).map((_: any, index: number) => (
+                        {(insights?.deviceBreakdown || []).map((item: { device: string; count: number }, index: number) => (
                           <Cell
-                            key={`cell-${index}`}
+
+                            key={item.device || `cell-${index}`}
                             fill={COLORS[index % COLORS.length]}
                           />
                         ))}
@@ -297,7 +292,7 @@ export function AudienceAnalyticsDashboard({ projectId }: AudienceAnalyticsDashb
                   </ResponsiveContainer>
                 </div>
                 <div className="mt-4 flex justify-center gap-4">
-                  {(insights?.deviceBreakdown || []).map((item: any, index: number) => (
+                  {(insights?.deviceBreakdown || []).map((item: { device: string }, index: number) => (
                     <div key={item.device} className="flex items-center gap-2">
                       <div
                         className="h-3 w-3 rounded-full"
@@ -382,7 +377,7 @@ export function AudienceAnalyticsDashboard({ projectId }: AudienceAnalyticsDashb
                     </tr>
                   </thead>
                   <tbody>
-                    {(insights?.slideEngagement || []).map((slide: any) => (
+                    {(insights?.slideEngagement || []).map((slide: { slideId: string; slideNumber: number; title?: string; views: number; averageTimeSpent: number; dropOffRate: number; interactions: number }) => (
                       <tr key={slide.slideId} className="border-b">
                         <td className="py-3">{slide.slideNumber}</td>
                         <td className="py-3 font-medium">{slide.title}</td>
@@ -449,7 +444,7 @@ export function AudienceAnalyticsDashboard({ projectId }: AudienceAnalyticsDashb
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {(insights?.locationBreakdown || []).slice(0, 5).map((location: any) => (
+                  {(insights?.locationBreakdown || []).slice(0, 5).map((location: { location: string; percentage: number; count: number }) => (
                     <div key={location.location} className="flex items-center gap-3">
                       <div className="w-24 truncate font-medium">{location.location}</div>
                       <Progress value={location.percentage} className="flex-1" />
@@ -517,9 +512,8 @@ export function AudienceAnalyticsDashboard({ projectId }: AudienceAnalyticsDashb
                   </div>
                 </div>
                 {/* Hotspots */}
-                {(insights?.interactionHotspots || []).slice(0, 5).map((hotspot: any, i: number) => (
-                  <div
-                    key={i}
+                {(insights?.interactionHotspots || []).slice(0, 5).map((hotspot: { x: number; y: number; count: number }, _i: number) => (
+                  <div key={`${hotspot.x}-${hotspot.y}`}
                     className="absolute h-8 w-8 -translate-x-1/2 -translate-y-1/2 animate-pulse rounded-full bg-red-500/50"
                     style={{
                       left: `${(hotspot.x / 1920) * 100}%`,

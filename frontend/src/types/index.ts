@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 // ============================================
 // USER & AUTH TYPES
 // ============================================
@@ -71,6 +69,8 @@ export interface GenerateProjectInput {
   audience?: string;
   length?: number;
   type?: string;
+  generateImages?: boolean;
+  imageSource?: 'ai' | 'stock';
 }
 
 // ============================================
@@ -121,7 +121,16 @@ export interface BlockContent {
   language?: string;
   author?: string;
   rows?: string[][];
-  [key: string]: string | string[] | string[][] | undefined;
+  chartData?: {
+    type: 'bar' | 'line' | 'pie' | 'doughnut' | 'area';
+    labels: string[];
+    datasets: {
+      label: string;
+      data: number[];
+      backgroundColor?: string | string[];
+    }[];
+  };
+  [key: string]: unknown;
 }
 
 export interface BlockStyle {
@@ -140,6 +149,22 @@ export interface Block {
   blockType?: BlockType; // Alias for compatibility
   content: BlockContent;
   style: BlockStyle | null;
+  formatting?: {
+    bold?: boolean;
+    size?: string;
+    alignment?: string;
+    color?: string;
+    variant?: string;
+  };
+  chartData?: {
+    type: 'bar' | 'line' | 'pie' | 'doughnut' | 'area';
+    labels: string[];
+    datasets: {
+      label: string;
+      data: number[];
+      backgroundColor?: string | string[];
+    }[];
+  };
   order: number;
   createdAt: string;
   updatedAt: string;
@@ -317,7 +342,7 @@ export interface ProjectVersion {
   projectId: string;
   versionNumber: number;
   name?: string;
-  snapshot: any;
+  snapshot: unknown;
   createdById: string;
   createdBy: {
     id: string;
@@ -388,12 +413,63 @@ export interface HeatmapData {
 }
 
 export interface AIInsight {
-  type: 'improvement' | 'warning' | 'success';
+  type: 'improvement' | 'warning' | 'tip' | 'success';
   title: string;
   description: string;
+  actionable: boolean;
+  priority: 'high' | 'medium' | 'low';
   slideId?: string;
   metric?: string;
   value?: number;
+  implementation?: string;
+  expectedImpact?: string;
+}
+
+export interface StructuredInsightsResponse {
+  insights: AIInsight[];
+  generatedAt: string;
+}
+
+export interface PredictiveAnalytics {
+  forecast: Array<{
+    date: string;
+    predictedViews: number;
+  }>;
+  trend: 'growing' | 'declining' | 'stable' | 'insufficient_data';
+  confidence: number;
+  projectedGrowth: number;
+  insights: string[];
+}
+
+export interface RealTimeMetrics {
+  activeViewers: number;
+  viewsLastHour: number;
+  viewsLast24Hours: number;
+  engagementRate: number;
+  timestamp: string;
+}
+
+export interface AudienceSegments {
+  devices: Record<string, number>;
+  browsers: Record<string, number>;
+  engagement: {
+    high: number;
+    medium: number;
+    low: number;
+  };
+  totalAudience: number;
+  insights: string[];
+}
+
+export interface ContentOptimization {
+  suggestions: Array<{
+    slideNumber: number;
+    type: 'content' | 'design' | 'engagement' | 'pacing';
+    issue: string;
+    suggestion: string;
+    priority: 'high' | 'medium' | 'low';
+    expectedImpact: string;
+  }>;
 }
 
 // ============================================
@@ -415,9 +491,69 @@ export interface Integration {
   accessToken: string;
   refreshToken?: string;
   expiresAt?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
+}
+
+// ============================================
+// INTEGRATION FILE TYPES
+// ============================================
+
+export interface GoogleDriveFile {
+  id: string;
+  name: string;
+  mimeType: string;
+  webViewLink: string;
+  thumbnailLink?: string;
+}
+
+export interface FigmaFile {
+  id: string;
+  name: string;
+  thumbnailUrl: string;
+  lastModified: Date;
+}
+
+export interface NotionPage {
+  id: string;
+  title: string;
+  icon?: string;
+  lastEdited: Date;
+}
+
+// ============================================
+// WEBHOOK TYPES
+// ============================================
+
+export interface WebhookConfig {
+  id: string;
+  url: string;
+  events: string[];
+  secret: string;
+  active: boolean;
+  createdAt: Date;
+  lastTriggeredAt?: Date;
+  failureCount: number;
+}
+
+// ============================================
+// MEETING INTEGRATION TYPES
+// ============================================
+
+export interface ZoomMeeting {
+  id: string;
+  topic: string;
+  startUrl: string;
+  joinUrl: string;
+  startTime: Date;
+  duration: number;
+}
+
+export interface SlackChannel {
+  id: string;
+  name: string;
+  isPrivate: boolean;
 }
 
 // ============================================
@@ -474,7 +610,7 @@ export type OrgRole = 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
 export interface Organization {
   id: string;
   name: string;
-  slug: string;
+  slug?: string;
   logo?: string;
   primaryColor?: string;
   secondaryColor?: string;
@@ -543,7 +679,7 @@ export interface AuditLogEntry {
   resourceType: string;
   resourceId: string;
   resourceName?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   ipAddress?: string;
   userAgent?: string;
   timestamp: string;
@@ -573,7 +709,7 @@ export interface SyncQueueItem {
   operation: SyncOperation;
   entityType: 'PROJECT' | 'SLIDE' | 'BLOCK';
   entityId: string;
-  data: any;
+  data: unknown;
   timestamp: number;
   status: SyncStatus;
 }
@@ -582,14 +718,14 @@ export interface SyncConflict {
   id: string;
   entityType: 'PROJECT' | 'SLIDE' | 'BLOCK';
   entityId: string;
-  localVersion: any;
-  serverVersion: any;
+  localVersion: unknown;
+  serverVersion: unknown;
   createdAt: string;
 }
 
 export interface OfflineCache {
   key: string;
-  data: any;
+  data: unknown;
   timestamp: number;
   expiresAt?: number;
 }
@@ -619,3 +755,120 @@ export interface UpdateTagInput {
   name?: string;
   color?: string;
 }
+
+// ============================================
+// AI THINKING MODE TYPES
+// ============================================
+
+export type ThinkingPhase = 'planning' | 'research' | 'generation' | 'reflection' | 'refinement' | 'complete';
+
+export interface ThinkingStep {
+  stepNumber: number;
+  phase: ThinkingPhase;
+  thought: string;
+  action: string;
+  observation: string;
+  timestamp: string;
+}
+
+export interface ThinkingState {
+  currentPhase: ThinkingPhase;
+  iteration: number;
+  maxIterations: number;
+  overallProgress: number;
+  qualityScore?: number;
+  targetQualityScore: number;
+}
+
+export interface ThinkingSection {
+  id: string;
+  heading: string;
+  subheading?: string;
+  blocks: Array<{
+    id: string;
+    type: string;
+    content: string;
+    formatting?: {
+      bold?: boolean;
+      size?: string;
+      alignment?: string;
+      color?: string;
+      variant?: string;
+    };
+    chartData?: {
+      type: 'bar' | 'line' | 'pie' | 'doughnut' | 'area';
+      labels: string[];
+      datasets: {
+        label: string;
+        data: number[];
+        backgroundColor?: string | string[];
+      }[];
+    };
+  }>;
+  layout: string;
+  suggestedImage?: {
+    prompt: string;
+    style: string;
+    placement: string;
+  };
+  speakerNotes?: string;
+  transition?: string;
+  duration?: number;
+}
+
+export interface ThinkingPresentation {
+  title: string;
+  subtitle?: string;
+  sections: ThinkingSection[];
+  metadata: {
+    estimatedDuration: number;
+    keywords: string[];
+    summary: string;
+    difficulty: 'beginner' | 'intermediate' | 'advanced';
+    category: string;
+  };
+}
+
+export interface QualityScore {
+  criterion: string;
+  score: number;
+  maxScore: number;
+  feedback: string;
+}
+
+export interface ImprovementSuggestion {
+  area: string;
+  currentState: string;
+  suggestedChange: string;
+  priority: 'high' | 'medium' | 'low';
+  affectedSections: number[];
+}
+
+export interface QualityReport {
+  overallScore: number;
+  categoryScores: QualityScore[];
+  improvements: ImprovementSuggestion[];
+  passedQualityThreshold: boolean;
+  summary: string;
+}
+
+export interface ThinkingGenerationResult {
+  presentation: ThinkingPresentation;
+  qualityReport: QualityReport;
+  thinkingSteps: ThinkingStep[];
+  thinkingProcess?: {
+    steps: ThinkingStep[];
+  };
+  metadata: {
+    totalIterations: number;
+    totalTokensUsed: number;
+    generationTimeMs: number;
+    qualityImprovement: number;
+  };
+}
+
+// ============================================
+// TYPE ALIASES
+// ============================================
+
+export type Presentation = Project;

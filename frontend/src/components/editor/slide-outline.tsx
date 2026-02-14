@@ -32,7 +32,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { Slide, Block } from "@/types";
+import type { Slide } from "@/types";
 
 interface SlideOutlineProps {
     slides: Slide[];
@@ -69,8 +69,8 @@ function extractSlideTitle(slide: Slide): { title: string; subtitle?: string } {
     const subtitle = contentBlock?.content?.text as string | undefined;
 
     return {
-        title: title.length > 50 ? title.substring(0, 47) + "..." : title,
-        subtitle: subtitle ? (subtitle.length > 80 ? subtitle.substring(0, 77) + "..." : subtitle) : undefined,
+        title: title.length > 50 ? `${title.substring(0, 47)  }...` : title,
+        subtitle: subtitle ? (subtitle.length > 80 ? `${subtitle.substring(0, 77)  }...` : subtitle) : undefined,
     };
 }
 
@@ -80,7 +80,6 @@ export function SlideOutline({
     onSlideSelect,
     onSlideDelete,
     onSlideDuplicate,
-    onSlideReorder,
 }: SlideOutlineProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");

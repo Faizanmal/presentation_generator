@@ -117,6 +117,9 @@ export class BrandKitService {
       updatedAt: new Date(),
     };
 
+    // Simulate async operation
+    await Promise.resolve();
+
     this.logger.log(`Created brand kit ${brandKit.id} for user ${userId}`);
     return brandKit;
   }
@@ -126,6 +129,7 @@ export class BrandKitService {
     organizationId?: string,
   ): Promise<BrandKit[]> {
     // In production, fetch from database
+    await Promise.resolve();
     return [
       {
         id: 'brand-1',
@@ -229,6 +233,9 @@ export class BrandKitService {
       ...logo,
     };
 
+    // Simulate async operation
+    await Promise.resolve();
+
     this.logger.log(`Added logo ${logoAsset.id} to brand kit ${brandKitId}`);
     return logoAsset;
   }
@@ -238,10 +245,12 @@ export class BrandKitService {
     brandKitId: string,
     logoId: string,
   ): Promise<void> {
+    await Promise.resolve();
     this.logger.log(`Removed logo ${logoId} from brand kit ${brandKitId}`);
   }
 
   async setDefaultBrandKit(userId: string, brandKitId: string): Promise<void> {
+    await Promise.resolve();
     this.logger.log(
       `Set brand kit ${brandKitId} as default for user ${userId}`,
     );
@@ -252,16 +261,17 @@ export class BrandKitService {
     projectId: string,
     brandKitId: string,
   ): Promise<void> {
-    const brandKit = await this.getBrandKitById(brandKitId);
+    await this.getBrandKitById(brandKitId);
 
     // Apply colors and typography to project theme
     // In production, this would update the project's theme settings
     this.logger.log(`Applied brand kit ${brandKitId} to project ${projectId}`);
   }
 
-  async extractColorsFromLogo(logoUrl: string): Promise<ColorPalette> {
+  async extractColorsFromLogo(): Promise<ColorPalette> {
     // In production, use color extraction library
     // For now, return a default palette
+    await Promise.resolve();
     return {
       primary: '#2563eb',
       secondary: '#7c3aed',
@@ -280,9 +290,11 @@ export class BrandKitService {
     Array<{
       heading: string;
       body: string;
+
       description: string;
     }>
   > {
+    await Promise.resolve();
     const pairings: Record<
       string,
       Array<{ heading: string; body: string; description: string }>

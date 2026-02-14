@@ -35,7 +35,7 @@ export class CollaborationController {
   async addCollaborator(
     @Param('projectId') projectId: string,
     @Body() body: { userId: string; role: 'VIEWER' | 'COMMENTER' | 'EDITOR' },
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
   ) {
     return this.collaborationService.addCollaborator(
       projectId,
@@ -75,7 +75,7 @@ export class CollaborationController {
       content: string;
       parentId?: string;
     },
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
   ) {
     return this.collaborationService.createComment({
       projectId,
@@ -132,8 +132,8 @@ export class CollaborationController {
   @Post(':projectId/versions')
   async createVersion(
     @Param('projectId') projectId: string,
-    @Body() body: { snapshot: any; message?: string },
-    @Request() req: any,
+    @Body() body: { snapshot: unknown; message?: string },
+    @Request() req: { user: { id: string } },
   ) {
     return this.collaborationService.createVersion({
       projectId,

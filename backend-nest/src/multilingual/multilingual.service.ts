@@ -1,11 +1,33 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import OpenAI from 'openai';
+import { AIService } from '../ai/ai.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { Project, Slide, Block, Prisma } from '@prisma/client';
 
-export type LanguageCode = 
-  | 'en' | 'es' | 'fr' | 'de' | 'it' | 'pt' | 'nl' | 'pl' | 'ru'
-  | 'zh' | 'ja' | 'ko' | 'ar' | 'hi' | 'tr' | 'vi' | 'th' | 'id';
+export type LanguageCode =
+  | 'en'
+  | 'es'
+  | 'fr'
+  | 'de'
+  | 'it'
+  | 'pt'
+  | 'nl'
+  | 'pl'
+  | 'ru'
+  | 'zh'
+  | 'ja'
+  | 'ko'
+  | 'ar'
+  | 'hi'
+  | 'tr'
+  | 'vi'
+  | 'th'
+  | 'id';
 
 export interface Language {
   code: LanguageCode;
@@ -18,11 +40,14 @@ export interface TranslatedContent {
   slideId: string;
   blockId: string;
   originalLanguage: LanguageCode;
-  translations: Record<LanguageCode, {
-    content: any;
-    translatedAt: Date;
-    isManuallyEdited: boolean;
-  }>;
+  translations: Record<
+    LanguageCode,
+    {
+      content: unknown;
+      translatedAt: Date;
+      isManuallyEdited: boolean;
+    }
+  >;
 }
 
 export interface ProjectTranslation {
@@ -30,11 +55,14 @@ export interface ProjectTranslation {
   projectId: string;
   primaryLanguage: LanguageCode;
   availableLanguages: LanguageCode[];
-  translationProgress: Record<LanguageCode, {
-    totalBlocks: number;
-    translatedBlocks: number;
-    percentage: number;
-  }>;
+  translationProgress: Record<
+    LanguageCode,
+    {
+      totalBlocks: number;
+      translatedBlocks: number;
+      percentage: number;
+    }
+  >;
   updatedAt: Date;
 }
 
@@ -54,7 +82,6 @@ export interface TranslationJob {
 @Injectable()
 export class MultilingualService {
   private readonly logger = new Logger(MultilingualService.name);
-  private openai: OpenAI;
 
   readonly supportedLanguages: Language[] = [
     { code: 'en', name: 'English', nativeName: 'English', direction: 'ltr' },
@@ -62,7 +89,12 @@ export class MultilingualService {
     { code: 'fr', name: 'French', nativeName: 'Français', direction: 'ltr' },
     { code: 'de', name: 'German', nativeName: 'Deutsch', direction: 'ltr' },
     { code: 'it', name: 'Italian', nativeName: 'Italiano', direction: 'ltr' },
-    { code: 'pt', name: 'Portuguese', nativeName: 'Português', direction: 'ltr' },
+    {
+      code: 'pt',
+      name: 'Portuguese',
+      nativeName: 'Português',
+      direction: 'ltr',
+    },
     { code: 'nl', name: 'Dutch', nativeName: 'Nederlands', direction: 'ltr' },
     { code: 'pl', name: 'Polish', nativeName: 'Polski', direction: 'ltr' },
     { code: 'ru', name: 'Russian', nativeName: 'Русский', direction: 'ltr' },
@@ -72,19 +104,26 @@ export class MultilingualService {
     { code: 'ar', name: 'Arabic', nativeName: 'العربية', direction: 'rtl' },
     { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी', direction: 'ltr' },
     { code: 'tr', name: 'Turkish', nativeName: 'Türkçe', direction: 'ltr' },
-    { code: 'vi', name: 'Vietnamese', nativeName: 'Tiếng Việt', direction: 'ltr' },
+    {
+      code: 'vi',
+      name: 'Vietnamese',
+      nativeName: 'Tiếng Việt',
+      direction: 'ltr',
+    },
     { code: 'th', name: 'Thai', nativeName: 'ไทย', direction: 'ltr' },
-    { code: 'id', name: 'Indonesian', nativeName: 'Bahasa Indonesia', direction: 'ltr' },
+    {
+      code: 'id',
+      name: 'Indonesian',
+      nativeName: 'Bahasa Indonesia',
+      direction: 'ltr',
+    },
   ];
 
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
-  ) {
-    this.openai = new OpenAI({
-      apiKey: this.configService.get<string>('OPENAI_API_KEY'),
-    });
-  }
+    private readonly aiService: AIService,
+  ) {}
 
   /**
    * Get supported languages
@@ -113,6 +152,7 @@ export class MultilingualService {
       where: { projectId },
       create: {
         projectId,
+        sourceLanguage: primaryLanguage,
         primaryLanguage,
         availableLanguages: [primaryLanguage],
         translationProgress: {},
@@ -127,7 +167,14 @@ export class MultilingualService {
       projectId: translation.projectId,
       primaryLanguage: translation.primaryLanguage as LanguageCode,
       availableLanguages: translation.availableLanguages as LanguageCode[],
-      translationProgress: translation.translationProgress as any,
+      translationProgress: translation.translationProgress as Record<
+        LanguageCode,
+        {
+          totalBlocks: number;
+          translatedBlocks: number;
+          percentage: number;
+        }
+      >,
       updatedAt: translation.updatedAt,
     };
   }
@@ -169,13 +216,21 @@ export class MultilingualService {
         targetLanguage,
         status: 'pending',
         progress: 0,
-        totalBlocks: project.slides.reduce((acc, s) => acc + s.blocks.length, 0),
+        totalBlocks: project.slides.reduce(
+          (acc, s) => acc + s.blocks.length,
+          0,
+        ),
         translatedBlocks: 0,
       },
     });
 
     // Start async translation
-    this.processTranslationJob(job.id, project, targetLanguage, translation.primaryLanguage as LanguageCode);
+    void this.processTranslationJob(
+      job.id,
+      project,
+      targetLanguage,
+      translation.primaryLanguage as LanguageCode,
+    );
 
     return {
       id: job.id,
@@ -213,12 +268,18 @@ export class MultilingualService {
       where: { projectId },
     });
 
-    const sourceLanguage = (translation?.primaryLanguage || 'en') as LanguageCode;
+    const sourceLanguage = (translation?.primaryLanguage ||
+      'en') as LanguageCode;
     let translatedCount = 0;
 
     for (const block of slide.blocks) {
       try {
-        await this.translateBlock(block, sourceLanguage, targetLanguage);
+        await this.translateBlock(
+          block,
+          sourceLanguage,
+          targetLanguage,
+          projectId,
+        );
         translatedCount++;
       } catch (error) {
         this.logger.error(`Failed to translate block ${block.id}:`, error);
@@ -235,7 +296,7 @@ export class MultilingualService {
     projectId: string,
     language: LanguageCode,
   ): Promise<{
-    project: any;
+    project: unknown;
     language: LanguageCode;
     direction: 'ltr' | 'rtl';
   }> {
@@ -270,23 +331,24 @@ export class MultilingualService {
     // Get translations for each block
     const slideTranslations = await this.prisma.slideTranslation.findMany({
       where: {
-        slideId: { in: project.slides.map(s => s.id) },
+        slideId: { in: project.slides.map((s) => s.id) },
         language,
       },
     });
 
     const translationMap = new Map(
-      slideTranslations.map(t => [`${t.slideId}_${t.blockId}`, t.translatedContent])
+      slideTranslations.map((t) => [
+        `${t.slideId}_${t.blockId}`,
+        t.translatedContent,
+      ]),
     );
 
     // Apply translations
-    const translatedSlides = project.slides.map(slide => ({
+    const translatedSlides = project.slides.map((slide) => ({
       ...slide,
-      blocks: slide.blocks.map(block => {
+      blocks: slide.blocks.map((block) => {
         const translated = translationMap.get(`${slide.id}_${block.id}`);
-        return translated
-          ? { ...block, content: translated }
-          : block;
+        return translated ? { ...block, content: translated } : block;
       }),
     }));
 
@@ -305,7 +367,7 @@ export class MultilingualService {
     slideId: string,
     blockId: string,
     language: LanguageCode,
-    translatedContent: any,
+    translatedContent: Prisma.InputJsonValue,
     userId: string,
   ): Promise<{ success: boolean }> {
     const block = await this.prisma.block.findFirst({
@@ -320,6 +382,14 @@ export class MultilingualService {
       throw new NotFoundException('Block not found');
     }
 
+    const projectTranslation = await this.prisma.projectTranslation.findUnique({
+      where: { projectId },
+    });
+
+    if (!projectTranslation) {
+      throw new NotFoundException('Project translation not found');
+    }
+
     await this.prisma.slideTranslation.upsert({
       where: {
         slideId_blockId_language: {
@@ -329,14 +399,17 @@ export class MultilingualService {
         },
       },
       create: {
+        projectTranslationId: projectTranslation.id,
         slideId,
         blockId,
         language,
-        translatedContent,
+        translations: {},
+
+        translatedContent: translatedContent as unknown as string,
         isManuallyEdited: true,
       },
       update: {
-        translatedContent,
+        translatedContent: translatedContent as unknown as string,
         isManuallyEdited: true,
       },
     });
@@ -352,12 +425,13 @@ export class MultilingualService {
     confidence: number;
   }> {
     try {
-      const response = await this.openai.chat.completions.create({
+      const response = await this.aiService.chatCompletion({
         model: 'gpt-4o',
         messages: [
           {
             role: 'system',
-            content: 'Detect the language of the given text. Respond with JSON: {"language": "ISO 639-1 code", "confidence": 0-1}',
+            content:
+              'Detect the language of the given text. Respond with JSON: {"language": "ISO 639-1 code", "confidence": 0-1}',
           },
           { role: 'user', content: text },
         ],
@@ -366,9 +440,11 @@ export class MultilingualService {
         response_format: { type: 'json_object' },
       });
 
-      const result = JSON.parse(response.choices[0]?.message?.content || '{}');
+      const result = JSON.parse(
+        response.choices[0]?.message?.content || '{}',
+      ) as { language?: string; confidence?: number };
       return {
-        language: result.language || 'en',
+        language: (result.language as LanguageCode) || 'en',
         confidence: result.confidence || 0,
       };
     } catch (error) {
@@ -404,7 +480,9 @@ export class MultilingualService {
   /**
    * Get translation progress for a project
    */
-  async getTranslationProgress(projectId: string): Promise<ProjectTranslation | null> {
+  async getTranslationProgress(
+    projectId: string,
+  ): Promise<ProjectTranslation | null> {
     const translation = await this.prisma.projectTranslation.findUnique({
       where: { projectId },
     });
@@ -416,7 +494,15 @@ export class MultilingualService {
       projectId: translation.projectId,
       primaryLanguage: translation.primaryLanguage as LanguageCode,
       availableLanguages: translation.availableLanguages as LanguageCode[],
-      translationProgress: translation.translationProgress as any,
+
+      translationProgress: translation.translationProgress as unknown as Record<
+        LanguageCode,
+        {
+          totalBlocks: number;
+          translatedBlocks: number;
+          percentage: number;
+        }
+      >,
       updatedAt: translation.updatedAt,
     };
   }
@@ -424,7 +510,7 @@ export class MultilingualService {
   // Private methods
   private async processTranslationJob(
     jobId: string,
-    project: any,
+    project: Project & { slides: (Slide & { blocks: Block[] })[] },
     targetLanguage: LanguageCode,
     sourceLanguage: LanguageCode,
   ) {
@@ -435,12 +521,26 @@ export class MultilingualService {
       });
 
       let translatedBlocks = 0;
-      const totalBlocks = project.slides.reduce((acc: number, s: any) => acc + s.blocks.length, 0);
+      const totalBlocks: number = project.slides.reduce(
+        //
+        (acc: number, s) => acc + s.blocks.length,
+        0,
+      );
 
-      for (const slide of project.slides) {
-        for (const block of slide.blocks) {
+      const slides = project.slides;
+
+      for (const slide of slides) {
+        const blocks = slide.blocks;
+
+        for (const block of blocks) {
           try {
-            await this.translateBlock(block, sourceLanguage, targetLanguage);
+            await this.translateBlock(
+              block,
+              sourceLanguage,
+              targetLanguage,
+              //
+              project.id,
+            );
             translatedBlocks++;
 
             // Update progress
@@ -451,7 +551,8 @@ export class MultilingualService {
                 progress: Math.round((translatedBlocks / totalBlocks) * 100),
               },
             });
-          } catch (error) {
+          } catch (error: unknown) {
+            //
             this.logger.error(`Failed to translate block ${block.id}:`, error);
           }
         }
@@ -461,7 +562,7 @@ export class MultilingualService {
       await this.prisma.projectTranslation.update({
         where: { projectId: project.id },
         data: {
-          availableLanguages: {
+          targetLanguages: {
             push: targetLanguage,
           },
           translationProgress: {
@@ -482,41 +583,55 @@ export class MultilingualService {
           progress: 100,
         },
       });
-    } catch (error) {
-      this.logger.error(`Translation job ${jobId} failed:`, error);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Translation job ${jobId} failed:`, err);
       await this.prisma.translationJob.update({
         where: { id: jobId },
         data: {
           status: 'failed',
-          error: error.message,
+          error: err.message,
         },
       });
     }
   }
 
   private async translateBlock(
-    block: any,
+    block: Block,
     sourceLanguage: LanguageCode,
     targetLanguage: LanguageCode,
+    projectId: string,
   ): Promise<void> {
-    const textBlockTypes = ['HEADING', 'SUBHEADING', 'PARAGRAPH', 'BULLET_LIST', 'NUMBERED_LIST', 'QUOTE'];
-    
+    const textBlockTypes = [
+      'HEADING',
+      'SUBHEADING',
+      'PARAGRAPH',
+      'BULLET_LIST',
+      'NUMBERED_LIST',
+      'QUOTE',
+    ];
+
     if (!textBlockTypes.includes(block.blockType)) {
       return;
     }
 
-    const content = block.content;
+    //
+    const content = block.content as unknown;
     const textToTranslate = this.extractTextFromContent(content);
 
     if (!textToTranslate || textToTranslate.length < 2) {
       return;
     }
 
-    const sourceLang = this.supportedLanguages.find(l => l.code === sourceLanguage)?.name || 'English';
-    const targetLang = this.supportedLanguages.find(l => l.code === targetLanguage)?.name || 'Spanish';
+    const sourceLang =
+      this.supportedLanguages.find((l) => l.code === sourceLanguage)?.name ||
+      'English';
+    const targetLang =
+      this.supportedLanguages.find((l) => l.code === targetLanguage)?.name ||
+      'Spanish';
 
     try {
-      const response = await this.openai.chat.completions.create({
+      const response = await this.aiService.chatCompletion({
         model: 'gpt-4o',
         messages: [
           {
@@ -531,54 +646,91 @@ export class MultilingualService {
         max_tokens: 1000,
       });
 
-      const translatedText = response.choices[0]?.message?.content?.trim() || textToTranslate;
-      const translatedContent = this.applyTranslatedText(content, block.blockType, translatedText);
+      const translatedText =
+        response.choices[0]?.message?.content?.trim() || textToTranslate;
+
+      const translatedContent = this.applyTranslatedText(
+        content,
+
+        block.blockType,
+        translatedText,
+      );
+
+      const projectTranslation =
+        await this.prisma.projectTranslation.findUnique({
+          where: { projectId },
+        });
+
+      if (!projectTranslation) {
+        throw new NotFoundException('Project translation not found');
+      }
 
       await this.prisma.slideTranslation.upsert({
         where: {
           slideId_blockId_language: {
-            slideId: block.slideId,
+            slideId: block.slideId || '',
             blockId: block.id,
             language: targetLanguage,
           },
         },
         create: {
-          slideId: block.slideId,
+          projectTranslationId: projectTranslation.id,
+          slideId: block.slideId || '',
           blockId: block.id,
           language: targetLanguage,
-          translatedContent,
+
+          translations: {},
+          translatedContent: translatedContent as unknown as string,
           isManuallyEdited: false,
         },
         update: {
-          translatedContent,
+          translations: {},
+          translatedContent: translatedContent as unknown as string,
         },
       });
     } catch (error) {
+      //
       this.logger.error(`Translation failed for block ${block.id}:`, error);
       throw error;
     }
   }
 
-  private extractTextFromContent(content: any): string {
+  private extractTextFromContent(content: unknown): string {
     if (typeof content === 'string') return content;
-    if (content.text) return content.text;
-    if (content.content) return content.content;
-    if (Array.isArray(content.items)) return content.items.join('\n');
+    if (typeof content === 'object' && content !== null) {
+      const record = content as Record<string, unknown>;
+      if ('text' in record && typeof record.text === 'string')
+        return record.text;
+      if ('content' in record && typeof record.content === 'string')
+        return record.content;
+      if ('items' in record && Array.isArray(record.items))
+        return record.items.join('\n');
+    }
     return '';
   }
 
-  private applyTranslatedText(content: any, blockType: string, translatedText: string): any {
+  private applyTranslatedText(
+    content: unknown,
+    blockType: string,
+    translatedText: string,
+  ): Prisma.InputJsonValue {
     if (typeof content === 'string') return translatedText;
-    if (content.text) return { ...content, text: translatedText };
-    if (content.content) return { ...content, content: translatedText };
-    if (Array.isArray(content.items)) {
-      return { ...content, items: translatedText.split('\n').filter(Boolean) };
+    if (typeof content === 'object' && content !== null) {
+      const record = content as Record<string, unknown>;
+      if ('text' in record) return { ...record, text: translatedText };
+      if ('content' in record) return { ...record, content: translatedText };
+      if ('items' in record && Array.isArray(record.items)) {
+        return {
+          ...record,
+          items: translatedText.split('\n').filter(Boolean),
+        };
+      }
     }
-    return { ...content, text: translatedText };
+    return { ...(content as object), text: translatedText };
   }
 
   private getLanguageDirection(code: LanguageCode): 'ltr' | 'rtl' {
-    const lang = this.supportedLanguages.find(l => l.code === code);
+    const lang = this.supportedLanguages.find((l) => l.code === code);
     return lang?.direction || 'ltr';
   }
 }

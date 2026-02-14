@@ -1,15 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+// import { useMutation } from '@tanstack/react-query';
 import {
   Sparkles,
   Play,
-  Clock,
-  Zap,
-  ChevronRight,
-  ChevronDown,
-  RotateCcw,
   Check,
   Loader2,
 } from 'lucide-react';
@@ -21,9 +16,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from '@/components/ui/card';
 import {
   Select,
@@ -32,12 +24,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
+// import {
+//   Accordion,
+//   AccordionContent,
+//   AccordionItem,
+//   AccordionTrigger,
+// } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -137,9 +129,7 @@ const easings: Array<{ value: EasingType; label: string }> = [
 ];
 
 export function SlideTransitionsPanel({
-  slideId,
   onTransitionChange,
-  onAnimationChange,
 }: SlideTransitionsPanelProps) {
   const [transitionConfig, setTransitionConfig] = useState<TransitionConfig>({
     type: 'fade',

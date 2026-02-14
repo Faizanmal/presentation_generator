@@ -12,10 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import {
     Sparkles,
     Wand2,
-    ArrowLeftRight,
     ArrowDown,
     ArrowUp,
-    Languages,
     Mic,
     MessageSquare,
     Loader2,
@@ -413,7 +411,7 @@ export function AIFloatingToolbar({
         }
     };
 
-    if (!selectedText) return null;
+    if (!selectedText) {return null;}
 
     return (
         <div

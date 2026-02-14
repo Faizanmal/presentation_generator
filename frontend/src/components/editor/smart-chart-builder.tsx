@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 'use client';
 
 import React, { useState, useCallback, useMemo } from 'react';
@@ -32,13 +30,8 @@ import {
   PieChartIcon,
   TrendingUp,
   Table,
-  Upload,
   Sparkles,
-  Palette,
-  Settings,
-  Download,
   Copy,
-  RefreshCw,
   Plus,
   Trash2,
   Edit2,
@@ -57,14 +50,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+// import {
+//   Popover,
+//   PopoverContent,
+//   PopoverTrigger,
+// } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
-import { Slider } from '@/components/ui/slider';
-import { Badge } from '@/components/ui/badge';
+// import { Slider } from '@/components/ui/slider';
+// import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 type ChartType = 'bar' | 'line' | 'pie' | 'area' | 'radar' | 'donut' | 'stacked-bar' | 'horizontal-bar';
@@ -225,8 +218,9 @@ export function SmartChartBuilder({ onInsertChart }: SmartChartBuilderProps) {
             <Tooltip />
             {showLegend && <Legend />}
             <Bar dataKey="value" fill={colors[0]}>
-              {data.map((_, index) => (
-                <Cell key={index} fill={colors[index % colors.length]} />
+              {data.map((item, _index) => (
+
+                <Cell key={item.label} fill={colors[_index % colors.length]} />
               ))}
             </Bar>
           </BarChart>
@@ -241,8 +235,9 @@ export function SmartChartBuilder({ onInsertChart }: SmartChartBuilderProps) {
             <Tooltip />
             {showLegend && <Legend />}
             <Bar dataKey="value" fill={colors[0]}>
-              {data.map((_, index) => (
-                <Cell key={index} fill={colors[index % colors.length]} />
+              {data.map((item, _index) => (
+
+                <Cell key={item.label} fill={colors[_index % colors.length]} />
               ))}
             </Bar>
           </BarChart>
@@ -296,10 +291,11 @@ export function SmartChartBuilder({ onInsertChart }: SmartChartBuilderProps) {
               outerRadius={100}
               dataKey="value"
               nameKey="label"
-              label={({ label, percent }) => `${label}: ${(percent * 100).toFixed(0)}%`}
+              label={({ payload, percent }: { payload?: { label: string }; percent?: number }) => `${payload?.label || 'Unknown'}: ${((percent || 0) * 100).toFixed(0)}%`}
             >
-              {data.map((_, index) => (
-                <Cell key={index} fill={colors[index % colors.length]} />
+              {data.map((item, _index) => (
+
+                <Cell key={item.label} fill={colors[_index % colors.length]} />
               ))}
             </Pie>
             <Tooltip />
@@ -438,17 +434,18 @@ export function SmartChartBuilder({ onInsertChart }: SmartChartBuilderProps) {
               </div>
               <ScrollArea className="h-64">
                 <div className="space-y-2 pr-4">
-                  {config.data.map((point, index) => (
-                    <div key={index} className="flex items-center gap-2">
+                  {config.data.map((point, _index) => (
+
+                    <div key={point.label} className="flex items-center gap-2">
                       <div
                         className="h-4 w-4 rounded"
                         style={{
-                          backgroundColor: config.colors[index % config.colors.length],
+                          backgroundColor: config.colors[_index % config.colors.length],
                         }}
                       />
                       <Input
                         value={point.label}
-                        onChange={(e) => updateDataPoint(index, 'label', e.target.value)}
+                        onChange={(e) => updateDataPoint(_index, 'label', e.target.value)}
                         placeholder="Label"
                         className="flex-1"
                       />
@@ -456,7 +453,7 @@ export function SmartChartBuilder({ onInsertChart }: SmartChartBuilderProps) {
                         type="number"
                         value={point.value}
                         onChange={(e) =>
-                          updateDataPoint(index, 'value', parseFloat(e.target.value) || 0)
+                          updateDataPoint(_index, 'value', parseFloat(e.target.value) || 0)
                         }
                         placeholder="Value"
                         className="w-24"
@@ -464,7 +461,7 @@ export function SmartChartBuilder({ onInsertChart }: SmartChartBuilderProps) {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => removeDataPoint(index)}
+                        onClick={() => removeDataPoint(_index)}
                         disabled={config.data.length <= 1}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -512,12 +509,12 @@ export function SmartChartBuilder({ onInsertChart }: SmartChartBuilderProps) {
                   className={cn(
                     'flex gap-0.5 rounded-lg border p-2 transition-all',
                     JSON.stringify(config.colors) === JSON.stringify(palette) &&
-                      'ring-2 ring-primary'
+                    'ring-2 ring-primary'
                   )}
                 >
-                  {palette.slice(0, 5).map((color, i) => (
+                  {palette.slice(0, 5).map((color, _i) => (
                     <div
-                      key={i}
+                      key={color}
                       className="h-6 w-3 rounded-sm"
                       style={{ backgroundColor: color }}
                     />
@@ -564,7 +561,7 @@ export function SmartChartBuilder({ onInsertChart }: SmartChartBuilderProps) {
             <Label>Aspect Ratio</Label>
             <Select
               value={config.aspectRatio}
-              onValueChange={(v: any) => setConfig({ ...config, aspectRatio: v })}
+              onValueChange={(v: ChartConfig['aspectRatio']) => setConfig({ ...config, aspectRatio: v })}
             >
               <SelectTrigger className="mt-1">
                 <SelectValue />
@@ -618,8 +615,9 @@ export function SlideChart({ config }: { config: ChartConfig }) {
             <Tooltip />
             {showLegend && <Legend />}
             <Bar dataKey="value">
-              {data.map((_, index) => (
-                <Cell key={index} fill={colors[index % colors.length]} />
+              {data.map((_item, index) => (
+
+                <Cell key={_item.label} fill={colors[index % colors.length]} />
               ))}
             </Bar>
           </BarChart>
@@ -649,8 +647,9 @@ export function SlideChart({ config }: { config: ChartConfig }) {
               nameKey="label"
               label
             >
-              {data.map((_, index) => (
-                <Cell key={index} fill={colors[index % colors.length]} />
+              {data.map((item, _index) => (
+
+                <Cell key={item.label} fill={colors[_index % colors.length]} />
               ))}
             </Pie>
             <Tooltip />

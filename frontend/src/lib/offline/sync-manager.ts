@@ -1,4 +1,5 @@
-import { offlineDB, PendingChange } from './indexed-db';
+import type { PendingChange } from './indexed-db';
+import { offlineDB } from './indexed-db';
 
 const MAX_RETRY_COUNT = 5;
 const SYNC_INTERVAL = 30000; // 30 seconds
@@ -70,7 +71,7 @@ class SyncManager {
 
   // Background sync
   private startBackgroundSync(): void {
-    if (this.syncInterval) return;
+    if (this.syncInterval) {return;}
 
     this.syncInterval = setInterval(() => {
       if (this.isOnline && this.status !== 'syncing') {

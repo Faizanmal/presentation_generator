@@ -3,8 +3,9 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useState, useRef, useEffect } from "react";
-import { Block, Theme, BlockType } from "@/types";
+import type { Block, Theme } from "@/types";
 import { GripVertical, Trash2, MoreHorizontal } from "lucide-react";
+import Image from "next/image";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { ChartBlock } from "./chart-block";
 
 interface BlockRendererProps {
   block: Block;
@@ -80,7 +82,10 @@ export default function BlockRenderer({
 
   // Render based on block type
   const renderBlockContent = () => {
-    switch (block.type) {
+    // Support both 'type' and 'blockType' properties for compatibility
+    const blockType = (block.type || block.blockType)?.toUpperCase();
+
+    switch (blockType) {
       case "HEADING":
         return (
           <h1
@@ -117,19 +122,25 @@ export default function BlockRenderer({
         );
 
       case "PARAGRAPH":
+        const isCard = block.formatting?.variant === 'card';
         return (
-          <p
-            ref={contentRef}
-            contentEditable
-            suppressContentEditableWarning
-            onInput={handleTextChange}
-            onFocus={onFocus}
-            onBlur={onBlur}
-            className="text-lg leading-relaxed outline-none"
-            style={{ fontFamily: theme?.fonts?.body || "system-ui" }}
-          >
-            {content?.text || "Start typing..."}
-          </p>
+          <div className={isCard ? "bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700" : ""}>
+            <p
+              ref={contentRef}
+              contentEditable
+              suppressContentEditableWarning
+              onInput={handleTextChange}
+              onFocus={onFocus}
+              onBlur={onBlur}
+              className={`text-lg leading-relaxed outline-none ${block.formatting?.color ? `text-${block.formatting.color}` : ""}`}
+              style={{
+                fontFamily: theme?.fonts?.body || "system-ui",
+                color: block.formatting?.color && block.formatting.color.startsWith('#') ? block.formatting.color : undefined
+              }}
+            >
+              {content?.text || "Start typing..."}
+            </p>
+          </div>
         );
 
       case "BULLET_LIST":
@@ -138,11 +149,12 @@ export default function BlockRenderer({
             {(content?.items || ["Item 1", "Item 2", "Item 3"]).map(
               (item: string, i: number) => (
                 <li
-                  key={i}
+                  key={`bullet-${i}-${item.substring(0, 20)}`}
+                   
                   contentEditable
                   suppressContentEditableWarning
                   onInput={(e) => {
-                    const items = [...(content?.items || [])];
+                    const items = [...(content?.items || [])] as string[];
                     items[i] = (e.target as HTMLElement).innerText;
                     setContent({ ...content, items });
                   }}
@@ -164,11 +176,12 @@ export default function BlockRenderer({
             {(content?.items || ["Item 1", "Item 2", "Item 3"]).map(
               (item: string, i: number) => (
                 <li
-                  key={i}
+                  key={`numbered-${i}-${item.substring(0, 20)}`}
+                   
                   contentEditable
                   suppressContentEditableWarning
                   onInput={(e) => {
-                    const items = [...(content?.items || [])];
+                    const items = [...(content?.items || [])] as string[];
                     items[i] = (e.target as HTMLElement).innerText;
                     setContent({ ...content, items });
                   }}
@@ -188,7 +201,7 @@ export default function BlockRenderer({
         return (
           <div className="relative">
             {content?.url ? (
-              <img
+              <Image
                 src={content.url}
                 alt={content.alt || "Image"}
                 className="max-w-full h-auto rounded-lg"
@@ -265,14 +278,18 @@ export default function BlockRenderer({
           <table className="w-full border-collapse">
             <tbody>
               {rows.map((row: string[], rowIndex: number) => (
-                <tr key={rowIndex}>
+                <tr
+                  key={`row-${rowIndex}-${row[0]?.substring(0, 10)}`}
+                 
+                >
                   {row.map((cell: string, cellIndex: number) => (
                     <td
-                      key={cellIndex}
+                      key={`cell-${cellIndex}-${cell.substring(0, 10)}`}
+                       
                       contentEditable
                       suppressContentEditableWarning
                       onInput={(e) => {
-                        const newRows = [...rows];
+                        const newRows = [...rows] as string[][];
                         newRows[rowIndex][cellIndex] = (e.target as HTMLElement).innerText;
                         setContent({ ...content, rows: newRows });
                       }}
@@ -291,7 +308,7 @@ export default function BlockRenderer({
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table >
         );
 
       case "EMBED":
@@ -309,9 +326,37 @@ export default function BlockRenderer({
           </div>
         );
 
+      case "CHART": {
+        const chartData = (block.chartData || block.content.chartData) as {
+          type?: string;
+          datasets?: Array<{
+            data: number[];
+            backgroundColor?: string | string[];
+          }>;
+          labels?: string[];
+        } | undefined;
+
+        return (
+          <ChartBlock
+            data={chartData ? {
+              type: (chartData.type || 'bar') as 'bar' | 'line' | 'pie' | 'doughnut' | 'radar' | 'polarArea',
+              data: chartData.datasets?.[0]?.data.map((val, i) => ({
+                label: chartData.labels?.[i] || `Item ${i}`,
+                value: val,
+                color: Array.isArray(chartData.datasets?.[0]?.backgroundColor)
+                  ? chartData.datasets[0].backgroundColor[0]
+                  : (chartData.datasets?.[0]?.backgroundColor as string) || '#3b82f6'
+              })) || [],
+              title: typeof block.content.text === 'string' ? block.content.text : 'Chart',
+            } : undefined}
+            isEditable={isActive}
+          />
+        );
+      }
+
       default:
         return (
-          <p className="text-slate-500">Unknown block type: {block.type}</p>
+          <p className="text-slate-500">Unknown block type: {blockType}</p>
         );
     }
   };
@@ -321,8 +366,8 @@ export default function BlockRenderer({
       ref={setNodeRef}
       style={style}
       className={`group relative rounded-lg transition-all ${isActive
-          ? "ring-2 ring-blue-500"
-          : "hover:ring-1 hover:ring-slate-300"
+        ? "ring-2 ring-blue-500"
+        : "hover:ring-1 hover:ring-slate-300"
         } ${isDragging ? "opacity-50" : ""}`}
     >
       {/* Controls */}

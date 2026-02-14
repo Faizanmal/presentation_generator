@@ -1,7 +1,7 @@
 'use client';
 
-import { createContext, useContext, useEffect, useCallback, useState, ReactNode } from 'react';
-import { toast } from 'sonner';
+import type { ReactNode } from 'react';
+import { createContext, useContext, useEffect, useCallback, useState } from 'react';
 
 export interface KeyboardShortcut {
   id: string;
@@ -111,29 +111,29 @@ export function KeyboardShortcutsProvider({ children }: KeyboardShortcutsProvide
       const modKey = isMac ? event.metaKey : event.ctrlKey;
 
       for (const shortcut of shortcuts) {
-        if (shortcut.enabled === false) continue;
+        if (shortcut.enabled === false) {continue;}
 
         const keys = shortcut.keys.map((k) => k.toLowerCase());
         let matches = true;
 
         for (const key of keys) {
           if (key === 'mod') {
-            if (!modKey) matches = false;
+            if (!modKey) {matches = false;}
           } else if (key === 'shift') {
-            if (!event.shiftKey) matches = false;
+            if (!event.shiftKey) {matches = false;}
           } else if (key === 'alt') {
-            if (!event.altKey) matches = false;
+            if (!event.altKey) {matches = false;}
           } else if (key === 'ctrl') {
-            if (!event.ctrlKey) matches = false;
+            if (!event.ctrlKey) {matches = false;}
           } else {
-            if (event.key.toLowerCase() !== key) matches = false;
+            if (event.key.toLowerCase() !== key) {matches = false;}
           }
         }
 
         // Check for extra modifiers not in the shortcut
-        if (keys.indexOf('mod') === -1 && modKey) matches = false;
-        if (keys.indexOf('shift') === -1 && event.shiftKey) matches = false;
-        if (keys.indexOf('alt') === -1 && event.altKey) matches = false;
+        if (keys.indexOf('mod') === -1 && modKey) {matches = false;}
+        if (keys.indexOf('shift') === -1 && event.shiftKey) {matches = false;}
+        if (keys.indexOf('alt') === -1 && event.altKey) {matches = false;}
 
         if (matches) {
           event.preventDefault();

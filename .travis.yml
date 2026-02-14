@@ -1,0 +1,95 @@
+language: node_js
+node_js:
+  - "20"
+
+# Matrix builds for multiple services
+env:
+  matrix:
+    - SERVICE=backend-nest
+    - SERVICE=frontend
+
+# Services
+services:
+  - docker
+  - postgresql
+  - redis-server
+
+# Before script
+before_script:
+  - |
+    if [ "$SERVICE" = "backend-nest" ]; then
+      cd backend-nest
+      npm ci
+      npm run db:generate
+    elif [ "$SERVICE" = "frontend" ]; then
+      cd frontend
+      npm ci
+    fi
+
+# Build script
+script:
+  - |
+    if [ "$SERVICE" = "backend-nest" ]; then
+      npm run lint
+      npm run test:cov
+      npm run build
+    elif [ "$SERVICE" = "frontend" ]; then
+      npm run lint
+      npm run test:cov
+      npm run build
+    fi
+
+# After success
+after_success:
+  - |
+    if [ "$SERVICE" = "backend-nest" ]; then
+      bash <(curl -s https://codecov.io/bash) -F backend -f coverage/lcov.info
+    elif [ "$SERVICE" = "frontend" ]; then
+      bash <(curl -s https://codecov.io/bash) -F frontend -f coverage/lcov.info
+    fi
+
+# Environment variables
+env:
+  global:
+    - DATABASE_URL="postgresql://postgres:postgres@localhost:5432/presentation_designer_test"
+    - REDIS_HOST="localhost"
+    - REDIS_PORT=6379
+
+# Notifications
+notifications:
+  email:
+    on_success: change
+    on_failure: always
+  slack:
+    secure: YOUR_ENCRYPTED_SLACK_TOKEN_HERE
+    rooms:
+      - team-alerts:true
+
+# Deploy configuration (optional)
+deploy:
+  provider: docker
+  username: $DOCKER_USERNAME
+  password: $DOCKER_PASSWORD
+  email: $DOCKER_EMAIL
+  on:
+    branch: main
+  image: presentationdesigner
+  tag: latest,v$TRAVIS_BUILD_NUMBER
+  skip_cleanup: true
+
+# Cache dependencies
+cache:
+  npm: true
+  directories:
+    - backend-nest/node_modules
+    - frontend/node_modules
+
+# Branches to build
+branches:
+  only:
+    - main
+    - develop
+    - /^v\d+\.\d+\.\d+$/
+
+# Build timeout (45 minutes)
+timeout: 2700

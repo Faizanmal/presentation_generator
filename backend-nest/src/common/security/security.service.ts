@@ -15,7 +15,7 @@ interface AuditLogEntry {
   resourceId?: string;
   ipAddress?: string;
   userAgent?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   success: boolean;
   errorMessage?: string;
 }
@@ -58,8 +58,9 @@ export class SecurityService {
   /**
    * Sanitize user input to prevent XSS
    */
-  sanitizeInput(input: string): string {
-    if (!input) return input;
+  sanitizeInput(input: string | null | undefined): string | null | undefined {
+    if (input === null || input === undefined) return input;
+    if (input === '') return '';
 
     return input
       .replace(/&/g, '&amp;')
@@ -105,22 +106,25 @@ export class SecurityService {
   /**
    * Validate and sanitize object recursively
    */
-  sanitizeObject<T extends Record<string, any>>(obj: T): T {
+  sanitizeObject<T extends Record<string, unknown>>(obj: T): T {
     if (!obj || typeof obj !== 'object') return obj;
 
-    const sanitized: any = Array.isArray(obj) ? [] : {};
+    const sanitized: Record<string, unknown> = (Array.isArray(obj)
+      ? []
+      : {}) as unknown as Record<string, unknown>;
+    const objectEntries = Object.entries(obj);
 
-    for (const [key, value] of Object.entries(obj)) {
+    for (const [key, value] of objectEntries) {
       if (typeof value === 'string') {
         sanitized[key] = this.sanitizeInput(value);
       } else if (typeof value === 'object' && value !== null) {
-        sanitized[key] = this.sanitizeObject(value);
+        sanitized[key] = this.sanitizeObject(value as Record<string, unknown>);
       } else {
         sanitized[key] = value;
       }
     }
 
-    return sanitized;
+    return sanitized as T;
   }
 
   // ============================================
@@ -314,7 +318,8 @@ export class SecurityService {
    * Validate IP address format
    */
   isValidIP(ip: string): boolean {
-    const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
+    const ipv4Regex =
+      /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
     const ipv6Regex = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
     return ipv4Regex.test(ip) || ipv6Regex.test(ip);
   }

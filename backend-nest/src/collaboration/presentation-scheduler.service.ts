@@ -49,7 +49,7 @@ export class PresentationSchedulerService {
 
   constructor(private prisma: PrismaService) {}
 
-  async schedulePresentation(
+  schedulePresentation(
     userId: string,
     data: {
       projectId: string;
@@ -88,21 +88,14 @@ export class PresentationSchedulerService {
     };
 
     this.logger.log(
-      `Scheduled presentation ${scheduled.id} for ${data.scheduledAt}`,
+      `Scheduled presentation ${scheduled.id} for ${data.scheduledAt.toISOString()}`,
     );
-    return scheduled;
+    return Promise.resolve(scheduled);
   }
 
-  async getScheduledPresentations(
-    userId: string,
-    options?: {
-      status?: ScheduledPresentation['status'];
-      from?: Date;
-      to?: Date;
-    },
-  ): Promise<ScheduledPresentation[]> {
+  getScheduledPresentations(): Promise<ScheduledPresentation[]> {
     // In production, fetch from database
-    return [
+    return Promise.resolve([
       {
         id: 'sched-1',
         projectId: 'proj-1',
@@ -129,13 +122,13 @@ export class PresentationSchedulerService {
         createdAt: new Date(),
         updatedAt: new Date(),
       },
-    ];
+    ]);
   }
 
   async getScheduledPresentationById(
     id: string,
   ): Promise<ScheduledPresentation | null> {
-    const all = await this.getScheduledPresentations('');
+    const all = await this.getScheduledPresentations();
     return all.find((p) => p.id === id) || null;
   }
 
@@ -153,7 +146,7 @@ export class PresentationSchedulerService {
       throw new Error('Scheduled presentation not found');
     }
 
-    const updated = {
+    const updated: ScheduledPresentation = {
       ...existing,
       ...updates,
       settings: { ...existing.settings, ...updates.settings },
@@ -166,6 +159,7 @@ export class PresentationSchedulerService {
 
   async cancelScheduledPresentation(id: string): Promise<void> {
     this.logger.log(`Cancelled scheduled presentation ${id}`);
+    return Promise.resolve();
   }
 
   async inviteAttendees(
@@ -173,15 +167,21 @@ export class PresentationSchedulerService {
     emails: string[],
     message?: string,
   ): Promise<void> {
-    this.logger.log(`Invited ${emails.length} attendees to presentation ${id}`);
+    this.logger.log(
+      `Invited ${emails.length} attendees to presentation ${id}. Message: ${
+        message || 'None'
+      }`,
+    );
     // Send invitation emails
+    return Promise.resolve();
   }
 
   async removeAttendee(id: string, email: string): Promise<void> {
     this.logger.log(`Removed attendee ${email} from presentation ${id}`);
+    return Promise.resolve();
   }
 
-  async startPresentation(id: string): Promise<{
+  startPresentation(id: string): Promise<{
     sessionId: string;
     joinUrl: string;
     presenterUrl: string;
@@ -190,14 +190,14 @@ export class PresentationSchedulerService {
 
     this.logger.log(`Started presentation ${id} as session ${sessionId}`);
 
-    return {
+    return Promise.resolve({
       sessionId,
       joinUrl: `/live/${sessionId}`,
       presenterUrl: `/present/${sessionId}`,
-    };
+    });
   }
 
-  async endPresentation(id: string): Promise<PresentationStats> {
+  endPresentation(id: string): PresentationStats {
     this.logger.log(`Ended presentation ${id}`);
 
     return {
@@ -210,9 +210,7 @@ export class PresentationSchedulerService {
     };
   }
 
-  async getRecording(
-    id: string,
-  ): Promise<{ url: string; duration: number } | null> {
+  getRecording(id: string): { url: string; duration: number } | null {
     // In production, return actual recording URL
     return {
       url: `/recordings/${id}.mp4`,
@@ -223,7 +221,7 @@ export class PresentationSchedulerService {
   @Cron(CronExpression.EVERY_MINUTE)
   async processReminders(): Promise<void> {
     const now = new Date();
-    const scheduled = await this.getScheduledPresentations('');
+    const scheduled = await this.getScheduledPresentations();
 
     for (const presentation of scheduled) {
       if (presentation.status !== 'scheduled') continue;
@@ -256,10 +254,11 @@ export class PresentationSchedulerService {
       `Sending ${reminder.type} reminder for presentation ${presentation.id}`,
     );
     // Send email or push notification
+    return Promise.resolve();
   }
 
   async generateMeetingLink(id: string): Promise<string> {
-    return `https://present.example.com/join/${id}`;
+    return Promise.resolve(`https://present.example.com/join/${id}`);
   }
 
   async addToCalendar(
@@ -278,9 +277,15 @@ export class PresentationSchedulerService {
 
     switch (type) {
       case 'google':
-        return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(presentation.title)}&dates=${startTime.replace(/[-:]/g, '').replace('.000', '')}/${endTime.replace(/[-:]/g, '').replace('.000', '')}`;
+        return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
+          presentation.title,
+        )}&dates=${startTime.replace(/[-:]/g, '').replace('.000', '')}/${endTime
+          .replace(/[-:]/g, '')
+          .replace('.000', '')}`;
       case 'outlook':
-        return `https://outlook.live.com/calendar/0/deeplink/compose?subject=${encodeURIComponent(presentation.title)}&startdt=${startTime}&enddt=${endTime}`;
+        return `https://outlook.live.com/calendar/0/deeplink/compose?subject=${encodeURIComponent(
+          presentation.title,
+        )}&startdt=${startTime}&enddt=${endTime}`;
       case 'ical':
         return `/api/presentations/${id}/calendar.ics`;
       default:

@@ -7,6 +7,7 @@ import {
   LayoutType,
 } from './ai.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealTimeDataService } from './realtime-data.service';
 
 // Mock OpenAI
 const mockOpenAI = {
@@ -25,13 +26,32 @@ const mockOpenAI = {
   },
 };
 
+// Mock GoogleGenerativeAI
+const mockGoogleGenerativeAI = {
+  getGenerativeModel: jest.fn().mockReturnValue({
+    startChat: jest.fn().mockReturnValue({
+      sendMessage: jest.fn().mockResolvedValue({
+        response: {
+          text: jest.fn().mockReturnValue('Mock Google response'),
+        },
+      }),
+    }),
+  }),
+};
+
+jest.mock('@google/generative-ai', () => {
+  return {
+    GoogleGenerativeAI: jest.fn().mockImplementation(() => mockGoogleGenerativeAI),
+  };
+});
+
 jest.mock('openai', () => {
   return jest.fn().mockImplementation(() => mockOpenAI);
 });
 
 describe('AIService', () => {
   let service: AIService;
-  let prismaService: PrismaService;
+  // let prismaService: PrismaService;
 
   const mockPrismaService = {
     aIGeneration: {
@@ -49,9 +69,15 @@ describe('AIService', () => {
     get: jest.fn((key: string) => {
       const config: Record<string, string> = {
         OPENAI_API_KEY: 'test-api-key',
+        GOOGLE_GENERATIVE_AI_API_KEY: 'test-google-key',
       };
       return config[key];
     }),
+  };
+
+  const mockRealTimeDataService = {
+    extractChartData: jest.fn().mockResolvedValue([]),
+    fetchRealTimeData: jest.fn().mockResolvedValue([]),
   };
 
   beforeEach(async () => {
@@ -60,11 +86,12 @@ describe('AIService', () => {
         AIService,
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: ConfigService, useValue: mockConfigService },
+        { provide: RealTimeDataService, useValue: mockRealTimeDataService },
       ],
     }).compile();
 
     service = module.get<AIService>(AIService);
-    prismaService = module.get<PrismaService>(PrismaService);
+    // prismaService = module.get<PrismaService>(PrismaService);
 
     // Reset mocks
     jest.clearAllMocks();
@@ -238,9 +265,9 @@ describe('AIService', () => {
 
       const result = await service.generateImage('A futuristic city');
 
-      expect(result).toHaveProperty('url');
+      expect(result).toHaveProperty('imageUrl');
       expect(result).toHaveProperty('revisedPrompt');
-      expect(result.url).toBe('https://example.com/generated-image.png');
+      expect(result.imageUrl).toBe('https://example.com/generated-image.png');
     });
 
     it('should throw error when image generation fails', async () => {
@@ -295,7 +322,7 @@ describe('AIService', () => {
 
       expect(mockOpenAI.audio.speech.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          input: expect.any(String),
+          input: expect.any(String) as string,
         }),
       );
     });
@@ -317,25 +344,25 @@ describe('AIService', () => {
   });
 
   describe('recommendLayout', () => {
-    it('should recommend chart-focus for chart content', async () => {
+    it('should recommend chart-focus for chart content', () => {
       const blocks = [{ type: 'chart', content: 'Sales data' }];
-      const result = await service.recommendLayout(blocks, 'Sales Overview');
+      const result = service.recommendLayout(blocks, 'Sales Overview');
       expect(result).toBe('chart-focus');
     });
 
-    it('should recommend timeline for timeline content', async () => {
+    it('should recommend timeline for timeline content', () => {
       const blocks = [{ type: 'bullet', content: 'Step 1' }];
-      const result = await service.recommendLayout(blocks, 'Project Timeline');
+      const result = service.recommendLayout(blocks, 'Project Timeline');
       expect(result).toBe('timeline');
     });
 
-    it('should recommend comparison for vs content', async () => {
+    it('should recommend comparison for vs content', () => {
       const blocks = [{ type: 'bullet', content: 'Feature A' }];
-      const result = await service.recommendLayout(blocks, 'React vs Vue');
+      const result = service.recommendLayout(blocks, 'React vs Vue');
       expect(result).toBe('comparison');
     });
 
-    it('should recommend two-column for many bullet points', async () => {
+    it('should recommend two-column for many bullet points', () => {
       const blocks = [
         { type: 'bullet', content: '1' },
         { type: 'bullet', content: '2' },
@@ -344,13 +371,13 @@ describe('AIService', () => {
         { type: 'bullet', content: '5' },
         { type: 'bullet', content: '6' },
       ];
-      const result = await service.recommendLayout(blocks, 'Features');
+      const result = service.recommendLayout(blocks, 'Features');
       expect(result).toBe('two-column');
     });
 
-    it('should recommend title for introduction slides', async () => {
+    it('should recommend title for introduction slides', () => {
       const blocks = [{ type: 'paragraph', content: 'Welcome' }];
-      const result = await service.recommendLayout(blocks, 'Introduction');
+      const result = service.recommendLayout(blocks, 'Introduction');
       expect(result).toBe('title');
     });
   });

@@ -4,9 +4,9 @@ import { PrismaService } from '../prisma/prisma.service';
 
 describe('CollaborationService', () => {
   let service: CollaborationService;
-  let prismaService: PrismaService;
+  // let prismaService: PrismaService;
 
-  const mockProject = {
+  /* const mockProject = {
     id: 'project-1',
     title: 'Test Project',
     userId: 'user-1',
@@ -18,7 +18,7 @@ describe('CollaborationService', () => {
         user: { id: 'user-2', name: 'Collaborator', email: 'collab@test.com' },
       },
     ],
-  };
+  }; */
 
   const mockComment = {
     id: 'comment-1',
@@ -42,6 +42,7 @@ describe('CollaborationService', () => {
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
+      upsert: jest.fn(),
     },
     comment: {
       findMany: jest.fn(),
@@ -53,10 +54,12 @@ describe('CollaborationService', () => {
     projectVersion: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
+      findUnique: jest.fn(),
       create: jest.fn(),
     },
     user: {
       findUnique: jest.fn(),
+      findMany: jest.fn(),
     },
   };
 
@@ -69,7 +72,7 @@ describe('CollaborationService', () => {
     }).compile();
 
     service = module.get<CollaborationService>(CollaborationService);
-    prismaService = module.get<PrismaService>(PrismaService);
+    // prismaService = module.get<PrismaService>(PrismaService);
 
     jest.clearAllMocks();
   });
@@ -84,6 +87,9 @@ describe('CollaborationService', () => {
           user: { id: 'user-2', name: 'User 2', email: 'user2@test.com' },
         },
       ]);
+      mockPrismaService.user.findMany.mockResolvedValue([
+        { id: 'user-2', name: 'User 2', email: 'user2@test.com', image: null },
+      ]);
 
       const result = await service.getCollaborators('project-1');
 
@@ -93,6 +99,7 @@ describe('CollaborationService', () => {
 
     it('should return empty array for project without collaborators', async () => {
       mockPrismaService.projectCollaborator.findMany.mockResolvedValue([]);
+      mockPrismaService.user.findMany.mockResolvedValue([]);
 
       const result = await service.getCollaborators('project-1');
 
@@ -181,6 +188,9 @@ describe('CollaborationService', () => {
   describe('getComments', () => {
     it('should return comments for a project', async () => {
       mockPrismaService.comment.findMany.mockResolvedValue([mockComment]);
+      mockPrismaService.user.findMany.mockResolvedValue([
+        { id: 'user-2', name: 'Commenter', image: null },
+      ]);
 
       const result = await service.getComments('project-1');
 
@@ -190,6 +200,9 @@ describe('CollaborationService', () => {
 
     it('should filter comments by slideId', async () => {
       mockPrismaService.comment.findMany.mockResolvedValue([mockComment]);
+      mockPrismaService.user.findMany.mockResolvedValue([
+        { id: 'user-2', name: 'Commenter', image: null },
+      ]);
 
       await service.getComments('project-1', 'slide-1');
 
@@ -197,7 +210,7 @@ describe('CollaborationService', () => {
         expect.objectContaining({
           where: expect.objectContaining({
             slideId: 'slide-1',
-          }),
+          }) as unknown,
         }),
       );
     });
@@ -311,8 +324,11 @@ describe('CollaborationService', () => {
   describe('getVersions', () => {
     it('should return project versions', async () => {
       mockPrismaService.projectVersion.findMany.mockResolvedValue([
-        { id: 'v1', version: 1 },
-        { id: 'v2', version: 2 },
+        { id: 'v1', version: 1, createdBy: 'user-1' },
+        { id: 'v2', version: 2, createdBy: 'user-1' },
+      ]);
+      mockPrismaService.user.findMany.mockResolvedValue([
+        { id: 'user-1', name: 'User 1', image: null },
       ]);
 
       const result = await service.getVersions('project-1');
@@ -324,7 +340,7 @@ describe('CollaborationService', () => {
 
   describe('restoreVersion', () => {
     it('should restore project to specific version', async () => {
-      mockPrismaService.projectVersion.findFirst.mockResolvedValue({
+      mockPrismaService.projectVersion.findUnique.mockResolvedValue({
         id: 'v1',
         version: 1,
         snapshot: { title: 'Old Title', slides: [] },
@@ -334,13 +350,13 @@ describe('CollaborationService', () => {
         title: 'Old Title',
       });
 
-      const result = await service.restoreVersion('project-1', 1);
+      await service.restoreVersion('project-1', 1);
 
       expect(mockPrismaService.project.update).toHaveBeenCalled();
     });
 
     it('should throw error for non-existent version', async () => {
-      mockPrismaService.projectVersion.findFirst.mockResolvedValue(null);
+      mockPrismaService.projectVersion.findUnique.mockResolvedValue(null);
 
       await expect(service.restoreVersion('project-1', 999)).rejects.toThrow();
     });

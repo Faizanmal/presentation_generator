@@ -18,13 +18,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+// import {
+//   Card,
+//   CardContent,
+//   CardDescription,
+//   CardHeader,
+//   CardTitle,
+// } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -204,7 +204,7 @@ const formatPresets: FormatPreset[] = [
   },
 ];
 
-export function MagicResize({ projectId, currentFormat, onResize }: MagicResizeProps) {
+export function MagicResize({ currentFormat, onResize }: MagicResizeProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedFormat, setSelectedFormat] = useState<FormatPreset | null>(null);
   const [resizeProgress, setResizeProgress] = useState(0);
@@ -212,7 +212,7 @@ export function MagicResize({ projectId, currentFormat, onResize }: MagicResizeP
   const resizeMutation = useMutation({
     mutationFn: async (format: FormatPreset) => {
       setResizeProgress(0);
-      
+
       // Simulate AI-powered resize with progress
       for (let i = 0; i <= 100; i += 10) {
         await new Promise((r) => setTimeout(r, 200));
@@ -232,7 +232,7 @@ export function MagicResize({ projectId, currentFormat, onResize }: MagicResizeP
   });
 
   const handleResize = () => {
-    if (!selectedFormat) return;
+    if (!selectedFormat) {return;}
     resizeMutation.mutate(selectedFormat);
   };
 
@@ -242,12 +242,7 @@ export function MagicResize({ projectId, currentFormat, onResize }: MagicResizeP
     return `${currentFormat.width / divisor}:${currentFormat.height / divisor}`;
   };
 
-  const categoryLabels: Record<string, string> = {
-    presentation: 'Presentations',
-    social: 'Social Media',
-    print: 'Print',
-    mobile: 'Mobile',
-  };
+
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>

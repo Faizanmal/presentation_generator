@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 /// <reference lib="webworker" />
 
 const CACHE_VERSION = 'v1';
@@ -29,21 +27,16 @@ const CACHEABLE_ASSET_PATTERNS = [
   /\.(css|js)$/i,
 ];
 
-// TypeScript types for service worker events
-interface SyncEvent extends ExtendableEvent {
-  tag: string;
-}
-
 // Cast self to avoid type conflicts
-const sw = self as any;
+const sw = self as unknown as ServiceWorkerGlobalScope;
 
 // Install event - cache static files
 sw.addEventListener('install', (event: ExtendableEvent) => {
-  console.log('[SW] Installing service worker...');
+  // console.log('[SW] Installing service worker...');
 
   event.waitUntil(
     caches.open(STATIC_CACHE).then((cache) => {
-      console.log('[SW] Caching static files');
+      // console.log('[SW] Caching static files');
       return cache.addAll(STATIC_FILES);
     }).then(() => {
       return sw.skipWaiting();
@@ -53,7 +46,7 @@ sw.addEventListener('install', (event: ExtendableEvent) => {
 
 // Activate event - clean up old caches
 sw.addEventListener('activate', (event: ExtendableEvent) => {
-  console.log('[SW] Activating service worker...');
+  // console.log('[SW] Activating service worker...');
 
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -65,7 +58,7 @@ sw.addEventListener('activate', (event: ExtendableEvent) => {
             cacheName !== API_CACHE &&
             cacheName !== ASSET_CACHE
           ) {
-            console.log('[SW] Deleting old cache:', cacheName);
+            // console.log('[SW] Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
@@ -128,6 +121,7 @@ async function handleApiRequest(request: Request): Promise<Response> {
 
     return response;
   } catch (error) {
+    console.error(error);
     // Network failed, try cache
     const cached = await caches.match(request);
     if (cached) {
@@ -287,8 +281,8 @@ function createPlaceholderImage(): Response {
 }
 
 // Background sync
-sw.addEventListener('sync', (event: SyncEvent) => {
-  if (event.tag === 'sync-presentations') {
+sw.addEventListener('message', (event: ExtendableMessageEvent) => {
+  if (event.data?.type === 'background-sync') {
     event.waitUntil(syncPresentations());
   }
 });
@@ -296,23 +290,24 @@ sw.addEventListener('sync', (event: SyncEvent) => {
 async function syncPresentations(): Promise<void> {
   // Notify the app to run sync
   const clients = await sw.clients.matchAll();
-  clients.forEach((client: any) => {
-    client.postMessage({
-      type: 'SYNC_REQUIRED',
-    });
+  clients.forEach((client: Client) => {
+    if (client instanceof WindowClient) {
+      client.postMessage({
+        type: 'SYNC_REQUIRED',
+      });
+    }
   });
 }
 
 // Push notifications
 sw.addEventListener('push', (event: PushEvent) => {
-  const data = event.data?.json() || {};
+  const data = (event.data?.json() || {}) as { title?: string; body?: string; data?: unknown; actions?: unknown[] };
 
-  const options: any = {
+  const options: NotificationOptions = {
     body: data.body || 'You have a notification',
     icon: '/icons/icon-192.png',
     badge: '/icons/badge-72.png',
-    data: data.data,
-    actions: data.actions || [],
+    data: data.data as Record<string, unknown>,
   };
 
   event.waitUntil(
@@ -324,12 +319,13 @@ sw.addEventListener('push', (event: PushEvent) => {
 sw.addEventListener('notificationclick', (event: NotificationEvent) => {
   event.notification.close();
 
-  const urlToOpen = event.notification.data?.url || '/';
+  const urlToOpen = (event.notification.data as { url?: string } | undefined)?.url || '/';
 
   event.waitUntil(
-    sw.clients.matchAll({ type: 'window' }).then((clients: any) => {
+    sw.clients.matchAll({ type: 'window' }).then((clients) => {
+      const windowClients = clients as WindowClient[];
       // Check if there's already a window open
-      for (const client of clients) {
+      for (const client of windowClients) {
         if (client.url === urlToOpen && 'focus' in client) {
           return client.focus();
         }

@@ -12,7 +12,10 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { PersonalizationService } from './personalization.service';
+import {
+  PersonalizationService,
+  PersonalizationPreferences,
+} from './personalization.service';
 
 @Controller('personalization')
 @UseGuards(JwtAuthGuard)
@@ -26,13 +29,13 @@ export class PersonalizationController {
   // ============================================
 
   @Get('brand')
-  async getBrandProfile(@Request() req: any) {
+  async getBrandProfile(@Request() req: { user: { id: string } }) {
     return this.personalizationService.getBrandProfile(req.user.id);
   }
 
   @Post('brand')
   async updateBrandProfile(
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
     @Body()
     body: {
       companyName?: string;
@@ -49,7 +52,7 @@ export class PersonalizationController {
   @Post('brand/logo')
   @UseInterceptors(FileInterceptor('file'))
   async uploadLogo(
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
     @UploadedFile() file: Express.Multer.File,
   ) {
     return this.personalizationService.uploadBrandLogo(req.user.id, file);
@@ -60,14 +63,14 @@ export class PersonalizationController {
   // ============================================
 
   @Get('documents')
-  async getTrainingDocuments(@Request() req: any) {
+  async getTrainingDocuments(@Request() req: { user: { id: string } }) {
     return this.personalizationService.getTrainingDocuments(req.user.id);
   }
 
   @Post('documents')
   @UseInterceptors(FileInterceptor('file'))
   async uploadDocument(
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
     @UploadedFile() file: Express.Multer.File,
   ) {
     return this.personalizationService.uploadTrainingDocument(
@@ -77,7 +80,10 @@ export class PersonalizationController {
   }
 
   @Delete('documents/:id')
-  async deleteDocument(@Request() req: any, @Param('id') id: string) {
+  async deleteDocument(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+  ) {
     return this.personalizationService.deleteTrainingDocument(id, req.user.id);
   }
 
@@ -86,13 +92,13 @@ export class PersonalizationController {
   // ============================================
 
   @Get('settings')
-  async getPersonalizationSettings(@Request() req: any) {
+  async getPersonalizationSettings(@Request() req: { user: { id: string } }) {
     return this.personalizationService.getPersonalizationSettings(req.user.id);
   }
 
   @Post('settings')
   async savePersonalizationSettings(
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
     @Body()
     body: {
       preferences?: {
@@ -119,17 +125,18 @@ export class PersonalizationController {
 
   @Post('projects/:projectId/settings')
   async saveProjectSettings(
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
     @Param('projectId') projectId: string,
     @Body()
     body: {
-      preferences?: any;
+      preferences?: PersonalizationPreferences;
       promptTemplate?: string;
     },
   ) {
     return this.personalizationService.saveProjectPersonalization(
       req.user.id,
       projectId,
+
       body.preferences || {},
       body.promptTemplate,
     );
@@ -140,7 +147,7 @@ export class PersonalizationController {
   // ============================================
 
   @Get('brand/theme')
-  async generateBrandTheme(@Request() req: any) {
+  async generateBrandTheme(@Request() req: { user: { id: string } }) {
     return this.personalizationService.generateBrandTheme(req.user.id);
   }
 
@@ -149,20 +156,16 @@ export class PersonalizationController {
   // ============================================
 
   @Get('prompt')
-  async getPersonalizedPrompt(
-    @Request() req: any,
-    @Param('projectId') projectId?: string,
-  ) {
+  async getPersonalizedPrompt(@Request() req: { user: { id: string } }) {
     const prompt = await this.personalizationService.buildPersonalizedPrompt(
       req.user.id,
-      projectId,
     );
     return { prompt };
   }
 
   @Post('search')
   async searchRelevantContent(
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
     @Body() body: { query: string; limit?: number },
   ) {
     const results = await this.personalizationService.findRelevantContent(

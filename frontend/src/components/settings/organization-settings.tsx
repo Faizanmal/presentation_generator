@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 'use client';
 
 import { useState } from 'react';
@@ -12,12 +10,10 @@ import {
   Globe,
   Settings,
   Loader2,
-  Plus,
   MoreHorizontal,
   UserPlus,
   Crown,
   Eye,
-  Pencil,
   Trash2,
   Send,
   X,
@@ -69,7 +65,9 @@ import {
   useSSOConfig,
   useWhiteLabel,
 } from '@/hooks/use-organization';
-import { cn } from '@/lib/utils';
+import type { Organization } from '@/types';
+import Image from 'next/image';
+// import { cn } from '@/lib/utils';
 
 interface OrganizationSettingsProps {
   orgId: string;
@@ -92,14 +90,14 @@ export function OrganizationSettings({ orgId }: OrganizationSettingsProps) {
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <Building2 className="w-6 h-6" />
-            {organization.name}
+            {(organization as Organization).name}
           </h2>
           <p className="text-muted-foreground">
             Manage your organization settings and team
           </p>
         </div>
-        <Badge variant={organization.plan === 'enterprise' ? 'default' : 'secondary'}>
-          {organization.plan} Plan
+        <Badge variant={(organization as Organization).plan === 'ENTERPRISE' ? 'default' : 'secondary'}>
+          {(organization as Organization).plan} Plan
         </Badge>
       </div>
 
@@ -113,7 +111,7 @@ export function OrganizationSettings({ orgId }: OrganizationSettingsProps) {
             <Mail className="w-4 h-4" />
             Invitations
           </TabsTrigger>
-          {organization.plan === 'enterprise' && (
+          {(organization as Organization).plan === 'ENTERPRISE' && (
             <>
               <TabsTrigger value="sso" className="gap-2">
                 <Shield className="w-4 h-4" />
@@ -185,7 +183,7 @@ function MembersTab({ orgId }: { orgId: string }) {
               <TableHead>Role</TableHead>
               <TableHead>Joined</TableHead>
               <TableHead>Last Active</TableHead>
-              <TableHead></TableHead>
+              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -224,7 +222,7 @@ function MembersTab({ orgId }: { orgId: string }) {
                       : '-'}
                   </TableCell>
                   <TableCell>
-                    {member.role !== 'owner' && (
+                    {member.role !== 'OWNER' && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="sm">
@@ -236,11 +234,11 @@ function MembersTab({ orgId }: { orgId: string }) {
                             onClick={() =>
                               updateRole({
                                 memberId: member.id,
-                                role: member.role === 'admin' ? 'member' : 'admin',
+                                role: member.role === 'ADMIN' ? 'MEMBER' : 'ADMIN',
                               })
                             }
                           >
-                            {member.role === 'admin' ? 'Demote to Member' : 'Promote to Admin'}
+                            {member.role === 'ADMIN' ? 'Demote to Member' : 'Promote to Admin'}
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => removeMember(member.id)}
@@ -266,7 +264,7 @@ function MembersTab({ orgId }: { orgId: string }) {
 function InvitationsTab({ orgId }: { orgId: string }) {
   const [isInviting, setIsInviting] = useState(false);
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<'admin' | 'member' | 'viewer'>('member');
+  const [role, setRole] = useState<'ADMIN' | 'MEMBER' | 'VIEWER'>('MEMBER');
 
   const {
     invitations,
@@ -278,7 +276,7 @@ function InvitationsTab({ orgId }: { orgId: string }) {
   } = useTeamInvitations(orgId);
 
   const handleInvite = () => {
-    if (!email) return;
+    if (!email) {return;}
     invite({ email, role });
     setEmail('');
     setIsInviting(false);
@@ -324,14 +322,14 @@ function InvitationsTab({ orgId }: { orgId: string }) {
               </div>
               <div className="grid gap-2">
                 <Label>Role</Label>
-                <Select value={role} onValueChange={(v) => setRole(v as 'admin' | 'member' | 'viewer')}>
+                <Select value={role} onValueChange={(v) => setRole(v as 'ADMIN' | 'MEMBER' | 'VIEWER')}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="viewer">Viewer</SelectItem>
-                    <SelectItem value="member">Member</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="VIEWER">Viewer</SelectItem>
+                    <SelectItem value="MEMBER">Member</SelectItem>
+                    <SelectItem value="ADMIN">Admin</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -363,7 +361,7 @@ function InvitationsTab({ orgId }: { orgId: string }) {
                 <TableHead>Role</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Expires</TableHead>
-                <TableHead></TableHead>
+                <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -376,9 +374,9 @@ function InvitationsTab({ orgId }: { orgId: string }) {
                   <TableCell>
                     <Badge
                       variant={
-                        invitation.status === 'pending'
+                        invitation.status === 'PENDING'
                           ? 'secondary'
-                          : invitation.status === 'accepted'
+                          : invitation.status === 'ACCEPTED'
                           ? 'default'
                           : 'destructive'
                       }
@@ -390,7 +388,7 @@ function InvitationsTab({ orgId }: { orgId: string }) {
                     {new Date(invitation.expiresAt).toLocaleDateString()}
                   </TableCell>
                   <TableCell>
-                    {invitation.status === 'pending' && (
+                    {invitation.status === 'PENDING' && (
                       <div className="flex gap-1">
                         <Button
                           variant="ghost"
@@ -591,7 +589,7 @@ function WhiteLabelTab({ orgId }: { orgId: string }) {
             <Label>Organization Logo</Label>
             <div className="flex items-center gap-4">
               {config?.logo ? (
-                <img
+                <Image
                   src={config.logo}
                   alt="Logo"
                   className="w-16 h-16 object-contain bg-muted rounded"
@@ -681,9 +679,10 @@ function WhiteLabelTab({ orgId }: { orgId: string }) {
   );
 }
 
-function GeneralSettingsTab({ organization }: { organization: any }) {
-  const { updateOrganization, isUpdating } = useOrganization(organization.id);
-  const [name, setName] = useState(organization.name);
+function GeneralSettingsTab({ organization }: { organization: unknown }) {
+  const org = organization as { id: string; name: string };
+  const { updateOrganization, isUpdating } = useOrganization(org.id);
+  const [name, setName] = useState(org.name);
 
   return (
     <Card>
@@ -700,14 +699,14 @@ function GeneralSettingsTab({ organization }: { organization: any }) {
         </div>
         <div className="grid gap-2">
           <Label>Organization Slug</Label>
-          <Input value={organization.slug} disabled />
+          <Input value={(organization as Organization).slug || ''} disabled />
           <p className="text-xs text-muted-foreground">
-            Used in URLs: app.presentationdesigner.com/{organization.slug}
+            Used in URLs: app.presentationdesigner.com/{(organization as Organization).slug || 'slug'}
           </p>
         </div>
         <Button
           onClick={() => updateOrganization({ name })}
-          disabled={isUpdating || name === organization.name}
+          disabled={isUpdating || name === (organization as Organization).name}
         >
           {isUpdating ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Changes'}
         </Button>

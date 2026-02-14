@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
     MessageSquare,
     Send,
@@ -11,11 +11,8 @@ import {
     Check,
     Reply,
     AtSign,
-    Smile,
     Pin,
     PinOff,
-    Clock,
-    User,
     ChevronDown,
     ChevronUp,
     CheckCheck,
@@ -36,11 +33,6 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -90,7 +82,6 @@ interface CommentsProviderProps {
 
 // Comments Panel (sidebar)
 export function CommentsPanel({
-    projectId,
     slideId,
     currentUserId,
     currentUserName,
@@ -120,8 +111,8 @@ export function CommentsPanel({
 
         // Sort: pinned first, then by date
         return filtered.sort((a, b) => {
-            if (a.pinned && !b.pinned) return -1;
-            if (!a.pinned && b.pinned) return 1;
+            if (a.pinned && !b.pinned) {return -1;}
+            if (!a.pinned && b.pinned) {return 1;}
             return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         });
     }, [comments, slideId, filter]);
@@ -131,7 +122,7 @@ export function CommentsPanel({
     ).length;
 
     const handleAddComment = () => {
-        if (!newComment.trim()) return;
+        if (!newComment.trim()) {return;}
 
         // Extract mentions
         const mentionRegex = /@(\w+)/g;
@@ -273,7 +264,6 @@ export function CommentsPanel({
 function CommentItem({
     comment,
     currentUserId,
-    collaborators,
     onUpdate,
     onDelete,
     onResolve,
@@ -530,7 +520,7 @@ export function CommentIndicator({
     onClick: () => void;
     position?: { x: number; y: number };
 }) {
-    if (commentCount === 0) return null;
+    if (commentCount === 0) {return null;}
 
     return (
         <button

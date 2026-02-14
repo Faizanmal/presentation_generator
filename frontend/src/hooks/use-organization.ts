@@ -1,93 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
-
-// Types
-interface Organization {
-  id: string;
-  name: string;
-  slug: string;
-  logo?: string;
-  primaryColor?: string;
-  secondaryColor?: string;
-  customDomain?: string;
-  plan: 'starter' | 'team' | 'enterprise';
-  ssoEnabled: boolean;
-  createdAt: Date;
-  memberCount: number;
-}
-
-interface OrganizationMember {
-  id: string;
-  organizationId: string;
-  userId: string;
-  role: 'owner' | 'admin' | 'member' | 'viewer';
-  user: {
-    id: string;
-    email: string;
-    name: string | null;
-    image: string | null;
-  };
-  joinedAt: string;
-  lastActiveAt?: string;
-}
-
-interface TeamInvitation {
-  id: string;
-  email: string;
-  role: 'admin' | 'member' | 'viewer';
-  status: 'pending' | 'accepted' | 'expired';
-  invitedBy: string;
-  createdAt: Date;
-  expiresAt: Date;
-}
-
-interface SSOConfig {
-  id: string;
-  provider: 'saml' | 'oidc';
-  enabled: boolean;
-  domain: string;
-  issuer?: string;
-  ssoUrl?: string;
-  certificate?: string;
-  clientId?: string;
-  clientSecret?: string;
-}
-
-interface AuditLogEntry {
-  id: string;
-  action: string;
-  actor: {
-    id: string;
-    email: string;
-    name: string;
-  };
-  resource: {
-    type: string;
-    id: string;
-    name?: string;
-  };
-  metadata?: Record<string, any>;
-  ipAddress?: string;
-  userAgent?: string;
-  timestamp: Date;
-}
-
-interface WhiteLabelConfig {
-  logo: string;
-  favicon: string;
-  primaryColor: string;
-  secondaryColor: string;
-  accentColor: string;
-  customDomain: string;
-  customEmailDomain: string;
-  hideWatermark: boolean;
-  customFooter: string;
-}
+import type { Organization, OrganizationMember, TeamInvitation, SSOConfig, AuditLogEntry, WhiteLabelConfig } from '@/types';
 
 export function useOrganization(orgId?: string) {
   const queryClient = useQueryClient();
@@ -99,14 +15,17 @@ export function useOrganization(orgId?: string) {
     error,
   } = useQuery<Organization>({
     queryKey: ['organization', orgId || 'current'],
-    queryFn: () => (orgId ? api.getOrganization(orgId) : api.getCurrentOrganization()),
+    queryFn: async () => {
+      const response = orgId ? await api.getOrganization(orgId) : await api.getCurrentOrganization();
+      return response;
+    },
     enabled: orgId !== undefined || true,
   });
 
   // Update organization
   const updateMutation = useMutation({
     mutationFn: (data: Partial<Organization>) =>
-      api.updateOrganization(organization!.id, data),
+      api.updateOrganization(organization?.id || '', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['organization'] });
       toast.success('Organization updated');
@@ -211,8 +130,9 @@ export function useTeamInvitations(orgId: string) {
       queryClient.invalidateQueries({ queryKey: ['organization', orgId, 'invitations'] });
       toast.success('Invitation sent');
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to send invitation');
+    onError: (error: unknown) => {
+      const err = error as { message?: string };
+      toast.error(err.message || 'Failed to send invitation');
     },
   });
 
@@ -371,9 +291,16 @@ export function useAuditLogs(
     isLoading,
     error,
     refetch,
-  } = useQuery<{ entries: AuditLogEntry[]; total: number; page: number }>({
+  } = useQuery<{ entries: AuditLogEntry[]; total: number; page: number; }>({
     queryKey: ['organization', orgId, 'audit-logs', options],
-    queryFn: () => api.getAuditLogs(orgId, options),
+    queryFn: async () => {
+      const response = await api.getAuditLogs(orgId, options);
+      return {
+        entries: response.data,
+        total: response.meta.total,
+        page: response.meta.page,
+      };
+    },
     enabled: !!orgId,
   });
 

@@ -1,8 +1,26 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 
-export type ApprovalStatus = 'draft' | 'pending_review' | 'approved' | 'rejected' | 'changes_requested';
-export type WorkflowStage = 'draft' | 'internal_review' | 'legal_review' | 'compliance_review' | 'final_approval' | 'published';
+export type ApprovalStatus =
+  | 'draft'
+  | 'pending_review'
+  | 'approved'
+  | 'rejected'
+  | 'changes_requested';
+export type WorkflowStage =
+  | 'draft'
+  | 'internal_review'
+  | 'legal_review'
+  | 'compliance_review'
+  | 'final_approval'
+  | 'published';
 export type ContentLockType = 'full' | 'partial' | 'none';
 
 export interface ApprovalWorkflow {
@@ -11,10 +29,13 @@ export interface ApprovalWorkflow {
   description?: string;
   organizationId: string;
   stages: WorkflowStage[];
-  requiredApprovers: Record<WorkflowStage, {
-    minApprovals: number;
-    approverRoles: string[];
-  }>;
+  requiredApprovers: Record<
+    WorkflowStage,
+    {
+      minApprovals: number;
+      approverRoles: string[];
+    }
+  >;
   autoPublish: boolean;
   isActive: boolean;
 }
@@ -67,13 +88,78 @@ export interface ContentLock {
   expiresAt?: Date;
 }
 
+interface PrismaWorkflow {
+  id: string;
+  name: string;
+  description: string | null;
+  organizationId: string;
+  stages: unknown;
+  requiredApprovers: unknown;
+  autoPublish: boolean;
+  isActive: boolean;
+}
+
+interface PrismaApprovalRequest {
+  id: string;
+  projectId: string;
+  workflowId: string;
+  currentStage: string;
+  status: string;
+  requestedBy: string;
+  requestedAt: Date;
+  approvals: unknown;
+  comments: unknown;
+}
+
+interface PrismaDisclaimer {
+  id: string;
+  organizationId: string;
+  name: string;
+  content: string;
+  placement: string;
+  categories: unknown;
+  isRequired: boolean;
+  isActive: boolean;
+}
+
+interface PrismaContentLock {
+  id: string;
+  projectId: string;
+  slideId: string | null;
+  blockId: string | null;
+  lockType: string;
+  reason: string | null;
+  lockedBy: string;
+  lockedAt: Date;
+  expiresAt: Date | null;
+}
+
+interface PrismaPolicy {
+  id: string;
+  organizationId: string;
+  name: string;
+  rules: unknown;
+  enforcementLevel: string;
+  isActive: boolean;
+}
+
+export interface PolicyRuleConfig {
+  keywords?: string[];
+  fields?: string[];
+  [key: string]: unknown;
+}
+
 export interface GovernancePolicy {
   id: string;
   organizationId: string;
   name: string;
   rules: Array<{
-    type: 'required_fields' | 'forbidden_content' | 'required_disclaimers' | 'approval_required';
-    config: any;
+    type:
+      | 'required_fields'
+      | 'forbidden_content'
+      | 'required_disclaimers'
+      | 'approval_required';
+    config: PolicyRuleConfig;
   }>;
   enforcementLevel: 'warn' | 'block';
   isActive: boolean;
@@ -98,7 +184,10 @@ export class ContentGovernanceService {
       name: string;
       description?: string;
       stages: WorkflowStage[];
-      requiredApprovers: Record<WorkflowStage, { minApprovals: number; approverRoles: string[] }>;
+      requiredApprovers: Record<
+        WorkflowStage,
+        { minApprovals: number; approverRoles: string[] }
+      >;
       autoPublish?: boolean;
     },
   ): Promise<ApprovalWorkflow> {
@@ -151,12 +240,17 @@ export class ContentGovernanceService {
     });
 
     if (existing) {
-      throw new BadRequestException('Project already has a pending approval request');
+      throw new BadRequestException(
+        'Project already has a pending approval request',
+      );
     }
 
     // Validate content against policies
     const violations = await this.validateContent(projectId);
-    if (violations.length > 0 && violations.some(v => v.severity === 'block')) {
+    if (
+      violations.length > 0 &&
+      violations.some((v) => v.severity === 'block')
+    ) {
       throw new BadRequestException({
         message: 'Content violates governance policies',
         violations,
@@ -174,12 +268,16 @@ export class ContentGovernanceService {
         status: 'pending_review',
         requestedBy: userId,
         approvals: [],
-        comments: message ? [{
-          id: this.generateId(),
-          userId,
-          content: message,
-          createdAt: new Date(),
-        }] : [],
+        comments: message
+          ? [
+              {
+                id: this.generateId(),
+                userId,
+                content: message,
+                createdAt: new Date(),
+              },
+            ]
+          : [],
       },
     });
 
@@ -210,7 +308,10 @@ export class ContentGovernanceService {
       throw new NotFoundException('Approval request not found');
     }
 
-    if (request.status !== 'pending_review' && request.status !== 'changes_requested') {
+    if (
+      request.status !== 'pending_review' &&
+      request.status !== 'changes_requested'
+    ) {
       throw new BadRequestException('Request is not pending approval');
     }
 
@@ -220,12 +321,18 @@ export class ContentGovernanceService {
       select: { id: true, name: true },
     });
 
-    const approvals = (request.approvals as any[]) || [];
+    const approvals =
+      (request.approvals as unknown as ApprovalRequest['approvals']) || [];
     approvals.push({
-      stage: request.currentStage,
+      stage: request.currentStage as WorkflowStage,
       approverId,
       approverName: approver?.name || 'Unknown',
-      status: action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'changes_requested',
+      status:
+        action === 'approve'
+          ? 'approved'
+          : action === 'reject'
+            ? 'rejected'
+            : 'changes_requested',
       comment,
       timestamp: new Date(),
     });
@@ -236,20 +343,26 @@ export class ContentGovernanceService {
     if (action === 'approve') {
       // Check if stage requirements met
       const stages = request.workflow.stages as WorkflowStage[];
-      const requirements = request.workflow.requiredApprovers as Record<WorkflowStage, any>;
-      const stageRequirement = requirements[request.currentStage];
-      
+      const requirements = request.workflow.requiredApprovers as Record<
+        WorkflowStage,
+        { minApprovals: number }
+      >;
+      const stageRequirement =
+        requirements[request.currentStage as WorkflowStage];
+
       const stageApprovals = approvals.filter(
-        a => a.stage === request.currentStage && a.status === 'approved'
+        (a) => a.stage === request.currentStage && a.status === 'approved',
       );
 
       if (stageApprovals.length >= stageRequirement.minApprovals) {
         // Move to next stage or complete
-        const currentIndex = stages.indexOf(request.currentStage as WorkflowStage);
-        
+        const currentIndex = stages.indexOf(
+          request.currentStage as WorkflowStage,
+        );
+
         if (currentIndex === stages.length - 1) {
           newStatus = 'approved';
-          
+
           // Auto-publish if configured
           if (request.workflow.autoPublish) {
             await this.prisma.project.update({
@@ -380,14 +493,17 @@ export class ContentGovernanceService {
       },
     });
 
-    const projectCategories = project.tags.map(t => t.name);
+    const projectCategories = project.tags.map((t) => t.name);
 
     return disclaimers
-      .filter(d => {
+      .filter((d) => {
         const categories = d.categories as string[];
-        return categories.length === 0 || categories.some(c => projectCategories.includes(c));
+        return (
+          categories.length === 0 ||
+          categories.some((c) => projectCategories.includes(c))
+        );
       })
-      .map(d => this.mapDisclaimer(d));
+      .map((d) => this.mapDisclaimer(d));
   }
 
   /**
@@ -400,8 +516,11 @@ export class ContentGovernanceService {
     valid: boolean;
     missing: RequiredDisclaimer[];
   }> {
-    const required = await this.getApplicableDisclaimers(projectId, organizationId);
-    
+    const required = await this.getApplicableDisclaimers(
+      projectId,
+      organizationId,
+    );
+
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       include: {
@@ -418,9 +537,9 @@ export class ContentGovernanceService {
 
     const missing: RequiredDisclaimer[] = [];
 
-    for (const disclaimer of required.filter(d => d.isRequired)) {
+    for (const disclaimer of required.filter((d) => d.isRequired)) {
       let found = false;
-      
+
       for (const slide of project.slides) {
         for (const block of slide.blocks) {
           const content = JSON.stringify(block.content || {});
@@ -490,9 +609,14 @@ export class ContentGovernanceService {
 
     if (lock.lockedBy !== userId) {
       // Check if user has admin rights
-      const hasAdminRights = await this.checkAdminRights(userId, lock.projectId);
+      const hasAdminRights = await this.checkAdminRights(
+        userId,
+        lock.projectId,
+      );
       if (!hasAdminRights) {
-        throw new ForbiddenException('You cannot unlock content locked by another user');
+        throw new ForbiddenException(
+          'You cannot unlock content locked by another user',
+        );
       }
     }
 
@@ -517,9 +641,10 @@ export class ContentGovernanceService {
           { slideId, lockType: { in: ['full', 'partial'] } },
           { blockId },
         ],
-        OR: [
-          { expiresAt: null },
-          { expiresAt: { gt: new Date() } },
+        AND: [
+          {
+            OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+          },
         ],
       },
     });
@@ -546,7 +671,7 @@ export class ContentGovernanceService {
       data: {
         organizationId,
         name: data.name,
-        rules: data.rules,
+        rules: data.rules as unknown as Prisma.InputJsonValue,
         enforcementLevel: data.enforcementLevel,
         isActive: true,
       },
@@ -558,14 +683,16 @@ export class ContentGovernanceService {
   /**
    * Validate content against policies
    */
-  async validateContent(projectId: string): Promise<Array<{
-    policyId: string;
-    policyName: string;
-    ruleType: string;
-    message: string;
-    severity: 'warn' | 'block';
-    location?: { slideId?: string; blockId?: string };
-  }>> {
+  async validateContent(projectId: string): Promise<
+    Array<{
+      policyId: string;
+      policyName: string;
+      ruleType: string;
+      message: string;
+      severity: 'warn' | 'block';
+      location?: { slideId?: string; blockId?: string };
+    }>
+  > {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       include: {
@@ -615,7 +742,9 @@ export class ContentGovernanceService {
           case 'forbidden_content':
             for (const slide of project.slides) {
               for (const block of slide.blocks) {
-                const content = JSON.stringify(block.content || {}).toLowerCase();
+                const content = JSON.stringify(
+                  block.content || {},
+                ).toLowerCase();
                 for (const forbidden of rule.config.keywords || []) {
                   if (content.includes(forbidden.toLowerCase())) {
                     violations.push({
@@ -634,11 +763,11 @@ export class ContentGovernanceService {
 
           case 'required_fields':
             for (const field of rule.config.fields || []) {
-              const hasField = project.slides.some(s =>
-                s.blocks.some(b => {
+              const hasField = project.slides.some((s) =>
+                s.blocks.some((b) => {
                   const content = JSON.stringify(b.content || {});
                   return content.includes(field);
-                })
+                }),
               );
               if (!hasField) {
                 violations.push({
@@ -673,12 +802,14 @@ export class ContentGovernanceService {
   /**
    * Get organization workflows
    */
-  async getOrganizationWorkflows(organizationId: string): Promise<ApprovalWorkflow[]> {
+  async getOrganizationWorkflows(
+    organizationId: string,
+  ): Promise<ApprovalWorkflow[]> {
     const workflows = await this.prisma.approvalWorkflow.findMany({
       where: { organizationId, isActive: true },
     });
 
-    return workflows.map(w => this.mapWorkflow(w));
+    return workflows.map((w) => this.mapWorkflow(w));
   }
 
   /**
@@ -690,7 +821,7 @@ export class ContentGovernanceService {
       orderBy: { requestedAt: 'desc' },
     });
 
-    return requests.map(r => this.mapApprovalRequest(r));
+    return requests.map((r) => this.mapApprovalRequest(r));
   }
 
   // Helper methods
@@ -698,7 +829,10 @@ export class ContentGovernanceService {
     return `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  private async checkAdminRights(userId: string, projectId: string): Promise<boolean> {
+  private async checkAdminRights(
+    userId: string,
+    projectId: string,
+  ): Promise<boolean> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       include: {
@@ -713,26 +847,29 @@ export class ContentGovernanceService {
     if (project?.ownerId === userId) return true;
 
     const membership = project?.owner.organizationMembers.find(
-      m => m.role === 'OWNER' || m.role === 'ADMIN'
+      (m) => m.role === 'OWNER' || m.role === 'ADMIN',
     );
 
     return !!membership;
   }
 
-  private mapWorkflow(w: any): ApprovalWorkflow {
+  private mapWorkflow(w: PrismaWorkflow): ApprovalWorkflow {
     return {
       id: w.id,
       name: w.name,
-      description: w.description,
+      description: w.description ?? undefined,
       organizationId: w.organizationId,
       stages: w.stages as WorkflowStage[],
-      requiredApprovers: w.requiredApprovers as Record<WorkflowStage, any>,
+      requiredApprovers: w.requiredApprovers as Record<
+        WorkflowStage,
+        { minApprovals: number; approverRoles: string[] }
+      >,
       autoPublish: w.autoPublish,
       isActive: w.isActive,
     };
   }
 
-  private mapApprovalRequest(r: any): ApprovalRequest {
+  private mapApprovalRequest(r: PrismaApprovalRequest): ApprovalRequest {
     return {
       id: r.id,
       projectId: r.projectId,
@@ -746,7 +883,7 @@ export class ContentGovernanceService {
     };
   }
 
-  private mapDisclaimer(d: any): RequiredDisclaimer {
+  private mapDisclaimer(d: PrismaDisclaimer): RequiredDisclaimer {
     return {
       id: d.id,
       organizationId: d.organizationId,
@@ -759,21 +896,21 @@ export class ContentGovernanceService {
     };
   }
 
-  private mapContentLock(l: any): ContentLock {
+  private mapContentLock(l: PrismaContentLock): ContentLock {
     return {
       id: l.id,
       projectId: l.projectId,
-      slideId: l.slideId,
-      blockId: l.blockId,
+      slideId: l.slideId ?? undefined,
+      blockId: l.blockId ?? undefined,
       lockType: l.lockType as ContentLockType,
-      reason: l.reason,
+      reason: l.reason ?? undefined,
       lockedBy: l.lockedBy,
       lockedAt: l.lockedAt,
-      expiresAt: l.expiresAt,
+      expiresAt: l.expiresAt ?? undefined,
     };
   }
 
-  private mapPolicy(p: any): GovernancePolicy {
+  private mapPolicy(p: PrismaPolicy): GovernancePolicy {
     return {
       id: p.id,
       organizationId: p.organizationId,

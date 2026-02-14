@@ -9,10 +9,10 @@ import {
   Request,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { 
-  TemplateMarketplaceService, 
-  TemplateCategory, 
-  TemplatePricing 
+import {
+  TemplateMarketplaceService,
+  TemplateCategory,
+  TemplatePricing,
 } from './template-marketplace.service';
 
 // DTOs
@@ -58,7 +58,9 @@ class ModerateTemplateDto {
 
 @Controller('marketplace')
 export class TemplateMarketplaceController {
-  constructor(private readonly marketplaceService: TemplateMarketplaceService) {}
+  constructor(
+    private readonly marketplaceService: TemplateMarketplaceService,
+  ) {}
 
   @Get('templates')
   async listTemplates(@Query() query: ListTemplatesDto) {
@@ -66,7 +68,6 @@ export class TemplateMarketplaceController {
       category: query.category,
       pricing: query.pricing,
       search: query.search,
-      featured: query.featured === true || query.featured === ('true' as any),
       sortBy: query.sortBy,
       page: Number(query.page) || 1,
       limit: Number(query.limit) || 20,
@@ -87,7 +88,7 @@ export class TemplateMarketplaceController {
   @UseGuards(JwtAuthGuard)
   async submitTemplate(
     @Body() dto: SubmitTemplateDto,
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
   ) {
     return this.marketplaceService.submitTemplate(req.user.id, dto.projectId, {
       title: dto.title,
@@ -106,7 +107,7 @@ export class TemplateMarketplaceController {
   async useTemplate(
     @Param('templateId') templateId: string,
     @Body() dto: UseTemplateDto,
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
   ) {
     return this.marketplaceService.useTemplate(
       req.user.id,
@@ -120,7 +121,7 @@ export class TemplateMarketplaceController {
   async purchaseTemplate(
     @Param('templateId') templateId: string,
     @Body() dto: PurchaseTemplateDto,
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
   ) {
     return this.marketplaceService.purchaseTemplate(
       req.user.id,
@@ -134,7 +135,7 @@ export class TemplateMarketplaceController {
   async addReview(
     @Param('templateId') templateId: string,
     @Body() dto: AddReviewDto,
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
   ) {
     return this.marketplaceService.addReview(
       req.user.id,
@@ -159,7 +160,7 @@ export class TemplateMarketplaceController {
 
   @Get('author/dashboard')
   @UseGuards(JwtAuthGuard)
-  async getAuthorDashboard(@Request() req: any) {
+  async getAuthorDashboard(@Request() req: { user: { id: string } }) {
     return this.marketplaceService.getAuthorDashboard(req.user.id);
   }
 

@@ -3,7 +3,7 @@
 import { useOfflineMode } from '@/hooks/use-offline-mode';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Wifi, WifiOff, Cloud, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
+import { WifiOff, Cloud, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface OfflineIndicatorProps {
   variant?: 'full' | 'compact' | 'minimal';
@@ -14,34 +14,34 @@ export function OfflineIndicator({ variant = 'compact', showPendingCount = true 
   const { isOnline, syncStatus, pendingChanges } = useOfflineMode();
 
   const getIcon = () => {
-    if (!isOnline) return <WifiOff className="h-4 w-4" />;
-    if (syncStatus === 'syncing') return <RefreshCw className="h-4 w-4 animate-spin" />;
-    if (syncStatus === 'error') return <AlertCircle className="h-4 w-4" />;
-    if (pendingChanges > 0) return <Cloud className="h-4 w-4" />;
+    if (!isOnline) {return <WifiOff className="h-4 w-4" />;}
+    if (syncStatus === 'syncing') {return <RefreshCw className="h-4 w-4 animate-spin" />;}
+    if (syncStatus === 'error') {return <AlertCircle className="h-4 w-4" />;}
+    if (pendingChanges > 0) {return <Cloud className="h-4 w-4" />;}
     return <CheckCircle className="h-4 w-4" />;
   };
 
   const getColor = () => {
-    if (!isOnline) return 'text-red-500';
-    if (syncStatus === 'syncing') return 'text-blue-500';
-    if (syncStatus === 'error') return 'text-yellow-500';
-    if (pendingChanges > 0) return 'text-yellow-500';
+    if (!isOnline) {return 'text-red-500';}
+    if (syncStatus === 'syncing') {return 'text-blue-500';}
+    if (syncStatus === 'error') {return 'text-yellow-500';}
+    if (pendingChanges > 0) {return 'text-yellow-500';}
     return 'text-green-500';
   };
 
   const getLabel = () => {
-    if (!isOnline) return 'Offline';
-    if (syncStatus === 'syncing') return 'Syncing...';
-    if (syncStatus === 'error') return 'Sync Error';
-    if (pendingChanges > 0) return `${pendingChanges} pending`;
+    if (!isOnline) {return 'Offline';}
+    if (syncStatus === 'syncing') {return 'Syncing...';}
+    if (syncStatus === 'error') {return 'Sync Error';}
+    if (pendingChanges > 0) {return `${pendingChanges} pending`;}
     return 'Synced';
   };
 
   const getTooltip = () => {
-    if (!isOnline) return 'You are offline. Changes will sync when reconnected.';
-    if (syncStatus === 'syncing') return 'Syncing your changes...';
-    if (syncStatus === 'error') return 'Failed to sync. Will retry automatically.';
-    if (pendingChanges > 0) return `${pendingChanges} change(s) waiting to sync.`;
+    if (!isOnline) {return 'You are offline. Changes will sync when reconnected.';}
+    if (syncStatus === 'syncing') {return 'Syncing your changes...';}
+    if (syncStatus === 'error') {return 'Failed to sync. Will retry automatically.';}
+    if (pendingChanges > 0) {return `${pendingChanges} change(s) waiting to sync.`;}
     return 'All changes are synced.';
   };
 

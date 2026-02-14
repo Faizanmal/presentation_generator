@@ -34,4 +34,11 @@ export class GenerateProjectDto {
   @IsEnum(GenerationType)
   @IsOptional()
   type?: GenerationType = GenerationType.PRESENTATION;
+
+  @IsOptional()
+  generateImages?: boolean;
+
+  @IsString()
+  @IsOptional()
+  imageSource?: 'ai' | 'stock' = 'ai';
 }

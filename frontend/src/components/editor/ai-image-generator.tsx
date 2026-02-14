@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import axios, { AxiosError } from 'axios';
+import type { AxiosError } from 'axios';
 import {
   Wand2,
   Loader2,
@@ -9,11 +9,10 @@ import {
   Download,
   Check,
   AlertCircle,
-  Image as ImageIcon,
   Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+// import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -34,6 +33,7 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
+import Image from 'next/image';
 
 interface AIImageGeneratorProps {
   onImageGenerated: (imageUrl: string) => void;
@@ -101,23 +101,22 @@ export function AIImageGenerator({
   };
 
   const handleGenerate = async () => {
-    if (!prompt.trim()) return;
+    if (!prompt.trim()) {return;}
 
     setIsGenerating(true);
     setError(null);
 
     try {
       const enhancedPrompt = buildEnhancedPrompt();
-      
-      const response = await api.post('/ai/generate-image', {
-        prompt: enhancedPrompt,
+
+      const response = await api.generateImage(enhancedPrompt, {
         size,
         style,
       });
 
       setGeneratedImage(response.data.imageUrl);
     } catch (err) {
-      const error = err as AxiosError<{message: string}>;
+      const error = err as AxiosError<{ message: string }>;
       setError(error.response?.data?.message || 'Failed to generate image');
     } finally {
       setIsGenerating(false);
@@ -141,7 +140,7 @@ export function AIImageGenerator({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
       setIsOpen(open);
-      if (!open) resetState();
+      if (!open) {resetState();}
     }}>
       <DialogTrigger asChild>
         <Button variant="outline" className={cn('gap-2', className)}>
@@ -218,7 +217,7 @@ export function AIImageGenerator({
             <div className="space-y-2">
               <Label>Generated Image</Label>
               <div className="relative rounded-lg overflow-hidden border">
-                <img
+                <Image
                   src={generatedImage}
                   alt="Generated"
                   className="w-full h-auto"
@@ -302,12 +301,11 @@ export function QuickAIImage({
   const [isGenerating, setIsGenerating] = useState(false);
 
   const handleQuickGenerate = async () => {
-    if (!slideContext) return;
+    if (!slideContext) {return;}
 
     setIsGenerating(true);
     try {
-      const response = await api.post('/ai/generate-image', {
-        prompt: `Professional presentation image for: ${slideContext}`,
+      const response = await api.generateImage(`Professional presentation image for: ${slideContext}`, {
         size: '1792x1024',
         style: 'minimalist',
       });

@@ -1,19 +1,14 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { 
-  Play, 
-  Users, 
-  MessageSquare, 
-  BarChart3, 
-  Hand, 
-  Send, 
+import { useState, useEffect } from 'react';
+import {
+  Play,
+  Users,
+  MessageSquare,
+  BarChart3,
   ThumbsUp,
   X,
   Copy,
-  ExternalLink,
-  Mic,
-  MicOff,
   CheckCircle,
   Clock,
   PieChart,
@@ -86,7 +81,7 @@ export function LivePresentationPanel({
   const [polls, setPolls] = useState<Poll[]>([]);
   const [isStarting, setIsStarting] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
-  
+
   // Poll creation
   const [showPollDialog, setShowPollDialog] = useState(false);
   const [pollQuestion, setPollQuestion] = useState('');
@@ -104,6 +99,7 @@ export function LivePresentationPanel({
       toast.success('Live session started!');
       onStartPresentation?.();
     } catch (error) {
+      console.error(error);
       toast.error('Failed to start live session');
     } finally {
       setIsStarting(false);
@@ -111,7 +107,7 @@ export function LivePresentationPanel({
   };
 
   const endSession = async () => {
-    if (!session) return;
+    if (!session) { return; }
     try {
       await api.endLiveSession(projectId, session.sessionId);
       setSession(null);
@@ -119,6 +115,7 @@ export function LivePresentationPanel({
       setPolls([]);
       toast.success('Live session ended');
     } catch (error) {
+      console.error(error)
       toast.error('Failed to end session');
     }
   };
@@ -131,16 +128,16 @@ export function LivePresentationPanel({
   };
 
   const markQuestionAnswered = (questionId: string) => {
-    setQuestions(prev => 
-      prev.map(q => 
+    setQuestions(prev =>
+      prev.map(q =>
         q.id === questionId ? { ...q, answered: true } : q
       )
     );
   };
 
   const createPoll = async () => {
-    if (!session || !pollQuestion.trim()) return;
-    
+    if (!session || !pollQuestion.trim()) { return; }
+
     const validOptions = pollOptions.filter(o => o.trim());
     if (validOptions.length < 2) {
       toast.error('Please add at least 2 options');
@@ -149,26 +146,27 @@ export function LivePresentationPanel({
 
     try {
       const newPoll = await api.createPoll(session.sessionId, pollQuestion, validOptions);
-      setPolls(prev => [...prev, { 
+      setPolls(prev => [...prev, {
         id: String((newPoll as Record<string, unknown>).id || (newPoll as Record<string, unknown>).pollId || `poll-${Date.now()}`),
         question: pollQuestion,
         options: validOptions.map((text, idx) => ({ id: `opt-${idx}`, text, votes: 0 })),
-        isOpen: true, 
-        totalVotes: 0 
+        isOpen: true,
+        totalVotes: 0
       }]);
       setShowPollDialog(false);
       setPollQuestion('');
       setPollOptions(['', '']);
       toast.success('Poll created!');
     } catch (error) {
+      console.error(error)
       toast.error('Failed to create poll');
     }
   };
 
   const closePoll = async (pollId: string) => {
-    if (!session) return;
+    if (!session) { return; }
     try {
-      const results = await api.closePoll(session.sessionId, pollId);
+      // const results = await api.closePoll(session.sessionId, pollId);
       setPolls(prev =>
         prev.map(p =>
           p.id === pollId ? { ...p, isOpen: false } : p
@@ -176,19 +174,21 @@ export function LivePresentationPanel({
       );
       toast.success('Poll closed');
     } catch (error) {
+      console.error(error)
       toast.error('Failed to close poll');
     }
   };
 
   // Simulate real-time updates (in production, use WebSocket)
   useEffect(() => {
-    if (!session) return;
+    if (!session) { return; }
 
     const interval = setInterval(async () => {
       try {
         const newQuestions = await api.getLiveSessionQuestions(session.sessionId);
         setQuestions(newQuestions);
       } catch (error) {
+        console.error(error)
         // Silently fail for polling
       }
     }, 5000);
@@ -202,7 +202,7 @@ export function LivePresentationPanel({
   };
 
   const getElapsedTime = () => {
-    if (!session?.startedAt) return '0:00';
+    if (!session?.startedAt) { return '0:00'; }
     const elapsed = Date.now() - new Date(session.startedAt).getTime();
     const minutes = Math.floor(elapsed / 60000);
     const seconds = Math.floor((elapsed % 60000) / 1000);
@@ -313,7 +313,7 @@ export function LivePresentationPanel({
                     <CardHeader className="pb-2">
                       <CardDescription>Engagement</CardDescription>
                       <CardTitle className="text-2xl">
-                        {session.attendeeCount > 0 
+                        {session.attendeeCount > 0
                           ? Math.round((questions.length / session.attendeeCount) * 100)
                           : 0}%
                       </CardTitle>
@@ -459,7 +459,8 @@ export function LivePresentationPanel({
               <Label>Options</Label>
               <div className="space-y-2 mt-2">
                 {pollOptions.map((option, index) => (
-                  <div key={index} className="flex gap-2">
+
+                  <div key={option} className="flex gap-2">
                     <Input
                       value={option}
                       onChange={(e) => {

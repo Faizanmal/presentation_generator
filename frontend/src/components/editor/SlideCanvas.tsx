@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
+import type {
+  DragEndEvent
+} from "@dnd-kit/core";
 import {
   DndContext,
-  DragEndEvent,
   PointerSensor,
   useSensor,
   useSensors,
@@ -16,7 +18,7 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { toast } from "sonner";
-import { Slide, Theme, Block, UpdateBlockInput } from "@/types";
+import type { Slide, Theme, UpdateBlockInput, BlockContent } from "@/types";
 import { api } from "@/lib/api";
 import { useEditorStore } from "@/stores/editor-store";
 import BlockRenderer from "./BlockRenderer";
@@ -28,16 +30,16 @@ interface SlideCanvasProps {
 }
 
 export default function SlideCanvas({ projectId, slide, theme }: SlideCanvasProps) {
-  const queryClient = useQueryClient();
+
   const { updateBlock, deleteBlock, reorderBlocks } = useEditorStore();
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
 
   // Theme colors
   const bgColor = theme?.colors?.background || "#ffffff";
   const textColor = theme?.colors?.text || "#1f2937";
-  const primaryColor = theme?.colors?.primary || "#3b82f6";
-  const secondaryColor = theme?.colors?.secondary || "#8b5cf6";
-  const accentColor = theme?.colors?.accent || "#10b981";
+  // const primaryColor = theme?.colors?.primary || "#3b82f6";
+  // const secondaryColor = theme?.colors?.secondary || "#8b5cf6";
+  // const accentColor = theme?.colors?.accent || "#10b981";
 
   // DnD sensors
   const sensors = useSensors(
@@ -70,10 +72,11 @@ export default function SlideCanvas({ projectId, slide, theme }: SlideCanvasProp
 
   // Handle block content change
   const handleBlockChange = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (blockId: string, content: any) => {
-      updateBlock(slide.id, blockId, { content });
-      updateBlockMutation.mutate({ blockId, data: { content } });
+
+    (blockId: string, content: Record<string, unknown>) => {
+      const blockContent = content as BlockContent;
+      updateBlock(slide.id, blockId, { content: blockContent });
+      updateBlockMutation.mutate({ blockId, data: { content: blockContent } });
     },
     [slide.id, updateBlock, updateBlockMutation]
   );
@@ -89,7 +92,7 @@ export default function SlideCanvas({ projectId, slide, theme }: SlideCanvasProp
   // Handle block reorder
   const handleBlockReorder = (event: DragEndEvent) => {
     const { active, over } = event;
-    if (!over || active.id === over.id || !slide.blocks) return;
+    if (!over || active.id === over.id || !slide.blocks) { return; }
 
     const oldIndex = slide.blocks.findIndex((b) => b.id === active.id);
     const newIndex = slide.blocks.findIndex((b) => b.id === over.id);
@@ -116,7 +119,7 @@ export default function SlideCanvas({ projectId, slide, theme }: SlideCanvasProp
       onDragEnd={handleBlockReorder}
     >
       <div
-        className="w-full max-w-4xl aspect-[16/10] rounded-lg shadow-xl overflow-hidden"
+        className="w-full max-w-4xl aspect-16/10 rounded-lg shadow-xl overflow-hidden"
         style={{
           backgroundColor: bgColor,
           color: textColor,

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import OpenAI from 'openai';
 import { ConfigService } from '@nestjs/config';
+import { AIService } from './ai.service';
 
 export interface PresentationAnalysis {
   overallScore: number;
@@ -67,13 +67,11 @@ export interface RehearsalFeedback {
 @Injectable()
 export class PresentationCoachService {
   private readonly logger = new Logger(PresentationCoachService.name);
-  private openai: OpenAI;
 
-  constructor(private configService: ConfigService) {
-    this.openai = new OpenAI({
-      apiKey: this.configService.get('OPENAI_API_KEY'),
-    });
-  }
+  constructor(
+    private configService: ConfigService,
+    private readonly aiService: AIService,
+  ) {}
 
   async analyzePresentation(presentation: {
     title: string;
@@ -150,7 +148,7 @@ Provide analysis in JSON format:
 }`;
 
     try {
-      const response = await this.openai.chat.completions.create({
+      const response = await this.aiService.chatCompletion({
         model: 'gpt-4o',
         messages: [
           {
@@ -164,7 +162,18 @@ Provide analysis in JSON format:
         response_format: { type: 'json_object' },
       });
 
-      const analysis = JSON.parse(response.choices[0].message.content || '{}');
+      const analysis = JSON.parse(
+        response.choices[0].message.content || '{}',
+      ) as {
+        overallScore?: number;
+        content?: Partial<CategoryScore>;
+        design?: Partial<CategoryScore>;
+        engagement?: Partial<CategoryScore>;
+        clarity?: Partial<CategoryScore>;
+        suggestions?: Suggestion[];
+        strengths?: string[];
+        improvements?: string[];
+      };
 
       return {
         overallScore: analysis.overallScore || 75,
@@ -172,13 +181,17 @@ Provide analysis in JSON format:
           content: {
             score: analysis.content?.score || 20,
             maxScore: 25,
+
             feedback: analysis.content?.feedback || 'Content analysis pending',
+
             tips: analysis.content?.tips || [],
           },
           design: {
             score: analysis.design?.score || 20,
             maxScore: 25,
+
             feedback: analysis.design?.feedback || 'Design analysis pending',
+
             tips: analysis.design?.tips || [],
           },
           engagement: {
@@ -186,18 +199,24 @@ Provide analysis in JSON format:
             maxScore: 25,
             feedback:
               analysis.engagement?.feedback || 'Engagement analysis pending',
+
             tips: analysis.engagement?.tips || [],
           },
           clarity: {
             score: analysis.clarity?.score || 20,
             maxScore: 25,
+
             feedback: analysis.clarity?.feedback || 'Clarity analysis pending',
+
             tips: analysis.clarity?.tips || [],
           },
-          accessibility: await this.checkAccessibility(slides),
+          accessibility: this.checkAccessibility(slides),
         },
+
         suggestions: analysis.suggestions || [],
+
         strengths: analysis.strengths || [],
+
         improvements: analysis.improvements || [],
         estimatedDuration: Math.ceil(totalWords / 130), // ~130 words per minute
         readabilityScore: this.calculateReadability(slides),
@@ -265,7 +284,7 @@ Provide analysis in JSON format:
 }`;
 
     try {
-      const response = await this.openai.chat.completions.create({
+      const response = await this.aiService.chatCompletion({
         model: 'gpt-4o',
         messages: [
           {
@@ -279,7 +298,15 @@ Provide analysis in JSON format:
         response_format: { type: 'json_object' },
       });
 
-      const analysis = JSON.parse(response.choices[0].message.content || '{}');
+      const analysis = JSON.parse(
+        response.choices[0].message.content || '{}',
+      ) as {
+        clarityScore?: number;
+        clarityFeedback?: string;
+        confidenceScore?: number;
+        confidenceIndicators?: string[];
+        confidenceTips?: string[];
+      };
 
       return {
         pace: {
@@ -355,7 +382,7 @@ Provide improvements in JSON format:
   "alternatives": ["<alt1>", "<alt2>", "<alt3>"]
 }`;
 
-    const response = await this.openai.chat.completions.create({
+    const response = await this.aiService.chatCompletion({
       model: 'gpt-4o',
       messages: [
         {
@@ -369,7 +396,11 @@ Provide improvements in JSON format:
       response_format: { type: 'json_object' },
     });
 
-    return JSON.parse(response.choices[0].message.content || '{}');
+    return JSON.parse(response.choices[0].message.content || '{}') as {
+      improvedContent: string;
+      explanation: string;
+      alternatives: string[];
+    };
   }
 
   async generateSpeakerNotes(slide: {
@@ -396,7 +427,7 @@ Provide in JSON format:
   "transitionPhrase": "<smooth transition to next slide>"
 }`;
 
-    const response = await this.openai.chat.completions.create({
+    const response = await this.aiService.chatCompletion({
       model: 'gpt-4o',
       messages: [
         {
@@ -410,12 +441,16 @@ Provide in JSON format:
       response_format: { type: 'json_object' },
     });
 
-    return JSON.parse(response.choices[0].message.content || '{}');
+    return JSON.parse(response.choices[0].message.content || '{}') as {
+      notes: string;
+      talkingPoints: string[];
+      transitionPhrase: string;
+    };
   }
 
-  private async checkAccessibility(
+  private checkAccessibility(
     slides: Array<{ content: string; hasImage: boolean }>,
-  ): Promise<CategoryScore> {
+  ): CategoryScore {
     let score = 25;
     const tips: string[] = [];
 

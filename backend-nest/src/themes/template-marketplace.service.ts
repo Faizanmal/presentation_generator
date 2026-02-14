@@ -66,6 +66,7 @@ export class TemplateMarketplaceService {
 
   async getCategories(): Promise<TemplateCategory[]> {
     // In production, this would come from the database
+    await Promise.resolve();
     return [
       {
         id: 'business',
@@ -150,6 +151,8 @@ export class TemplateMarketplaceService {
       page = 1,
       limit = 20,
     } = params;
+
+    await Promise.resolve();
 
     // This would be a database query in production
     // For now, return mock data
@@ -282,6 +285,7 @@ export class TemplateMarketplaceService {
 
   async getTemplateById(templateId: string): Promise<TemplateDetails> {
     // In production, fetch from database
+    await Promise.resolve();
     const template: TemplateDetails = {
       id: templateId,
       title: 'Modern Business Pitch',
@@ -389,6 +393,7 @@ export class TemplateMarketplaceService {
 
   async likeTemplate(userId: string, templateId: string): Promise<void> {
     // In production, store in database
+    await Promise.resolve();
     this.logger.log(`User ${userId} liked template ${templateId}`);
   }
 
@@ -402,6 +407,7 @@ export class TemplateMarketplaceService {
     }
 
     // In production, store in database
+    await Promise.resolve();
     this.logger.log(
       `User ${userId} reviewed template ${templateId}: ${data.rating} stars`,
     );
@@ -410,14 +416,6 @@ export class TemplateMarketplaceService {
   async publishTemplate(
     userId: string,
     projectId: string,
-    data: {
-      title: string;
-      description: string;
-      category: string;
-      tags: string[];
-      isPremium: boolean;
-      price?: number;
-    },
   ): Promise<{ templateId: string }> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },

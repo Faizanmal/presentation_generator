@@ -10,5 +10,5 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fetchProfile();
   }, [fetchProfile]);
 
-  return <>{children}</>;
+  return children;
 }

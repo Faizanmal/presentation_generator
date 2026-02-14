@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import axios, { AxiosError } from 'axios';
+import type { AxiosError } from 'axios';
 import {
   Download,
   FileJson,
@@ -12,7 +12,6 @@ import {
   Loader2,
   Check,
   Settings,
-  ExternalLink,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -36,9 +35,6 @@ import {
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -133,13 +129,31 @@ export function ExportOptionsPanel({
 
     try {
       let blob: Blob | null = null;
-      const filename = `${projectTitle.replace(/[^a-z0-9]/gi, '_')}.${EXPORT_OPTIONS.find(o => o.id === selectedFormat)?.fileExtension}`;
+      let filename = `${projectTitle.replace(/[^a-z0-9]/gi, '_')}.${EXPORT_OPTIONS.find(o => o.id === selectedFormat)?.fileExtension}`;
 
       switch (selectedFormat) {
         case 'pdf':
           setExportProgress(30);
           const pdfResponse = await api.exportProject(projectId, 'pdf');
-          blob = new Blob([pdfResponse], { type: 'application/pdf' });
+
+          // Use filename from server if provided (handles fallback to .html)
+          if (pdfResponse.filename) {
+            filename = pdfResponse.filename;
+
+            // If server returned HTML, notify user
+            if (filename.toLowerCase().endsWith('.html')) {
+              toast.info('PDF export unavailable. Downloading as HTML (open in browser to print).');
+            }
+          } else {
+            // Fallback check if filename header is missing but content is HTML
+            const pdfContentHeader = await pdfResponse.blob.slice(0, 5).text();
+            if (!pdfContentHeader.startsWith('%PDF')) {
+              filename = filename.replace(/\.pdf$/i, '.html');
+              toast.info('PDF export unavailable. Downloading as HTML (open in browser to print).');
+            }
+          }
+
+          blob = pdfResponse.blob;
           break;
 
         case 'pptx':
@@ -154,13 +168,40 @@ export function ExportOptionsPanel({
         case 'html':
           setExportProgress(30);
           const htmlResponse = await api.exportProject(projectId, 'html');
-          blob = new Blob([htmlResponse], { type: 'text/html' });
+          if (htmlResponse.filename) { filename = htmlResponse.filename; }
+          blob = new Blob([htmlResponse.blob], { type: 'text/html' });
           break;
 
         case 'json':
           setExportProgress(30);
           const jsonResponse = await api.exportProject(projectId, 'json');
-          blob = new Blob([JSON.stringify(jsonResponse, null, 2)], { type: 'application/json' });
+
+
+          if (jsonResponse.filename) { filename = jsonResponse.filename; }
+
+          const jsonText = await jsonResponse.blob.text();
+
+          if (!jsonText || jsonText.trim().length === 0) {
+            console.error('Exported JSON is empty');
+            throw new Error('Exported JSON is empty');
+          }
+
+          // Validate that it's valid JSON
+          try {
+            const parsed = JSON.parse(jsonText);
+            // check for error response
+            if (parsed.statusCode && parsed.statusCode >= 400) {
+              throw new Error(parsed.message || 'Export failed');
+            }
+          } catch (e) {
+            if (e instanceof Error && e.message !== 'Export failed') {
+              console.error('Invalid JSON received:', jsonText.substring(0, 100));
+              throw new Error('Received invalid JSON data');
+            }
+            throw e;
+          }
+
+          blob = new Blob([jsonText], { type: 'application/json' });
           break;
 
         case 'video':
@@ -193,7 +234,7 @@ export function ExportOptionsPanel({
         toast.success(`Exported as ${filename}`);
       }
     } catch (error) {
-      const err = error as AxiosError<{message: string}>;
+      const err = error as AxiosError<{ message: string }>;
       toast.error(err.response?.data?.message || 'Export failed');
     } finally {
       setIsExporting(false);
@@ -218,6 +259,7 @@ export function ExportOptionsPanel({
           toast.error(status.error || 'Video export failed');
         }
       } catch (error) {
+        console.error(error)
         clearInterval(interval);
       }
     }, 5000);
@@ -258,8 +300,8 @@ export function ExportOptionsPanel({
                     <div className="flex items-center gap-3">
                       <div className={cn(
                         'p-2 rounded-lg',
-                        selectedFormat === option.id 
-                          ? 'bg-blue-500 text-white' 
+                        selectedFormat === option.id
+                          ? 'bg-blue-500 text-white'
                           : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                       )}>
                         {option.icon}
@@ -270,7 +312,7 @@ export function ExportOptionsPanel({
                       </div>
                     </div>
                     {option.isPremium && (
-                      <Badge variant="secondary" className="bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-700">
+                      <Badge variant="secondary" className="bg-linear-to-r from-amber-100 to-yellow-100 text-amber-700">
                         Pro
                       </Badge>
                     )}

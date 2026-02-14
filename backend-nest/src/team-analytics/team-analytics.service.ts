@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 
 export interface TeamMember {
   id: string;
@@ -53,7 +54,7 @@ export interface ActivityTimeline {
   action: string;
   target: string;
   targetId: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   timestamp: Date;
 }
 
@@ -85,19 +86,21 @@ export class TeamAnalyticsService {
     organizationId: string,
     period?: { start: Date; end: Date },
   ): Promise<TeamPerformanceMetrics> {
-    const dateFilter = period ? {
-      createdAt: {
-        gte: period.start,
-        lte: period.end,
-      },
-    } : {};
+    const dateFilter = period
+      ? {
+          createdAt: {
+            gte: period.start,
+            lte: period.end,
+          },
+        }
+      : {};
 
     // Get organization members
     const members = await this.prisma.organizationMember.findMany({
       where: { organizationId },
       select: { userId: true },
     });
-    const userIds = members.map(m => m.userId);
+    const userIds = members.map((m) => m.userId);
 
     // Total presentations
     const totalPresentations = await this.prisma.project.count({
@@ -139,12 +142,15 @@ export class TeamAnalyticsService {
       },
     });
 
-    const avgTimeToPublish = publishedProjects.length > 0
-      ? publishedProjects.reduce((acc, p) => {
-          const hours = (p.publishedAt!.getTime() - p.createdAt.getTime()) / (1000 * 60 * 60);
-          return acc + hours;
-        }, 0) / publishedProjects.length
-      : 0;
+    const avgTimeToPublish =
+      publishedProjects.length > 0
+        ? publishedProjects.reduce((acc, p) => {
+            const hours =
+              (p.publishedAt!.getTime() - p.createdAt.getTime()) /
+              (1000 * 60 * 60);
+            return acc + hours;
+          }, 0) / publishedProjects.length
+        : 0;
 
     // Average revisions per project
     const revisionCounts = await this.prisma.projectVersion.groupBy({
@@ -158,9 +164,11 @@ export class TeamAnalyticsService {
       },
     });
 
-    const avgRevisions = revisionCounts.length > 0
-      ? revisionCounts.reduce((acc, r) => acc + r._count, 0) / revisionCounts.length
-      : 0;
+    const avgRevisions =
+      revisionCounts.length > 0
+        ? revisionCounts.reduce((acc, r) => acc + r._count, 0) /
+          revisionCounts.length
+        : 0;
 
     // Active collaborations
     const activeCollaborations = await this.prisma.collaborationSession.count({
@@ -189,12 +197,14 @@ export class TeamAnalyticsService {
     organizationId: string,
     period?: { start: Date; end: Date },
   ): Promise<MemberContribution[]> {
-    const dateFilter = period ? {
-      createdAt: {
-        gte: period.start,
-        lte: period.end,
-      },
-    } : {};
+    const dateFilter = period
+      ? {
+          createdAt: {
+            gte: period.start,
+            lte: period.end,
+          },
+        }
+      : {};
 
     const members = await this.prisma.organizationMember.findMany({
       where: { organizationId },
@@ -241,7 +251,9 @@ export class TeamAnalyticsService {
       const totalEdits = await this.prisma.activityLog.count({
         where: {
           userId,
-          action: { in: ['edit', 'update', 'create_slide', 'create_block', 'delete'] },
+          action: {
+            in: ['edit', 'update', 'create_slide', 'create_block', 'delete'],
+          },
           ...dateFilter,
         },
       });
@@ -272,12 +284,15 @@ export class TeamAnalyticsService {
         },
       });
 
-      const avgTimeToComplete = userProjects.length > 0
-        ? userProjects.reduce((acc, p) => {
-            const hours = (p.updatedAt.getTime() - p.createdAt.getTime()) / (1000 * 60 * 60);
-            return acc + hours;
-          }, 0) / userProjects.length
-        : 0;
+      const avgTimeToComplete =
+        userProjects.length > 0
+          ? userProjects.reduce((acc, p) => {
+              const hours =
+                (p.updatedAt.getTime() - p.createdAt.getTime()) /
+                (1000 * 60 * 60);
+              return acc + hours;
+            }, 0) / userProjects.length
+          : 0;
 
       contributions.push({
         userId,
@@ -385,8 +400,12 @@ export class TeamAnalyticsService {
       }
 
       // Get slide title from first text block
-      const titleBlock = slide.blocks.find(b => b.type === 'heading' || b.type === 'title');
-      const slideTitle = titleBlock ? (titleBlock.content as any)?.text : undefined;
+      const titleBlock = slide.blocks.find(
+        (b) => b.blockType === 'SUBHEADING' || b.blockType === 'PARAGRAPH',
+      );
+      const slideTitle = titleBlock
+        ? ((titleBlock.content as Record<string, unknown>)?.text as string)
+        : undefined;
 
       heatmaps.push({
         slideId: slide.id,
@@ -418,9 +437,9 @@ export class TeamAnalyticsService {
       where: { organizationId },
       select: { userId: true },
     });
-    const userIds = members.map(m => m.userId);
+    const userIds = members.map((m) => m.userId);
 
-    const where: any = {
+    const where: Prisma.ActivityLogWhereInput = {
       userId: options?.userId ? options.userId : { in: userIds },
     };
 
@@ -439,18 +458,20 @@ export class TeamAnalyticsService {
         take: options?.limit || 50,
         skip: options?.offset || 0,
       }),
-      this.prisma.activityLog.count({ where }),
+      this.prisma.activityLog.count({
+        where,
+      }),
     ]);
 
     return {
-      activities: activities.map(a => ({
+      activities: activities.map((a) => ({
         id: a.id,
         userId: a.userId,
         userName: a.user?.name || 'Unknown',
         action: a.action,
         target: a.targetType,
         targetId: a.targetId,
-        metadata: a.metadata as Record<string, any>,
+        metadata: a.metadata as Record<string, unknown>,
         timestamp: a.createdAt,
       })),
       total,
@@ -477,14 +498,18 @@ export class TeamAnalyticsService {
       end: new Date(),
     };
 
-    const [overallMetrics, allContributions, activityResult] = await Promise.all([
-      this.getTeamPerformance(organizationId, defaultPeriod),
-      this.getMemberContributions(organizationId, defaultPeriod),
-      this.getActivityTimeline(organizationId, { limit: 20 }),
-    ]);
+    const [overallMetrics, allContributions, activityResult] =
+      await Promise.all([
+        this.getTeamPerformance(organizationId, defaultPeriod),
+        this.getMemberContributions(organizationId, defaultPeriod),
+        this.getActivityTimeline(organizationId, { limit: 20 }),
+      ]);
 
     // Calculate productivity trends (daily)
-    const productivityTrends = await this.getProductivityTrends(organizationId, defaultPeriod);
+    const productivityTrends = await this.getProductivityTrends(
+      organizationId,
+      defaultPeriod,
+    );
 
     return {
       organizationId,
@@ -508,7 +533,7 @@ export class TeamAnalyticsService {
       where: { organizationId },
       select: { userId: true },
     });
-    const userIds = members.map(m => m.userId);
+    const userIds = members.map((m) => m.userId);
 
     const trends: TeamDashboard['productivityTrends'] = [];
     const current = new Date(period.start);
@@ -519,27 +544,30 @@ export class TeamAnalyticsService {
       const dayEnd = new Date(current);
       dayEnd.setHours(23, 59, 59, 999);
 
-      const [presentationsCreated, edits, collaborationSessions] = await Promise.all([
-        this.prisma.project.count({
-          where: {
-            ownerId: { in: userIds },
-            createdAt: { gte: dayStart, lte: dayEnd },
-          },
-        }),
-        this.prisma.activityLog.count({
-          where: {
-            userId: { in: userIds },
-            action: { in: ['edit', 'update', 'create_slide', 'create_block'] },
-            createdAt: { gte: dayStart, lte: dayEnd },
-          },
-        }),
-        this.prisma.collaborationSession.count({
-          where: {
-            project: { ownerId: { in: userIds } },
-            startedAt: { gte: dayStart, lte: dayEnd },
-          },
-        }),
-      ]);
+      const [presentationsCreated, edits, collaborationSessions] =
+        await Promise.all([
+          this.prisma.project.count({
+            where: {
+              ownerId: { in: userIds },
+              createdAt: { gte: dayStart, lte: dayEnd },
+            },
+          }),
+          this.prisma.activityLog.count({
+            where: {
+              userId: { in: userIds },
+              action: {
+                in: ['edit', 'update', 'create_slide', 'create_block'],
+              },
+              createdAt: { gte: dayStart, lte: dayEnd },
+            },
+          }),
+          this.prisma.collaborationSession.count({
+            where: {
+              project: { ownerId: { in: userIds } },
+              startedAt: { gte: dayStart, lte: dayEnd },
+            },
+          }),
+        ]);
 
       trends.push({
         date: current.toISOString().split('T')[0],
@@ -612,8 +640,16 @@ export class TeamAnalyticsService {
       where: {
         OR: [
           { targetId: projectId, targetType: 'project' },
-          { targetId: { in: project.slides.map(s => s.id) }, targetType: 'slide' },
-          { targetId: { in: project.slides.flatMap(s => s.blocks.map(b => b.id)) }, targetType: 'block' },
+          {
+            targetId: { in: project.slides.map((s) => s.id) },
+            targetType: 'slide',
+          },
+          {
+            targetId: {
+              in: project.slides.flatMap((s) => s.blocks.map((b) => b.id)),
+            },
+            targetType: 'block',
+          },
         ],
       },
       include: {
@@ -623,17 +659,20 @@ export class TeamAnalyticsService {
     });
 
     // Group by user
-    const userContributions: Record<string, {
-      slidesCreated: Set<string>;
-      blocksCreated: Set<string>;
-      editsCount: number;
-      firstContribution: Date;
-      lastContribution: Date;
-    }> = {};
+    const userContributions: Record<
+      string,
+      {
+        slidesCreated: Set<string>;
+        blocksCreated: Set<string>;
+        editsCount: number;
+        firstContribution: Date;
+        lastContribution: Date;
+      }
+    > = {};
 
     for (const activity of allActivities) {
       const userId = activity.userId;
-      
+
       if (!userContributions[userId]) {
         userContributions[userId] = {
           slidesCreated: new Set(),
@@ -646,10 +685,16 @@ export class TeamAnalyticsService {
 
       const contrib = userContributions[userId];
       contrib.lastContribution = activity.createdAt;
-      
-      if (activity.action === 'create_slide' && activity.targetType === 'slide') {
+
+      if (
+        activity.action === 'create_slide' &&
+        activity.targetType === 'slide'
+      ) {
         contrib.slidesCreated.add(activity.targetId);
-      } else if (activity.action === 'create_block' && activity.targetType === 'block') {
+      } else if (
+        activity.action === 'create_block' &&
+        activity.targetType === 'block'
+      ) {
         contrib.blocksCreated.add(activity.targetId);
       } else if (['edit', 'update'].includes(activity.action)) {
         contrib.editsCount++;
@@ -658,7 +703,11 @@ export class TeamAnalyticsService {
 
     // Calculate total work for percentage
     const totalWork = Object.values(userContributions).reduce(
-      (acc, c) => acc + c.slidesCreated.size * 5 + c.blocksCreated.size * 2 + c.editsCount,
+      (acc, c) =>
+        acc +
+        c.slidesCreated.size * 5 +
+        c.blocksCreated.size * 2 +
+        c.editsCount,
       0,
     );
 
@@ -669,7 +718,10 @@ export class TeamAnalyticsService {
           select: { name: true },
         });
 
-        const workUnits = contrib.slidesCreated.size * 5 + contrib.blocksCreated.size * 2 + contrib.editsCount;
+        const workUnits =
+          contrib.slidesCreated.size * 5 +
+          contrib.blocksCreated.size * 2 +
+          contrib.editsCount;
 
         return {
           userId,
@@ -680,7 +732,8 @@ export class TeamAnalyticsService {
             editsCount: contrib.editsCount,
             firstContribution: contrib.firstContribution,
             lastContribution: contrib.lastContribution,
-            percentageOfWork: totalWork > 0 ? Math.round((workUnits / totalWork) * 100) : 0,
+            percentageOfWork:
+              totalWork > 0 ? Math.round((workUnits / totalWork) * 100) : 0,
           },
         };
       }),
@@ -688,15 +741,18 @@ export class TeamAnalyticsService {
 
     return {
       project: { id: project.id, title: project.title },
-      contributors: contributors.sort((a, b) => b.contribution.percentageOfWork - a.contribution.percentageOfWork),
-      timeline: allActivities.slice(-50).map(a => ({
+      contributors: contributors.sort(
+        (a, b) =>
+          b.contribution.percentageOfWork - a.contribution.percentageOfWork,
+      ),
+      timeline: allActivities.slice(-50).map((a) => ({
         id: a.id,
         userId: a.userId,
         userName: a.user?.name || 'Unknown',
         action: a.action,
         target: a.targetType,
         targetId: a.targetId,
-        metadata: a.metadata as Record<string, any>,
+        metadata: a.metadata as Record<string, unknown>,
         timestamp: a.createdAt,
       })),
     };

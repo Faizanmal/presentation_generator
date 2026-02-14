@@ -1,0 +1,211 @@
+name: Integration Tests with Third-Party Services
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: presentation_designer_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      # ═══════════════════════════════════════════════════════════════
+      # New Relic Configuration
+      # ═══════════════════════════════════════════════════════════════
+      - name: Setup New Relic
+        env:
+          NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
+        run: |
+          echo "NEW_RELIC_ENABLED=true" >> $GITHUB_ENV
+          echo "NEW_RELIC_LICENSE_KEY=$NEW_RELIC_LICENSE_KEY" >> $GITHUB_ENV
+
+      # ═══════════════════════════════════════════════════════════════
+      # Doppler Secrets Setup
+      # ═══════════════════════════════════════════════════════════════
+      - name: Install Doppler CLI
+        uses: dopplerhq/cli-action@v3
+        with:
+          token: ${{ secrets.DOPPLER_TOKEN_TEST }}
+
+      - name: Fetch secrets from Doppler
+        run: |
+          doppler secrets download --format dotenv --config test > backend-nest/.env.test
+          cat backend-nest/.env.test >> $GITHUB_ENV
+
+      # ═══════════════════════════════════════════════════════════════
+      # TestMail Configuration
+      # ═══════════════════════════════════════════════════════════════
+      - name: Setup TestMail
+        env:
+          TESTMAIL_API_KEY: ${{ secrets.TESTMAIL_API_KEY }}
+        run: |
+          echo "TESTMAIL_ENABLED=true" >> $GITHUB_ENV
+          echo "TESTMAIL_API_KEY=$TESTMAIL_API_KEY" >> $GITHUB_ENV
+          echo "TESTMAIL_NAMESPACE=presentation-designer-ci" >> $GITHUB_ENV
+
+      # ═══════════════════════════════════════════════════════════════
+      # Backend Tests
+      # ═══════════════════════════════════════════════════════════════
+      - name: Install backend dependencies
+        working-directory: backend-nest
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: backend-nest
+        run: npm run db:generate
+
+      - name: Run backend linter
+        working-directory: backend-nest
+        run: npm run lint
+
+      - name: Run backend unit tests
+        working-directory: backend-nest
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/presentation_designer_test
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          NODE_ENV: test
+        run: npm run test:cov
+
+      - name: Run backend E2E tests
+        working-directory: backend-nest
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/presentation_designer_test
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          NODE_ENV: test
+        run: npm run test:e2e
+
+      # ═══════════════════════════════════════════════════════════════
+      # Frontend Tests
+      # ═══════════════════════════════════════════════════════════════
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run frontend linter
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Run frontend tests
+        working-directory: frontend
+        env:
+          REACT_APP_TESTMAIL_ENABLED: "true"
+          REACT_APP_TESTMAIL_API_KEY: ${{ secrets.TESTMAIL_API_KEY }}
+          REACT_APP_TESTMAIL_NAMESPACE: presentation-designer-ci
+        run: npm run test:cov
+
+      # ═══════════════════════════════════════════════════════════════
+      # Upload Coverage to Codecov
+      # ═══════════════════════════════════════════════════════════════
+      - name: Upload backend coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./backend-nest/coverage/lcov.info
+          flags: backend
+          name: backend-coverage
+
+      - name: Upload frontend coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./frontend/coverage/lcov.info
+          flags: frontend
+          name: frontend-coverage
+
+      # ═══════════════════════════════════════════════════════════════
+      # Build Docker Images
+      # ═══════════════════════════════════════════════════════════════
+      - name: Build backend Docker image
+        working-directory: backend-nest
+        run: |
+          docker build -t presentation-designer-backend:test . \
+            --build-arg NODE_ENV=test \
+            --build-arg APP_VERSION=${{ github.sha }}
+
+      - name: Build frontend Docker image
+        working-directory: frontend
+        run: |
+          docker build -t presentation-designer-frontend:test . \
+            --build-arg NODE_ENV=test \
+            --build-arg APP_VERSION=${{ github.sha }}
+
+      # ═══════════════════════════════════════════════════════════════
+      # Notifications
+      # ═══════════════════════════════════════════════════════════════
+      - name: Send Slack notification on success
+        if: success()
+        uses: slackapi/slack-github-action@v1
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          payload: |
+            {
+              "text": "✅ CI/CD Pipeline Passed",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*All tests passed* - Build `${{ github.sha }}`"
+                  }
+                }
+              ]
+            }
+
+      - name: Send Slack notification on failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          payload: |
+            {
+              "text": "❌ CI/CD Pipeline Failed",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Tests failed* - Check details on [GitHub Actions](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+                  }
+                }
+              ]
+            }

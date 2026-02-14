@@ -7,12 +7,11 @@ import {
   Eye,
   Type,
   Contrast,
-  Image,
+  Image as ImageIcon,
   Check,
   X,
   AlertTriangle,
   Info,
-  ChevronRight,
   Loader2,
   Wand2,
   Download,
@@ -25,7 +24,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -82,7 +80,7 @@ interface AccessibilityCheckerProps {
 const categoryIcons: Record<string, React.ReactNode> = {
   contrast: <Contrast className="h-4 w-4" />,
   text: <Type className="h-4 w-4" />,
-  images: <Image className="h-4 w-4" />,
+  images: <ImageIcon className="h-4 w-4" />,
   structure: <FileText className="h-4 w-4" />,
   motion: <Eye className="h-4 w-4" />,
 };
@@ -95,7 +93,7 @@ const categoryLabels: Record<string, string> = {
   motion: 'Motion & Animation',
 };
 
-export function AccessibilityChecker({ projectId, slides }: AccessibilityCheckerProps) {
+export function AccessibilityChecker({ }: AccessibilityCheckerProps) {
   const [report, setReport] = useState<AccessibilityReport | null>(null);
   const [expandedIssue, setExpandedIssue] = useState<string | null>(null);
 
@@ -103,7 +101,7 @@ export function AccessibilityChecker({ projectId, slides }: AccessibilityChecker
     mutationFn: async () => {
       // Simulate accessibility check
       await new Promise((r) => setTimeout(r, 2000));
-      
+
       // Mock report
       const mockReport: AccessibilityReport = {
         score: 78,
@@ -179,7 +177,7 @@ export function AccessibilityChecker({ projectId, slides }: AccessibilityChecker
           motion: { passed: 4, failed: 0 },
         },
       };
-      
+
       return mockReport;
     },
     onSuccess: (data) => {
@@ -188,7 +186,8 @@ export function AccessibilityChecker({ projectId, slides }: AccessibilityChecker
   });
 
   const autoFixMutation = useMutation({
-    mutationFn: async (issueId: string) => {
+    mutationFn: async (_issueId: string) => {
+      void _issueId;
       await new Promise((r) => setTimeout(r, 1000));
       return { success: true };
     },
@@ -206,8 +205,8 @@ export function AccessibilityChecker({ projectId, slides }: AccessibilityChecker
   });
 
   const getScoreColor = (score: number) => {
-    if (score >= 90) return 'text-green-600';
-    if (score >= 70) return 'text-yellow-600';
+    if (score >= 90) {return 'text-green-600';}
+    if (score >= 70) {return 'text-yellow-600';}
     return 'text-red-600';
   };
 
@@ -285,7 +284,7 @@ export function AccessibilityChecker({ projectId, slides }: AccessibilityChecker
                 <span>Text readability</span>
               </div>
               <div className="flex items-start gap-2">
-                <Image className="h-4 w-4 text-blue-500 mt-0.5" />
+                <ImageIcon className="h-4 w-4 text-blue-500 mt-0.5" />
                 <span>Image alt text</span>
               </div>
               <div className="flex items-start gap-2">

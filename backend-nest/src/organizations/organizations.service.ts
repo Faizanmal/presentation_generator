@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
-import { v4 as uuidv4 } from 'uuid';
+import { Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
 
 type OrgRole = 'OWNER' | 'ADMIN' | 'MEMBER';
@@ -27,7 +27,7 @@ interface UpdateOrganizationDto {
   secondaryColor?: string;
   customCss?: string;
   customDomain?: string;
-  settings?: any;
+  settings?: Record<string, unknown>;
 }
 
 interface SSOConfigDto {
@@ -162,7 +162,10 @@ export class OrganizationsService {
 
     const organization = await this.prisma.organization.update({
       where: { id: organizationId },
-      data: dto,
+      data: {
+        ...dto,
+        settings: dto.settings as unknown as Prisma.InputJsonValue,
+      },
     });
 
     await this.logAuditEvent(
@@ -171,8 +174,8 @@ export class OrganizationsService {
       'UPDATE',
       'organization',
       organizationId,
-      oldData,
-      dto,
+      oldData as unknown as Prisma.InputJsonValue,
+      dto as unknown as Prisma.InputJsonValue,
     );
 
     return organization;
@@ -274,8 +277,8 @@ export class OrganizationsService {
       'INVITE',
       'member',
       invitation.id,
-      null,
-      { email: dto.email, role: dto.role },
+      null as unknown as Prisma.InputJsonValue,
+      { email: dto.email, role: dto.role } as unknown as Prisma.InputJsonValue,
     );
 
     // In production, send email with invitation link
@@ -371,8 +374,8 @@ export class OrganizationsService {
       'UPDATE',
       'member',
       memberId,
-      { role: member.role },
-      { role },
+      { role: member.role } as unknown as Prisma.InputJsonValue,
+      { role } as unknown as Prisma.InputJsonValue,
     );
 
     return updated;
@@ -459,8 +462,8 @@ export class OrganizationsService {
       'CONFIGURE',
       'sso',
       ssoConfig.id,
-      null,
-      { provider: dto.provider },
+      null as unknown as Prisma.InputJsonValue,
+      { provider: dto.provider } as unknown as Prisma.InputJsonValue,
     );
 
     return ssoConfig;
@@ -575,7 +578,7 @@ export class OrganizationsService {
     const limit = options?.limit || 50;
     const skip = (page - 1) * limit;
 
-    const where: any = { organizationId };
+    const where: Prisma.AuditLogWhereInput = { organizationId };
 
     if (options?.action) {
       where.action = options.action;
@@ -585,7 +588,9 @@ export class OrganizationsService {
     }
     if (options?.startDate || options?.endDate) {
       where.createdAt = {};
+
       if (options.startDate) where.createdAt.gte = options.startDate;
+
       if (options.endDate) where.createdAt.lte = options.endDate;
     }
 
@@ -596,6 +601,7 @@ export class OrganizationsService {
         skip,
         take: limit,
       }),
+
       this.prisma.auditLog.count({ where }),
     ]);
 
@@ -628,8 +634,8 @@ export class OrganizationsService {
     action: string,
     resource: string,
     resourceId?: string,
-    oldValue?: any,
-    newValue?: any,
+    oldValue?: Prisma.InputJsonValue,
+    newValue?: Prisma.InputJsonValue,
     ipAddress?: string,
     userAgent?: string,
   ) {
@@ -640,8 +646,9 @@ export class OrganizationsService {
         action,
         resource,
         resourceId,
-        oldValue,
-        newValue,
+
+        oldValue: oldValue ?? Prisma.DbNull,
+        newValue: newValue ?? Prisma.DbNull,
         ipAddress,
         userAgent,
       },

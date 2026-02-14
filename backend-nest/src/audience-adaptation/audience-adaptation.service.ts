@@ -1,9 +1,10 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import OpenAI from 'openai';
+import { AIService } from '../ai/ai.service';
 import { PrismaService } from '../prisma/prisma.service';
+import type { Block as PrismaBlock, Prisma } from '@prisma/client';
 
-export type AudienceType = 
+export type AudienceType =
   | 'executives'
   | 'sales'
   | 'technical'
@@ -22,13 +23,6 @@ export interface AdaptationOptions {
   preserveKeyPoints: boolean;
 }
 
-export interface AdaptedSlide {
-  slideId: string;
-  originalContent: any;
-  adaptedContent: any;
-  changes: string[];
-}
-
 export interface AdaptationResult {
   projectId: string;
   originalAudience: string;
@@ -42,45 +36,79 @@ export interface AdaptationResult {
   };
 }
 
+interface AdaptationResponse {
+  adaptedText: string;
+  changes: string[];
+}
+
+interface AdaptedSlide {
+  slideId: string;
+  originalContent: PrismaBlock[];
+  adaptedContent: any[];
+  changes: string[];
+}
+
 @Injectable()
 export class AudienceAdaptationService {
   private readonly logger = new Logger(AudienceAdaptationService.name);
-  private openai: OpenAI;
 
-  private audienceProfiles: Record<AudienceType, {
-    tone: string;
-    complexity: string;
-    focus: string;
-    avgWordCount: number;
-    keyElements: string[];
-  }> = {
+  private audienceProfiles: Record<
+    AudienceType,
+    {
+      tone: string;
+      complexity: string;
+      focus: string;
+      avgWordCount: number;
+      keyElements: string[];
+    }
+  > = {
     executives: {
       tone: 'concise, strategic, results-focused',
       complexity: 'high-level, minimal jargon',
       focus: 'ROI, business impact, key metrics',
       avgWordCount: 50,
-      keyElements: ['executive summary', 'key takeaways', 'financial impact', 'timeline'],
+      keyElements: [
+        'executive summary',
+        'key takeaways',
+        'financial impact',
+        'timeline',
+      ],
     },
     sales: {
       tone: 'persuasive, benefit-oriented, action-driven',
       complexity: 'accessible, customer-focused',
       focus: 'value proposition, benefits, testimonials',
       avgWordCount: 75,
-      keyElements: ['pain points', 'solutions', 'proof points', 'call to action'],
+      keyElements: [
+        'pain points',
+        'solutions',
+        'proof points',
+        'call to action',
+      ],
     },
     technical: {
       tone: 'precise, detailed, factual',
       complexity: 'technical, in-depth',
       focus: 'specifications, architecture, implementation',
       avgWordCount: 120,
-      keyElements: ['technical specs', 'diagrams', 'code examples', 'best practices'],
+      keyElements: [
+        'technical specs',
+        'diagrams',
+        'code examples',
+        'best practices',
+      ],
     },
     marketing: {
       tone: 'engaging, creative, brand-aligned',
       complexity: 'accessible, visual-first',
       focus: 'brand story, target audience, campaigns',
       avgWordCount: 60,
-      keyElements: ['visuals', 'brand messaging', 'market data', 'campaign metrics'],
+      keyElements: [
+        'visuals',
+        'brand messaging',
+        'market data',
+        'campaign metrics',
+      ],
     },
     training: {
       tone: 'instructional, clear, step-by-step',
@@ -108,7 +136,12 @@ export class AudienceAdaptationService {
       complexity: 'rigorous, citation-heavy',
       focus: 'methodology, findings, implications',
       avgWordCount: 150,
-      keyElements: ['research question', 'methodology', 'results', 'discussion'],
+      keyElements: [
+        'research question',
+        'methodology',
+        'results',
+        'discussion',
+      ],
     },
     customers: {
       tone: 'friendly, helpful, solution-oriented',
@@ -122,11 +155,8 @@ export class AudienceAdaptationService {
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
-  ) {
-    this.openai = new OpenAI({
-      apiKey: this.configService.get<string>('OPENAI_API_KEY'),
-    });
-  }
+    private readonly aiService: AIService,
+  ) {}
 
   /**
    * Adapt an entire presentation to a specific audience
@@ -150,6 +180,10 @@ export class AudienceAdaptationService {
       throw new BadRequestException('Project not found');
     }
 
+    if (!project) {
+      throw new BadRequestException('Project not found');
+    }
+
     const targetProfile = this.audienceProfiles[options.targetAudience];
     const adaptedSlides: AdaptedSlide[] = [];
     let totalChanges = 0;
@@ -158,7 +192,7 @@ export class AudienceAdaptationService {
     let complexityAdjustments = 0;
 
     for (const slide of project.slides) {
-      const adaptedBlocks = [];
+      const adaptedBlocks: any[] = [];
       const changes: string[] = [];
 
       for (const block of slide.blocks) {
@@ -168,12 +202,15 @@ export class AudienceAdaptationService {
           options,
         );
 
-        adaptedBlocks.push(adaptedBlock.content as any);
+        adaptedBlocks.push(adaptedBlock.content);
         changes.push(...adaptedBlock.changes);
 
-        if (adaptedBlock.changes.some(c => c.includes('tone'))) toneAdjustments++;
-        if (adaptedBlock.changes.some(c => c.includes('length'))) lengthAdjustments++;
-        if (adaptedBlock.changes.some(c => c.includes('complexity'))) complexityAdjustments++;
+        if (adaptedBlock.changes.some((c) => c.includes('tone')))
+          toneAdjustments++;
+        if (adaptedBlock.changes.some((c) => c.includes('length')))
+          lengthAdjustments++;
+        if (adaptedBlock.changes.some((c) => c.includes('complexity')))
+          complexityAdjustments++;
       }
 
       totalChanges += changes.length;
@@ -191,7 +228,7 @@ export class AudienceAdaptationService {
         userId,
         projectId,
         prompt: `Audience adaptation: ${options.targetAudience}`,
-        response: { adaptedSlides } as any,
+        response: JSON.stringify({ adaptedSlides }),
         tokens: 0,
         model: 'gpt-4o',
       },
@@ -215,16 +252,30 @@ export class AudienceAdaptationService {
    * Adapt a single block to target audience
    */
   private async adaptBlock(
-    block: any,
-    targetProfile: typeof this.audienceProfiles[AudienceType],
+    block: PrismaBlock,
+    targetProfile: (typeof this.audienceProfiles)[AudienceType],
     options: AdaptationOptions,
-  ): Promise<{ content: any; changes: string[] }> {
+  ): Promise<{ content: Prisma.JsonValue; changes: string[] }> {
     const changes: string[] = [];
-    let content = { ...block.content };
+    let content: Prisma.JsonValue = block.content;
+    if (
+      typeof content === 'object' &&
+      content !== null &&
+      !Array.isArray(content)
+    ) {
+      content = { ...(content as Record<string, any>) } as Prisma.JsonValue;
+    }
 
     // Only adapt text-based blocks
-    const textBlockTypes = ['HEADING', 'SUBHEADING', 'PARAGRAPH', 'BULLET_LIST', 'NUMBERED_LIST', 'QUOTE'];
-    
+    const textBlockTypes = [
+      'HEADING',
+      'SUBHEADING',
+      'PARAGRAPH',
+      'BULLET_LIST',
+      'NUMBERED_LIST',
+      'QUOTE',
+    ];
+
     if (!textBlockTypes.includes(block.blockType)) {
       return { content, changes };
     }
@@ -234,10 +285,14 @@ export class AudienceAdaptationService {
       return { content, changes };
     }
 
-    const prompt = this.buildAdaptationPrompt(originalText, targetProfile, options);
+    const prompt = this.buildAdaptationPrompt(
+      originalText,
+      targetProfile,
+      options,
+    );
 
     try {
-      const response = await this.openai.chat.completions.create({
+      const response = await this.aiService.chatCompletion({
         model: 'gpt-4o',
         messages: [
           {
@@ -252,13 +307,19 @@ export class AudienceAdaptationService {
         response_format: { type: 'json_object' },
       });
 
-      const result = JSON.parse(response.choices[0]?.message?.content || '{}');
-      
+      const result: AdaptationResponse = JSON.parse(
+        response.choices[0]?.message?.content || '{}',
+      ) as AdaptationResponse;
+
       if (result.adaptedText) {
-        content = this.applyAdaptedText(content, block.blockType, result.adaptedText);
+        content = this.applyAdaptedText(
+          content,
+          block.blockType,
+          result.adaptedText,
+        );
         changes.push(...(result.changes || []));
       }
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.error(`Failed to adapt block ${block.id}:`, error);
     }
 
@@ -267,7 +328,7 @@ export class AudienceAdaptationService {
 
   private buildAdaptationPrompt(
     text: string,
-    profile: typeof this.audienceProfiles[AudienceType],
+    profile: (typeof this.audienceProfiles)[AudienceType],
     options: AdaptationOptions,
   ): string {
     const instructions: string[] = [];
@@ -276,7 +337,9 @@ export class AudienceAdaptationService {
       instructions.push(`Adjust tone to be: ${profile.tone}`);
     }
     if (options.adjustLength) {
-      instructions.push(`Target word count: ~${profile.avgWordCount} words per paragraph`);
+      instructions.push(
+        `Target word count: ~${profile.avgWordCount} words per paragraph`,
+      );
     }
     if (options.adjustComplexity) {
       instructions.push(`Adjust complexity to: ${profile.complexity}`);
@@ -301,22 +364,35 @@ Provide the adapted text and list the specific changes made.
     `.trim();
   }
 
-  private extractText(content: any): string {
+  private extractText(content: Prisma.JsonValue): string {
     if (typeof content === 'string') return content;
-    if (content.text) return content.text;
-    if (content.content) return content.content;
-    if (Array.isArray(content.items)) return content.items.join('\n');
-    return JSON.stringify(content);
+    if (content && typeof content === 'object') {
+      const obj = content as Record<string, any>;
+      if (typeof obj.text === 'string') return obj.text;
+      if (typeof obj.content === 'string') return obj.content;
+      if (Array.isArray(obj.items)) return obj.items.join('\n');
+      return JSON.stringify(obj);
+    }
+    return '';
   }
 
-  private applyAdaptedText(content: any, blockType: string, adaptedText: string): any {
+  private applyAdaptedText(
+    content: Prisma.JsonValue,
+    blockType: string,
+    adaptedText: string,
+  ): Prisma.JsonValue {
     if (typeof content === 'string') return adaptedText;
-    if (content.text) return { ...content, text: adaptedText };
-    if (content.content) return { ...content, content: adaptedText };
-    if (Array.isArray(content.items)) {
-      return { ...content, items: adaptedText.split('\n').filter(Boolean) };
+    if (content && typeof content === 'object') {
+      const obj = { ...(content as Record<string, any>) };
+      if ('text' in obj) return { ...obj, text: adaptedText };
+      if ('content' in obj) return { ...obj, content: adaptedText };
+      if (Array.isArray(obj.items)) {
+        return { ...obj, items: adaptedText.split('\n').filter(Boolean) };
+      }
+      // Fallback: set a content property
+      return { ...obj, content: adaptedText };
     }
-    return { ...content, text: adaptedText };
+    return adaptedText;
   }
 
   /**
@@ -356,8 +432,10 @@ Provide the adapted text and list the specific changes made.
 
     // Analyze each slide for improvements
     for (const slide of project.slides) {
-      const slideContent = slide.blocks.map(b => this.extractText(b.content)).join(' ');
-      
+      const slideContent = slide.blocks
+        .map((b) => this.extractText(b.content))
+        .join(' ');
+
       // Check for missing key elements
       for (const element of targetProfile.keyElements) {
         if (!slideContent.toLowerCase().includes(element.toLowerCase())) {
@@ -382,15 +460,51 @@ Provide the adapted text and list the specific changes made.
     description: string;
   }> {
     return [
-      { type: 'executives', name: 'Executives', description: 'C-suite and senior leadership' },
-      { type: 'sales', name: 'Sales Team', description: 'Sales reps and account managers' },
-      { type: 'technical', name: 'Technical', description: 'Developers and engineers' },
-      { type: 'marketing', name: 'Marketing', description: 'Marketing and brand teams' },
-      { type: 'training', name: 'Training', description: 'Employees and learners' },
-      { type: 'investors', name: 'Investors', description: 'VCs and angel investors' },
-      { type: 'general', name: 'General', description: 'Mixed or general audience' },
-      { type: 'academic', name: 'Academic', description: 'Researchers and scholars' },
-      { type: 'customers', name: 'Customers', description: 'End users and clients' },
+      {
+        type: 'executives',
+        name: 'Executives',
+        description: 'C-suite and senior leadership',
+      },
+      {
+        type: 'sales',
+        name: 'Sales Team',
+        description: 'Sales reps and account managers',
+      },
+      {
+        type: 'technical',
+        name: 'Technical',
+        description: 'Developers and engineers',
+      },
+      {
+        type: 'marketing',
+        name: 'Marketing',
+        description: 'Marketing and brand teams',
+      },
+      {
+        type: 'training',
+        name: 'Training',
+        description: 'Employees and learners',
+      },
+      {
+        type: 'investors',
+        name: 'Investors',
+        description: 'VCs and angel investors',
+      },
+      {
+        type: 'general',
+        name: 'General',
+        description: 'Mixed or general audience',
+      },
+      {
+        type: 'academic',
+        name: 'Academic',
+        description: 'Researchers and scholars',
+      },
+      {
+        type: 'customers',
+        name: 'Customers',
+        description: 'End users and clients',
+      },
     ];
   }
 }

@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -10,13 +8,7 @@ import {
     ChevronRight,
     Maximize,
     Minimize,
-    Clock,
-    Mic,
-    MicOff,
-    Monitor,
-    Settings,
     Grid3X3,
-    LayoutGrid,
     Crosshair,
     Pencil,
     Highlighter,
@@ -25,25 +17,23 @@ import {
     MessageSquare,
     Timer,
     X,
-    Volume2,
-    VolumeX,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
+// import { Slider } from "@/components/ui/slider";
 import {
     Tooltip,
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
+// import {
+//     Dialog,
+//     DialogContent,
+//     DialogDescription,
+//     DialogHeader,
+//     DialogTitle,
+// } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
@@ -74,10 +64,17 @@ export function PresentationMode({
     const [showNotes, setShowNotes] = useState(false);
     const [showThumbnails, setShowThumbnails] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
-    const [autoPlayInterval, setAutoPlayInterval] = useState(5000); // 5 seconds
+    const [autoPlayInterval,] = useState(5000); // 5 seconds
     const [elapsedTime, setElapsedTime] = useState(0);
     const [pointerMode, setPointerMode] = useState<"pointer" | "laser" | "pen" | "highlighter">("pointer");
-    const [drawings, setDrawings] = useState<Map<number, any[]>>(new Map());
+
+    interface Drawing {
+        path: { x: number; y: number }[];
+        color: string;
+        width: number;
+        mode: "pen" | "highlighter" | "laser";
+    }
+    const [drawings, setDrawings] = useState<Map<number, Drawing[]>>(new Map());
 
     const containerRef = useRef<HTMLDivElement>(null);
     const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -123,7 +120,7 @@ export function PresentationMode({
         }, 1000);
 
         return () => {
-            if (timerRef.current) clearInterval(timerRef.current);
+            if (timerRef.current) {clearInterval(timerRef.current);}
         };
     }, []);
 
@@ -138,7 +135,7 @@ export function PresentationMode({
         }
 
         return () => {
-            if (autoPlayRef.current) clearInterval(autoPlayRef.current);
+            if (autoPlayRef.current) {clearInterval(autoPlayRef.current);}
         };
     }, [isPlaying, autoPlayInterval, goToNextSlide]);
 
@@ -208,7 +205,7 @@ export function PresentationMode({
         window.addEventListener("mousemove", handleMouseMove);
         return () => {
             window.removeEventListener("mousemove", handleMouseMove);
-            if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+            if (controlsTimeoutRef.current) {clearTimeout(controlsTimeoutRef.current);}
         };
     }, []);
 
@@ -338,7 +335,7 @@ export function PresentationMode({
                                                         ? "bg-white/20"
                                                         : "text-white hover:bg-white/10"
                                                 )}
-                                                onClick={() => setPointerMode(mode as any)}
+                                                onClick={() => setPointerMode(mode as "pointer" | "laser" | "pen" | "highlighter")}
                                             >
                                                 <Icon className="h-4 w-4" />
                                             </Button>
@@ -559,7 +556,7 @@ function LaserPointer() {
         };
     }, []);
 
-    if (!visible) return null;
+    if (!visible) {return null;}
 
     return (
         <div
@@ -574,6 +571,13 @@ function LaserPointer() {
     );
 }
 
+interface Drawing {
+    path: { x: number; y: number }[];
+    color: string;
+    width: number;
+    mode: "pen" | "highlighter" | "laser";
+}
+
 // Drawing canvas for annotations
 function DrawingCanvas({
     mode,
@@ -581,8 +585,8 @@ function DrawingCanvas({
     onDraw,
 }: {
     mode: "pen" | "highlighter" | "laser";
-    drawings: any[];
-    onDraw: (drawing: any) => void;
+    drawings: Drawing[];
+    onDraw: (drawing: Drawing) => void;
 }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
@@ -590,10 +594,10 @@ function DrawingCanvas({
 
     useEffect(() => {
         const canvas = canvasRef.current;
-        if (!canvas) return;
+        if (!canvas) {return;}
 
         const ctx = canvas.getContext("2d");
-        if (!ctx) return;
+        if (!ctx) {return;}
 
         // Clear and redraw all drawings
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -632,7 +636,7 @@ function DrawingCanvas({
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
-        if (!isDrawing) return;
+        if (!isDrawing) {return;}
         const rect = canvasRef.current?.getBoundingClientRect();
         if (rect) {
             setCurrentPath((prev) => [

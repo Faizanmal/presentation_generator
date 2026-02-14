@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -34,26 +32,44 @@ const SYNC_QUEUE_KEY = 'pd_sync_queue';
 const CACHE_PREFIX = 'pd_cache_';
 const SYNC_INTERVAL = 30000; // 30 seconds
 
+// Helper to read sync queue from storage
+const readSyncQueue = (): Array<{
+  type: 'create' | 'update' | 'delete';
+  entity: 'project' | 'slide' | 'block';
+  entityId: string;
+  data: Record<string, unknown>;
+  timestamp: number;
+}> => {
+  if (typeof window === 'undefined') {return [];}
+  try {
+    const queue = localStorage.getItem(SYNC_QUEUE_KEY);
+    return queue ? JSON.parse(queue) : [];
+  } catch {
+    return [];
+  }
+};
+
 export function useOffline() {
-  const [status, setStatus] = useState<SyncStatus>({
+  const [status, setStatus] = useState<SyncStatus>(() => ({
     isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
     isSyncing: false,
-    pendingChanges: 0,
+    pendingChanges: readSyncQueue().length,
     lastSyncedAt: null,
     conflicts: [],
-  });
+  }));
 
   const queryClient = useQueryClient();
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Get sync queue from localStorage - defined first so it can be used in useEffect
-  const getSyncQueue = useCallback((): any[] => {
-    try {
-      const queue = localStorage.getItem(SYNC_QUEUE_KEY);
-      return queue ? JSON.parse(queue) : [];
-    } catch {
-      return [];
-    }
+  const getSyncQueue = useCallback((): Array<{
+    type: 'create' | 'update' | 'delete';
+    entity: 'project' | 'slide' | 'block';
+    entityId: string;
+    data: Record<string, unknown>;
+    timestamp: number;
+  }> => {
+    return readSyncQueue();
   }, []);
 
   // Save to sync queue
@@ -62,7 +78,7 @@ export function useOffline() {
       type: 'create' | 'update' | 'delete';
       entity: 'project' | 'slide' | 'block';
       entityId: string;
-      data: any;
+      data: Record<string, unknown>;
       timestamp: number;
     }) => {
       const queue = getSyncQueue();
@@ -76,9 +92,25 @@ export function useOffline() {
     [getSyncQueue]
   );
 
+  // Clear expired cache
+  const clearExpiredCache = useCallback(() => {
+    const keys = Object.keys(localStorage).filter((k) => k.startsWith(CACHE_PREFIX));
+
+    keys.forEach((key) => {
+      try {
+        const item = JSON.parse(localStorage.getItem(key) || '');
+        if (item.expiry && Date.now() > item.expiry) {
+          localStorage.removeItem(key);
+        }
+      } catch {
+        localStorage.removeItem(key);
+      }
+    });
+  }, []);
+
   // Cache data locally
   const cacheData = useCallback(
-    (key: string, data: any, expiryMs?: number) => {
+    (key: string, data: Record<string, unknown>, expiryMs?: number) => {
       const cacheItem: CachedItem = {
         key,
         data,
@@ -94,51 +126,37 @@ export function useOffline() {
         clearExpiredCache();
       }
     },
-    []
+    [clearExpiredCache]
   );
 
   // Get cached data
-  const getCachedData = useCallback(<T>(key: string): T | null => {
+  const getCachedData = useCallback((key: string): Record<string, unknown> | null => {
     try {
       const item = localStorage.getItem(CACHE_PREFIX + key);
-      if (!item) return null;
+      if (!item) {return null;}
 
-      const cached: CachedItem = JSON.parse(item);
-      
+      const cached = JSON.parse(item) as CachedItem;
+
       // Check expiry
       if (cached.expiry && Date.now() > cached.expiry) {
         localStorage.removeItem(CACHE_PREFIX + key);
         return null;
       }
 
-      return cached.data as T;
+      return cached.data;
     } catch {
       return null;
     }
   }, []);
 
-  // Clear expired cache
-  const clearExpiredCache = useCallback(() => {
-    const keys = Object.keys(localStorage).filter((k) => k.startsWith(CACHE_PREFIX));
-    
-    keys.forEach((key) => {
-      try {
-        const item = JSON.parse(localStorage.getItem(key) || '');
-        if (item.expiry && Date.now() > item.expiry) {
-          localStorage.removeItem(key);
-        }
-      } catch {
-        localStorage.removeItem(key);
-      }
-    });
-  }, []);
+
 
   // Sync changes to server  
   const syncChanges = useCallback(async () => {
-    if (!navigator.onLine) return;
+    if (!navigator.onLine) {return;}
 
     const queue = getSyncQueue();
-    if (queue.length === 0) return;
+    if (queue.length === 0) {return;}
 
     setStatus((prev) => ({ ...prev, isSyncing: true }));
 
@@ -211,13 +229,7 @@ export function useOffline() {
 
   // Initialize and load sync queue - now after all callbacks are defined
   useEffect(() => {
-    const queue = getSyncQueue();
-    setStatus((prev) => ({
-      ...prev,
-      pendingChanges: queue.length,
-    }));
-
-    // Set up online/offline listeners
+    // Check initial online status (already handled in state init, but we set up listeners)
     const handleOnline = () => {
       setStatus((prev) => ({ ...prev, isOnline: true }));
       toast.success('Back online');
@@ -249,12 +261,12 @@ export function useOffline() {
     async (
       conflictId: string,
       resolution: 'local' | 'server' | 'merge',
-      mergedData?: any
+      mergedData?: unknown
     ) => {
       const conflict = status.conflicts.find((c) => c.id === conflictId);
-      if (!conflict) return;
+      if (!conflict) {return;}
 
-      let dataToSync: any;
+      let dataToSync: unknown;
 
       switch (resolution) {
         case 'local':
@@ -306,6 +318,18 @@ export function useOffline() {
     toast.success('Sync complete');
   }, [syncChanges]);
 
+  // Cache an asset (image, etc.)
+  const cacheAsset = async (url: string) => {
+    if ('caches' in window) {
+      try {
+        const cache = await caches.open('pd-assets');
+        await cache.add(url);
+      } catch (error) {
+        console.error('Error caching asset:', error);
+      }
+    }
+  };
+
   // Cache project for offline use
   const cacheProjectForOffline = useCallback(
     async (projectId: string) => {
@@ -338,29 +362,19 @@ export function useOffline() {
     [cacheData]
   );
 
-  // Cache an asset (image, etc.)
-  const cacheAsset = async (url: string) => {
-    if ('caches' in window) {
-      try {
-        const cache = await caches.open('pd-assets');
-        await cache.add(url);
-      } catch (error) {
-        console.error('Error caching asset:', error);
-      }
-    }
-  };
+
 
   // Get offline-available projects
   const getOfflineProjects = useCallback((): string[] => {
     const keys = Object.keys(localStorage).filter((k) =>
-      k.startsWith(CACHE_PREFIX + 'project_')
+      k.startsWith(`${CACHE_PREFIX  }project_`)
     );
-    return keys.map((k) => k.replace(CACHE_PREFIX + 'project_', ''));
+    return keys.map((k) => k.replace(`${CACHE_PREFIX  }project_`, ''));
   }, []);
 
   // Remove project from offline cache
   const removeOfflineProject = useCallback((projectId: string) => {
-    localStorage.removeItem(CACHE_PREFIX + `project_${projectId}`);
+    localStorage.removeItem(`${CACHE_PREFIX  }project_${projectId}`);
     toast.success('Project removed from offline cache');
   }, []);
 

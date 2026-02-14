@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import OpenAI from 'openai';
+import { AIService } from './ai.service';
 
 export interface TranslationResult {
   originalLanguage: string;
@@ -11,8 +11,8 @@ export interface TranslationResult {
 
 export interface SlideTranslation {
   slideId: string;
-  originalContent: any;
-  translatedContent: any;
+  originalContent: Record<string, unknown> | string;
+  translatedContent: Record<string, unknown> | string;
   confidence: number;
 }
 
@@ -25,8 +25,6 @@ export interface SupportedLanguage {
 
 @Injectable()
 export class TranslationService {
-  private openai: OpenAI;
-
   private supportedLanguages: SupportedLanguage[] = [
     { code: 'en', name: 'English', nativeName: 'English', rtl: false },
     { code: 'es', name: 'Spanish', nativeName: 'Español', rtl: false },
@@ -64,11 +62,10 @@ export class TranslationService {
     { code: 'ms', name: 'Malay', nativeName: 'Bahasa Melayu', rtl: false },
   ];
 
-  constructor(private configService: ConfigService) {
-    this.openai = new OpenAI({
-      apiKey: this.configService.get<string>('OPENAI_API_KEY'),
-    });
-  }
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly aiService: AIService,
+  ) {}
 
   getSupportedLanguages(): SupportedLanguage[] {
     return this.supportedLanguages;
@@ -84,7 +81,7 @@ Text: "${text.substring(0, 500)}"
 Return JSON: { "code": "xx", "confidence": 0.0 }`;
 
     try {
-      const response = await this.openai.chat.completions.create({
+      const response = await this.aiService.chatCompletion({
         model: 'gpt-4o',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.1,
@@ -92,9 +89,10 @@ Return JSON: { "code": "xx", "confidence": 0.0 }`;
 
       const result = this.parseJsonResponse(
         response.choices[0].message.content || '{}',
-      );
+      ) as { code: string; confidence: number };
       return {
         code: result.code || 'en',
+
         confidence: result.confidence || 0.5,
       };
     } catch {
@@ -103,7 +101,7 @@ Return JSON: { "code": "xx", "confidence": 0.0 }`;
   }
 
   async translatePresentation(
-    slides: any[],
+    slides: unknown[],
     targetLanguage: string,
     options: {
       preserveFormatting?: boolean;
@@ -122,10 +120,11 @@ Return JSON: { "code": "xx", "confidence": 0.0 }`;
     const warnings: string[] = [];
 
     // Detect source language from first slide
-    const firstSlideText = this.extractText(slides[0]?.content);
+    const firstSlide = slides[0] as Record<string, unknown>;
+    const firstSlideText = this.extractText(firstSlide?.content);
     const sourceLanguage = await this.detectLanguage(firstSlideText);
 
-    for (const slide of slides) {
+    for (const slide of slides as { id: string; content: unknown }[]) {
       try {
         const translated = await this.translateSlide(
           slide,
@@ -135,11 +134,14 @@ Return JSON: { "code": "xx", "confidence": 0.0 }`;
         );
         translations.push(translated);
       } catch (error) {
-        warnings.push(`Failed to translate slide ${slide.id}: ${error}`);
+        const s = slide as Record<string, unknown>;
+        warnings.push(
+          `Failed to translate slide ${String(s.id)}: ${String(error)}`,
+        );
         translations.push({
-          slideId: slide.id,
-          originalContent: slide.content,
-          translatedContent: slide.content,
+          slideId: s.id as string,
+          originalContent: s.content as Record<string, unknown>,
+          translatedContent: s.content as Record<string, unknown>,
           confidence: 0,
         });
       }
@@ -154,7 +156,7 @@ Return JSON: { "code": "xx", "confidence": 0.0 }`;
   }
 
   async translateSlide(
-    slide: any,
+    slide: unknown,
     sourceLanguage: string,
     targetLanguage: string,
     options: {
@@ -163,13 +165,14 @@ Return JSON: { "code": "xx", "confidence": 0.0 }`;
       glossary?: Record<string, string>;
     } = {},
   ): Promise<SlideTranslation> {
-    const textElements = this.extractTextElements(slide.content);
+    const slideRecord = slide as Record<string, unknown>;
+    const textElements = this.extractTextElements(slideRecord.content);
 
     if (textElements.length === 0) {
       return {
-        slideId: slide.id,
-        originalContent: slide.content,
-        translatedContent: slide.content,
+        slideId: slideRecord.id as string,
+        originalContent: slideRecord.content as Record<string, unknown>,
+        translatedContent: slideRecord.content as Record<string, unknown>,
         confidence: 1,
       };
     }
@@ -195,7 +198,7 @@ ${JSON.stringify(textElements, null, 2)}
 Return the translated content as a JSON array with the same structure.`;
 
     try {
-      const response = await this.openai.chat.completions.create({
+      const response = await this.aiService.chatCompletion({
         model: 'gpt-4o',
         messages: [
           {
@@ -210,26 +213,28 @@ Return the translated content as a JSON array with the same structure.`;
 
       const translatedElements = this.parseJsonResponse(
         response.choices[0].message.content || '[]',
-      );
+      ) as { path: string[]; text: string }[];
 
       const translatedContent = this.applyTranslations(
-        slide.content,
+        slideRecord.content as Record<string, unknown>,
         textElements,
         translatedElements,
       );
 
       return {
-        slideId: slide.id,
-        originalContent: slide.content,
+        slideId: slideRecord.id as string,
+        originalContent: slideRecord.content as Record<string, unknown>,
         translatedContent,
         confidence: 0.9,
       };
     } catch (error) {
       console.error('Translation error:', error);
       return {
-        slideId: slide.id,
-        originalContent: slide.content,
-        translatedContent: slide.content,
+        slideId: slideRecord.id as string,
+
+        originalContent: slideRecord.content as Record<string, unknown>,
+
+        translatedContent: slideRecord.content as Record<string, unknown>,
         confidence: 0,
       };
     }
@@ -259,7 +264,7 @@ ${contextNote}
 Return JSON: { "translated": "...", "confidence": 0.0 }`;
 
     try {
-      const response = await this.openai.chat.completions.create({
+      const response = await this.aiService.chatCompletion({
         model: 'gpt-4o',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.3,
@@ -267,9 +272,10 @@ Return JSON: { "translated": "...", "confidence": 0.0 }`;
 
       const result = this.parseJsonResponse(
         response.choices[0].message.content || '{}',
-      );
+      ) as { translated: string; confidence: number };
       return {
         translated: result.translated || text,
+
         confidence: result.confidence || 0.5,
       };
     } catch {
@@ -278,7 +284,7 @@ Return JSON: { "translated": "...", "confidence": 0.0 }`;
   }
 
   async createMultilingualPresentation(
-    slides: any[],
+    slides: unknown[],
     targetLanguages: string[],
   ): Promise<Map<string, TranslationResult>> {
     const results = new Map<string, TranslationResult>();
@@ -292,7 +298,7 @@ Return JSON: { "translated": "...", "confidence": 0.0 }`;
   }
 
   async suggestLocalizationImprovements(
-    slides: any[],
+    slides: unknown[],
     targetLanguage: string,
   ): Promise<{
     suggestions: {
@@ -302,7 +308,9 @@ Return JSON: { "translated": "...", "confidence": 0.0 }`;
       severity: 'low' | 'medium' | 'high';
     }[];
   }> {
-    const allText = slides.map((s) => this.extractText(s.content)).join('\n\n');
+    const allText = slides
+      .map((s) => this.extractText((s as Record<string, unknown>).content))
+      .join('\n\n');
 
     const prompt = `Analyze this presentation content for localization to ${targetLanguage}:
 
@@ -327,7 +335,7 @@ Return JSON:
 }`;
 
     try {
-      const response = await this.openai.chat.completions.create({
+      const response = await this.aiService.chatCompletion({
         model: 'gpt-4o',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.5,
@@ -335,21 +343,30 @@ Return JSON:
 
       return this.parseJsonResponse(
         response.choices[0].message.content || '{ "suggestions": [] }',
-      );
+      ) as {
+        suggestions: {
+          slideId: string;
+          issue: string;
+          suggestion: string;
+          severity: 'low' | 'medium' | 'high';
+        }[];
+      };
     } catch {
       return { suggestions: [] };
     }
   }
 
-  private extractText(content: any): string {
+  private extractText(content: unknown): string {
     if (typeof content === 'string') return content;
     if (Array.isArray(content)) {
       return content.map((item) => this.extractText(item)).join(' ');
     }
     if (typeof content === 'object' && content !== null) {
-      if (content.text) return content.text;
-      if (content.content) return this.extractText(content.content);
-      return Object.values(content)
+      const record = content as Record<string, unknown>;
+      if ('text' in record && typeof record.text === 'string')
+        return record.text;
+      if ('content' in record) return this.extractText(record.content);
+      return Object.values(record)
         .map((v) => this.extractText(v))
         .join(' ');
     }
@@ -357,7 +374,7 @@ Return JSON:
   }
 
   private extractTextElements(
-    content: any,
+    content: unknown,
     path: string[] = [],
   ): { path: string[]; text: string }[] {
     const elements: { path: string[]; text: string }[] = [];
@@ -371,7 +388,9 @@ Return JSON:
         );
       });
     } else if (typeof content === 'object' && content !== null) {
-      for (const [key, value] of Object.entries(content)) {
+      for (const [key, value] of Object.entries(
+        content as Record<string, unknown>,
+      )) {
         if (key === 'text' && typeof value === 'string') {
           elements.push({ path: [...path, key], text: value });
         } else {
@@ -384,11 +403,14 @@ Return JSON:
   }
 
   private applyTranslations(
-    originalContent: any,
+    originalContent: unknown,
     originalElements: { path: string[]; text: string }[],
     translatedElements: { path: string[]; text: string }[],
-  ): any {
-    const content = JSON.parse(JSON.stringify(originalContent));
+  ): Record<string, unknown> {
+    const content = JSON.parse(JSON.stringify(originalContent)) as Record<
+      string,
+      unknown
+    >;
 
     for (
       let i = 0;
@@ -404,17 +426,20 @@ Return JSON:
     return content;
   }
 
-  private setNestedValue(obj: any, path: string[], value: any): void {
-    let current = obj;
+  private setNestedValue(obj: unknown, path: string[], value: unknown): void {
+    let current = obj as Record<string, unknown>;
     for (let i = 0; i < path.length - 1; i++) {
       const key = path[i];
       if (current[key] === undefined) return;
-      current = current[key];
+      current = current[key] as Record<string, unknown>;
     }
-    current[path[path.length - 1]] = value;
+    const lastKey = path[path.length - 1];
+    if (current && typeof current === 'object') {
+      current[lastKey] = value;
+    }
   }
 
-  private parseJsonResponse(text: string): any {
+  private parseJsonResponse(text: string): unknown {
     try {
       const jsonMatch = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
       if (jsonMatch) {

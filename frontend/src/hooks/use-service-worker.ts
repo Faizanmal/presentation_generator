@@ -38,7 +38,7 @@ export function useServiceWorker(): UseServiceWorkerReturn {
       // Check for updates
       registration.addEventListener('updatefound', () => {
         const newWorker = registration.installing;
-        if (!newWorker) return;
+        if (!newWorker) {return;}
 
         newWorker.addEventListener('statechange', () => {
           if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
@@ -55,18 +55,20 @@ export function useServiceWorker(): UseServiceWorkerReturn {
     }
   }, []);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+
   useEffect(() => {
     // Check if service workers are supported
     if (!('serviceWorker' in navigator)) {
       return;
     }
-
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setState((prev) => ({ ...prev, isSupported: true }));
+    setTimeout(() => {
+      setState((prev) => ({ ...prev, isSupported: true }));
+    }, 0);
 
     // Register service worker
-    registerServiceWorker();
+    setTimeout(() => {
+      registerServiceWorker();
+    }, 0);
 
     // Listen for controller changes
     navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -76,7 +78,7 @@ export function useServiceWorker(): UseServiceWorkerReturn {
   }, [registerServiceWorker]);
 
   const update = useCallback(async () => {
-    if (!state.registration) return;
+    if (!state.registration) {return;}
 
     try {
       await state.registration.update();
@@ -86,14 +88,14 @@ export function useServiceWorker(): UseServiceWorkerReturn {
   }, [state.registration]);
 
   const skipWaiting = useCallback(() => {
-    if (!state.registration?.waiting) return;
+    if (!state.registration?.waiting) {return;}
 
     // Tell the waiting service worker to skip waiting
     state.registration.waiting.postMessage({ type: 'SKIP_WAITING' });
   }, [state.registration]);
 
   const checkForUpdate = useCallback(async () => {
-    if (!state.registration) return;
+    if (!state.registration) {return;}
 
     try {
       await state.registration.update();

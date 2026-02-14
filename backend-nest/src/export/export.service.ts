@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import JSZip from 'jszip';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { SubscriptionPlan } from '@prisma/client';
@@ -17,10 +18,16 @@ interface ExportOptions {
   quality?: 'standard' | 'high';
 }
 
+interface IJSZip {
+  file(name: string, data: string): this;
+  folder(name: string): this | null;
+  generateAsync(options: Record<string, unknown>): Promise<Buffer>;
+}
+
 interface ExportBlock {
   blockType: string;
-  content: any;
-  style?: any;
+  content: unknown;
+  style?: Record<string, unknown>;
   order: number;
 }
 
@@ -52,12 +59,48 @@ interface ExportProject {
   type: string;
   theme: ExportTheme | null;
   slides: ExportSlide[];
+  blocks: ExportBlock[];
 }
 
 interface ExportResult {
   filename: string;
   mimeType: string;
   data: string | Buffer;
+}
+
+interface PptxSlideElement {
+  elementType: string;
+  text?: string | Record<string, unknown>[];
+  options: Record<string, unknown>;
+  type: string;
+  order: number;
+  style?: Record<string, unknown>;
+  path?: string;
+  chartType?: string;
+  data?: unknown[];
+}
+
+interface PptxSlide {
+  slideNumber: number;
+  layout: string;
+  elements: PptxSlideElement[];
+}
+
+interface PptxData {
+  title: string;
+  description: string | null;
+  theme: {
+    colors?: Record<string, string | undefined>;
+    fonts?: Record<string, string | undefined>;
+  };
+  slides: PptxSlide[];
+  metadata: {
+    creator: string;
+    lastModifiedBy: string;
+    revision: number;
+    createdAt: string;
+    modifiedAt: string;
+  };
 }
 
 @Injectable()
@@ -81,7 +124,7 @@ export class ExportService {
   /**
    * Public export methods for testing and API
    */
-  async exportToJSON(projectId: string): Promise<any> {
+  async exportToJSON(projectId: string): Promise<Record<string, unknown>> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       include: {
@@ -91,6 +134,9 @@ export class ExportService {
               orderBy: { order: 'asc' },
             },
           },
+          orderBy: { order: 'asc' },
+        },
+        blocks: {
           orderBy: { order: 'asc' },
         },
         theme: true,
@@ -118,6 +164,9 @@ export class ExportService {
           },
           orderBy: { order: 'asc' },
         },
+        blocks: {
+          orderBy: { order: 'asc' },
+        },
         theme: true,
       },
     });
@@ -131,7 +180,10 @@ export class ExportService {
     return result.data as string;
   }
 
-  async exportToPDF(projectId: string, options?: any): Promise<Buffer> {
+  async exportToPDF(
+    projectId: string,
+    // _options?: ExportOptions,
+  ): Promise<Buffer> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       include: {
@@ -143,6 +195,9 @@ export class ExportService {
           },
           orderBy: { order: 'asc' },
         },
+        blocks: {
+          orderBy: { order: 'asc' },
+        },
         theme: true,
       },
     });
@@ -152,11 +207,14 @@ export class ExportService {
     }
 
     const exportData = project as unknown as ExportProject;
-    const result = this.exportToPdf(exportData, options || {});
-    return result.data as Buffer;
+    const result = this.exportToPdf(exportData);
+    return Buffer.from(result.data as string, 'utf-8');
   }
 
-  async exportToPPTX(projectId: string, options?: any): Promise<Buffer> {
+  async exportToPPTX(
+    projectId: string,
+    // _options?: ExportOptions,
+  ): Promise<Buffer> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       include: {
@@ -168,6 +226,9 @@ export class ExportService {
           },
           orderBy: { order: 'asc' },
         },
+        blocks: {
+          orderBy: { order: 'asc' },
+        },
         theme: true,
       },
     });
@@ -177,7 +238,7 @@ export class ExportService {
     }
 
     const exportData = project as unknown as ExportProject;
-    const result = await this.exportToPptx(exportData, options || {});
+    const result = await this.exportToPptx(exportData);
     return result.data as Buffer;
   }
 
@@ -209,6 +270,9 @@ export class ExportService {
           },
           orderBy: { order: 'asc' },
         },
+        blocks: {
+          orderBy: { order: 'asc' },
+        },
         theme: true,
         owner: {
           select: {
@@ -235,9 +299,9 @@ export class ExportService {
       case 'html':
         return this.exportToHtml(exportData);
       case 'pdf':
-        return this.exportToPdf(exportData, options);
+        return this.exportToPdf(exportData);
       case 'pptx':
-        return this.exportToPptx(exportData, options);
+        return this.exportToPptx(exportData);
       default:
         throw new Error('Unsupported export format');
     }
@@ -255,13 +319,19 @@ export class ExportService {
       description: project.description,
       type: project.type,
       theme: project.theme,
+      blocks: (project.blocks || []).map((block: ExportBlock) => ({
+        type: block.blockType,
+        content: block.content as Record<string, unknown>,
+        style: block.style as Record<string, unknown>,
+        order: block.order,
+      })),
       slides: (project.slides || []).map((slide: ExportSlide) => ({
         layout: slide.layout,
         order: slide.order,
         blocks: (slide.blocks || []).map((block: ExportBlock) => ({
           type: block.blockType,
-          content: block.content,
-          style: block.style,
+          content: block.content as Record<string, unknown>,
+          style: block.style as Record<string, unknown>,
           order: block.order,
         })),
       })),
@@ -401,10 +471,7 @@ export class ExportService {
    * Export to PDF format
    * In production, use a proper PDF generation library like Puppeteer or wkhtmltopdf
    */
-  private exportToPdf(
-    project: ExportProject,
-    options: ExportOptions,
-  ): ExportResult {
+  private exportToPdf(project: ExportProject): ExportResult {
     // Generate HTML first
     const htmlExport = this.exportToHtml(project);
 
@@ -425,10 +492,7 @@ export class ExportService {
    * Export to PowerPoint (PPTX) format
    * Production-ready implementation using pptxgenjs
    */
-  private async exportToPptx(
-    project: ExportProject,
-    options: ExportOptions,
-  ): Promise<ExportResult> {
+  private async exportToPptx(project: ExportProject): Promise<ExportResult> {
     // Note: In production, install pptxgenjs: npm install pptxgenjs
     // For now, we'll create a detailed PPTX-like structure that can be used
     // by a frontend library or converted server-side
@@ -477,13 +541,19 @@ export class ExportService {
   private convertBlockToPptxElement(
     block: ExportBlock,
     theme: ExportTheme,
-  ): any {
-    const content = block.content?.text || block.content || '';
+  ): PptxSlideElement {
+    const blockContent = block.content as Record<string, unknown> | undefined;
+    const content = (
+      (blockContent?.text as string) ||
+      (typeof block.content === 'string' ? block.content : '') ||
+      ''
+    ).toString();
 
     const baseElement = {
       type: block.blockType,
       order: block.order,
-      style: block.style,
+
+      style: block.style as Record<string, unknown>,
     };
 
     switch (block.blockType) {
@@ -538,7 +608,7 @@ export class ExportService {
         return {
           ...baseElement,
           elementType: 'text',
-          text: content.split('\n').map((line: string) => ({
+          text: content.split('\n').map((line) => ({
             text: line,
             options: { bullet: true },
           })),
@@ -556,7 +626,7 @@ export class ExportService {
         return {
           ...baseElement,
           elementType: 'text',
-          text: content.split('\n').map((line: string, idx: number) => ({
+          text: content.split('\n').map((line, idx: number) => ({
             text: `${idx + 1}. ${line}`,
           })),
           options: {
@@ -572,7 +642,7 @@ export class ExportService {
         return {
           ...baseElement,
           elementType: 'image',
-          path: block.content?.url || content,
+          path: (blockContent?.url as string) || content,
           options: {
             x: 1,
             y: 1.5,
@@ -584,8 +654,8 @@ export class ExportService {
         return {
           ...baseElement,
           elementType: 'chart',
-          chartType: block.content?.chartType || 'bar',
-          data: block.content?.chartData || [],
+          chartType: (blockContent?.chartType as string) || 'bar',
+          data: (blockContent?.chartData as unknown[]) || [],
           options: {
             x: 1,
             y: 1.5,
@@ -630,15 +700,13 @@ export class ExportService {
    * This creates a valid PPTX file structure
    */
   private async generatePptxBuffer(
-    pptxData: any,
+    pptxData: PptxData,
     theme: ExportTheme,
   ): Promise<Buffer> {
     // Create PPTX structure - Office Open XML format
     // PPTX is a ZIP file containing XML files
 
-    // @ts-ignore - jszip is optional dependency
-    const JSZip = require('jszip');
-    const zip = new JSZip();
+    const zip = new JSZip() as unknown as IJSZip;
 
     // [Content_Types].xml
     zip.file(
@@ -697,7 +765,7 @@ export class ExportService {
     const slides = ppt.folder('slides')!;
     const slidesRels = slides.folder('_rels')!;
 
-    pptxData.slides.forEach((slide: any, index: number) => {
+    pptxData.slides.forEach((slide, index: number) => {
       slides.file(`slide${index + 1}.xml`, this.generateSlideXml(slide, theme));
       slidesRels.file(`slide${index + 1}.xml.rels`, this.generateSlideRels());
     });
@@ -749,7 +817,7 @@ export class ExportService {
 </Relationships>`;
   }
 
-  private generateAppXml(pptxData: any): string {
+  private generateAppXml(pptxData: PptxData): string {
     return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties">
   <Application>Presentation Designer</Application>
@@ -758,7 +826,7 @@ export class ExportService {
 </Properties>`;
   }
 
-  private generateCoreXml(pptxData: any): string {
+  private generateCoreXml(pptxData: PptxData): string {
     return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" 
                    xmlns:dc="http://purl.org/dc/elements/1.1/" 
@@ -907,11 +975,9 @@ export class ExportService {
 </a:theme>`;
   }
 
-  private generateSlideXml(slide: any, theme: ExportTheme): string {
+  private generateSlideXml(slide: PptxSlide, theme: ExportTheme): string {
     const elements = slide.elements
-      .map((el: any, idx: number) =>
-        this.generateSlideElement(el, idx + 2, theme),
-      )
+      .map((el, idx: number) => this.generateSlideElement(el, idx + 2, theme))
       .join('\n');
 
     return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -929,7 +995,7 @@ export class ExportService {
   }
 
   private generateSlideElement(
-    element: any,
+    element: PptxSlideElement,
     id: number,
     theme: ExportTheme,
   ): string {
@@ -941,18 +1007,21 @@ export class ExportService {
       typeof element.text === 'string'
         ? element.text
         : Array.isArray(element.text)
-          ? element.text.map((t: any) => t.text || t).join('\n')
+          ? element.text
+              .map((t) => (typeof t === 'string' ? t : t.text))
+              .join('\n')
           : '';
 
-    const opts = element.options || {};
-    const x = Math.round((opts.x || 0.5) * 914400);
-    const y = Math.round((opts.y || 0.5) * 914400);
-    const w = Math.round((opts.w || 9) * 914400);
-    const h = Math.round((opts.h || 1) * 914400);
-    const fontSize = (opts.fontSize || 18) * 100;
-    const fontFace = opts.fontFace || theme.fonts?.body || 'Arial';
+    const opts = element.options as Record<string, number | string>;
+    const x = Math.round(((opts.x as number) || 0.5) * 914400);
+    const y = Math.round(((opts.y as number) || 0.5) * 914400);
+    const w = Math.round(((opts.w as number) || 9) * 914400);
+    const h = Math.round(((opts.h as number) || 1) * 914400);
+    const fontSize = ((opts.fontSize as number) || 18) * 100;
+    const fontFace = (opts.fontFace as string) || theme.fonts?.body || 'Arial';
     const color =
-      opts.color || (theme.colors?.text || '#1e293b').replace('#', '');
+      (opts.color as string) ||
+      (theme.colors?.text || '#1e293b').replace('#', '');
     const bold = opts.bold ? '<a:b val="true"/>' : '';
     const italic = opts.italic ? '<a:i val="true"/>' : '';
 
@@ -1002,35 +1071,46 @@ export class ExportService {
    * Render a block to HTML
    */
   private renderBlockToHtml(block: ExportBlock, theme: ExportTheme): string {
-    const content = block.content?.text || '';
+    const blockContent = block.content as Record<string, unknown> | undefined;
 
     switch (block.blockType) {
       case 'HEADING':
-        return `<h1>${this.escapeHtml(content)}</h1>`;
       case 'SUBHEADING':
-        return `<h2>${this.escapeHtml(content)}</h2>`;
-      case 'PARAGRAPH':
-        return `<p>${this.escapeHtml(content)}</p>`;
+      case 'PARAGRAPH': {
+        const text = (blockContent?.text as string) || '';
+        return block.blockType === 'HEADING'
+          ? `<h1>${this.escapeHtml(text)}</h1>`
+          : block.blockType === 'SUBHEADING'
+            ? `<h2>${this.escapeHtml(text)}</h2>`
+            : `<p>${this.escapeHtml(text)}</p>`;
+      }
       case 'BULLET_LIST': {
-        const bullets = content.split('\n').filter(Boolean);
-        return `<ul>${bullets.map((b: string) => `<li>${this.escapeHtml(b)}</li>`).join('')}</ul>`;
+        const items = (blockContent?.items as string[]) || [];
+        return `<ul>${items.map((item) => `<li>${this.escapeHtml(item)}</li>`).join('')}</ul>`;
       }
       case 'NUMBERED_LIST': {
-        const items = content.split('\n').filter(Boolean);
-        return `<ol>${items.map((i: string) => `<li>${this.escapeHtml(i)}</li>`).join('')}</ol>`;
+        const items = (blockContent?.items as string[]) || [];
+        return `<ol>${items.map((item) => `<li>${this.escapeHtml(item)}</li>`).join('')}</ol>`;
       }
-      case 'QUOTE':
-        return `<blockquote>${this.escapeHtml(content)}</blockquote>`;
-      case 'CODE':
-        return `<pre><code>${this.escapeHtml(content)}</code></pre>`;
+      case 'QUOTE': {
+        const quoteText = (blockContent?.text as string) || '';
+        return `<blockquote>${this.escapeHtml(quoteText)}</blockquote>`;
+      }
+      case 'CODE': {
+        const codeText = (blockContent?.text as string) || '';
+        return `<pre><code>${this.escapeHtml(codeText)}</code></pre>`;
+      }
       case 'IMAGE': {
-        const imageUrl = block.content?.url || '';
-        return `<img src="${this.escapeHtml(imageUrl)}" alt="${this.escapeHtml(block.content?.alt || '')}" style="max-width: 100%;" />`;
+        const imageUrl = (blockContent?.url as string) || '';
+        const imageAlt = (blockContent?.alt as string) || '';
+        return `<img src="${this.escapeHtml(imageUrl)}" alt="${this.escapeHtml(imageAlt)}" style="max-width: 100%;" />`;
       }
       case 'DIVIDER':
         return `<hr style="border: none; border-top: 1px solid ${theme.colors?.textMuted || '#ccc'}; margin: 2rem 0;" />`;
-      default:
-        return `<p>${this.escapeHtml(content)}</p>`;
+      default: {
+        const defaultText = (blockContent?.text as string) || '';
+        return `<p>${this.escapeHtml(defaultText)}</p>`;
+      }
     }
   }
 
@@ -1059,11 +1139,12 @@ export class ExportService {
    * Sanitize filename
    */
   private sanitizeFilename(name: string): string {
-    return name
+    const sanitized = name
       .replace(/[^a-z0-9\s-]/gi, '')
       .replace(/\s+/g, '-')
       .toLowerCase()
       .substring(0, 50);
+    return sanitized || 'untitled';
   }
 
   /**

@@ -124,7 +124,7 @@ export class TeamAnalyticsController {
   @Post('track')
   async trackActivity(
     @Body() dto: TrackActivityDto,
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
   ) {
     await this.teamAnalyticsService.trackActivity(
       req.user.id,
@@ -136,7 +136,9 @@ export class TeamAnalyticsController {
     return { success: true };
   }
 
-  private buildPeriod(query: DateRangeDto): { start: Date; end: Date } | undefined {
+  private buildPeriod(
+    query: DateRangeDto,
+  ): { start: Date; end: Date } | undefined {
     if (query.startDate && query.endDate) {
       return {
         start: new Date(query.startDate),

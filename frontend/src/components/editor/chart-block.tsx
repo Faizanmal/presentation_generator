@@ -15,13 +15,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -29,7 +22,7 @@ import {
 import { cn } from '@/lib/utils';
 
 // Chart types
-type ChartType = 'bar' | 'line' | 'pie' | 'area';
+type ChartType = 'bar' | 'line' | 'pie' | 'area' | 'doughnut' | 'radar' | 'polarArea';
 
 interface ChartDataPoint {
   label: string;
@@ -81,7 +74,7 @@ export function ChartBlock({
   const [showGrid, setShowGrid] = useState(data.showGrid ?? true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const drawBarChart = (
+  const drawBarChart = useCallback((
     ctx: CanvasRenderingContext2D,
     width: number,
     height: number,
@@ -120,9 +113,9 @@ export function ChartBlock({
       ctx.textAlign = 'center';
       ctx.fillText(point.label, x + barWidth / 2, height - padding + 15);
     });
-  };
+  }, [chartData, showGrid, showLegend]);
 
-  const drawLineChart = (
+  const drawLineChart = useCallback((
     ctx: CanvasRenderingContext2D,
     width: number,
     height: number,
@@ -179,9 +172,9 @@ export function ChartBlock({
       ctx.textAlign = 'center';
       ctx.fillText(point.label, x, height - padding + 15);
     });
-  };
+  }, [chartData, showGrid, showLegend]);
 
-  const drawPieChart = (
+  const drawPieChart = useCallback((
     ctx: CanvasRenderingContext2D,
     width: number,
     height: number,
@@ -210,9 +203,9 @@ export function ChartBlock({
 
       startAngle += sliceAngle;
     });
-  };
+  }, [chartData, showLegend]);
 
-  const drawAreaChart = (
+  const drawAreaChart = useCallback((
     ctx: CanvasRenderingContext2D,
     width: number,
     height: number,
@@ -236,7 +229,7 @@ export function ChartBlock({
     }
 
     // Draw filled area
-    ctx.fillStyle = COLORS[0] + '40'; // Add transparency
+    ctx.fillStyle = `${COLORS[0]}40`; // Add transparency
     ctx.beginPath();
     ctx.moveTo(padding, padding + chartHeight);
 
@@ -276,9 +269,9 @@ export function ChartBlock({
       ctx.textAlign = 'center';
       ctx.fillText(point.label, x, height - padding + 15);
     });
-  };
+  }, [chartData, showGrid, showLegend]);
 
-  const drawLegend = (
+  const drawLegend = useCallback((
     ctx: CanvasRenderingContext2D,
     width: number,
     height: number,
@@ -299,15 +292,15 @@ export function ChartBlock({
 
       legendX += ctx.measureText(point.label).width + 36;
     });
-  };
+  }, [chartData]);
 
   // Draw chart on canvas
   const drawChart = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) { return; }
 
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) { return; }
 
     const width = canvas.width;
     const height = canvas.height;
@@ -336,7 +329,7 @@ export function ChartBlock({
     if (showLegend) {
       drawLegend(ctx, width, height);
     }
-  }, [chartType, chartData, showLegend, showGrid, drawBarChart, drawLineChart, drawPieChart, drawAreaChart, drawLegend]);
+  }, [chartType, showLegend, drawBarChart, drawLineChart, drawPieChart, drawAreaChart, drawLegend]);
 
   useEffect(() => {
     drawChart();
@@ -447,7 +440,8 @@ export function ChartBlock({
                 </div>
                 <div className="space-y-2 max-h-40 overflow-y-auto">
                   {chartData.map((point, index) => (
-                    <div key={index} className="flex items-center gap-2">
+
+                    <div key={`${point.label}-${point.value}`} className="flex items-center gap-2">
                       <Input
                         value={point.label}
                         onChange={(e) => handleDataChange(index, 'label', e.target.value)}

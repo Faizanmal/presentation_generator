@@ -16,7 +16,7 @@ interface ErrorResponse {
   timestamp: string;
   requestId: string;
   path: string;
-  details?: any;
+  details?: unknown;
 }
 
 /**
@@ -35,11 +35,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
       response.getHeader('X-Request-ID')?.toString() || uuidv4();
     const timestamp = new Date().toISOString();
     const path = request.url;
-
     let statusCode: number;
-    let message: string;
+    let message: string | string[];
     let error: string;
-    let details: any;
+    let details: unknown;
 
     if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
@@ -48,10 +47,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
       if (typeof exceptionResponse === 'string') {
         message = exceptionResponse;
         error = exception.name;
-      } else if (typeof exceptionResponse === 'object') {
-        const resp = exceptionResponse as any;
-        message = resp.message || exception.message;
-        error = resp.error || exception.name;
+      } else if (
+        typeof exceptionResponse === 'object' &&
+        exceptionResponse !== null
+      ) {
+        const resp = exceptionResponse as Record<string, unknown>;
+        message = (resp.message || exception.message) as string | string[];
+        error = (resp.error || exception.name) as string;
+
         details = resp.details;
       } else {
         message = exception.message;
@@ -76,7 +79,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     }
 
     // Don't expose internal errors to clients
-    if (statusCode === HttpStatus.INTERNAL_SERVER_ERROR) {
+    if (statusCode === (HttpStatus.INTERNAL_SERVER_ERROR as number)) {
       message = 'Internal server error';
       details = undefined;
     }
@@ -90,19 +93,26 @@ export class HttpExceptionFilter implements ExceptionFilter {
       path,
     };
 
-    if (details && statusCode !== HttpStatus.INTERNAL_SERVER_ERROR) {
+    if (
+      details &&
+      statusCode !== (HttpStatus.INTERNAL_SERVER_ERROR as number)
+    ) {
       errorResponse.details = details;
     }
+
+    const formattedMessage = Array.isArray(message)
+      ? message.join(', ')
+      : message;
 
     // Log error based on severity
     if (statusCode >= 500) {
       this.logger.error(
-        `[${requestId}] ${statusCode} ${error}: ${message} - ${path}`,
+        `[${requestId}] ${statusCode} ${error}: ${formattedMessage} - ${path}`,
         exception instanceof Error ? exception.stack : undefined,
       );
     } else if (statusCode >= 400) {
       this.logger.warn(
-        `[${requestId}] ${statusCode} ${error}: ${message} - ${path}`,
+        `[${requestId}] ${statusCode} ${error}: ${formattedMessage} - ${path}`,
       );
     }
 

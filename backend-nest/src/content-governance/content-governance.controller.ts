@@ -5,12 +5,12 @@ import {
   Body,
   Param,
   UseGuards,
-  Request,
   Delete,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { 
-  ContentGovernanceService, 
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import {
+  ContentGovernanceService,
   WorkflowStage,
   ContentLockType,
 } from './content-governance.service';
@@ -20,7 +20,10 @@ class CreateWorkflowDto {
   name: string;
   description?: string;
   stages: WorkflowStage[];
-  requiredApprovers: Record<WorkflowStage, { minApprovals: number; approverRoles: string[] }>;
+  requiredApprovers: Record<
+    WorkflowStage,
+    { minApprovals: number; approverRoles: string[] }
+  >;
   autoPublish?: boolean;
 }
 
@@ -57,8 +60,12 @@ class LockContentDto {
 class CreatePolicyDto {
   name: string;
   rules: Array<{
-    type: 'required_fields' | 'forbidden_content' | 'required_disclaimers' | 'approval_required';
-    config: any;
+    type:
+      | 'required_fields'
+      | 'forbidden_content'
+      | 'required_disclaimers'
+      | 'approval_required';
+    config: Record<string, unknown>;
   }>;
   enforcementLevel: 'warn' | 'block';
 }
@@ -87,11 +94,11 @@ export class ContentGovernanceController {
   async submitForApproval(
     @Param('projectId') projectId: string,
     @Body() dto: SubmitApprovalDto,
-    @Request() req: any,
+    @CurrentUser() user: { id: string },
   ) {
     return this.governanceService.submitForApproval(
       projectId,
-      req.user.id,
+      user.id,
       dto.workflowId,
       dto.message,
     );
@@ -101,11 +108,11 @@ export class ContentGovernanceController {
   async processApproval(
     @Param('requestId') requestId: string,
     @Body() dto: ProcessApprovalDto,
-    @Request() req: any,
+    @CurrentUser() user: { id: string },
   ) {
     return this.governanceService.processApproval(
       requestId,
-      req.user.id,
+      user.id,
       dto.action,
       dto.comment,
     );
@@ -115,9 +122,9 @@ export class ContentGovernanceController {
   async addComment(
     @Param('requestId') requestId: string,
     @Body() dto: AddCommentDto,
-    @Request() req: any,
+    @CurrentUser() user: { id: string },
   ) {
-    return this.governanceService.addComment(requestId, req.user.id, dto.content);
+    return this.governanceService.addComment(requestId, user.id, dto.content);
   }
 
   @Get('projects/:projectId/approval-history')
@@ -155,9 +162,9 @@ export class ContentGovernanceController {
   async lockContent(
     @Param('projectId') projectId: string,
     @Body() dto: LockContentDto,
-    @Request() req: any,
+    @CurrentUser() user: { id: string },
   ) {
-    return this.governanceService.lockContent(projectId, req.user.id, {
+    return this.governanceService.lockContent(projectId, user.id, {
       ...dto,
       expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : undefined,
     });
@@ -166,16 +173,14 @@ export class ContentGovernanceController {
   @Delete('locks/:lockId')
   async unlockContent(
     @Param('lockId') lockId: string,
-    @Request() req: any,
+    @CurrentUser() user: { id: string },
   ) {
-    await this.governanceService.unlockContent(lockId, req.user.id);
+    await this.governanceService.unlockContent(lockId, user.id);
     return { success: true };
   }
 
   @Get('projects/:projectId/check-lock')
-  async isContentLocked(
-    @Param('projectId') projectId: string,
-  ) {
+  async isContentLocked(@Param('projectId') projectId: string) {
     return this.governanceService.isContentLocked(projectId);
   }
 

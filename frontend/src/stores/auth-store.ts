@@ -11,6 +11,7 @@ interface AuthState {
 
   // Actions
   login: (email: string, password: string) => Promise<void>;
+  loginWithOtp: (identifier: string, otp: string, rememberDevice?: boolean) => Promise<void>;
   register: (email: string, name: string, password: string) => Promise<void>;
   logout: () => void;
   fetchProfile: () => Promise<void>;
@@ -30,6 +31,25 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         try {
           const response = await api.login({ email, password });
+          set({
+            user: response.user,
+            isAuthenticated: true,
+            isLoading: false,
+          });
+          // Fetch subscription after login
+          get().fetchSubscription();
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
+
+      loginWithOtp: async (identifier: string, otp: string, rememberDevice: boolean = false) => {
+        set({ isLoading: true });
+        try {
+          // Detect channel based on identifier format
+          const channel = identifier.includes('@') ? 'email' : 'sms';
+          const response = await api.verifyOtpLoginMultiChannel(identifier, otp, channel, rememberDevice);
           set({
             user: response.user,
             isAuthenticated: true,

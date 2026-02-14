@@ -5,12 +5,20 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Get,
+  Delete,
+  Param,
 } from '@nestjs/common';
-import { AIService } from './ai.service';
+import { AIService, GeneratedPresentation, GeneratedBlock } from './ai.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UsersService } from '../users/users.service';
 import { ForbiddenException } from '@nestjs/common';
+import { BackgroundLibraryService } from './background-library.service';
+import { AutoLayoutService } from './auto-layout.service';
+import { AIChatService, SlideContext } from './ai-chat.service';
+import { URLImportService } from './url-import.service';
+import { RealTimeDataService } from './realtime-data.service';
 
 class EnhanceContentDto {
   content: string;
@@ -51,6 +59,11 @@ export class AIController {
   constructor(
     private readonly aiService: AIService,
     private readonly usersService: UsersService,
+    private readonly backgroundLibrary: BackgroundLibraryService,
+    private readonly autoLayoutService: AutoLayoutService,
+    private readonly aiChatService: AIChatService,
+    private readonly urlImportService: URLImportService,
+    private readonly realTimeDataService: RealTimeDataService,
   ) {}
 
   /**
@@ -345,6 +358,46 @@ Format as a numbered list with clear structure.`;
   }
 
   /**
+   * Generate chart data with real-time information
+   */
+  @Post('generate-chart-data')
+  @HttpCode(HttpStatus.OK)
+  async generateChartWithRealData(
+    @CurrentUser() user: { id: string },
+    @Body()
+    body: {
+      title: string;
+      topic: string;
+      chartType?: 'bar' | 'line' | 'pie' | 'doughnut';
+      useRealTimeData?: boolean;
+      projectId?: string;
+    },
+  ) {
+    const canGenerate = await this.usersService.canGenerateAI(user.id);
+    if (!canGenerate) {
+      throw new ForbiddenException('AI generation limit reached');
+    }
+
+    let chartData;
+    if (body.useRealTimeData) {
+      chartData = await this.aiService.generateChartWithRealData(
+        body.title,
+        body.topic,
+        body.chartType || 'bar',
+      );
+    } else {
+      chartData = await this.aiService.generateChartData(
+        body.topic,
+        body.chartType || 'bar',
+      );
+    }
+
+    await this.usersService.incrementAIGenerations(user.id);
+
+    return chartData;
+  }
+
+  /**
    * Advanced presentation generation with smart layouts
    */
   @Post('generate-advanced')
@@ -359,6 +412,7 @@ Format as a numbered list with clear structure.`;
       length?: number;
       type?: string;
       generateImages?: boolean;
+      imageSource?: 'ai' | 'stock';
       smartLayout?: boolean;
     },
   ) {
@@ -384,7 +438,7 @@ Format as a numbered list with clear structure.`;
   @HttpCode(HttpStatus.OK)
   async generateAllSpeakerNotes(
     @CurrentUser() user: { id: string },
-    @Body() body: { presentation: any },
+    @Body() body: { presentation: GeneratedPresentation },
   ) {
     const canGenerate = await this.usersService.canGenerateAI(user.id);
     if (!canGenerate) {
@@ -458,14 +512,610 @@ Format as a numbered list with clear structure.`;
    */
   @Post('recommend-layout')
   @HttpCode(HttpStatus.OK)
-  async recommendLayout(
+  recommendLayout(
     @CurrentUser() user: { id: string },
-    @Body() body: { blocks: any[]; heading: string },
+    @Body() body: { blocks: GeneratedBlock[]; heading: string },
   ) {
-    const layout = await this.aiService.recommendLayout(
-      body.blocks,
-      body.heading,
-    );
+    const layout = this.aiService.recommendLayout(body.blocks, body.heading);
     return { layout };
+  }
+
+  /**
+   * Generate custom presentation background from prompt
+   */
+  @Post('generate-background')
+  @HttpCode(HttpStatus.OK)
+  async generateBackground(
+    @CurrentUser() user: { id: string },
+    @Body()
+    body: {
+      prompt: string;
+      style?:
+        | 'abstract'
+        | 'gradient'
+        | 'geometric'
+        | 'minimal'
+        | 'nature'
+        | 'professional'
+        | 'creative';
+      colorScheme?: string;
+    },
+  ) {
+    const canGenerate = await this.usersService.canGenerateAI(user.id);
+    if (!canGenerate) {
+      throw new ForbiddenException('AI generation limit reached');
+    }
+
+    // Enhance the prompt for background generation
+    const styleDescriptions = {
+      abstract: 'abstract artistic patterns',
+      gradient: 'smooth flowing gradients',
+      geometric: 'geometric shapes and patterns',
+      minimal: 'minimal clean design',
+      nature: 'natural organic elements',
+      professional: 'professional corporate style',
+      creative: 'creative and imaginative',
+    };
+
+    const styleDesc = styleDescriptions[body.style || 'professional'];
+    const enhancedPrompt = `Create a presentation background with ${styleDesc}. ${body.prompt}. ${body.colorScheme ? `Color scheme: ${body.colorScheme}.` : ''} The image should be suitable as a slide background - not too busy, with good contrast for text overlay. Wide aspect ratio.`;
+
+    const result = await this.aiService.generateImage(
+      enhancedPrompt,
+      'vivid',
+      '1792x1024', // Wide format perfect for presentations
+    );
+
+    await this.usersService.incrementAIGenerations(user.id, 5); // Premium feature
+
+    return {
+      ...result,
+      originalPrompt: body.prompt,
+      enhancedPrompt,
+      style: body.style || 'professional',
+    };
+  }
+
+  /**
+   * Batch generate multiple background variations
+   */
+  @Post('generate-backgrounds-batch')
+  @HttpCode(HttpStatus.OK)
+  async generateBackgroundsBatch(
+    @CurrentUser() user: { id: string },
+    @Body()
+    body: {
+      prompts: string[];
+      style?: string;
+      colorScheme?: string;
+    },
+  ) {
+    const canGenerate = await this.usersService.canGenerateAI(user.id);
+    if (!canGenerate) {
+      throw new ForbiddenException('AI generation limit reached');
+    }
+
+    if (body.prompts.length > 4) {
+      throw new ForbiddenException('Maximum 4 backgrounds per batch');
+    }
+
+    const results = await Promise.all(
+      body.prompts.map(async (prompt) => {
+        try {
+          const styleDesc = body.style || 'professional';
+          const enhancedPrompt = `Create a presentation background with ${styleDesc} style. ${prompt}. ${body.colorScheme ? `Color scheme: ${body.colorScheme}.` : ''} Suitable for text overlay, not too busy.`;
+
+          const result = await this.aiService.generateImage(
+            enhancedPrompt,
+            'vivid',
+            '1792x1024',
+          );
+
+          return { success: true, ...result, prompt };
+        } catch {
+          return { success: false, prompt, error: 'Generation failed' };
+        }
+      }),
+    );
+
+    await this.usersService.incrementAIGenerations(
+      user.id,
+      body.prompts.length * 5,
+    );
+
+    return { results };
+  }
+
+  /**
+   * Get background presets for quick generation
+   */
+  @Post('background-presets')
+  @HttpCode(HttpStatus.OK)
+  getBackgroundPresets(@Body() body: { industry?: string; style?: string }) {
+    const presets = this.backgroundLibrary.getPresetPrompts(
+      body.industry || 'business',
+      body.style || 'professional',
+    );
+    return { presets };
+  }
+
+  /**
+   * Save background to user library
+   */
+  @Post('background-library/save')
+  @HttpCode(HttpStatus.OK)
+  async saveBackgroundToLibrary(
+    @CurrentUser() user: { id: string },
+    @Body()
+    body: {
+      url: string;
+      prompt: string;
+      style: string;
+      colorScheme?: string;
+    },
+  ) {
+    const saved = await this.backgroundLibrary.saveBackground(
+      user.id,
+      body.url,
+      body.prompt,
+      body.style,
+      body.colorScheme,
+    );
+    return saved;
+  }
+
+  /**
+   * Get user's background library
+   */
+  @Get('background-library')
+  @HttpCode(HttpStatus.OK)
+  async getBackgroundLibrary(@CurrentUser() user: { id: string }) {
+    const backgrounds = await this.backgroundLibrary.getUserBackgrounds(
+      user.id,
+    );
+    return { backgrounds };
+  }
+
+  /**
+   * Delete background from library
+   */
+  @Delete('background-library/:id')
+  @HttpCode(HttpStatus.OK)
+  async deleteBackgroundFromLibrary(
+    @CurrentUser() user: { id: string },
+    @Param('id') backgroundId: string,
+  ) {
+    await this.backgroundLibrary.deleteBackground(user.id, backgroundId);
+    return { success: true };
+  }
+
+  /**
+   * Get layout suggestions for a slide
+   */
+  @Post('layout-suggestions')
+  @HttpCode(HttpStatus.OK)
+  getLayoutSuggestions(
+    @Body()
+    body: {
+      blocks: { id: string; type: string; content: unknown }[];
+      heading?: string;
+    },
+  ) {
+    const suggestions = this.autoLayoutService.suggestLayouts({
+      blocks: body.blocks,
+      heading: body.heading,
+    });
+    return { suggestions };
+  }
+
+  /**
+   * Auto-layout a slide using AI
+   */
+  @Post('auto-layout')
+  @HttpCode(HttpStatus.OK)
+  async autoLayout(
+    @CurrentUser() user: { id: string },
+    @Body()
+    body: {
+      blocks: { id: string; type: string; content: unknown }[];
+      heading?: string;
+    },
+  ) {
+    const canGenerate = await this.usersService.canGenerateAI(user.id);
+    if (!canGenerate) {
+      throw new ForbiddenException('AI generation limit reached');
+    }
+
+    const layout = await this.autoLayoutService.autoLayout({
+      blocks: body.blocks,
+      heading: body.heading,
+    });
+
+    await this.usersService.incrementAIGenerations(user.id);
+    return { layout };
+  }
+
+  /**
+   * Get layout recommendations based on block types
+   */
+  @Post('layout-recommendations')
+  @HttpCode(HttpStatus.OK)
+  getLayoutRecommendations(@Body() body: { blockTypes: string[] }) {
+    const recommendations = this.autoLayoutService.getRecommendations(
+      body.blockTypes,
+    );
+    return { recommendations };
+  }
+
+  // ============================================
+  // AI CHAT ASSISTANT ENDPOINTS (GAMMA AGENT)
+  // ============================================
+
+  /**
+   * AI Chat - Process chat message in slide context
+   */
+  @Post('chat')
+  @HttpCode(HttpStatus.OK)
+  async processChat(
+    @CurrentUser() user: { id: string },
+    @Body()
+    body: {
+      projectId: string;
+      slideContext: SlideContext;
+      message: string;
+      conversationHistory?: Array<{
+        role: 'user' | 'assistant';
+        content: string;
+      }>;
+    },
+  ) {
+    const canGenerate = await this.usersService.canGenerateAI(user.id);
+    if (!canGenerate) {
+      throw new ForbiddenException('AI generation limit reached');
+    }
+
+    const response = await this.aiChatService.processChat(
+      user.id,
+      body.projectId,
+      body.slideContext,
+      body.message,
+      body.conversationHistory || [],
+    );
+
+    await this.usersService.incrementAIGenerations(user.id);
+    return response;
+  }
+
+  /**
+   * AI Chat - Quick action on content
+   */
+  @Post('chat/quick-action')
+  @HttpCode(HttpStatus.OK)
+  async chatQuickAction(
+    @CurrentUser() user: { id: string },
+    @Body()
+    body: {
+      action:
+        | 'improve'
+        | 'shorten'
+        | 'expand'
+        | 'fix_grammar'
+        | 'make_professional'
+        | 'add_examples'
+        | 'simplify';
+      content: string;
+      context?: SlideContext;
+    },
+  ) {
+    const canGenerate = await this.usersService.canGenerateAI(user.id);
+    if (!canGenerate) {
+      throw new ForbiddenException('AI generation limit reached');
+    }
+
+    const result = await this.aiChatService.quickAction(
+      user.id,
+      body.action,
+      body.content,
+      body.context,
+    );
+
+    await this.usersService.incrementAIGenerations(user.id);
+    return result;
+  }
+
+  /**
+   * AI Chat - Generate suggestions for slide
+   */
+  @Post('chat/suggestions')
+  @HttpCode(HttpStatus.OK)
+  async getChatSuggestions(
+    @CurrentUser() user: { id: string },
+    @Body()
+    body: {
+      slideContext: SlideContext;
+      type: 'next_slide' | 'improve_current' | 'add_visuals' | 'transitions';
+    },
+  ) {
+    const suggestions = await this.aiChatService.generateSuggestions(
+      body.slideContext,
+      body.type,
+    );
+    return { suggestions };
+  }
+
+  /**
+   * AI Chat - Rewrite entire slide
+   */
+  @Post('chat/rewrite-slide')
+  @HttpCode(HttpStatus.OK)
+  async rewriteSlide(
+    @CurrentUser() user: { id: string },
+    @Body()
+    body: {
+      slideContext: SlideContext;
+      instruction: string;
+    },
+  ) {
+    const canGenerate = await this.usersService.canGenerateAI(user.id);
+    if (!canGenerate) {
+      throw new ForbiddenException('AI generation limit reached');
+    }
+
+    const result = await this.aiChatService.rewriteSlide(
+      body.slideContext,
+      body.instruction,
+    );
+
+    await this.usersService.incrementAIGenerations(user.id, 2);
+    return result;
+  }
+
+  // ============================================
+  // URL IMPORT ENDPOINTS
+  // ============================================
+
+  /**
+   * Import presentation from URL
+   */
+  @Post('import-url')
+  @HttpCode(HttpStatus.OK)
+  async importFromURL(
+    @CurrentUser() user: { id: string },
+    @Body()
+    body: {
+      url: string;
+      targetSlides?: number;
+      style?: 'detailed' | 'summary' | 'bullet-points';
+      includeImages?: boolean;
+    },
+  ) {
+    const canGenerate = await this.usersService.canGenerateAI(user.id);
+    if (!canGenerate) {
+      throw new ForbiddenException('AI generation limit reached');
+    }
+
+    const result = await this.urlImportService.importFromURL(body.url, {
+      targetSlides: body.targetSlides,
+      style: body.style,
+      includeImages: body.includeImages,
+    });
+
+    await this.usersService.incrementAIGenerations(user.id, 5);
+    return result;
+  }
+
+  /**
+   * Import presentation from YouTube URL
+   */
+  @Post('import-youtube')
+  @HttpCode(HttpStatus.OK)
+  async importFromYouTube(
+    @CurrentUser() user: { id: string },
+    @Body()
+    body: {
+      url: string;
+      targetSlides?: number;
+    },
+  ) {
+    const canGenerate = await this.usersService.canGenerateAI(user.id);
+    if (!canGenerate) {
+      throw new ForbiddenException('AI generation limit reached');
+    }
+
+    const result = await this.urlImportService.importFromYouTube(body.url, {
+      targetSlides: body.targetSlides,
+    });
+
+    await this.usersService.incrementAIGenerations(user.id, 5);
+    return result;
+  }
+
+  // ============================================
+  // ENHANCED FEATURES: CHARTS, EMOJIS, REAL-TIME DATA
+  // ============================================
+
+  /**
+   * Generate enhanced presentation with charts, emojis, and rich content
+   */
+  @Post('generate-enhanced')
+  @HttpCode(HttpStatus.OK)
+  async generateEnhancedPresentation(
+    @CurrentUser() user: { id: string },
+    @Body()
+    body: {
+      topic: string;
+      tone?: string;
+      audience?: string;
+      length?: number;
+      includeCharts?: boolean;
+      includeRealTimeData?: boolean;
+      includeEmojis?: boolean;
+      generateImages?: boolean;
+      imageSource?: 'ai' | 'stock';
+    },
+  ) {
+    const canGenerate = await this.usersService.canGenerateAI(user.id);
+    if (!canGenerate) {
+      throw new ForbiddenException('AI generation limit reached');
+    }
+
+    const presentation = await this.aiService.generateEnhancedPresentation({
+      topic: body.topic,
+      tone: body.tone || 'professional',
+      audience: body.audience || 'general',
+      length: body.length || 5,
+      includeCharts: body.includeCharts !== false,
+      includeRealTimeData: body.includeRealTimeData !== false,
+      includeEmojis: body.includeEmojis !== false,
+      generateImages: body.generateImages || false,
+      imageSource: body.imageSource || 'stock',
+    });
+
+    await this.usersService.incrementAIGenerations(user.id, body.length || 5);
+
+    return {
+      success: true,
+      presentation,
+      message:
+        'Enhanced presentation generated with charts, emojis, and rich formatting',
+    };
+  }
+
+  /**
+   * Generate chart with real-time data
+   */
+  @Post('generate-chart-realtime')
+  @HttpCode(HttpStatus.OK)
+  async generateChartRealtime(
+    @CurrentUser() user: { id: string },
+    @Body()
+    body: {
+      title: string;
+      topic: string;
+      chartType?: 'bar' | 'line' | 'pie' | 'doughnut';
+    },
+  ) {
+    const canGenerate = await this.usersService.canGenerateAI(user.id);
+    if (!canGenerate) {
+      throw new ForbiddenException('AI generation limit reached');
+    }
+
+    const chartData = await this.aiService.generateChartWithRealData(
+      body.title,
+      body.topic,
+      body.chartType || 'bar',
+    );
+
+    await this.usersService.incrementAIGenerations(user.id);
+
+    return {
+      success: true,
+      chartData,
+      message: 'Chart generated with real-time data',
+    };
+  }
+
+  /**
+   * Search real-time data for presentation content
+   */
+  @Post('search-realtime-data')
+  @HttpCode(HttpStatus.OK)
+  async searchRealTimeData(
+    @CurrentUser() user: { id: string },
+    @Body()
+    body: {
+      query: string;
+      limit?: number;
+    },
+  ) {
+    const result = await this.realTimeDataService.search(
+      body.query,
+      body.limit || 5,
+    );
+
+    return {
+      success: true,
+      data: result,
+      message: 'Real-time data retrieved',
+    };
+  }
+
+  /**
+   * Extract chart data from search results
+   */
+  @Post('extract-chart-data')
+  @HttpCode(HttpStatus.OK)
+  async extractChartData(
+    @CurrentUser() user: { id: string },
+    @Body()
+    body: {
+      query: string;
+      dataPoints?: number;
+    },
+  ) {
+    const chartData = await this.aiService[
+      'realTimeDataService'
+    ].extractChartData(body.query, body.dataPoints || 5);
+
+    return {
+      success: true,
+      chartData,
+      message: 'Chart data extracted from real-time search',
+    };
+  }
+
+  /**
+   * Add emojis to text content
+   */
+  @Post('add-emojis')
+  @HttpCode(HttpStatus.OK)
+  async addEmojis(
+    @CurrentUser() user: { id: string },
+    @Body()
+    body: {
+      text: string;
+      context?: string;
+    },
+  ) {
+    const canGenerate = await this.usersService.canGenerateAI(user.id);
+    if (!canGenerate) {
+      throw new ForbiddenException('AI generation limit reached');
+    }
+
+    const enhancedText = await this.aiService.addEmojisToContent(
+      body.text,
+      body.context || '',
+    );
+
+    await this.usersService.incrementAIGenerations(user.id);
+
+    return {
+      success: true,
+      text: enhancedText,
+      original: body.text,
+    };
+  }
+
+  /**
+   * Get topic statistics from real-time search
+   */
+  @Post('topic-statistics')
+  @HttpCode(HttpStatus.OK)
+  async getTopicStatistics(
+    @CurrentUser() user: { id: string },
+    @Body()
+    body: {
+      topic: string;
+    },
+  ) {
+    const statistics = await this.realTimeDataService.getTopicStatistics(
+      body.topic,
+    );
+
+    return {
+      success: true,
+      statistics,
+      message: 'Topic statistics retrieved',
+    };
   }
 }

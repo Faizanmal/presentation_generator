@@ -1,7 +1,14 @@
-import { Injectable, Logger, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
+import { Prisma, BlockType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
-export type TemplateCategory = 
+export type TemplateCategory =
   | 'pitch-deck'
   | 'sales'
   | 'marketing'
@@ -34,9 +41,7 @@ export interface MarketplaceTemplate {
   downloads: number;
   rating: number;
   reviewCount: number;
-  featured: boolean;
-  verified: boolean;
-  content: any; // Full template content
+  content: Prisma.JsonValue; // Full template content
   createdAt: Date;
   updatedAt: Date;
 }
@@ -52,6 +57,13 @@ export interface TemplateReview {
   createdAt: Date;
 }
 
+interface BlockContent {
+  blockType: string;
+  content: Prisma.JsonValue;
+  style: Prisma.JsonValue;
+  order: number;
+}
+
 export interface TemplateSubmission {
   id: string;
   templateId: string;
@@ -59,6 +71,17 @@ export interface TemplateSubmission {
   feedback?: string;
   submittedAt: Date;
   reviewedAt?: Date;
+}
+
+interface TemplateContent {
+  title: string;
+  description?: string;
+  themeId: string;
+  slides: Array<{
+    layout: string;
+    order: number;
+    blocks: BlockContent[];
+  }>;
 }
 
 @Injectable()
@@ -74,7 +97,6 @@ export class TemplateMarketplaceService {
     category?: TemplateCategory;
     pricing?: TemplatePricing;
     search?: string;
-    featured?: boolean;
     sortBy?: 'downloads' | 'rating' | 'newest' | 'popular';
     page?: number;
     limit?: number;
@@ -84,35 +106,40 @@ export class TemplateMarketplaceService {
     page: number;
     totalPages: number;
   }> {
-    const { 
-      category, 
-      pricing, 
-      search, 
-      featured,
+    const {
+      category,
+      pricing,
+      search,
       sortBy = 'popular',
       page = 1,
       limit = 20,
     } = options;
 
-    const where: any = {
-      status: 'published',
+    const where: Prisma.MarketplaceTemplateWhereInput = {
+      status: 'PUBLISHED',
     };
 
     if (category) where.category = category;
     if (pricing) where.pricing = pricing;
-    if (featured) where.featured = true;
     if (search) {
       where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
+        {
+          title: { contains: search, mode: 'insensitive' as Prisma.QueryMode },
+        },
+        {
+          description: {
+            contains: search,
+            mode: 'insensitive' as Prisma.QueryMode,
+          },
+        },
         { tags: { hasSome: [search.toLowerCase()] } },
       ];
     }
 
-    const orderBy: any = {};
+    const orderBy: Prisma.MarketplaceTemplateOrderByWithRelationInput = {};
     switch (sortBy) {
       case 'downloads':
-        orderBy.downloads = 'desc';
+        orderBy.downloadCount = 'desc';
         break;
       case 'rating':
         orderBy.rating = 'desc';
@@ -122,7 +149,7 @@ export class TemplateMarketplaceService {
         break;
       case 'popular':
       default:
-        orderBy.downloads = 'desc';
+        orderBy.downloadCount = 'desc';
         break;
     }
 
@@ -142,7 +169,7 @@ export class TemplateMarketplaceService {
     ]);
 
     return {
-      templates: templates.map(t => this.mapTemplate(t)),
+      templates: templates.map((t) => this.mapTemplate(t)),
       total,
       page,
       totalPages: Math.ceil(total / limit),
@@ -205,14 +232,15 @@ export class TemplateMarketplaceService {
     // Create template content
     const content = {
       title: project.title,
+      description: project.description,
       themeId: project.themeId,
-      slides: project.slides.map(s => ({
+      slides: project.slides.map((s) => ({
         layout: s.layout,
         order: s.order,
-        blocks: s.blocks.map(b => ({
+        blocks: s.blocks.map((b) => ({
           blockType: b.blockType,
-          content: b.content,
-          style: b.style,
+          content: b.content as Prisma.InputJsonValue,
+          style: b.style as Prisma.InputJsonValue,
           order: b.order,
         })),
       })),
@@ -231,8 +259,9 @@ export class TemplateMarketplaceService {
         price: data.price,
         authorId: userId,
         slideCount: project.slides.length,
-        content,
-        status: 'pending',
+        content: content as Prisma.InputJsonValue,
+        templateData: content as Prisma.InputJsonValue,
+        status: 'DRAFT',
       },
     });
 
@@ -240,6 +269,7 @@ export class TemplateMarketplaceService {
     const submission = await this.prisma.templateSubmission.create({
       data: {
         templateId: template.id,
+        authorId: userId,
         status: 'pending',
       },
     });
@@ -262,7 +292,7 @@ export class TemplateMarketplaceService {
       where: { id: templateId },
     });
 
-    if (!template || template.status !== 'published') {
+    if (!template || template.status !== 'PUBLISHED') {
       throw new NotFoundException('Template not found');
     }
 
@@ -274,7 +304,7 @@ export class TemplateMarketplaceService {
       }
     }
 
-    const content = template.content as any;
+    const content = template.content as unknown as TemplateContent;
 
     // Create new project from template
     const project = await this.prisma.project.create({
@@ -287,7 +317,7 @@ export class TemplateMarketplaceService {
     });
 
     // Create slides and blocks
-    for (const slideData of content.slides) {
+    for (const slideData of content.slides || []) {
       const slide = await this.prisma.slide.create({
         data: {
           projectId: project.id,
@@ -296,14 +326,14 @@ export class TemplateMarketplaceService {
         },
       });
 
-      for (const blockData of slideData.blocks) {
+      for (const blockData of slideData.blocks || []) {
         await this.prisma.block.create({
           data: {
             projectId: project.id,
             slideId: slide.id,
-            blockType: blockData.blockType,
-            content: blockData.content,
-            style: blockData.style,
+            blockType: blockData.blockType as BlockType,
+            content: blockData.content || {},
+            style: blockData.style || {},
             order: blockData.order,
           },
         });
@@ -313,7 +343,7 @@ export class TemplateMarketplaceService {
     // Increment download count
     await this.prisma.marketplaceTemplate.update({
       where: { id: templateId },
-      data: { downloads: { increment: 1 } },
+      data: { downloadCount: { increment: 1 } },
     });
 
     // Record the download
@@ -349,6 +379,7 @@ export class TemplateMarketplaceService {
       data: {
         templateId,
         userId,
+        amount: template.price || 0,
         price: template.price || 0,
         paymentIntentId,
       },
@@ -387,7 +418,9 @@ export class TemplateMarketplaceService {
     });
 
     if (!hasAccess) {
-      throw new ForbiddenException('You must use this template before reviewing');
+      throw new ForbiddenException(
+        'You must use this template before reviewing',
+      );
     }
 
     // Check for existing review
@@ -417,9 +450,10 @@ export class TemplateMarketplaceService {
     const reviews = await this.prisma.templateReview.findMany({
       where: { templateId },
     });
-    
-    const avgRating = reviews.reduce((a, r) => a + r.rating, 0) / reviews.length;
-    
+
+    const avgRating =
+      reviews.reduce((a, r) => a + r.rating, 0) / reviews.length;
+
     await this.prisma.marketplaceTemplate.update({
       where: { id: templateId },
       data: {
@@ -467,7 +501,7 @@ export class TemplateMarketplaceService {
     ]);
 
     return {
-      reviews: reviews.map(r => ({
+      reviews: reviews.map((r) => ({
         id: r.id,
         templateId: r.templateId,
         userId: r.userId,
@@ -489,7 +523,7 @@ export class TemplateMarketplaceService {
     totalDownloads: number;
     totalEarnings: number;
     pendingEarnings: number;
-    recentSales: any[];
+    recentSales: unknown[];
   }> {
     const templates = await this.prisma.marketplaceTemplate.findMany({
       where: { authorId: userId },
@@ -506,18 +540,18 @@ export class TemplateMarketplaceService {
     });
 
     const totalEarnings = earnings
-      .filter(e => e.status === 'paid')
-      .reduce((a, e) => a + e.amount, 0);
-    
-    const pendingEarnings = earnings
-      .filter(e => e.status === 'pending')
+      .filter((e) => e.status === 'paid')
       .reduce((a, e) => a + e.amount, 0);
 
-    const totalDownloads = templates.reduce((a, t) => a + t.downloads, 0);
+    const pendingEarnings = earnings
+      .filter((e) => e.status === 'pending')
+      .reduce((a, e) => a + e.amount, 0);
+
+    const totalDownloads = templates.reduce((a, t) => a + t.downloadCount, 0);
 
     const recentSales = await this.prisma.templatePurchase.findMany({
       where: {
-        templateId: { in: templates.map(t => t.id) },
+        templateId: { in: templates.map((t) => t.id) },
       },
       orderBy: { createdAt: 'desc' },
       take: 10,
@@ -527,7 +561,7 @@ export class TemplateMarketplaceService {
     });
 
     return {
-      templates: templates.map(t => this.mapTemplate(t)),
+      templates: templates.map((t) => this.mapTemplate(t)),
       totalDownloads,
       totalEarnings,
       pendingEarnings,
@@ -554,8 +588,7 @@ export class TemplateMarketplaceService {
     await this.prisma.marketplaceTemplate.update({
       where: { id: templateId },
       data: {
-        status: action === 'approve' ? 'published' : 'rejected',
-        verified: action === 'approve',
+        status: action === 'approve' ? 'PUBLISHED' : 'REJECTED',
       },
     });
 
@@ -572,41 +605,52 @@ export class TemplateMarketplaceService {
   /**
    * Get categories with counts
    */
-  async getCategories(): Promise<Array<{
-    category: TemplateCategory;
-    count: number;
-    name: string;
-  }>> {
+  async getCategories(): Promise<
+    Array<{
+      category: TemplateCategory;
+      count: number;
+      name: string;
+    }>
+  > {
     const categories: TemplateCategory[] = [
-      'pitch-deck', 'sales', 'marketing', 'business-plan', 
-      'proposal', 'training', 'education', 'portfolio',
-      'report', 'event', 'personal', 'other'
+      'pitch-deck',
+      'sales',
+      'marketing',
+      'business-plan',
+      'proposal',
+      'training',
+      'education',
+      'portfolio',
+      'report',
+      'event',
+      'personal',
+      'other',
     ];
 
     const names: Record<TemplateCategory, string> = {
       'pitch-deck': 'Pitch Deck',
-      'sales': 'Sales',
-      'marketing': 'Marketing',
+      sales: 'Sales',
+      marketing: 'Marketing',
       'business-plan': 'Business Plan',
-      'proposal': 'Proposal',
-      'training': 'Training',
-      'education': 'Education',
-      'portfolio': 'Portfolio',
-      'report': 'Report',
-      'event': 'Event',
-      'personal': 'Personal',
-      'other': 'Other',
+      proposal: 'Proposal',
+      training: 'Training',
+      education: 'Education',
+      portfolio: 'Portfolio',
+      report: 'Report',
+      event: 'Event',
+      personal: 'Personal',
+      other: 'Other',
     };
 
     const counts = await this.prisma.marketplaceTemplate.groupBy({
       by: ['category'],
-      where: { status: 'published' },
+      where: { status: 'PUBLISHED' },
       _count: true,
     });
 
-    const countMap = new Map(counts.map(c => [c.category, c._count]));
+    const countMap = new Map(counts.map((c) => [c.category, c._count]));
 
-    return categories.map(category => ({
+    return categories.map((category) => ({
       category,
       count: countMap.get(category) || 0,
       name: names[category],
@@ -614,7 +658,10 @@ export class TemplateMarketplaceService {
   }
 
   // Helper methods
-  private async checkTemplateAccess(userId: string, templateId: string): Promise<boolean> {
+  private async checkTemplateAccess(
+    userId: string,
+    templateId: string,
+  ): Promise<boolean> {
     // Check if purchased
     const purchase = await this.prisma.templatePurchase.findFirst({
       where: { userId, templateId },
@@ -630,26 +677,28 @@ export class TemplateMarketplaceService {
     return subscription?.plan === 'PRO' || subscription?.plan === 'ENTERPRISE';
   }
 
-  private mapTemplate(t: any): MarketplaceTemplate {
+  private mapTemplate(
+    t: Prisma.MarketplaceTemplateGetPayload<{
+      include: { author: { select: { name: true; image: true } } };
+    }>,
+  ): MarketplaceTemplate {
     return {
       id: t.id,
       title: t.title,
-      description: t.description,
+      description: t.description || '',
       category: t.category as TemplateCategory,
       tags: t.tags,
-      thumbnail: t.thumbnail,
+      thumbnail: t.thumbnail || '',
       previewImages: t.previewImages,
       pricing: t.pricing as TemplatePricing,
-      price: t.price,
+      price: t.price || 0,
       authorId: t.authorId,
       authorName: t.author?.name || 'Unknown',
-      authorAvatar: t.author?.image,
+      authorAvatar: t.author?.image || undefined,
       slideCount: t.slideCount,
-      downloads: t.downloads,
-      rating: t.rating,
+      downloads: t.downloadCount,
+      rating: t.rating || 0,
       reviewCount: t.reviewCount,
-      featured: t.featured,
-      verified: t.verified,
       content: t.content,
       createdAt: t.createdAt,
       updatedAt: t.updatedAt,

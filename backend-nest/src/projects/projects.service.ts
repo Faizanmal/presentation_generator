@@ -2,7 +2,6 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
-  BadRequestException,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -10,9 +9,12 @@ import { UsersService } from '../users/users.service';
 import { AIService, GeneratedPresentation } from '../ai/ai.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
-import { GenerateProjectDto } from './dto/generate-project.dto';
-import { ProjectType, ProjectStatus, BlockType } from '@prisma/client';
+import { GenerateProjectDto, GenerationType } from './dto/generate-project.dto';
+import { ProjectType, BlockType, Prisma } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
+
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 @Injectable()
 export class ProjectsService {
@@ -22,7 +24,8 @@ export class ProjectsService {
     private readonly prisma: PrismaService,
     private readonly usersService: UsersService,
     private readonly aiService: AIService,
-  ) {}
+    @InjectQueue('generation') private readonly generationQueue: Queue,
+  ) { }
 
   /**
    * Create a new empty project
@@ -90,6 +93,56 @@ export class ProjectsService {
       );
     }
 
+    // Add to queue
+    const job = await this.generationQueue.add('generate', {
+      userId,
+      dto: generateDto,
+    });
+
+    this.logger.log(`Project generation queued: ${job.id} for user ${userId}`);
+
+    // Return job ID so frontend can poll
+    return {
+      status: 'queued',
+      jobId: job.id,
+      message: 'Project generation started in background',
+    };
+  }
+
+  /**
+   * Get generation job status
+   */
+  async getGenerationStatus(jobId: string, userId: string) {
+    const job = await this.generationQueue.getJob(jobId);
+
+    if (!job) {
+      throw new NotFoundException('Job not found');
+    }
+
+    // Verify ownership
+    if (job.data.userId !== userId) {
+      throw new ForbiddenException('You cannot access this job');
+    }
+
+    const state = await job.getState();
+    const result = job.returnvalue;
+    // const progress = job.progress;
+
+    return {
+      id: job.id,
+      state,
+      // progress,
+      result, // This will be the project object if completed
+      failedReason: job.failedReason,
+    };
+  }
+
+  /**
+   * Process the generation (called by Worker)
+   */
+  async processGeneration(userId: string, generateDto: GenerateProjectDto) {
+    this.logger.log(`Processing generation for user ${userId}`);
+
     // Generate content using AI
     const generatedContent = await this.aiService.generatePresentation({
       topic: generateDto.topic,
@@ -97,7 +150,32 @@ export class ProjectsService {
       audience: generateDto.audience,
       length: generateDto.length,
       type: generateDto.type,
+      generateImages: generateDto.generateImages,
+      imageSource: generateDto.imageSource,
     });
+
+    // If requested, generate images for the presentation
+    if (generateDto.generateImages && generateDto.imageSource === 'ai') {
+      this.logger.log(`Generating images for project ${generateDto.topic}...`);
+      const images = await this.aiService.generatePresentationImages(
+        generatedContent.sections,
+      );
+
+      // Add image blocks to sections where images were generated
+      generatedContent.sections.forEach((section, index) => {
+        if (images.has(index)) {
+          const imageResult = images.get(index);
+          if (imageResult) {
+            // Add image block at the beginning of content blocks (after heading)
+            section.blocks.unshift({
+              type: 'image',
+              content: imageResult.imageUrl,
+              embedUrl: imageResult.imageUrl,
+            });
+          }
+        }
+      });
+    }
 
     // Create project with generated content
     const project = await this.createFromAIContent(
@@ -124,11 +202,16 @@ export class ProjectsService {
     content: GeneratedPresentation,
     generateDto: GenerateProjectDto,
   ) {
+    // Get the default theme
+    const defaultTheme = await this.prisma.theme.findFirst({
+      where: { isDefault: true },
+    });
+
     const project = await this.prisma.project.create({
       data: {
         title: content.title,
         type:
-          generateDto.type === 'document'
+          generateDto.type === GenerationType.DOCUMENT
             ? ProjectType.DOCUMENT
             : ProjectType.PRESENTATION,
         ownerId: userId,
@@ -136,6 +219,7 @@ export class ProjectsService {
         generatedFromPrompt: generateDto.topic,
         tone: generateDto.tone,
         audience: generateDto.audience,
+        themeId: defaultTheme?.id, // Auto-assign default theme
       },
     });
 
@@ -167,23 +251,59 @@ export class ProjectsService {
         },
       });
 
-      // Create content blocks
-      for (
-        let blockIndex = 0;
-        blockIndex < section.blocks.length;
-        blockIndex++
-      ) {
-        const block = section.blocks[blockIndex];
+      // Create content blocks - group consecutive bullets into lists
+      let blockOrder = 1;
+      let i = 0;
 
-        await this.prisma.block.create({
-          data: {
-            projectId: project.id,
-            slideId: slide.id,
-            blockType: this.mapBlockType(block.type),
-            content: { text: block.content },
-            order: blockIndex + 1,
-          },
-        });
+      while (i < section.blocks.length) {
+        const block = section.blocks[i];
+        const blockType = this.mapBlockType(block.type);
+
+        // Check if this is a bullet or numbered list item
+        if (
+          blockType === BlockType.BULLET_LIST ||
+          blockType === BlockType.NUMBERED_LIST
+        ) {
+          // Collect all consecutive list items of the same type
+          const items: string[] = [];
+          const currentType = blockType;
+
+          while (
+            i < section.blocks.length &&
+            this.mapBlockType(section.blocks[i].type) === currentType
+          ) {
+            items.push(section.blocks[i].content);
+            i++;
+          }
+
+          // Create a single list block with all items
+          await this.prisma.block.create({
+            data: {
+              projectId: project.id,
+              slideId: slide.id,
+              blockType: currentType,
+              content: { items },
+              order: blockOrder++,
+            },
+          });
+        } else {
+          // Create regular block
+          const content =
+            blockType === BlockType.IMAGE
+              ? { url: block.content, alt: 'AI Generated Image' }
+              : { text: block.content };
+
+          await this.prisma.block.create({
+            data: {
+              projectId: project.id,
+              slideId: slide.id,
+              blockType,
+              content,
+              order: blockOrder++,
+            },
+          });
+          i++;
+        }
       }
     }
 
@@ -218,7 +338,10 @@ export class ProjectsService {
 
     const [projects, total] = await Promise.all([
       this.prisma.project.findMany({
-        where: { ownerId: userId },
+        where: {
+          ownerId: userId,
+          deletedAt: null, // Soft delete filter
+        },
         include: {
           theme: true,
           _count: {
@@ -251,7 +374,7 @@ export class ProjectsService {
   /**
    * Get a single project by ID
    */
-  async findOne(id: string, userId?: string) {
+  async findOne(id: string, userId: string) {
     const project = await this.prisma.project.findUnique({
       where: { id },
       include: {
@@ -280,7 +403,19 @@ export class ProjectsService {
 
     // Check access
     if (!project.isPublic && project.ownerId !== userId) {
-      throw new ForbiddenException('You do not have access to this project');
+      // Check if user is a collaborator
+      const collaborator = await this.prisma.projectCollaborator.findUnique({
+        where: {
+          projectId_userId: {
+            projectId: id,
+            userId: userId,
+          },
+        },
+      });
+
+      if (!collaborator) {
+        throw new ForbiddenException('You do not have access to this project');
+      }
     }
 
     return project;
@@ -366,8 +501,9 @@ export class ProjectsService {
       throw new ForbiddenException('You cannot delete this project');
     }
 
-    await this.prisma.project.delete({
+    await this.prisma.project.update({
       where: { id },
+      data: { deletedAt: new Date() },
     });
 
     this.logger.log(`Project deleted: ${id} by user ${userId}`);
@@ -417,8 +553,8 @@ export class ProjectsService {
             projectId: newProject.id,
             slideId: newSlide.id,
             blockType: block.blockType,
-            content: block.content as any,
-            style: block.style as any,
+            content: block.content as Prisma.InputJsonValue,
+            style: block.style as Prisma.InputJsonValue,
             order: block.order,
           },
         });
@@ -428,5 +564,41 @@ export class ProjectsService {
     this.logger.log(`Project duplicated: ${id} -> ${newProject.id}`);
 
     return this.findOne(newProject.id, userId);
+  }
+
+  /**
+   * Create project from AI-generated presentation (public API for data imports)
+   */
+  async createProjectFromAI(
+    userId: string,
+    presentation: GeneratedPresentation,
+    metadata?: Record<string, unknown>,
+  ) {
+    // Create a minimal GenerateProjectDto
+    const generateDto = {
+      topic: presentation.title,
+      tone: 'professional',
+      audience: 'general',
+      length: presentation.sections.length,
+      type: 'presentation' as const,
+    };
+
+    const project = await this.createFromAIContent(
+      userId,
+      presentation,
+      generateDto as any,
+    );
+
+    // Update project with additional metadata if provided
+    if (metadata && project) {
+      await this.prisma.project.update({
+        where: { id: project.id },
+        data: {
+          metadata: metadata as Prisma.InputJsonValue,
+        },
+      });
+    }
+
+    return project;
   }
 }

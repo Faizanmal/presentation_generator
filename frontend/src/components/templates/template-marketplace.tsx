@@ -1,12 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 'use client';
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Search,
-  Filter,
   Star,
   Heart,
   Download,
@@ -53,16 +50,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
+// import {
+//   Tabs,
+//   TabsContent,
+//   TabsList,
+//   TabsTrigger,
+// } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
-import Image from 'next/image';
+// import Image from 'next/image';
 
 interface TemplatePreview {
   id: string;
@@ -117,41 +114,53 @@ export function TemplateMarketplace() {
   const [showPremiumOnly, setShowPremiumOnly] = useState(false);
 
   // Fetch categories
-  const { data: categories } = useQuery({
+  const { data: categories } = useQuery<TemplateCategory[]>({
     queryKey: ['template-categories'],
-    queryFn: () => api.get('/templates/categories'),
+    queryFn: async () => {
+      const response = await api.get('/templates/categories');
+      return response.data as TemplateCategory[];
+    },
   });
 
   // Fetch templates
-  const { data: templatesData, isLoading } = useQuery({
+  const { data: templatesData, isLoading } = useQuery<{ templates: TemplatePreview[]; total: number }>({
     queryKey: ['templates', searchQuery, selectedCategory, sortBy, showPremiumOnly],
-    queryFn: () =>
-      api.get('/templates/search', {
+    queryFn: async () => {
+      const response = await api.get('/templates/search', {
         params: {
           q: searchQuery || undefined,
           category: selectedCategory || undefined,
           sort: sortBy,
           premium: showPremiumOnly ? 'true' : undefined,
         },
-      }),
+      });
+      return response.data as { templates: TemplatePreview[]; total: number };
+    },
   });
 
   // Fetch featured templates
-  const { data: featuredTemplates } = useQuery({
+  const { data: featuredTemplates } = useQuery<TemplatePreview[]>({
     queryKey: ['templates-featured'],
-    queryFn: () => api.get('/templates/featured'),
+    queryFn: async () => {
+      const response = await api.get('/templates/featured');
+      return response.data as TemplatePreview[];
+    },
   });
 
   // Use template mutation
   const useMutation_useTemplate = useMutation({
-    mutationFn: (templateId: string) => api.post(`/templates/${templateId}/use`),
-    onSuccess: (data) => {
+    mutationFn: async (templateId: string) => {
+      const response = await api.post(`/templates/${templateId}/use`);
+      return response.data as { projectId: string };
+    },
+    onSuccess: (data: { projectId: string }) => {
       toast.success('Template applied! Opening project...');
       // Navigate to project
-      window.location.href = `/editor/${(data as any).projectId}`;
+      window.location.href = `/editor/${data.projectId}`;
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to use template');
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Failed to use template');
     },
   });
 
@@ -188,7 +197,7 @@ export function TemplateMarketplace() {
             <Grid3X3 className="h-4 w-4" />
             <span>All Templates</span>
           </button>
-          {categories?.data?.map((category: TemplateCategory) => (
+          {categories?.map((category: TemplateCategory) => (
             <button
               key={category.id}
               onClick={() => setSelectedCategory(category.slug)}
@@ -223,7 +232,7 @@ export function TemplateMarketplace() {
                 className="pl-10"
               />
             </div>
-            <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'popular' | 'newest' | 'rating')}>
               <SelectTrigger className="w-40">
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
@@ -275,11 +284,11 @@ export function TemplateMarketplace() {
         <ScrollArea className="flex-1">
           <div className="p-4">
             {/* Featured Section */}
-            {!searchQuery && !selectedCategory && featuredTemplates?.data?.length > 0 && (
+            {!searchQuery && !selectedCategory && featuredTemplates && featuredTemplates.length > 0 && (
               <div className="mb-8">
                 <h2 className="text-lg font-semibold mb-4">Featured Templates</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {featuredTemplates!.data.slice(0, 3).map((template: TemplatePreview) => (
+                  {featuredTemplates?.slice(0, 3).map((template: TemplatePreview) => (
                     <Card
                       key={template.id}
                       className="cursor-pointer hover:shadow-lg transition-shadow overflow-hidden"
@@ -290,7 +299,7 @@ export function TemplateMarketplace() {
                           <ImageIcon className="h-12 w-12" />
                         </div>
                         {template.isPremium && (
-                          <Badge className="absolute top-2 right-2 bg-gradient-to-r from-yellow-500 to-amber-500">
+                          <Badge className="absolute top-2 right-2 bg-linear-to-r from-yellow-500 to-amber-500">
                             <Crown className="h-3 w-3 mr-1" />
                             Premium
                           </Badge>
@@ -334,7 +343,7 @@ export function TemplateMarketplace() {
                 </div>
               ) : viewMode === 'grid' ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {templatesData?.data?.templates?.map((template: TemplatePreview) => (
+                  {templatesData?.templates?.map((template: TemplatePreview) => (
                     <Card
                       key={template.id}
                       className="cursor-pointer hover:shadow-lg transition-shadow overflow-hidden group"
@@ -345,7 +354,7 @@ export function TemplateMarketplace() {
                           <ImageIcon className="h-8 w-8" />
                         </div>
                         {template.isPremium && (
-                          <Badge className="absolute top-2 right-2 bg-gradient-to-r from-yellow-500 to-amber-500">
+                          <Badge className="absolute top-2 right-2 bg-linear-to-r from-yellow-500 to-amber-500">
                             <Crown className="h-3 w-3" />
                           </Badge>
                         )}
@@ -370,14 +379,14 @@ export function TemplateMarketplace() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {templatesData?.data?.templates?.map((template: TemplatePreview) => (
+                  {templatesData?.templates?.map((template: TemplatePreview) => (
                     <Card
                       key={template.id}
                       className="cursor-pointer hover:shadow-md transition-shadow"
                       onClick={() => setSelectedTemplate(template)}
                     >
                       <div className="flex items-center p-4 gap-4">
-                        <div className="w-32 aspect-video bg-slate-100 rounded flex items-center justify-center flex-shrink-0">
+                        <div className="w-32 aspect-video bg-slate-100 rounded flex items-center justify-center shrink-0">
                           <ImageIcon className="h-6 w-6 text-slate-400" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -412,7 +421,7 @@ export function TemplateMarketplace() {
                 </div>
               )}
 
-              {templatesData?.data?.templates?.length === 0 && (
+              {templatesData?.templates?.length === 0 && (
                 <div className="text-center py-12">
                   <Search className="h-12 w-12 text-slate-300 mx-auto mb-4" />
                   <p className="text-slate-600">No templates found</p>
@@ -433,7 +442,7 @@ export function TemplateMarketplace() {
                 <DialogTitle className="flex items-center gap-2">
                   {selectedTemplate.title}
                   {selectedTemplate.isPremium && (
-                    <Badge className="bg-gradient-to-r from-yellow-500 to-amber-500">
+                    <Badge className="bg-linear-to-r from-yellow-500 to-amber-500">
                       <Crown className="h-3 w-3 mr-1" />
                       Premium
                     </Badge>

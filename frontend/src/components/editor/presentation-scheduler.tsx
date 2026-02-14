@@ -1,10 +1,8 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 'use client';
 
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { format, addMinutes } from 'date-fns';
+import { format } from 'date-fns';
 import {
   Calendar,
   Clock,
@@ -15,16 +13,11 @@ import {
   Settings,
   Plus,
   Trash2,
-  Edit,
   Copy,
-  ExternalLink,
   Mail,
   Play,
-  X,
-  Check,
   Loader2,
   CalendarPlus,
-  Link,
   Globe,
   Lock,
   Key,
@@ -35,13 +28,12 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { ScrollArea } from '@/components/ui/scroll-area';
+// import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -61,19 +53,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
+// import {
+//   Tabs,
+//   TabsContent,
+//   TabsList,
+//   TabsTrigger,
+// } from '@/components/ui/tabs';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { cn } from '@/lib/utils';
+// import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 
@@ -133,7 +125,7 @@ export function PresentationScheduler({
 }: PresentationSchedulerProps) {
   const queryClient = useQueryClient();
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
-  const [selectedPresentation, setSelectedPresentation] = useState<ScheduledPresentation | null>(null);
+  const [] = useState<ScheduledPresentation | null>(null);
   const [inviteEmails, setInviteEmails] = useState('');
 
   // Form state
@@ -149,7 +141,7 @@ export function PresentationScheduler({
   const [password, setPassword] = useState('');
 
   // Fetch scheduled presentations
-  const { data: presentations, isLoading } = useQuery({
+  const { data: presentations, isLoading } = useQuery<{ data: Record<string, unknown>[] }>({
     queryKey: ['scheduled-presentations', projectId],
     queryFn: () => api.get(`/presentations/scheduled?projectId=${projectId}`),
   });
@@ -177,8 +169,8 @@ export function PresentationScheduler({
   // Start mutation
   const startMutation = useMutation({
     mutationFn: (id: string) => api.post(`/presentations/scheduled/${id}/start`),
-    onSuccess: (data) => {
-      window.open((data as any).presenterUrl, '_blank');
+    onSuccess: (data: unknown) => {
+      window.open((data as { presenterUrl: string }).presenterUrl, '_blank');
     },
   });
 
@@ -277,11 +269,15 @@ export function PresentationScheduler({
   };
 
   // Mock data - moved to use useMemo to avoid impure function during render
-  const mockPresentations = useMemo(() => {
+  const mockPresentations: ScheduledPresentation[] = useMemo(() => {
     const tomorrow = new Date();
     tomorrow.setTime(tomorrow.getTime() + 86400000);
     
-    return presentations?.data || [
+    if (Array.isArray(presentations?.data)) {
+      return presentations.data as unknown as ScheduledPresentation[];
+    }
+
+    return [
     {
       id: 'sched-1',
       projectId,
@@ -422,7 +418,7 @@ export function PresentationScheduler({
 
               <div>
                 <Label>Access</Label>
-                <Select value={accessType} onValueChange={(v: any) => setAccessType(v)}>
+                <Select value={accessType} onValueChange={(v) => setAccessType(v as 'public' | 'private' | 'password')}>
                   <SelectTrigger className="mt-1">
                     <SelectValue />
                   </SelectTrigger>
@@ -484,7 +480,7 @@ export function PresentationScheduler({
         </Card>
       ) : (
         <div className="space-y-4">
-          {mockPresentations.map((presentation: any) => (
+          {mockPresentations.map((presentation) => (
             <Card key={presentation.id}>
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between">
@@ -581,9 +577,9 @@ export function PresentationScheduler({
                 {/* Attendees */}
                 <div className="flex items-center gap-2">
                   <div className="flex -space-x-2">
-                    {presentation.attendees.slice(0, 5).map((attendee: any, i: number) => (
+                    {presentation.attendees.slice(0, 5).map((attendee: { email: string; name?: string }) => (
                       <div
-                        key={i}
+                        key={attendee.email}
                         className="w-8 h-8 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center text-xs font-medium"
                       >
                         {attendee.name?.[0] || attendee.email[0].toUpperCase()}

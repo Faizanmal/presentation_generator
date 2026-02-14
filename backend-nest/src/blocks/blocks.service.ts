@@ -11,15 +11,15 @@ interface CreateBlockDto {
   projectId: string;
   slideId?: string;
   blockType: BlockType;
-  content: any;
+  content: Record<string, any>;
   order: number;
-  style?: any;
+  style?: Record<string, any>;
 }
 
 interface UpdateBlockDto {
-  content?: any;
+  content?: Record<string, any>;
   order?: number;
-  style?: any;
+  style?: Record<string, any>;
   blockType?: BlockType;
 }
 
@@ -57,7 +57,7 @@ export class BlocksService {
         blockType: createBlockDto.blockType,
         content: createBlockDto.content,
         order: createBlockDto.order,
-        style: createBlockDto.style,
+        style: createBlockDto.style || {},
       },
     });
 
@@ -221,7 +221,11 @@ export class BlocksService {
   async batchUpdate(
     userId: string,
     projectId: string,
-    blocks: Array<{ id: string; content?: any; style?: any }>,
+    blocks: Array<{
+      id: string;
+      content?: Record<string, any>;
+      style?: Record<string, any>;
+    }>,
   ) {
     // Verify project ownership
     const project = await this.prisma.project.findUnique({

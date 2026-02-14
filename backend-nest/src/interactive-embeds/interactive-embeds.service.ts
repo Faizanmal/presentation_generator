@@ -1,7 +1,36 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { InteractiveEmbedType, Prisma } from '@prisma/client';
 
-export type EmbedType = 'poll' | 'qa' | 'form' | 'quiz' | 'reaction' | 'wordcloud';
+export type EmbedType =
+  | 'poll'
+  | 'qa'
+  | 'form'
+  | 'quiz'
+  | 'reaction'
+  | 'wordcloud';
+
+const embedTypeToPrisma = (type: EmbedType): InteractiveEmbedType => {
+  switch (type) {
+    case 'poll':
+      return InteractiveEmbedType.POLL;
+    case 'qa':
+      return InteractiveEmbedType.QA;
+    case 'form':
+      return InteractiveEmbedType.FORM;
+    case 'quiz':
+      return InteractiveEmbedType.QUIZ;
+    case 'wordcloud':
+      return InteractiveEmbedType.WORD_CLOUD;
+    default:
+      throw new BadRequestException(`Unsupported embed type: ${type}`);
+  }
+};
 
 export interface PollOption {
   id: string;
@@ -41,7 +70,14 @@ export interface QASession {
 
 export interface FormField {
   id: string;
-  type: 'text' | 'email' | 'number' | 'select' | 'checkbox' | 'textarea' | 'rating';
+  type:
+    | 'text'
+    | 'email'
+    | 'number'
+    | 'select'
+    | 'checkbox'
+    | 'textarea'
+    | 'rating';
   label: string;
   required: boolean;
   options?: string[];
@@ -74,12 +110,20 @@ export interface Quiz {
   timeLimit?: number;
 }
 
+export interface WordCloudConfig {
+  id: string;
+  prompt: string;
+  words: Record<string, number>;
+  maxResponses: number;
+  isOpen: boolean;
+}
+
 export interface InteractiveEmbed {
   id: string;
   projectId: string;
   slideId: string;
   type: EmbedType;
-  config: Poll | QASession | Form | Quiz | any;
+  config: Poll | QASession | Form | Quiz | WordCloudConfig;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -128,13 +172,13 @@ export class InteractiveEmbedsService {
     voterId?: string,
   ): Promise<Poll> {
     const embed = await this.getEmbed(embedId);
-    
+
     if (embed.type !== 'poll') {
       throw new BadRequestException('Not a poll embed');
     }
 
     const poll = embed.config as Poll;
-    
+
     if (poll.closedAt) {
       throw new BadRequestException('Poll is closed');
     }
@@ -144,7 +188,7 @@ export class InteractiveEmbedsService {
     }
 
     // Update vote counts
-    poll.options = poll.options.map(opt => ({
+    poll.options = poll.options.map((opt) => ({
       ...opt,
       votes: optionIds.includes(opt.id) ? opt.votes + 1 : opt.votes,
     }));
@@ -199,13 +243,13 @@ export class InteractiveEmbedsService {
     authorId?: string,
   ): Promise<QAQuestion> {
     const embed = await this.getEmbed(embedId);
-    
+
     if (embed.type !== 'qa') {
       throw new BadRequestException('Not a Q&A embed');
     }
 
     const qa = embed.config as QASession;
-    
+
     if (!qa.isOpen) {
       throw new BadRequestException('Q&A session is closed');
     }
@@ -242,12 +286,12 @@ export class InteractiveEmbedsService {
   async upvoteQuestion(
     embedId: string,
     questionId: string,
-    voterId?: string,
+    // _voterId?: string,
   ): Promise<QASession> {
     const embed = await this.getEmbed(embedId);
     const qa = embed.config as QASession;
 
-    const question = qa.questions.find(q => q.id === questionId);
+    const question = qa.questions.find((q) => q.id === questionId);
     if (!question) {
       throw new NotFoundException('Question not found');
     }
@@ -265,12 +309,12 @@ export class InteractiveEmbedsService {
     embedId: string,
     questionId: string,
     answer: string,
-    userId: string,
+    // _userId: string,
   ): Promise<QASession> {
     const embed = await this.getEmbed(embedId);
     const qa = embed.config as QASession;
 
-    const question = qa.questions.find(q => q.id === questionId);
+    const question = qa.questions.find((q) => q.id === questionId);
     if (!question) {
       throw new NotFoundException('Question not found');
     }
@@ -319,13 +363,13 @@ export class InteractiveEmbedsService {
     responderId?: string,
   ): Promise<{ success: boolean; submissionId: string }> {
     const embed = await this.getEmbed(embedId);
-    
+
     if (embed.type !== 'form') {
       throw new BadRequestException('Not a form embed');
     }
 
     const form = embed.config as Form;
-    
+
     if (!form.isOpen) {
       throw new BadRequestException('Form is closed');
     }
@@ -399,7 +443,7 @@ export class InteractiveEmbedsService {
     }>;
   }> {
     const embed = await this.getEmbed(embedId);
-    
+
     if (embed.type !== 'quiz') {
       throw new BadRequestException('Not a quiz embed');
     }
@@ -418,7 +462,7 @@ export class InteractiveEmbedsService {
       totalPoints += question.points;
       const userAnswer = answers[question.id];
       const correct = userAnswer === question.correctAnswer;
-      
+
       if (correct) {
         score += question.points;
       }
@@ -426,8 +470,12 @@ export class InteractiveEmbedsService {
       results.push({
         questionId: question.id,
         correct,
-        correctAnswer: quiz.showCorrectAfterSubmit ? question.correctAnswer : -1,
-        explanation: quiz.showCorrectAfterSubmit ? question.explanation : undefined,
+        correctAnswer: quiz.showCorrectAfterSubmit
+          ? question.correctAnswer
+          : -1,
+        explanation: quiz.showCorrectAfterSubmit
+          ? question.explanation
+          : undefined,
       });
     }
 
@@ -480,10 +528,12 @@ export class InteractiveEmbedsService {
     responderId?: string,
   ): Promise<Record<string, number>> {
     const embed = await this.getEmbed(embedId);
-    const config = embed.config as any;
+    const config = embed.config as WordCloudConfig;
 
     if (words.length > (config.maxResponses || 3)) {
-      throw new BadRequestException(`Maximum ${config.maxResponses} words allowed`);
+      throw new BadRequestException(
+        `Maximum ${config.maxResponses} words allowed`,
+      );
     }
 
     for (const word of words) {
@@ -512,7 +562,11 @@ export class InteractiveEmbedsService {
     totalResponses: number;
     uniqueResponders: number;
     responsesByType: Record<string, number>;
-    recentActivity: any[];
+    recentActivity: Array<{
+      id: string;
+      responseType: string | null;
+      createdAt: Date;
+    }>;
   }> {
     const responses = await this.prisma.interactiveResponse.findMany({
       where: { embedId },
@@ -521,20 +575,26 @@ export class InteractiveEmbedsService {
     });
 
     const uniqueResponders = new Set(
-      responses.filter(r => r.responderId).map(r => r.responderId)
+      responses.filter((r) => r.responderId).map((r) => r.responderId),
     ).size;
 
     const responsesByType: Record<string, number> = {};
     for (const response of responses) {
-      responsesByType[response.responseType] = 
-        (responsesByType[response.responseType] || 0) + 1;
+      if (response.responseType) {
+        responsesByType[response.responseType] =
+          (responsesByType[response.responseType] || 0) + 1;
+      }
     }
 
     return {
       totalResponses: responses.length,
       uniqueResponders,
       responsesByType,
-      recentActivity: responses.slice(0, 10),
+      recentActivity: responses.slice(0, 10).map((r) => ({
+        id: r.id,
+        responseType: r.responseType,
+        createdAt: r.createdAt,
+      })),
     };
   }
 
@@ -547,12 +607,17 @@ export class InteractiveEmbedsService {
       orderBy: { createdAt: 'asc' },
     });
 
-    return embeds.map(e => ({
+    return embeds.map((e) => ({
       id: e.id,
       projectId: e.projectId,
       slideId: e.slideId,
       type: e.type as EmbedType,
-      config: e.config as any,
+      config: e.config as unknown as
+        | Poll
+        | QASession
+        | Form
+        | Quiz
+        | WordCloudConfig,
       createdAt: e.createdAt,
       updatedAt: e.updatedAt,
     }));
@@ -562,17 +627,21 @@ export class InteractiveEmbedsService {
   private async createEmbed(
     projectId: string,
     slideId: string,
-    userId: string,
+    _userId: string,
     type: EmbedType,
-    config: any,
+    config: Poll | QASession | Form | Quiz | WordCloudConfig,
   ): Promise<InteractiveEmbed> {
+    const configWithTitle = config as { title?: string; question?: string };
     const embed = await this.prisma.interactiveEmbed.create({
       data: {
         projectId,
         slideId,
-        userId,
-        type,
-        config,
+        type: embedTypeToPrisma(type),
+        title:
+          configWithTitle.title ||
+          configWithTitle.question ||
+          'Interactive Embed',
+        config: config as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -581,7 +650,12 @@ export class InteractiveEmbedsService {
       projectId: embed.projectId,
       slideId: embed.slideId,
       type: embed.type as EmbedType,
-      config: embed.config as any,
+      config: embed.config as unknown as
+        | Poll
+        | QASession
+        | Form
+        | Quiz
+        | WordCloudConfig,
       createdAt: embed.createdAt,
       updatedAt: embed.updatedAt,
     };
@@ -601,16 +675,24 @@ export class InteractiveEmbedsService {
       projectId: embed.projectId,
       slideId: embed.slideId,
       type: embed.type as EmbedType,
-      config: embed.config as any,
+      config: embed.config as unknown as
+        | Poll
+        | QASession
+        | Form
+        | Quiz
+        | WordCloudConfig,
       createdAt: embed.createdAt,
       updatedAt: embed.updatedAt,
     };
   }
 
-  private async updateEmbed(embedId: string, config: any): Promise<void> {
+  private async updateEmbed(
+    embedId: string,
+    config: Poll | QASession | Form | Quiz | WordCloudConfig,
+  ): Promise<void> {
     await this.prisma.interactiveEmbed.update({
       where: { id: embedId },
-      data: { config },
+      data: { config: config as unknown as Prisma.InputJsonValue },
     });
   }
 

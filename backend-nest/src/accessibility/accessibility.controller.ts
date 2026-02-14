@@ -10,6 +10,10 @@ import {
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AccessibilityService } from './accessibility.service';
 
+interface AuthRequest extends Request {
+  user: { id: string };
+}
+
 // DTOs
 class CheckContrastDto {
   foreground: string;
@@ -38,7 +42,7 @@ export class AccessibilityController {
   @Post(':projectId/check')
   async checkProject(
     @Param('projectId') projectId: string,
-    @Request() req: any,
+    @Request() req: AuthRequest,
   ) {
     return this.accessibilityService.checkProject(projectId, req.user.id);
   }
@@ -50,11 +54,14 @@ export class AccessibilityController {
 
   @Post('check-contrast')
   checkContrast(@Body() dto: CheckContrastDto) {
-    return this.accessibilityService.checkContrast(dto.foreground, dto.background);
+    return this.accessibilityService.checkContrast(
+      dto.foreground,
+      dto.background,
+    );
   }
 
   @Post('suggest-colors')
-  async suggestAccessibleColors(@Body() dto: SuggestColorsDto) {
+  suggestAccessibleColors(@Body() dto: SuggestColorsDto) {
     return this.accessibilityService.suggestAccessibleColors(
       dto.foreground,
       dto.background,
@@ -64,7 +71,9 @@ export class AccessibilityController {
 
   @Post('generate-alt-text')
   async generateAltText(@Body() dto: GenerateAltTextDto) {
-    const altText = await this.accessibilityService.generateAltText(dto.imageUrl);
+    const altText = await this.accessibilityService.generateAltText(
+      dto.imageUrl,
+    );
     return { altText };
   }
 
@@ -72,7 +81,7 @@ export class AccessibilityController {
   async autoFixIssues(
     @Param('projectId') projectId: string,
     @Body() dto: AutoFixDto,
-    @Request() req: any,
+    @Request() req: AuthRequest,
   ) {
     return this.accessibilityService.autoFixIssues(
       projectId,

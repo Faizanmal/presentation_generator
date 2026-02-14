@@ -1,8 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
+import { Server } from 'http';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+
+interface RegisterResponse {
+  access_token: string;
+  user: {
+    id: string;
+    email: string;
+  };
+}
 
 describe('AI Generation (e2e)', () => {
   let app: INestApplication;
@@ -30,7 +39,7 @@ describe('AI Generation (e2e)', () => {
     prisma = app.get(PrismaService);
 
     // Create a test user and get auth token
-    const registerResponse = await request(app.getHttpServer())
+    const registerResponse = await request(app.getHttpServer() as Server)
       .post('/api/auth/register')
       .send({
         email: 'ai-test@test-e2e.com',
@@ -38,8 +47,9 @@ describe('AI Generation (e2e)', () => {
         name: 'AI Test User',
       });
 
-    authToken = registerResponse.body.access_token;
-    testUserId = registerResponse.body.user.id;
+    const body = registerResponse.body as RegisterResponse;
+    authToken = body.access_token;
+    testUserId = body.user.id;
   }, 30000);
 
   afterAll(async () => {
@@ -52,7 +62,7 @@ describe('AI Generation (e2e)', () => {
 
   describe('POST /api/ai/generate', () => {
     it('should generate presentation outline', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(app.getHttpServer() as Server)
         .post('/api/ai/generate')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -64,13 +74,14 @@ describe('AI Generation (e2e)', () => {
         })
         .expect(201);
 
-      expect(response.body).toHaveProperty('title');
-      expect(response.body).toHaveProperty('sections');
-      expect(Array.isArray(response.body.sections)).toBe(true);
+      const body = response.body as Record<string, unknown>;
+      expect(body).toHaveProperty('title');
+      expect(body).toHaveProperty('sections');
+      expect(Array.isArray(body.sections)).toBe(true);
     }, 60000);
 
     it('should reject without topic', async () => {
-      await request(app.getHttpServer())
+      await request(app.getHttpServer() as Server)
         .post('/api/ai/generate')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -81,7 +92,7 @@ describe('AI Generation (e2e)', () => {
     });
 
     it('should reject without auth', async () => {
-      await request(app.getHttpServer())
+      await request(app.getHttpServer() as Server)
         .post('/api/ai/generate')
         .send({
           topic: 'Test Topic',
@@ -92,7 +103,7 @@ describe('AI Generation (e2e)', () => {
 
   describe('POST /api/ai/enhance', () => {
     it('should enhance text content', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(app.getHttpServer() as Server)
         .post('/api/ai/enhance')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -101,15 +112,16 @@ describe('AI Generation (e2e)', () => {
         })
         .expect(201);
 
-      expect(response.body).toHaveProperty('enhancedText');
-      expect(typeof response.body.enhancedText).toBe('string');
+      const body = response.body as { enhancedText: string };
+      expect(body).toHaveProperty('enhancedText');
+      expect(typeof body.enhancedText).toBe('string');
     }, 30000);
 
     it('should support different enhancement actions', async () => {
       const actions = ['shorten', 'expand', 'simplify', 'professional'];
 
       for (const action of actions) {
-        const response = await request(app.getHttpServer())
+        const response = await request(app.getHttpServer() as Server)
           .post('/api/ai/enhance')
           .set('Authorization', `Bearer ${authToken}`)
           .send({
@@ -118,14 +130,15 @@ describe('AI Generation (e2e)', () => {
           });
 
         expect(response.status).toBe(201);
-        expect(response.body).toHaveProperty('enhancedText');
+        const body = response.body as Record<string, unknown>;
+        expect(body).toHaveProperty('enhancedText');
       }
     }, 120000);
   });
 
   describe('POST /api/ai/suggest-layout', () => {
     it('should suggest a layout for content', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(app.getHttpServer() as Server)
         .post('/api/ai/suggest-layout')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -135,21 +148,23 @@ describe('AI Generation (e2e)', () => {
         })
         .expect(201);
 
-      expect(response.body).toHaveProperty('layout');
-      expect(response.body).toHaveProperty('confidence');
+      const body = response.body as Record<string, unknown>;
+      expect(body).toHaveProperty('layout');
+      expect(body).toHaveProperty('confidence');
     }, 30000);
   });
 
   describe('GET /api/ai/usage', () => {
     it('should return AI usage statistics', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(app.getHttpServer() as Server)
         .get('/api/ai/usage')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
-      expect(response.body).toHaveProperty('used');
-      expect(response.body).toHaveProperty('limit');
-      expect(response.body).toHaveProperty('remaining');
+      const body = response.body as Record<string, unknown>;
+      expect(body).toHaveProperty('used');
+      expect(body).toHaveProperty('limit');
+      expect(body).toHaveProperty('remaining');
     });
   });
 });

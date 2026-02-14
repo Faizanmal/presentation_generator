@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import {
-  BarChart3,
   Eye,
   Users,
   Clock,
@@ -11,7 +10,6 @@ import {
   RefreshCw,
   Lightbulb,
   AlertTriangle,
-  CheckCircle,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,7 +24,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useAnalytics, type SlideAnalytics, type ViewerSession } from '@/hooks/use-analytics';
+import { useAnalytics } from '@/hooks/use-analytics';
+import type { SlideAnalytics, ViewerSession } from '@/types';
 
 interface AnalyticsDashboardProps {
   projectId: string;
@@ -100,13 +99,13 @@ export function AnalyticsDashboard({ projectId }: AnalyticsDashboardProps) {
         />
         <MetricCard
           title="Unique Viewers"
-          value={overview?.uniqueViews || 0}
+          value={overview?.uniqueViewers || 0}
           icon={Users}
           description="Individual viewers"
         />
         <MetricCard
           title="Avg. Duration"
-          value={formatDuration(overview?.averageDuration || 0)}
+          value={formatDuration(overview?.avgViewDuration || 0)}
           icon={Clock}
           description="Average time spent"
         />
@@ -208,9 +207,9 @@ function SlidePerformance({ slides, topSlides, lowPerforming }: SlidePerformance
                     <Progress value={Math.min((slide.avgDuration / 60) * 100, 100)} className="h-2" />
 
                     <div className="flex justify-between text-xs text-muted-foreground pt-1">
-                      <span>{slide.clicks} interactions</span>
-                      {slide.dropOffRate > 20 && (
-                        <span className="text-amber-600 font-medium">{slide.dropOffRate}% drop-off</span>
+                      <span>{slide.engagementScore} interactions</span>
+                      {slide.dropoffRate > 20 && (
+                        <span className="text-amber-600 font-medium">{slide.dropoffRate}% drop-off</span>
                       )}
                     </div>
                   </div>
@@ -253,7 +252,7 @@ function SlidePerformance({ slides, topSlides, lowPerforming }: SlidePerformance
               <div key={slide.slideId} className="flex items-center justify-between py-2">
                 <span>Slide {slide.slideNumber}</span>
                 <Badge variant="destructive">
-                  {slide.dropOffRate}% drop-off
+                  {slide.dropoffRate}% drop-off
                 </Badge>
               </div>
             ))}
@@ -294,13 +293,13 @@ function ViewerSessionsTable({ sessions }: ViewerSessionsTableProps) {
               {sessions.slice(0, 10).map((session) => (
                 <tr key={session.id} className="border-b">
                   <td className="p-3 text-sm">
-                    {session.viewerEmail || session.viewerName || 'Anonymous'}
+                    {session.viewerEmail || 'Anonymous'}
                   </td>
                   <td className="p-3 text-sm">{formatDuration(session.duration)}</td>
                   <td className="p-3 text-sm">{session.slidesViewed}</td>
                   <td className="p-3 text-sm">
                     <Progress
-                      value={session.completionRate}
+                      value={session.completionPercentage}
                       className="w-20 h-2"
                     />
                   </td>
@@ -338,12 +337,13 @@ function AIInsightsPanel({ insights }: AIInsightsPanelProps) {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {insights.map((insight, index) => (
+          {insights.map((insight, _index) => (
             <div
-              key={index}
+
+              key={insight}
               className="flex gap-4 p-4 rounded-lg border bg-card"
             >
-              <Lightbulb className="w-5 h-5 text-blue-500 mt-1 flex-shrink-0" />
+              <Lightbulb className="w-5 h-5 text-blue-500 mt-1 shrink-0" />
               <div>
                 <p className="text-sm">
                   {insight}
@@ -364,7 +364,7 @@ function AIInsightsPanel({ insights }: AIInsightsPanelProps) {
 }
 
 function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${Math.round(seconds)}s`;
+  if (seconds < 60) { return `${Math.round(seconds)}s`; }
   const mins = Math.floor(seconds / 60);
   const secs = Math.round(seconds % 60);
   return `${mins}m ${secs}s`;

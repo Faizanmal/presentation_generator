@@ -31,7 +31,7 @@ class CacheManager {
 
   // Cache static assets (images, fonts, etc.)
   async cacheAsset(url: string, response?: Response): Promise<void> {
-    if (!this.isAvailable()) return;
+    if (!this.isAvailable()) {return;}
 
     try {
       const cache = await caches.open(ASSET_CACHE_NAME);
@@ -59,7 +59,7 @@ class CacheManager {
 
   // Get cached asset
   async getAsset(url: string): Promise<Response | undefined> {
-    if (!this.isAvailable()) return undefined;
+    if (!this.isAvailable()) {return undefined;}
 
     try {
       const cache = await caches.open(ASSET_CACHE_NAME);
@@ -85,10 +85,10 @@ class CacheManager {
 
   // Cache API response
   async cacheApiResponse(url: string, response: Response): Promise<void> {
-    if (!this.isAvailable()) return;
+    if (!this.isAvailable()) {return;}
 
     // Only cache GET requests for specific endpoints
-    if (!this.isCacheableApiUrl(url)) return;
+    if (!this.isCacheableApiUrl(url)) {return;}
 
     try {
       const cache = await caches.open(API_CACHE_NAME);
@@ -100,7 +100,7 @@ class CacheManager {
 
   // Get cached API response
   async getApiResponse(url: string): Promise<Response | undefined> {
-    if (!this.isAvailable()) return undefined;
+    if (!this.isAvailable()) {return undefined;}
 
     try {
       const cache = await caches.open(API_CACHE_NAME);
@@ -114,7 +114,7 @@ class CacheManager {
 
   // Cache static files
   async cacheStaticFiles(urls: string[]): Promise<void> {
-    if (!this.isAvailable()) return;
+    if (!this.isAvailable()) {return;}
 
     try {
       const cache = await caches.open(STATIC_CACHE_NAME);
@@ -126,7 +126,7 @@ class CacheManager {
 
   // Get static file from cache
   async getStaticFile(url: string): Promise<Response | undefined> {
-    if (!this.isAvailable()) return undefined;
+    if (!this.isAvailable()) {return undefined;}
 
     try {
       const cache = await caches.open(STATIC_CACHE_NAME);
@@ -147,7 +147,7 @@ class CacheManager {
       }>;
     }>;
   }): Promise<void> {
-    if (!this.isAvailable() || !presentationData.slides) return;
+    if (!this.isAvailable() || !presentationData.slides) {return;}
 
     const assetUrls: string[] = [];
 
@@ -243,7 +243,7 @@ class CacheManager {
 
   // Clear all caches
   async clearAll(): Promise<void> {
-    if (!this.isAvailable()) return;
+    if (!this.isAvailable()) {return;}
 
     await Promise.all([
       caches.delete(ASSET_CACHE_NAME),
@@ -255,7 +255,7 @@ class CacheManager {
 
   // Clear specific cache
   async clearCache(cacheType: 'assets' | 'api' | 'static'): Promise<void> {
-    if (!this.isAvailable()) return;
+    if (!this.isAvailable()) {return;}
 
     const cacheNames: Record<string, string> = {
       assets: ASSET_CACHE_NAME,

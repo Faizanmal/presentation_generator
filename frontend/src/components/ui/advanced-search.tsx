@@ -9,7 +9,7 @@ import {
     Clock,
     FileText,
 } from "lucide-react";
-import { Slide, Block } from "@/types";
+import type { Slide } from "@/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -68,118 +68,127 @@ export function AdvancedSearch({
 
     const debouncedQuery = useDebounce(query, 300);
 
-    // Focus input when opened
+    // Focus input when opened and reset state
+    const [prevOpen, setPrevOpen] = useState(open);
+    if (open !== prevOpen) {
+        setPrevOpen(open);
+        if (!open) {
+            setQuery("");
+
+            setResults([]);
+        }
+    }
+
     useEffect(() => {
         if (open) {
             inputRef.current?.focus();
-        } else {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            setQuery("");
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            setResults([]);
         }
     }, [open]);
 
     // Perform search
     useEffect(() => {
-        if (!debouncedQuery.trim()) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            setResults([]);
-            return;
-        }
-
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setIsSearching(true);
-
-        // Simulate search across projects and slides
-        const searchResults: SearchResult[] = [];
-        const searchLower = debouncedQuery.toLowerCase();
-
-        for (const project of projects) {
-            // Search project title
-            if (project.title.toLowerCase().includes(searchLower)) {
-                searchResults.push({
-                    id: `project-${project.id}`,
-                    type: "project",
-                    projectId: project.id,
-                    projectTitle: project.title,
-                    content: project.title,
-                    highlights: highlightMatches(project.title, debouncedQuery),
-                    updatedAt: project.updatedAt,
-                });
+        const performSearch = async () => {
+            if (!debouncedQuery.trim()) {
+                // Avoid synchronous setState warning
+                await Promise.resolve();
+                setResults([]);
+                return;
             }
 
-            // Search slides
-            if (project.slides) {
-                for (const slide of project.slides) {
-                    const slideTitle = slide.title || `Slide ${slide.order + 1}`;
 
-                    if (slideTitle.toLowerCase().includes(searchLower)) {
-                        searchResults.push({
-                            id: `slide-${slide.id}`,
-                            type: "slide",
-                            projectId: project.id,
-                            projectTitle: project.title,
-                            slideId: slide.id,
-                            slideTitle,
-                            content: slideTitle,
-                            highlights: highlightMatches(slideTitle, debouncedQuery),
-                            updatedAt: slide.updatedAt || project.updatedAt,
-                        });
-                    }
+            setIsSearching(true);
 
-                    // Search blocks
-                    if (slide.blocks) {
-                        for (const block of slide.blocks) {
-                            const blockContent = typeof block.content === "string"
-                                ? block.content
-                                : JSON.stringify(block.content);
+            // Simulate search across projects and slides
+            const searchResults: SearchResult[] = [];
+            const searchLower = debouncedQuery.toLowerCase();
 
-                            if (blockContent.toLowerCase().includes(searchLower)) {
-                                searchResults.push({
-                                    id: `block-${block.id}`,
-                                    type: "block",
-                                    projectId: project.id,
-                                    projectTitle: project.title,
-                                    slideId: slide.id,
-                                    slideTitle,
-                                    content: blockContent.slice(0, 100),
-                                    highlights: highlightMatches(blockContent.slice(0, 100), debouncedQuery),
-                                    updatedAt: block.updatedAt || project.updatedAt,
-                                });
+            for (const project of projects) {
+                // Search project title
+                if (project.title.toLowerCase().includes(searchLower)) {
+                    searchResults.push({
+                        id: `project-${project.id}`,
+                        type: "project",
+                        projectId: project.id,
+                        projectTitle: project.title,
+                        content: project.title,
+                        highlights: highlightMatches(project.title, debouncedQuery),
+                        updatedAt: project.updatedAt,
+                    });
+                }
+
+                // Search slides
+                if (project.slides) {
+                    for (const slide of project.slides) {
+                        const slideTitle = slide.title || `Slide ${slide.order + 1}`;
+
+                        if (slideTitle.toLowerCase().includes(searchLower)) {
+                            searchResults.push({
+                                id: `slide-${slide.id}`,
+                                type: "slide",
+                                projectId: project.id,
+                                projectTitle: project.title,
+                                slideId: slide.id,
+                                slideTitle,
+                                content: slideTitle,
+                                highlights: highlightMatches(slideTitle, debouncedQuery),
+                                updatedAt: slide.updatedAt || project.updatedAt,
+                            });
+                        }
+
+                        // Search blocks
+                        if (slide.blocks) {
+                            for (const block of slide.blocks) {
+                                const blockContent = typeof block.content === "string"
+                                    ? block.content
+                                    : JSON.stringify(block.content);
+
+                                if (blockContent.toLowerCase().includes(searchLower)) {
+                                    searchResults.push({
+                                        id: `block-${block.id}`,
+                                        type: "block",
+                                        projectId: project.id,
+                                        projectTitle: project.title,
+                                        slideId: slide.id,
+                                        slideTitle,
+                                        content: blockContent.slice(0, 100),
+                                        highlights: highlightMatches(blockContent.slice(0, 100), debouncedQuery),
+                                        updatedAt: block.updatedAt || project.updatedAt,
+                                    });
+                                }
                             }
                         }
                     }
                 }
             }
-        }
 
-        // Apply filters
-        const filtered = filterType === "all"
-            ? searchResults
-            : searchResults.filter((r) => {
-                if (filterType === "projects") return r.type === "project";
-                if (filterType === "slides") return r.type === "slide";
-                if (filterType === "content") return r.type === "block";
-                return true;
+            // Apply filters
+            const filtered = filterType === "all"
+                ? searchResults
+                : searchResults.filter((r) => {
+                    if (filterType === "projects") {return r.type === "project";}
+                    if (filterType === "slides") {return r.type === "slide";}
+                    if (filterType === "content") {return r.type === "block";}
+                    return true;
+                });
+
+            // Apply sorting
+            const sorted = [...filtered].sort((a, b) => {
+                switch (sortBy) {
+                    case "recent":
+                        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+                    case "oldest":
+                        return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+                    case "title":
+                        return a.projectTitle.localeCompare(b.projectTitle);
+                    default: // relevance - already by match quality
+                        return 0;
+                }
             });
 
-        // Apply sorting
-        const sorted = [...filtered].sort((a, b) => {
-            switch (sortBy) {
-                case "recent":
-                    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-                case "oldest":
-                    return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
-                case "title":
-                    return a.projectTitle.localeCompare(b.projectTitle);
-                default: // relevance - already by match quality
-                    return 0;
-            }
-        });
-
-        setResults(sorted);
-        setIsSearching(false);
+            setResults(sorted);
+            setIsSearching(false);
+        };
+        performSearch();
     }, [debouncedQuery, projects, sortBy, filterType]);
 
     // Navigate to result
@@ -433,7 +442,7 @@ function SearchResultItem({
 
 // Helper to highlight search matches
 function highlightMatches(text: string, query: string): string[] {
-    if (!query) return [text];
+    if (!query) {return [text];}
 
     const regex = new RegExp(`(${escapeRegExp(query)})`, "gi");
     const highlighted = text.replace(

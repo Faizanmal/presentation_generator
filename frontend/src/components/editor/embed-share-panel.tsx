@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -24,10 +24,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
+// import { Slider } from '@/components/ui/slider';
 import {
   Share2,
-  Link,
   Code,
   Mail,
   Copy,
@@ -37,13 +36,10 @@ import {
   Facebook,
   QrCode,
   Eye,
-  EyeOff,
   Lock,
   Globe,
   Users,
-  Calendar,
   Clock,
-  Settings,
   ExternalLink,
   Download,
 } from 'lucide-react';
@@ -115,12 +111,12 @@ export function EmbedSharePanel({
 
   const generateEmbedCode = useCallback(() => {
     const params = new URLSearchParams();
-    if (embedSettings.autoplay) params.set('autoplay', '1');
-    if (embedSettings.loop) params.set('loop', '1');
-    if (!embedSettings.showControls) params.set('controls', '0');
-    if (!embedSettings.showNavigation) params.set('nav', '0');
-    if (embedSettings.theme !== 'auto') params.set('theme', embedSettings.theme);
-    if (embedSettings.startSlide > 1) params.set('start', embedSettings.startSlide.toString());
+    if (embedSettings.autoplay) {params.set('autoplay', '1');}
+    if (embedSettings.loop) {params.set('loop', '1');}
+    if (!embedSettings.showControls) {params.set('controls', '0');}
+    if (!embedSettings.showNavigation) {params.set('nav', '0');}
+    if (embedSettings.theme !== 'auto') {params.set('theme', embedSettings.theme);}
+    if (embedSettings.startSlide > 1) {params.set('start', embedSettings.startSlide.toString());}
 
     const queryString = params.toString() ? `?${params.toString()}` : '';
     const src = `${embedUrl}${queryString}`;

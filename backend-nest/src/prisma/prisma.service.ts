@@ -16,7 +16,7 @@ export class PrismaService
   private readonly logger = new Logger(PrismaService.name);
 
   constructor() {
-    const connectionString = process.env.DATABASE_URL;
+    const connectionString = process.env.DATABASE_URL || '';
 
     const pool = new Pool({ connectionString });
     const adapter = new PrismaPg(pool);
@@ -28,6 +28,10 @@ export class PrismaService
           ? ['query', 'info', 'warn', 'error']
           : ['error'],
     });
+
+    if (!connectionString) {
+      this.logger.warn('DATABASE_URL is not set');
+    }
   }
 
   async onModuleInit() {
@@ -60,8 +64,13 @@ export class PrismaService
     );
 
     for (const model of models) {
-      if (this[model as string]?.deleteMany) {
-        await this[model as string].deleteMany();
+      const modelKey = model as string;
+
+      const delegate = (this as Record<string, unknown>)[modelKey] as
+        | { deleteMany?: () => Promise<unknown> }
+        | undefined;
+      if (delegate?.deleteMany) {
+        await delegate.deleteMany();
       }
     }
   }

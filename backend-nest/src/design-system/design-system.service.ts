@@ -1,10 +1,23 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma, DesignSystem as PrismaDesignSystem } from '@prisma/client';
 
 export interface ColorToken {
   name: string;
   value: string;
-  type: 'primary' | 'secondary' | 'accent' | 'background' | 'text' | 'border' | 'custom';
+  type:
+    | 'primary'
+    | 'secondary'
+    | 'accent'
+    | 'background'
+    | 'text'
+    | 'border'
+    | 'custom';
   shade?: number; // 50, 100, 200, ... 900
 }
 
@@ -46,16 +59,16 @@ export interface DesignSystem {
   organizationId?: string;
   userId: string;
   isDefault: boolean;
-  
+
   colors: ColorToken[];
   typography: TypographyToken[];
   spacing: SpacingToken[];
   shadows: ShadowToken[];
   borders: BorderToken[];
-  
+
   cssVariables: Record<string, string>;
-  tailwindConfig?: any;
-  
+  tailwindConfig?: Record<string, unknown> | undefined;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -88,9 +101,30 @@ export class DesignSystemService {
           { name: 'text', value: '#18181b', type: 'text' },
         ],
         typography: [
-          { name: 'h1', fontFamily: 'Inter', fontSize: '48px', fontWeight: 700, lineHeight: '1.1', role: 'heading' },
-          { name: 'h2', fontFamily: 'Inter', fontSize: '36px', fontWeight: 600, lineHeight: '1.2', role: 'subheading' },
-          { name: 'body', fontFamily: 'Inter', fontSize: '16px', fontWeight: 400, lineHeight: '1.6', role: 'body' },
+          {
+            name: 'h1',
+            fontFamily: 'Inter',
+            fontSize: '48px',
+            fontWeight: 700,
+            lineHeight: '1.1',
+            role: 'heading',
+          },
+          {
+            name: 'h2',
+            fontFamily: 'Inter',
+            fontSize: '36px',
+            fontWeight: 600,
+            lineHeight: '1.2',
+            role: 'subheading',
+          },
+          {
+            name: 'body',
+            fontFamily: 'Inter',
+            fontSize: '16px',
+            fontWeight: 400,
+            lineHeight: '1.6',
+            role: 'body',
+          },
         ],
       },
     },
@@ -108,16 +142,38 @@ export class DesignSystemService {
           { name: 'text', value: '#1e293b', type: 'text' },
         ],
         typography: [
-          { name: 'h1', fontFamily: 'Roboto', fontSize: '44px', fontWeight: 700, lineHeight: '1.2', role: 'heading' },
-          { name: 'h2', fontFamily: 'Roboto', fontSize: '32px', fontWeight: 600, lineHeight: '1.3', role: 'subheading' },
-          { name: 'body', fontFamily: 'Roboto', fontSize: '16px', fontWeight: 400, lineHeight: '1.6', role: 'body' },
+          {
+            name: 'h1',
+            fontFamily: 'Roboto',
+            fontSize: '44px',
+            fontWeight: 700,
+            lineHeight: '1.2',
+            role: 'heading',
+          },
+          {
+            name: 'h2',
+            fontFamily: 'Roboto',
+            fontSize: '32px',
+            fontWeight: 600,
+            lineHeight: '1.3',
+            role: 'subheading',
+          },
+          {
+            name: 'body',
+            fontFamily: 'Roboto',
+            fontSize: '16px',
+            fontWeight: 400,
+            lineHeight: '1.6',
+            role: 'body',
+          },
         ],
       },
     },
     {
       id: 'creative-bold',
       name: 'Creative Bold',
-      description: 'Vibrant colors and bold typography for creative presentations',
+      description:
+        'Vibrant colors and bold typography for creative presentations',
       preview: '/presets/creative-bold.png',
       system: {
         colors: [
@@ -128,9 +184,31 @@ export class DesignSystemService {
           { name: 'text', value: '#f8fafc', type: 'text' },
         ],
         typography: [
-          { name: 'h1', fontFamily: 'Poppins', fontSize: '56px', fontWeight: 800, lineHeight: '1.1', textTransform: 'uppercase', role: 'heading' },
-          { name: 'h2', fontFamily: 'Poppins', fontSize: '40px', fontWeight: 700, lineHeight: '1.2', role: 'subheading' },
-          { name: 'body', fontFamily: 'Open Sans', fontSize: '18px', fontWeight: 400, lineHeight: '1.7', role: 'body' },
+          {
+            name: 'h1',
+            fontFamily: 'Poppins',
+            fontSize: '56px',
+            fontWeight: 800,
+            lineHeight: '1.1',
+            textTransform: 'uppercase',
+            role: 'heading',
+          },
+          {
+            name: 'h2',
+            fontFamily: 'Poppins',
+            fontSize: '40px',
+            fontWeight: 700,
+            lineHeight: '1.2',
+            role: 'subheading',
+          },
+          {
+            name: 'body',
+            fontFamily: 'Open Sans',
+            fontSize: '18px',
+            fontWeight: 400,
+            lineHeight: '1.7',
+            role: 'body',
+          },
         ],
       },
     },
@@ -153,14 +231,15 @@ export class DesignSystemService {
     let baseSystem: Partial<DesignSystem> = {};
 
     if (data.presetId) {
-      const preset = this.presets.find(p => p.id === data.presetId);
+      const preset = this.presets.find((p) => p.id === data.presetId);
       if (preset) {
         baseSystem = { ...preset.system };
       }
     }
 
     const defaultColors = baseSystem.colors || this.getDefaultColors();
-    const defaultTypography = baseSystem.typography || this.getDefaultTypography();
+    const defaultTypography =
+      baseSystem.typography || this.getDefaultTypography();
     const defaultSpacing = this.getDefaultSpacing();
     const defaultShadows = this.getDefaultShadows();
     const defaultBorders = this.getDefaultBorders();
@@ -176,15 +255,14 @@ export class DesignSystemService {
     const system = await this.prisma.designSystem.create({
       data: {
         name: data.name,
-        description: data.description,
         organizationId: data.organizationId,
         userId,
         isDefault: false,
-        colors: defaultColors,
-        typography: defaultTypography,
-        spacing: defaultSpacing,
-        shadows: defaultShadows,
-        borders: defaultBorders,
+        colors: defaultColors as unknown as Prisma.InputJsonValue,
+        typography: defaultTypography as unknown as Prisma.InputJsonValue,
+        spacing: defaultSpacing as unknown as Prisma.InputJsonValue,
+        shadows: defaultShadows as unknown as Prisma.InputJsonValue,
+        borders: defaultBorders as unknown as Prisma.InputJsonValue,
         cssVariables,
       },
     });
@@ -230,11 +308,16 @@ export class DesignSystemService {
     }
 
     const merged = {
-      colors: updates.colors || (existing.colors as ColorToken[]),
-      typography: updates.typography || (existing.typography as TypographyToken[]),
-      spacing: updates.spacing || (existing.spacing as SpacingToken[]),
-      shadows: updates.shadows || (existing.shadows as ShadowToken[]),
-      borders: updates.borders || (existing.borders as BorderToken[]),
+      colors: updates.colors || (existing.colors as unknown as ColorToken[]),
+      typography:
+        updates.typography ||
+        (existing.typography as unknown as TypographyToken[]),
+      spacing:
+        updates.spacing || (existing.spacing as unknown as SpacingToken[]),
+      shadows:
+        updates.shadows || (existing.shadows as unknown as ShadowToken[]),
+      borders:
+        updates.borders || (existing.borders as unknown as BorderToken[]),
     };
 
     const cssVariables = this.generateCSSVariables(merged);
@@ -242,7 +325,7 @@ export class DesignSystemService {
     const updated = await this.prisma.designSystem.update({
       where: { id: systemId },
       data: {
-        ...updates,
+        ...(updates as unknown as Prisma.DesignSystemUpdateInput),
         cssVariables,
       },
     });
@@ -267,8 +350,8 @@ export class DesignSystemService {
       throw new NotFoundException('Design system not found');
     }
 
-    const colors = system.colors as ColorToken[];
-    const colorIndex = colors.findIndex(c => c.name === colorName);
+    const colors = system.colors as unknown as ColorToken[];
+    const colorIndex = colors.findIndex((c) => c.name === colorName);
 
     if (colorIndex === -1) {
       throw new BadRequestException(`Color "${colorName}" not found`);
@@ -282,10 +365,12 @@ export class DesignSystemService {
   /**
    * Apply design system to a project
    */
+  /**
+   * Apply design system to a project
+   */
   async applyToProject(
     systemId: string,
     projectId: string,
-    userId: string,
   ): Promise<{ success: boolean; appliedStyles: Record<string, string> }> {
     const system = await this.getDesignSystem(systemId);
 
@@ -335,11 +420,11 @@ export class DesignSystemService {
    */
   exportAsCSS(system: DesignSystem): string {
     let css = ':root {\n';
-    
+
     for (const [key, value] of Object.entries(system.cssVariables)) {
       css += `  ${key}: ${value};\n`;
     }
-    
+
     css += '}\n\n';
 
     // Generate typography classes
@@ -349,8 +434,10 @@ export class DesignSystemService {
       css += `  font-size: ${typo.fontSize};\n`;
       css += `  font-weight: ${typo.fontWeight};\n`;
       css += `  line-height: ${typo.lineHeight};\n`;
-      if (typo.letterSpacing) css += `  letter-spacing: ${typo.letterSpacing};\n`;
-      if (typo.textTransform) css += `  text-transform: ${typo.textTransform};\n`;
+      if (typo.letterSpacing)
+        css += `  letter-spacing: ${typo.letterSpacing};\n`;
+      if (typo.textTransform)
+        css += `  text-transform: ${typo.textTransform};\n`;
       css += '}\n\n';
     }
 
@@ -360,7 +447,7 @@ export class DesignSystemService {
   /**
    * Export design system as Tailwind config
    */
-  exportAsTailwindConfig(system: DesignSystem): any {
+  exportAsTailwindConfig(system: DesignSystem): Record<string, any> {
     const colors: Record<string, string> = {};
     const fontFamily: Record<string, string[]> = {};
     const fontSize: Record<string, string> = {};
@@ -383,13 +470,13 @@ export class DesignSystemService {
           fontFamily,
           fontSize,
           spacing: Object.fromEntries(
-            system.spacing.map(s => [s.name, s.value])
+            system.spacing.map((s) => [s.name, s.value]),
           ),
           boxShadow: Object.fromEntries(
-            system.shadows.map(s => [s.name, s.value])
+            system.shadows.map((s) => [s.name, s.value]),
           ),
           borderRadius: Object.fromEntries(
-            system.borders.map(b => [b.name, b.radius])
+            system.borders.map((b) => [b.name, b.radius]),
           ),
         },
       },
@@ -405,7 +492,7 @@ export class DesignSystemService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return systems.map(s => this.mapDesignSystem(s));
+    return systems.map((s) => this.mapDesignSystem(s));
   }
 
   // Helper methods
@@ -459,12 +546,54 @@ export class DesignSystemService {
 
   private getDefaultTypography(): TypographyToken[] {
     return [
-      { name: 'display', fontFamily: 'Inter', fontSize: '64px', fontWeight: 700, lineHeight: '1.1', role: 'heading' },
-      { name: 'h1', fontFamily: 'Inter', fontSize: '48px', fontWeight: 700, lineHeight: '1.2', role: 'heading' },
-      { name: 'h2', fontFamily: 'Inter', fontSize: '36px', fontWeight: 600, lineHeight: '1.25', role: 'subheading' },
-      { name: 'h3', fontFamily: 'Inter', fontSize: '24px', fontWeight: 600, lineHeight: '1.3', role: 'subheading' },
-      { name: 'body', fontFamily: 'Inter', fontSize: '16px', fontWeight: 400, lineHeight: '1.6', role: 'body' },
-      { name: 'small', fontFamily: 'Inter', fontSize: '14px', fontWeight: 400, lineHeight: '1.5', role: 'caption' },
+      {
+        name: 'display',
+        fontFamily: 'Inter',
+        fontSize: '64px',
+        fontWeight: 700,
+        lineHeight: '1.1',
+        role: 'heading',
+      },
+      {
+        name: 'h1',
+        fontFamily: 'Inter',
+        fontSize: '48px',
+        fontWeight: 700,
+        lineHeight: '1.2',
+        role: 'heading',
+      },
+      {
+        name: 'h2',
+        fontFamily: 'Inter',
+        fontSize: '36px',
+        fontWeight: 600,
+        lineHeight: '1.25',
+        role: 'subheading',
+      },
+      {
+        name: 'h3',
+        fontFamily: 'Inter',
+        fontSize: '24px',
+        fontWeight: 600,
+        lineHeight: '1.3',
+        role: 'subheading',
+      },
+      {
+        name: 'body',
+        fontFamily: 'Inter',
+        fontSize: '16px',
+        fontWeight: 400,
+        lineHeight: '1.6',
+        role: 'body',
+      },
+      {
+        name: 'small',
+        fontFamily: 'Inter',
+        fontSize: '14px',
+        fontWeight: 400,
+        lineHeight: '1.5',
+        role: 'caption',
+      },
     ];
   }
 
@@ -511,58 +640,66 @@ export class DesignSystemService {
 
     const max = Math.max(r, g, b);
     const min = Math.min(r, g, b);
-    let h = 0, s = 0, l = (max + min) / 2;
+    let h = 0,
+      s = 0,
+      l = (max + min) / 2;
 
     if (max !== min) {
       const d = max - min;
       s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-      
+
       switch (max) {
-        case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
-        case g: h = ((b - r) / d + 2) / 6; break;
-        case b: h = ((r - g) / d + 4) / 6; break;
+        case r:
+          h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+          break;
+        case g:
+          h = ((b - r) / d + 2) / 6;
+          break;
+        case b:
+          h = ((r - g) / d + 4) / 6;
+          break;
       }
     }
 
     // Adjust lightness based on shade (500 is the base)
-    const lightnessDiff = (500 - shade) / 500 * 0.5;
+    const lightnessDiff = ((500 - shade) / 500) * 0.5;
     l = Math.max(0, Math.min(1, l + lightnessDiff));
 
     // Convert back to hex
     const hue2rgb = (p: number, q: number, t: number) => {
       if (t < 0) t += 1;
       if (t > 1) t -= 1;
-      if (t < 1/6) return p + (q - p) * 6 * t;
-      if (t < 1/2) return q;
-      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 1 / 2) return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
       return p;
     };
 
     const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
     const p = 2 * l - q;
-    
-    const newR = Math.round(hue2rgb(p, q, h + 1/3) * 255);
+
+    const newR = Math.round(hue2rgb(p, q, h + 1 / 3) * 255);
     const newG = Math.round(hue2rgb(p, q, h) * 255);
-    const newB = Math.round(hue2rgb(p, q, h - 1/3) * 255);
+    const newB = Math.round(hue2rgb(p, q, h - 1 / 3) * 255);
 
     return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
   }
 
-  private mapDesignSystem(system: any): DesignSystem {
+  private mapDesignSystem(system: PrismaDesignSystem): DesignSystem {
     return {
       id: system.id,
       name: system.name,
-      description: system.description,
-      organizationId: system.organizationId,
-      userId: system.userId,
+      description: undefined, // Not in Prisma schema
+      organizationId: system.organizationId || undefined,
+      userId: system.userId || '',
       isDefault: system.isDefault,
-      colors: system.colors as ColorToken[],
-      typography: system.typography as TypographyToken[],
-      spacing: system.spacing as SpacingToken[],
-      shadows: system.shadows as ShadowToken[],
-      borders: system.borders as BorderToken[],
-      cssVariables: system.cssVariables as Record<string, string>,
-      tailwindConfig: system.tailwindConfig,
+      colors: system.colors as unknown as ColorToken[],
+      typography: system.typography as unknown as TypographyToken[],
+      spacing: system.spacing as unknown as SpacingToken[],
+      shadows: system.shadows as unknown as ShadowToken[],
+      borders: system.borders as unknown as BorderToken[],
+      cssVariables: system.cssVariables as unknown as Record<string, string>,
+      tailwindConfig: undefined, // Not in Prisma schema
       createdAt: system.createdAt,
       updatedAt: system.updatedAt,
     };

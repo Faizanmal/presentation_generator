@@ -1,0 +1,24 @@
+# ImgBot configuration
+# ImgBot: https://imgbot.net/
+
+schedule:
+  interval: weekly
+  
+minKBReduction: 10
+
+aggressiveCompression: false
+
+ignoreFiles:
+  - node_modules/**
+  - dist/**
+  - build/**
+  - .next/**
+  - coverage/**
+
+compressWEBP: true
+
+jpegOptimization: true
+
+pngQuantization: true
+
+jpegProgressive: true

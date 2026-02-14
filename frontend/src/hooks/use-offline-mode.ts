@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { syncManager, SyncStatus, SyncProgress, offlineStorage, OfflinePresentation } from '@/lib/offline';
+import type { SyncStatus, SyncProgress, OfflinePresentation } from '@/lib/offline';
+import type { Presentation } from '@/types';
+import { syncManager, offlineStorage } from '@/lib/offline';
 
 interface UseOfflineModeReturn {
   isOnline: boolean;
@@ -22,7 +24,7 @@ interface UseOfflineModeReturn {
 }
 
 export function useOfflineMode(): UseOfflineModeReturn {
-  const [isOnline, setIsOnline] = useState(true);
+  const [isOnline, setIsOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
   const [pendingChanges, setPendingChanges] = useState(0);
@@ -47,10 +49,9 @@ export function useOfflineMode(): UseOfflineModeReturn {
   }, []);
 
   // Initialize and set up listeners
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   useEffect(() => {
-    // Check initial online status
-    setIsOnline(navigator.onLine);
+    // Set up online/offline listeners
 
     // Set up online/offline listeners
     const handleOnline = () => setIsOnline(true);
@@ -68,7 +69,10 @@ export function useOfflineMode(): UseOfflineModeReturn {
     });
 
     // Load initial data
-    loadOfflineData();
+    // Load initial data
+    setTimeout(() => {
+      loadOfflineData();
+    }, 0);
 
     return () => {
       window.removeEventListener('online', handleOnline);
@@ -80,18 +84,18 @@ export function useOfflineMode(): UseOfflineModeReturn {
   const triggerSync = useCallback(async () => {
     await syncManager.forceSync();
     await loadOfflineData();
-  }, []);
+  }, [loadOfflineData]);
 
   const saveForOffline = useCallback(async (projectId: string, data: unknown) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await offlineStorage.savePresentation(projectId, data as any);
+
+    await offlineStorage.savePresentation(projectId, data as Presentation);
     await loadOfflineData();
-  }, []);
+  }, [loadOfflineData]);
 
   const removeFromOffline = useCallback(async (id: string) => {
     await offlineStorage.removeFromOffline(id);
     await loadOfflineData();
-  }, []);
+  }, [loadOfflineData]);
 
   const isAvailableOffline = useCallback(async (id: string) => {
     return offlineStorage.isAvailableOffline(id);

@@ -82,3 +82,31 @@ export { QuizPollBuilder } from "./quiz-poll-builder";
 
 // Smart chart builder
 export { SmartChartBuilder } from "./smart-chart-builder";
+
+// Background Generator
+export { BackgroundGenerator } from "./BackgroundGenerator";
+export { BackgroundGeneratorEnhanced } from "./BackgroundGeneratorEnhanced";
+
+// Content Library
+export { ContentLibrary } from "./ContentLibrary";
+
+// Color Palette Extractor
+export { ColorPaletteExtractor } from "./ColorPaletteExtractor";
+
+// Auto Layout Engine
+export { AutoLayoutEngine } from "./AutoLayoutEngine";
+
+// AI Chat Assistant (Gamma Agent-style)
+export { AIChatAssistant, AIChatTrigger } from "./ai-chat-assistant";
+
+// URL Importer
+export { URLImporter } from "./url-importer";
+
+// Brand Kit Manager
+export { BrandKitManager } from "./brand-kit-manager";
+
+// Viewer Analytics Widget
+export { ViewerAnalyticsWidget } from "./viewer-analytics-widget";
+
+// Smart Transition Suggestions
+export { SmartTransitionSuggestions } from "./smart-transition-suggestions";

@@ -8,7 +8,10 @@ import {
   Request,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import type { AudienceType, AdaptationOptions } from './audience-adaptation.service';
+import type {
+  AudienceType,
+  AdaptationResult,
+} from './audience-adaptation.service';
 import { AudienceAdaptationService } from './audience-adaptation.service';
 
 class AdaptPresentationDto {
@@ -17,13 +20,6 @@ class AdaptPresentationDto {
   adjustLength?: boolean = true;
   adjustComplexity?: boolean = true;
   preserveKeyPoints?: boolean = true;
-}
-
-class ApplyAdaptationDto {
-  adaptedSlides: Array<{
-    slideId: string;
-    adaptedContent: any[];
-  }>;
 }
 
 @Controller('audience-adaptation')
@@ -40,8 +36,8 @@ export class AudienceAdaptationController {
   async previewAdaptation(
     @Param('projectId') projectId: string,
     @Body() dto: AdaptPresentationDto,
-    @Request() req: any,
-  ) {
+    @Request() req: { user: { id: string } },
+  ): Promise<AdaptationResult> {
     return this.adaptationService.adaptPresentation(projectId, req.user.id, {
       targetAudience: dto.targetAudience,
       adjustTone: dto.adjustTone ?? true,
@@ -55,8 +51,14 @@ export class AudienceAdaptationController {
   async getSuggestions(
     @Param('projectId') projectId: string,
     @Param('audienceType') audienceType: AudienceType,
-    @Request() req: any,
-  ) {
+    @Request() req: { user: { id: string } },
+  ): Promise<{
+    suggestions: Array<{
+      slideId: string;
+      suggestion: string;
+      priority: 'high' | 'medium' | 'low';
+    }>;
+  }> {
     return this.adaptationService.getAudienceSuggestions(
       projectId,
       req.user.id,

@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+// import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type {
+    File
+} from "lucide-react";
 import {
     Upload,
     Image as ImageIcon,
@@ -9,9 +12,7 @@ import {
     Loader2,
     CheckCircle,
     AlertCircle,
-    File,
     Link as LinkIcon,
-    Camera,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 interface ImageUploadProps {
     onUpload: (url: string, metadata?: ImageMetadata) => void;
@@ -71,7 +73,7 @@ export function ImageUploadZone({
         setIsDragging(false);
     }, []);
 
-    const uploadFile = async (file: File) => {
+    const uploadFile = useCallback(async (file: File) => {
         const id = crypto.randomUUID();
 
         // Validate file size
@@ -130,6 +132,7 @@ export function ImageUploadZone({
                 setUploadingFiles((prev) => prev.filter((f) => f.id !== id));
             }, 2000);
         } catch (error) {
+            console.error(error)
             setUploadingFiles((prev) =>
                 prev.map((f) =>
                     f.id === id ? { ...f, status: "error", error: "Upload failed" } : f
@@ -137,7 +140,7 @@ export function ImageUploadZone({
             );
             toast.error(`Failed to upload "${file.name}"`);
         }
-    };
+    }, [maxSize, projectId, onUpload]);
 
     const handleDrop = useCallback(
         (e: React.DragEvent) => {
@@ -263,7 +266,7 @@ function getImageDimensions(
     file: File
 ): Promise<{ width: number; height: number }> {
     return new Promise((resolve) => {
-        const img = new Image();
+        const img = new window.Image();
         img.onload = () => {
             resolve({ width: img.width, height: img.height });
             URL.revokeObjectURL(img.src);
@@ -382,7 +385,7 @@ export function ImageInsertDialog({
                         {/* URL Preview */}
                         {urlInput && (
                             <div className="aspect-video bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden flex items-center justify-center">
-                                <img
+                                <Image
                                     src={urlInput}
                                     alt="Preview"
                                     className="max-w-full max-h-full object-contain"
@@ -406,7 +409,7 @@ export function usePasteImage(
     const handlePaste = useCallback(
         (e: ClipboardEvent) => {
             const items = e.clipboardData?.items;
-            if (!items) return;
+            if (!items) { return; }
 
             for (const item of Array.from(items)) {
                 if (item.type.startsWith("image/")) {

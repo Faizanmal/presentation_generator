@@ -30,8 +30,8 @@ export function useDebounce<T>(value: T, delay: number): T {
  * @param delay - Delay in milliseconds
  * @returns The debounced callback
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function useDebouncedCallback<T extends (...args: any[]) => any>(
+
+export function useDebouncedCallback<T extends (...args: unknown[]) => unknown>(
     callback: T,
     delay: number
 ): T {
@@ -70,8 +70,8 @@ export function useDebouncedCallback<T extends (...args: any[]) => any>(
  * @param delay - Minimum delay between calls in milliseconds
  * @returns The throttled callback
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function useThrottle<T extends (...args: any[]) => any>(
+
+export function useThrottle<T extends (...args: unknown[]) => unknown>(
     callback: T,
     delay: number
 ): T {
@@ -215,7 +215,7 @@ export function useMediaQuery(query: string): boolean {
     const initializedRef = useRef(false);
 
     useEffect(() => {
-        if (typeof window === "undefined") return;
+        if (typeof window === "undefined") { return; }
 
         const media = window.matchMedia(query);
 
@@ -224,9 +224,10 @@ export function useMediaQuery(query: string): boolean {
 
         // Set initial state only once
         if (!initializedRef.current) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            setMatches(media.matches);
-            initializedRef.current = true;
+            setTimeout(() => {
+                setMatches(media.matches);
+                initializedRef.current = true;
+            }, 0);
         }
 
         return () => media.removeEventListener("change", listener);
@@ -259,7 +260,7 @@ export function useWindowSize(): { width: number; height: number } {
     });
 
     useEffect(() => {
-        if (typeof window === "undefined") return;
+        if (typeof window === "undefined") { return; }
 
         const handleResize = () => {
             setSize({
@@ -287,10 +288,10 @@ export function useKeyboardShortcut(
         const handleKeyDown = (event: KeyboardEvent) => {
             const pressedKeys = new Set<string>();
 
-            if (event.ctrlKey) pressedKeys.add("ctrl");
-            if (event.metaKey) pressedKeys.add("meta");
-            if (event.shiftKey) pressedKeys.add("shift");
-            if (event.altKey) pressedKeys.add("alt");
+            if (event.ctrlKey) { pressedKeys.add("ctrl"); }
+            if (event.metaKey) { pressedKeys.add("meta"); }
+            if (event.shiftKey) { pressedKeys.add("shift"); }
+            if (event.altKey) { pressedKeys.add("alt"); }
             pressedKeys.add(event.key.toLowerCase());
 
             const requiredKeys = new Set(keys.map((k) => k.toLowerCase()));

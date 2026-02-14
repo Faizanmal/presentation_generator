@@ -2,7 +2,7 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Slide, Theme } from "@/types";
+import type { Slide, Theme } from "@/types";
 import {
   GripVertical,
   MoreHorizontal,
@@ -112,7 +112,7 @@ export default function SlidePanel({
       >
         {/* Mini representation of slide content */}
         <div className="h-full flex flex-col gap-1 overflow-hidden">
-          {slide.blocks?.slice(0, 3).map((block, i) => (
+          {slide.blocks?.slice(0, 3).map((block) => (
             <div
               key={block.id}
               className={`rounded ${

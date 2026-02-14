@@ -10,14 +10,9 @@ import {
   Info,
   Lightbulb,
   MessageSquare,
-  Mic,
-  Play,
-  RefreshCw,
   Target,
   TrendingUp,
   Loader2,
-  ChevronDown,
-  ChevronUp,
   Wand2,
   Eye,
   Clock,
@@ -31,16 +26,15 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
+// import {
+//   Accordion,
+//   AccordionContent,
+//   AccordionItem,
+//   AccordionTrigger,
+// } from '@/components/ui/accordion';
 import {
   Tabs,
   TabsContent,
@@ -99,7 +93,6 @@ interface PresentationCoachProps {
 }
 
 export function PresentationCoach({
-  projectId,
   slides,
   title,
   audience,
@@ -128,16 +121,16 @@ export function PresentationCoach({
 
   const getScoreColor = (score: number, max: number) => {
     const percentage = (score / max) * 100;
-    if (percentage >= 80) return 'text-green-600';
-    if (percentage >= 60) return 'text-yellow-600';
+    if (percentage >= 80) { return 'text-green-600'; }
+    if (percentage >= 60) { return 'text-yellow-600'; }
     return 'text-red-600';
   };
 
   const getOverallGrade = (score: number) => {
-    if (score >= 90) return { grade: 'A+', color: 'text-green-600', bg: 'bg-green-100' };
-    if (score >= 80) return { grade: 'A', color: 'text-green-600', bg: 'bg-green-100' };
-    if (score >= 70) return { grade: 'B', color: 'text-blue-600', bg: 'bg-blue-100' };
-    if (score >= 60) return { grade: 'C', color: 'text-yellow-600', bg: 'bg-yellow-100' };
+    if (score >= 90) { return { grade: 'A+', color: 'text-green-600', bg: 'bg-green-100' }; }
+    if (score >= 80) { return { grade: 'A', color: 'text-green-600', bg: 'bg-green-100' }; }
+    if (score >= 70) { return { grade: 'B', color: 'text-blue-600', bg: 'bg-blue-100' }; }
+    if (score >= 60) { return { grade: 'C', color: 'text-yellow-600', bg: 'bg-yellow-100' }; }
     return { grade: 'D', color: 'text-red-600', bg: 'bg-red-100' };
   };
 
@@ -302,9 +295,10 @@ export function PresentationCoach({
                       <p className="text-sm text-slate-600 mb-3">{category.feedback}</p>
                       {category.tips.length > 0 && (
                         <div className="space-y-1">
-                          {category.tips.map((tip, i) => (
-                            <div key={i} className="flex items-start gap-2 text-sm">
-                              <Lightbulb className="h-3 w-3 text-yellow-500 mt-1 flex-shrink-0" />
+                          {category.tips.map((tip) => (
+
+                            <div key={tip} className="flex items-start gap-2 text-sm">
+                              <Lightbulb className="h-3 w-3 text-yellow-500 mt-1 shrink-0" />
                               <span>{tip}</span>
                             </div>
                           ))}
@@ -317,8 +311,9 @@ export function PresentationCoach({
 
               <TabsContent value="suggestions" className="mt-4">
                 <div className="space-y-3">
-                  {analysis.suggestions.map((suggestion, i) => (
-                    <Card key={i}>
+                  {analysis.suggestions.map((suggestion, _i) => (
+
+                    <Card key={suggestion.type}>
                       <CardContent className="pt-4">
                         <div className="flex items-start gap-3">
                           {getSuggestionIcon(suggestion.type)}
@@ -363,8 +358,9 @@ export function PresentationCoach({
                   </CardHeader>
                   <CardContent>
                     <ul className="space-y-2">
-                      {analysis.strengths.map((strength, i) => (
-                        <li key={i} className="flex items-start gap-2 text-sm">
+                      {analysis.strengths.map((strength, _i) => (
+
+                        <li key={strength} className="flex items-start gap-2 text-sm">
                           <div className="w-1.5 h-1.5 rounded-full bg-green-500 mt-2" />
                           {strength}
                         </li>
@@ -382,8 +378,9 @@ export function PresentationCoach({
                   </CardHeader>
                   <CardContent>
                     <ul className="space-y-2">
-                      {analysis.improvements.map((improvement, i) => (
-                        <li key={i} className="flex items-start gap-2 text-sm">
+                      {analysis.improvements.map((improvement, _i) => (
+
+                        <li key={improvement} className="flex items-start gap-2 text-sm">
                           <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-2" />
                           {improvement}
                         </li>

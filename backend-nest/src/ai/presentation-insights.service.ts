@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import OpenAI from 'openai';
+import { AIService } from './ai.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface PresentationInsight {
@@ -72,16 +72,11 @@ export interface ComprehensiveInsights {
 
 @Injectable()
 export class PresentationInsightsService {
-  private openai: OpenAI;
-
   constructor(
     private configService: ConfigService,
     private prisma: PrismaService,
-  ) {
-    this.openai = new OpenAI({
-      apiKey: this.configService.get<string>('OPENAI_API_KEY'),
-    });
-  }
+    private readonly aiService: AIService,
+  ) {}
 
   async analyzePresentation(projectId: string): Promise<ComprehensiveInsights> {
     const project = await this.prisma.project.findUnique({
@@ -95,25 +90,29 @@ export class PresentationInsightsService {
 
     const slides = project.slides;
     const allContent = slides
-      .map((s: any) =>
-        this.extractText(s.blocks?.map((b: any) => b.content).join('\n') || ''),
-      )
+      .map((s) => {
+        const slide = s as Record<string, unknown>;
+        const blocks = (
+          Array.isArray(slide.blocks) ? slide.blocks : []
+        ) as Record<string, unknown>[];
+        const content =
+          blocks
+            .map((b) => (typeof b.content === 'string' ? b.content : ''))
+            .join('\n') || '';
+        return this.extractText(content);
+      })
       .join('\n\n');
 
-    // Run analyses in parallel
-    const [
-      contentAnalysis,
-      structureAnalysis,
-      timingAnalysis,
-      audienceAnalysis,
-      aiInsights,
-    ] = await Promise.all([
-      this.analyzeContent(slides),
-      this.analyzeStructure(slides),
-      this.analyzeTiming(slides),
-      this.analyzeAudience(slides),
-      this.getAIInsights(project.title || '', allContent, slides.length),
-    ]);
+    // Run analyses
+    const contentAnalysis = this.analyzeContent(slides);
+    const structureAnalysis = this.analyzeStructure(slides);
+    const timingAnalysis = this.analyzeTiming(slides);
+    const audienceAnalysis = this.analyzeAudience(slides);
+    const aiInsights = await this.getAIInsights(
+      project.title || '',
+      allContent,
+      slides.length,
+    );
 
     // Calculate overall score
     const overallScore = this.calculateOverallScore({
@@ -133,7 +132,7 @@ export class PresentationInsightsService {
     };
   }
 
-  private async analyzeContent(slides: any[]): Promise<ContentAnalysis> {
+  private analyzeContent(slides: unknown[]): ContentAnalysis {
     let totalWords = 0;
     const topicCounts = new Map<string, number>();
     const actionWordCounts = new Map<string, number>();
@@ -156,7 +155,8 @@ export class PresentationInsightsService {
       'transform',
     ];
 
-    for (const slide of slides) {
+    for (const slideItem of slides) {
+      const slide = slideItem as Record<string, unknown>;
       const text = this.extractText(slide.content);
       const words = text.toLowerCase().split(/\s+/).filter(Boolean);
       totalWords += words.length;
@@ -206,9 +206,9 @@ export class PresentationInsightsService {
     };
   }
 
-  private async analyzeStructure(slides: any[]): Promise<StructureAnalysis> {
+  private analyzeStructure(slides: unknown[]): StructureAnalysis {
     const slideTexts = slides.map((s) =>
-      this.extractText(s.content).toLowerCase(),
+      this.extractText((s as Record<string, unknown>).content).toLowerCase(),
     );
 
     const hasIntroduction =
@@ -233,12 +233,10 @@ export class PresentationInsightsService {
 
     // Detect sections based on content patterns
     const sections: { section: string; count: number }[] = [];
-    let currentSection = 'Introduction';
     let sectionCount = 0;
 
     for (const text of slideTexts) {
       if (text.includes('section') || text.length < 50) {
-        currentSection = text.substring(0, 30);
         sectionCount++;
       }
     }
@@ -260,14 +258,15 @@ export class PresentationInsightsService {
     };
   }
 
-  private async analyzeTiming(slides: any[]): Promise<TimingAnalysis> {
+  private analyzeTiming(slides: unknown[]): TimingAnalysis {
     const perSlideTime: { slideId: string; estimatedSeconds: number }[] = [];
     let totalTime = 0;
     const pacingIssues: { slideId: string; issue: string }[] = [];
     const recommendedBreakPoints: number[] = [];
 
     for (let i = 0; i < slides.length; i++) {
-      const slide = slides[i];
+      const slide = slides[i] as Record<string, unknown>;
+      const slideId = String(slide.id);
       const text = this.extractText(slide.content);
       const wordCount = text.split(/\s+/).filter(Boolean).length;
 
@@ -276,18 +275,18 @@ export class PresentationInsightsService {
         30,
         Math.ceil((wordCount / 150) * 60) + 10,
       );
-      perSlideTime.push({ slideId: slide.id, estimatedSeconds });
+      perSlideTime.push({ slideId, estimatedSeconds });
       totalTime += estimatedSeconds;
 
       // Check for pacing issues
       if (estimatedSeconds > 180) {
         pacingIssues.push({
-          slideId: slide.id,
+          slideId,
           issue: 'Slide may take too long (over 3 minutes)',
         });
       } else if (estimatedSeconds < 15) {
         pacingIssues.push({
-          slideId: slide.id,
+          slideId,
           issue: 'Slide may be too brief',
         });
       }
@@ -306,8 +305,10 @@ export class PresentationInsightsService {
     };
   }
 
-  private async analyzeAudience(slides: any[]): Promise<AudienceAnalysis> {
-    const allText = slides.map((s) => this.extractText(s.content)).join(' ');
+  private analyzeAudience(slides: unknown[]): AudienceAnalysis {
+    const allText = slides
+      .map((s) => this.extractText((s as Record<string, unknown>).content))
+      .join(' ');
     const words = allText.toLowerCase().split(/\s+/);
 
     // Technical word detection
@@ -352,22 +353,31 @@ export class PresentationInsightsService {
     const accessibilityIssues: { slideId: string; issue: string }[] = [];
     let accessibilityScore = 100;
 
-    for (const slide of slides) {
-      const content = slide.content;
+    for (const slideItem of slides) {
+      const slide = slideItem as Record<string, unknown>;
+      const slideId = String(slide.id);
+      const content = slide.content as Record<string, unknown>;
 
       // Check for images without alt text
-      if (content?.images?.some((img: any) => !img.alt)) {
+      if (
+        Array.isArray(content?.images) &&
+        content.images.some(
+          (img: Record<string, unknown>) =>
+            typeof img === 'object' && img !== null && !('alt' in img),
+        )
+      ) {
         accessibilityIssues.push({
-          slideId: slide.id,
+          slideId,
           issue: 'Image missing alt text',
         });
         accessibilityScore -= 5;
       }
 
       // Check for low contrast (simplified)
-      if (content?.style?.backgroundColor && content?.style?.color) {
+      const style = content?.style as Record<string, unknown> | undefined;
+      if (style?.backgroundColor && style?.color) {
         accessibilityIssues.push({
-          slideId: slide.id,
+          slideId,
           issue: 'Check color contrast',
         });
       }
@@ -414,7 +424,7 @@ Format as JSON array:
 ]`;
 
     try {
-      const response = await this.openai.chat.completions.create({
+      const response = await this.aiService.chatCompletion({
         model: 'gpt-4o',
         messages: [
           {
@@ -429,14 +439,14 @@ Format as JSON array:
 
       return this.parseJsonResponse(
         response.choices[0].message.content || '[]',
-      );
+      ) as PresentationInsight[];
     } catch (error) {
       console.error('AI insights error:', error);
       return [];
     }
   }
 
-  async getQuickTips(slideContent: any): Promise<string[]> {
+  getQuickTips(slideContent: unknown): string[] {
     const text = this.extractText(slideContent);
     const wordCount = text.split(/\s+/).filter(Boolean).length;
 
@@ -490,22 +500,24 @@ Format as JSON array:
     return 'Very complex';
   }
 
-  private extractText(content: any): string {
+  private extractText(content: unknown): string {
     if (typeof content === 'string') return content;
     if (Array.isArray(content)) {
       return content.map((item) => this.extractText(item)).join(' ');
     }
     if (typeof content === 'object' && content !== null) {
-      if (content.text) return content.text;
-      if (content.content) return this.extractText(content.content);
-      return Object.values(content)
+      const record = content as Record<string, unknown>;
+      if ('text' in record && typeof record.text === 'string')
+        return record.text;
+      if ('content' in record) return this.extractText(record.content);
+      return Object.values(record)
         .map((v) => this.extractText(v))
         .join(' ');
     }
     return '';
   }
 
-  private parseJsonResponse(text: string): any {
+  private parseJsonResponse(text: string): unknown {
     try {
       const jsonMatch = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
       if (jsonMatch) {

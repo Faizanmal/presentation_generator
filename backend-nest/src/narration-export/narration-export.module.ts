@@ -4,8 +4,10 @@ import { NarrationExportController } from './narration-export.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { UploadModule } from '../upload/upload.module';
 
+import { AIModule } from '../ai/ai.module';
+
 @Module({
-  imports: [PrismaModule, UploadModule],
+  imports: [PrismaModule, UploadModule, AIModule],
   controllers: [NarrationExportController],
   providers: [NarrationExportService],
   exports: [NarrationExportService],

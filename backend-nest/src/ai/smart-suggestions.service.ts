@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import OpenAI from 'openai';
+import { AIService } from './ai.service';
 
 export interface ContentSuggestion {
   id: string;
@@ -13,7 +13,7 @@ export interface ContentSuggestion {
     | 'statistic'
     | 'bullet'
     | 'layout';
-  content: string | any;
+  content: string;
   confidence: number;
   reason: string;
   preview?: string;
@@ -33,20 +33,17 @@ export interface RelatedContent {
 
 @Injectable()
 export class SmartSuggestionsService {
-  private openai: OpenAI;
-
-  constructor(private configService: ConfigService) {
-    this.openai = new OpenAI({
-      apiKey: this.configService.get<string>('OPENAI_API_KEY'),
-    });
-  }
+  constructor(
+    private configService: ConfigService,
+    private readonly aiService: AIService,
+  ) {}
 
   async getSuggestionsForSlide(
-    slideContent: any,
+    slideContent: unknown,
     presentationContext: {
       title: string;
       topic: string;
-      previousSlides: any[];
+      previousSlides: unknown[];
       targetAudience?: string;
     },
   ): Promise<ContentSuggestion[]> {
@@ -72,7 +69,7 @@ Provide 5-7 specific suggestions to improve this slide. For each suggestion, pro
 Format as JSON array with: type, content, confidence, reason`;
 
     try {
-      const response = await this.openai.chat.completions.create({
+      const response = await this.aiService.chatCompletion({
         model: 'gpt-4o',
         messages: [
           {
@@ -87,12 +84,17 @@ Format as JSON array with: type, content, confidence, reason`;
 
       const parsed = this.parseJsonResponse(
         response.choices[0].message.content || '[]',
-      );
+      ) as {
+        type: string;
+        content: string;
+        confidence: number;
+        reason: string;
+      }[];
 
       for (const item of parsed) {
         suggestions.push({
           id: `sug-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          type: item.type,
+          type: item.type as ContentSuggestion['type'],
           content: item.content,
           confidence: item.confidence,
           reason: item.reason,
@@ -129,7 +131,7 @@ Provide 3 possible completions that:
 Return as JSON: { "completions": ["completion1", "completion2", "completion3"] }`;
 
     try {
-      const response = await this.openai.chat.completions.create({
+      const response = await this.aiService.chatCompletion({
         model: 'gpt-4o',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.8,
@@ -137,20 +139,20 @@ Return as JSON: { "completions": ["completion1", "completion2", "completion3"] }
 
       const parsed = this.parseJsonResponse(
         response.choices[0].message.content || '{}',
-      );
+      ) as Partial<SmartCompleteResult>;
 
       return {
         completions: parsed.completions || [],
         context: partialText,
       };
-    } catch (error) {
+    } catch {
       return { completions: [], context: partialText };
     }
   }
 
   async suggestRelatedContent(
     topic: string,
-    slideContent: any,
+    slideContent: unknown,
   ): Promise<RelatedContent> {
     const prompt = `For a presentation about "${topic}", suggest related content:
 
@@ -171,7 +173,7 @@ Format as JSON:
 }`;
 
     try {
-      const response = await this.openai.chat.completions.create({
+      const response = await this.aiService.chatCompletion({
         model: 'gpt-4o',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
@@ -179,7 +181,7 @@ Format as JSON:
 
       const parsed = this.parseJsonResponse(
         response.choices[0].message.content || '{}',
-      );
+      ) as Partial<RelatedContent>;
 
       return {
         images: parsed.images || [],
@@ -187,13 +189,13 @@ Format as JSON:
         quotes: parsed.quotes || [],
         statistics: parsed.statistics || [],
       };
-    } catch (error) {
+    } catch {
       return { images: [], icons: [], quotes: [], statistics: [] };
     }
   }
 
   async suggestNextSlide(
-    currentSlides: any[],
+    currentSlides: unknown[],
     presentationTopic: string,
   ): Promise<{
     suggestedType: string;
@@ -223,7 +225,7 @@ Respond with JSON:
 }`;
 
     try {
-      const response = await this.openai.chat.completions.create({
+      const response = await this.aiService.chatCompletion({
         model: 'gpt-4o',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
@@ -231,8 +233,13 @@ Respond with JSON:
 
       return this.parseJsonResponse(
         response.choices[0].message.content || '{}',
-      );
-    } catch (error) {
+      ) as {
+        suggestedType: string;
+        suggestedTitle: string;
+        suggestedContent: string[];
+        reason: string;
+      };
+    } catch {
       return {
         suggestedType: 'content',
         suggestedTitle: 'Continue Here',
@@ -275,7 +282,7 @@ Respond with JSON:
 }`;
 
     try {
-      const response = await this.openai.chat.completions.create({
+      const response = await this.aiService.chatCompletion({
         model: 'gpt-4o',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
@@ -283,8 +290,8 @@ Respond with JSON:
 
       return this.parseJsonResponse(
         response.choices[0].message.content || '{}',
-      );
-    } catch (error) {
+      ) as { rewritten: string; changes: string[] };
+    } catch {
       return { rewritten: content, changes: [] };
     }
   }
@@ -315,7 +322,7 @@ JSON format:
 }`;
 
     try {
-      const response = await this.openai.chat.completions.create({
+      const response = await this.aiService.chatCompletion({
         model: 'gpt-4o',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
@@ -323,8 +330,12 @@ JSON format:
 
       return this.parseJsonResponse(
         response.choices[0].message.content || '{}',
-      );
-    } catch (error) {
+      ) as {
+        expandedContent: string;
+        subPoints: string[];
+        speakerNotes: string;
+      };
+    } catch {
       return {
         expandedContent: bulletPoint,
         subPoints: [],
@@ -333,7 +344,7 @@ JSON format:
     }
   }
 
-  async suggestVisualElements(slideContent: any): Promise<{
+  async suggestVisualElements(slideContent: unknown): Promise<{
     layout: string;
     colors: string[];
     visualType: string;
@@ -360,7 +371,7 @@ JSON:
 }`;
 
     try {
-      const response = await this.openai.chat.completions.create({
+      const response = await this.aiService.chatCompletion({
         model: 'gpt-4o',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
@@ -368,8 +379,13 @@ JSON:
 
       return this.parseJsonResponse(
         response.choices[0].message.content || '{}',
-      );
-    } catch (error) {
+      ) as {
+        layout: string;
+        colors: string[];
+        visualType: string;
+        iconSuggestions: string[];
+      };
+    } catch {
       return {
         layout: 'centered',
         colors: ['#3B82F6', '#10B981', '#6366F1'],
@@ -379,22 +395,24 @@ JSON:
     }
   }
 
-  private extractText(content: any): string {
+  private extractText(content: unknown): string {
     if (typeof content === 'string') return content;
     if (Array.isArray(content)) {
       return content.map((item) => this.extractText(item)).join(' ');
     }
     if (typeof content === 'object' && content !== null) {
-      if (content.text) return content.text;
-      if (content.content) return this.extractText(content.content);
-      return Object.values(content)
+      const record = content as Record<string, unknown>;
+      if ('text' in record && typeof record.text === 'string')
+        return record.text;
+      if ('content' in record) return this.extractText(record.content);
+      return Object.values(record)
         .map((v) => this.extractText(v))
         .join(' ');
     }
     return '';
   }
 
-  private detectSlideType(content: any): string {
+  private detectSlideType(content: unknown): string {
     const text = this.extractText(content).toLowerCase();
 
     if (text.includes('agenda') || text.includes('outline')) return 'agenda';
@@ -412,7 +430,7 @@ JSON:
     return 'content';
   }
 
-  private parseJsonResponse(text: string): any {
+  private parseJsonResponse(text: string): unknown {
     try {
       // Try to extract JSON from the response
       const jsonMatch = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);

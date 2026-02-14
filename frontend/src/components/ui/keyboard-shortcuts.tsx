@@ -142,18 +142,18 @@ export function KeyboardShortcutsDialog({
                                 {category.name}
                             </h3>
                             <div className="space-y-1">
-                                {category.shortcuts.map((shortcut, idx) => (
+                                {category.shortcuts.map((shortcut) => (
                                     <div
-                                        key={idx}
+                                        key={shortcut.description}
                                         className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                                     >
                                         <span className="text-sm text-slate-600 dark:text-slate-400">
                                             {shortcut.description}
                                         </span>
                                         <div className="flex items-center gap-0.5">
-                                            {shortcut.keys.map((key, keyIdx) => (
+                                            {shortcut.keys.map((key) => (
                                                 <kbd
-                                                    key={keyIdx}
+                                                    key={key}
                                                     className="inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm"
                                                 >
                                                     {key}

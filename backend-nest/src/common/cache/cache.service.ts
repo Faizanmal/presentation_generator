@@ -48,7 +48,10 @@ export class CacheService implements OnModuleDestroy {
   /**
    * Get a value from cache
    */
-  async get<T>(key: string): Promise<T | null> {
+  /**
+   * Get a value from cache
+   */
+  get<T>(key: string): T | null {
     const entry = this.cache.get(key);
 
     if (!entry) {
@@ -75,7 +78,7 @@ export class CacheService implements OnModuleDestroy {
   /**
    * Set a value in cache with optional TTL
    */
-  async set<T>(key: string, value: T, ttlSeconds?: number): Promise<void> {
+  set<T>(key: string, value: T, ttlSeconds?: number): void {
     const ttl = ttlSeconds || this.config.defaultTTL;
     const expiresAt = Date.now() + ttl * 1000;
 
@@ -91,7 +94,7 @@ export class CacheService implements OnModuleDestroy {
   /**
    * Delete a value from cache
    */
-  async delete(key: string): Promise<boolean> {
+  delete(key: string): boolean {
     const existed = this.cache.delete(key);
     if (existed) {
       this.removeFromAccessOrder(key);
@@ -102,7 +105,7 @@ export class CacheService implements OnModuleDestroy {
   /**
    * Delete all keys matching a pattern
    */
-  async deletePattern(pattern: string): Promise<number> {
+  deletePattern(pattern: string): number {
     const regex = new RegExp(pattern.replace(/\*/g, '.*'));
     let count = 0;
 
@@ -125,20 +128,20 @@ export class CacheService implements OnModuleDestroy {
     factory: () => Promise<T>,
     ttlSeconds?: number,
   ): Promise<T> {
-    const cached = await this.get<T>(key);
+    const cached = this.get<T>(key);
     if (cached !== null) {
       return cached;
     }
 
     const value = await factory();
-    await this.set(key, value, ttlSeconds);
+    this.set(key, value, ttlSeconds);
     return value;
   }
 
   /**
    * Clear all cache entries
    */
-  async clear(): Promise<void> {
+  clear(): void {
     this.cache.clear();
     this.accessOrder.length = 0;
     this.hits = 0;
@@ -161,7 +164,10 @@ export class CacheService implements OnModuleDestroy {
   /**
    * Check if key exists in cache
    */
-  async has(key: string): Promise<boolean> {
+  /**
+   * Check if key exists in cache
+   */
+  has(key: string): boolean {
     const entry = this.cache.get(key);
     if (!entry) return false;
     if (Date.now() > entry.expiresAt) {
@@ -175,7 +181,7 @@ export class CacheService implements OnModuleDestroy {
   /**
    * Get all keys matching a pattern
    */
-  async keys(pattern?: string): Promise<string[]> {
+  keys(pattern?: string): string[] {
     if (!pattern) {
       return Array.from(this.cache.keys());
     }

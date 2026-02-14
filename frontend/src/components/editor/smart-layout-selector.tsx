@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, Layout, LayoutGrid as LayoutGridIcon, Columns2, Image, FileText, BarChart3 } from 'lucide-react';
+import { Check, Layout, LayoutGrid as LayoutGridIcon, Columns2, Image as ImageIcon, FileText, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -85,7 +85,7 @@ const LAYOUTS: LayoutOption[] = [
     id: 'image-left',
     name: 'Image Left',
     description: 'Image on left, content on right',
-    icon: <Image className="h-4 w-4" />,
+    icon: <ImageIcon className="h-4 w-4" />,
     preview: (
       <div className="w-full h-full p-2 flex gap-1">
         <div className="w-1/2 h-full bg-slate-300 rounded" />
@@ -101,7 +101,7 @@ const LAYOUTS: LayoutOption[] = [
     id: 'image-right',
     name: 'Image Right',
     description: 'Content on left, image on right',
-    icon: <Image className="h-4 w-4" />,
+    icon: <ImageIcon className="h-4 w-4" />,
     preview: (
       <div className="w-full h-full p-2 flex gap-1">
         <div className="w-1/2 space-y-1">
@@ -117,7 +117,7 @@ const LAYOUTS: LayoutOption[] = [
     id: 'full-image',
     name: 'Full Image',
     description: 'Full-bleed background image',
-    icon: <Image className="h-4 w-4" />,
+    icon: <ImageIcon className="h-4 w-4" />,
     preview: (
       <div className="w-full h-full bg-slate-300 rounded flex items-end p-1">
         <div className="w-2/3 h-2 bg-white/80 rounded" />
@@ -187,7 +187,7 @@ const LAYOUTS: LayoutOption[] = [
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="flex items-center gap-1">
               <div className="w-1 h-1 bg-blue-400 rounded-full" />
-              <div className={`h-1.5 bg-slate-200 rounded`} style={{ width: `${70 - i * 10}%` }} />
+              <div className="h-1.5 bg-slate-200 rounded" style={{ width: `${70 - i * 10}%` }} />
             </div>
           ))}
         </div>

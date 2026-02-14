@@ -9,8 +9,9 @@ import {
   UseGuards,
   Request,
   Res,
+  BadRequestException,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Response, Request as ExpressRequest } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { IntegrationsService } from './integrations.service';
 import { ConfigService } from '@nestjs/config';
@@ -23,6 +24,8 @@ type IntegrationProvider =
   | 'FIGMA'
   | 'NOTION'
   | 'DROPBOX';
+
+type AuthRequest = ExpressRequest & { user: { id: string } };
 
 @Controller('integrations')
 export class IntegrationsController {
@@ -40,8 +43,10 @@ export class IntegrationsController {
    */
   @Get()
   @UseGuards(JwtAuthGuard)
-  async getUserIntegrations(@Request() req: any) {
-    return this.integrationsService.getUserIntegrations(req.user.id);
+  async getUserIntegrations(@Request() req: AuthRequest) {
+    const userId = req.user?.id;
+    if (!userId) throw new BadRequestException('User not authenticated');
+    return this.integrationsService.getUserIntegrations(userId);
   }
 
   /**
@@ -49,11 +54,13 @@ export class IntegrationsController {
    */
   @Get(':provider/auth')
   @UseGuards(JwtAuthGuard)
-  async getAuthUrl(
+  getAuthUrl(
     @Param('provider') provider: IntegrationProvider,
-    @Request() req: any,
+    @Request() req: AuthRequest,
   ) {
-    const url = this.integrationsService.getAuthUrl(provider, req.user.id);
+    const userId = req.user?.id;
+    if (!userId) throw new BadRequestException('User not authenticated');
+    const url = this.integrationsService.getAuthUrl(provider, userId);
     return { url };
   }
 
@@ -64,12 +71,11 @@ export class IntegrationsController {
   @UseGuards(JwtAuthGuard)
   async disconnectIntegration(
     @Param('provider') provider: IntegrationProvider,
-    @Request() req: any,
+    @Request() req: AuthRequest,
   ) {
-    return this.integrationsService.disconnectIntegration(
-      req.user.id,
-      provider,
-    );
+    const userId = req.user?.id;
+    if (!userId) throw new BadRequestException('User not authenticated');
+    return this.integrationsService.disconnectIntegration(userId, provider);
   }
 
   // ============================================
@@ -170,11 +176,13 @@ export class IntegrationsController {
   @Post('zoom/meeting')
   @UseGuards(JwtAuthGuard)
   async createZoomMeeting(
-    @Request() req: any,
+    @Request() req: AuthRequest,
     @Body() body: { projectId: string; topic: string; startTime?: string },
   ) {
+    const userId = req.user?.id;
+    if (!userId) throw new BadRequestException('User not authenticated');
     return this.integrationsService.createZoomMeeting(
-      req.user.id,
+      userId,
       body.projectId,
       body.topic,
       body.startTime ? new Date(body.startTime) : undefined,
@@ -187,18 +195,57 @@ export class IntegrationsController {
 
   @Get('slack/channels')
   @UseGuards(JwtAuthGuard)
-  async getSlackChannels(@Request() req: any) {
-    return this.integrationsService.getSlackChannels(req.user.id);
+  async getSlackChannels(
+    @Request() req: AuthRequest,
+  ): Promise<Array<{ id: string; name: string; isPrivate: boolean }>> {
+    const userId = req.user?.id;
+    if (!userId) throw new BadRequestException('User not authenticated');
+    const channelsRaw = (await this.integrationsService.getSlackChannels(
+      userId,
+    )) as unknown;
+    if (!Array.isArray(channelsRaw)) return [];
+    const channels = channelsRaw as unknown[];
+
+    const normalized = channels
+      .map((c) => {
+        if (!c || typeof c !== 'object') return null;
+        const obj = c as Record<string, unknown>;
+        const idRaw = obj.id ?? obj['channel'] ?? obj['channel_id'];
+        const nameRaw = obj.name ?? obj['title'] ?? obj['display_name'];
+        const isPrivate = obj.is_private ?? obj.isPrivate ?? false;
+
+        const id =
+          typeof idRaw === 'string' || typeof idRaw === 'number'
+            ? String(idRaw)
+            : '';
+        const name =
+          typeof nameRaw === 'string' || typeof nameRaw === 'number'
+            ? String(nameRaw)
+            : '';
+        return {
+          id: String(id ?? ''),
+          name: String(name ?? ''),
+          isPrivate: Boolean(isPrivate),
+        };
+      })
+      .filter(
+        (ch): ch is { id: string; name: string; isPrivate: boolean } =>
+          !!ch && ch.id !== '',
+      );
+
+    return normalized;
   }
 
   @Post('slack/message')
   @UseGuards(JwtAuthGuard)
   async sendSlackMessage(
-    @Request() req: any,
+    @Request() req: AuthRequest,
     @Body() body: { channel: string; message: string; presentationUrl: string },
   ) {
+    const userId = req.user?.id;
+    if (!userId) throw new BadRequestException('User not authenticated');
     return this.integrationsService.sendSlackMessage(
-      req.user.id,
+      userId,
       body.channel,
       body.message,
       body.presentationUrl,
@@ -212,10 +259,12 @@ export class IntegrationsController {
   @Post('notion/import')
   @UseGuards(JwtAuthGuard)
   async importFromNotion(
-    @Request() req: any,
+    @Request() req: AuthRequest,
     @Body() body: { pageId: string },
   ) {
-    return this.integrationsService.importFromNotion(req.user.id, body.pageId);
+    const userId = req.user?.id;
+    if (!userId) throw new BadRequestException('User not authenticated');
+    return this.integrationsService.importFromNotion(userId, body.pageId);
   }
 
   // ============================================
@@ -224,20 +273,35 @@ export class IntegrationsController {
 
   @Get('figma/file/:fileKey')
   @UseGuards(JwtAuthGuard)
-  async getFigmaFile(@Request() req: any, @Param('fileKey') fileKey: string) {
-    return this.integrationsService.getFigmaFile(req.user.id, fileKey);
+  async getFigmaFile(
+    @Request() req: AuthRequest,
+    @Param('fileKey') fileKey: string,
+  ) {
+    const userId = req.user?.id;
+    if (!userId) throw new BadRequestException('User not authenticated');
+    return this.integrationsService.getFigmaFile(userId, fileKey);
   }
 
   @Post('figma/export')
   @UseGuards(JwtAuthGuard)
   async exportFigmaFrames(
-    @Request() req: any,
+    @Request() req: AuthRequest,
     @Body() body: { fileKey: string; nodeIds: string[] },
-  ) {
-    return this.integrationsService.exportFigmaFrames(
-      req.user.id,
+  ): Promise<Record<string, string>> {
+    const userId = req.user?.id;
+    if (!userId) throw new BadRequestException('User not authenticated');
+    const images = await this.integrationsService.exportFigmaFrames(
+      userId,
       body.fileKey,
       body.nodeIds,
     );
+
+    if (!images || typeof images !== 'object') return {};
+    const result: Record<string, string> = {};
+    Object.keys(images).forEach((k) => {
+      const v = (images as Record<string, unknown>)[k];
+      if (typeof v === 'string') result[k] = v;
+    });
+    return result;
   }
 }

@@ -14,7 +14,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
-import { Slide, Theme, Block } from "@/types";
+import type { Slide, Theme, Block } from "@/types";
+import Image from "next/image";
 
 export default function PresentPage() {
   const params = useParams();
@@ -162,7 +163,7 @@ export default function PresentPage() {
           }`}
       >
         {/* Top bar */}
-        <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-black/50 to-transparent flex items-center justify-between px-4 pointer-events-auto">
+        <div className="absolute top-0 left-0 right-0 h-16 bg-linear-to-b from-black/50 to-transparent flex items-center justify-between px-4 pointer-events-auto">
           <Button
             variant="ghost"
             size="icon"
@@ -191,7 +192,7 @@ export default function PresentPage() {
         </div>
 
         {/* Bottom bar */}
-        <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black/50 to-transparent flex items-center justify-center gap-4 pointer-events-auto">
+        <div className="absolute bottom-0 left-0 right-0 h-20 bg-linear-to-t from-black/50 to-transparent flex items-center justify-center gap-4 pointer-events-auto">
           <Button
             variant="ghost"
             size="icon"
@@ -203,11 +204,12 @@ export default function PresentPage() {
           </Button>
 
           <div className="flex items-center gap-2">
-            {project.slides?.map((_, index) => (
+            {project.slides?.map((slide) => (
               <button
-                key={index}
-                onClick={() => setCurrentSlideIndex(index)}
-                className={`h-2 w-2 rounded-full transition-all ${index === currentSlideIndex
+
+                key={slide.id}
+                onClick={() => setCurrentSlideIndex(project.slides?.indexOf(slide) || 0)}
+                className={`h-2 w-2 rounded-full transition-all ${project.slides?.indexOf(slide) === currentSlideIndex
                   ? "bg-white w-4"
                   : "bg-white/50 hover:bg-white/80"
                   }`}
@@ -259,7 +261,7 @@ function SlideView({ slide, theme }: { slide: Slide; theme?: Theme }) {
 
   return (
     <div
-      className="w-full h-full max-w-[90vw] max-h-[90vh] aspect-[16/10] rounded-lg shadow-2xl overflow-hidden"
+      className="w-full h-full max-w-[90vw] max-h-[90vh] aspect-16/10 rounded-lg shadow-2xl overflow-hidden"
       style={{
         backgroundColor: bgColor,
         color: textColor,
@@ -332,8 +334,9 @@ function BlockView({ block, theme }: { block: Block; theme?: Theme }) {
     case "BULLET_LIST":
       return (
         <ul className="list-disc list-inside space-y-3 text-2xl">
-          {(content?.items || []).map((item: string, i: number) => (
-            <li key={i}>{item}</li>
+          {(content?.items || []).map((item: string) => (
+
+            <li key={item}>{item}</li>
           ))}
         </ul>
       );
@@ -341,16 +344,16 @@ function BlockView({ block, theme }: { block: Block; theme?: Theme }) {
     case "NUMBERED_LIST":
       return (
         <ol className="list-decimal list-inside space-y-3 text-2xl">
-          {(content?.items || []).map((item: string, i: number) => (
-            <li key={i}>{item}</li>
+          {(content?.items || []).map((item: string) => (
+
+            <li key={item}>{item}</li>
           ))}
         </ol>
       );
 
     case "IMAGE":
       return content?.url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <Image
           src={content.url}
           alt={content.alt || ""}
           className="max-w-full max-h-[60vh] object-contain mx-auto rounded-lg"
@@ -391,10 +394,12 @@ function BlockView({ block, theme }: { block: Block; theme?: Theme }) {
         <table className="w-full border-collapse text-xl">
           <tbody>
             {rows.map((row: string[], rowIndex: number) => (
-              <tr key={rowIndex}>
-                {row.map((cell: string, cellIndex: number) => (
+
+              <tr key={`row-${row.join('-')}`}>
+                {row.map((cell: string, _cellIndex: number) => (
                   <td
-                    key={cellIndex}
+
+                    key={cell}
                     className={`border p-3 ${rowIndex === 0 ? "font-semibold bg-slate-100 dark:bg-slate-800" : ""
                       }`}
                     style={{

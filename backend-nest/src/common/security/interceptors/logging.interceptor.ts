@@ -5,6 +5,8 @@ import {
   CallHandler,
   Logger,
 } from '@nestjs/common';
+import { Request, Response } from 'express';
+import { HttpException } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { tap, catchError } from 'rxjs/operators';
 import { v4 as uuidv4 } from 'uuid';
@@ -16,23 +18,27 @@ import { v4 as uuidv4 } from 'uuid';
 export class LoggingInterceptor implements NestInterceptor {
   private readonly logger = new Logger('HTTP');
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    const request = context.switchToHttp().getRequest();
-    const response = context.switchToHttp().getResponse();
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
+    const request = context.switchToHttp().getRequest<Request>();
+    const response = context.switchToHttp().getResponse<Response>();
 
     const requestId = uuidv4();
     const method = request.method;
     const url = request.url;
     const userAgent = request.headers['user-agent'] || 'unknown';
     const ip = this.getClientIP(request);
-    const userId = request.user?.id || 'anonymous';
+
+    const req = request as unknown as Record<string, unknown> & {
+      user?: { id?: string; sub?: string };
+    };
+    const userId = req.user?.id || req.user?.sub || 'anonymous';
     const startTime = Date.now();
 
     // Add request ID to headers for tracing
     response.setHeader('X-Request-ID', requestId);
 
     return next.handle().pipe(
-      tap((data) => {
+      tap(() => {
         const duration = Date.now() - startTime;
         const statusCode = response.statusCode;
 
@@ -56,7 +62,12 @@ export class LoggingInterceptor implements NestInterceptor {
       }),
       catchError((error) => {
         const duration = Date.now() - startTime;
-        const statusCode = error.status || 500;
+
+        const err = error as { status?: number; message?: string };
+        const statusCode =
+          error instanceof HttpException
+            ? error.getStatus()
+            : err.status || 500;
 
         this.logger.error(
           this.formatLog({
@@ -68,7 +79,8 @@ export class LoggingInterceptor implements NestInterceptor {
             userId,
             ip,
             userAgent,
-            error: error.message,
+
+            error: err.message || 'Unknown error',
           }),
         );
 
@@ -77,10 +89,15 @@ export class LoggingInterceptor implements NestInterceptor {
     );
   }
 
-  private getClientIP(request: any): string {
+  private getClientIP(request: Request): string {
+    const forwardedIdx = request.headers['x-forwarded-for'];
+    const forwardedFirst = Array.isArray(forwardedIdx)
+      ? forwardedIdx[0]
+      : forwardedIdx;
+
     return (
-      request.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
-      request.headers['x-real-ip'] ||
+      forwardedFirst?.split(',')[0]?.trim() ||
+      (request.headers['x-real-ip'] as string) ||
       request.connection?.remoteAddress ||
       request.ip ||
       'unknown'

@@ -1,0 +1,61 @@
+
+  /**
+   * Generate stock images (using LoremFlickr as placeholder service for now)
+   */
+  async generateStockImages(
+    sections: GeneratedSection[],
+  ): Promise<Map<number, ImageGenerationResult>> {
+    const imageMap = new Map<number, ImageGenerationResult>();
+
+    // Generate images for sections that have suggestedImage
+    const imagePromises = sections
+      .map((section, index) => ({ section, index }))
+      .filter(({ section }) => section.suggestedImage)
+      .map(async ({ section, index }) => {
+        try {
+          // Extract keywords from the description to use for search
+          const keywords = await this.extractKeywords(section.suggestedImage!);
+          const imageUrl = `https://loremflickr.com/1024/768/${encodeURIComponent(keywords.replace(/\s+/g, ','))}`;
+          
+          imageMap.set(index, {
+            imageUrl,
+            revisedPrompt: section.suggestedImage!,
+          });
+        } catch (error) {
+          this.logger.warn(
+            `Failed to get stock image for section ${index}`,
+            error,
+          );
+        }
+      });
+
+    await Promise.allSettled(imagePromises);
+    return imageMap;
+  }
+
+  /**
+   * Extract keywords from image description for stock search
+   */
+  private async extractKeywords(description: string): Promise<string> {
+    try {
+      const response = await this.chatCompletion({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: 'Extract 1-2 main visual keywords from the image description. Return only keywords separated by comma, no extra text.',
+          },
+          {
+            role: 'user',
+            content: description,
+          },
+        ],
+        temperature: 0.3,
+        max_tokens: 20,
+      });
+
+      return response.choices[0]?.message?.content || 'business,technology';
+    } catch {
+      return 'business,technology';
+    }
+  }

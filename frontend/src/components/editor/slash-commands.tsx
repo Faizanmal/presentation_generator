@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import type {
+    LucideIcon} from "lucide-react";
 import {
     Type,
     Image,
@@ -17,8 +19,7 @@ import {
     FileText,
     Sparkles,
     ChevronRight,
-    Search,
-    LucideIcon,
+    Search
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -191,7 +192,7 @@ export function SlashCommandMenu({
     // Filter commands based on search
     const filteredCommands = useMemo(() => {
         const query = searchQuery.toLowerCase();
-        if (!query) return defaultCommands;
+        if (!query) {return defaultCommands;}
 
         return defaultCommands.filter(
             (cmd) =>
@@ -227,20 +228,27 @@ export function SlashCommandMenu({
         return groupedCommands.flatMap((g) => g.commands);
     }, [groupedCommands]);
 
-    // Focus input when opened
+    // Focus input when opened and reset state
+    const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+    if (isOpen !== prevIsOpen) {
+        setPrevIsOpen(isOpen);
+        if (isOpen) {
+            setSearchQuery("");
+            setSelectedIndex(0);
+        }
+    }
+
     useEffect(() => {
         if (isOpen) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            setSearchQuery("");
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            setSelectedIndex(0);
+
+
             inputRef.current?.focus();
         }
     }, [isOpen]);
 
     // Handle keyboard navigation
     useEffect(() => {
-        if (!isOpen) return;
+        if (!isOpen) {return;}
 
         const handleKeyDown = (e: KeyboardEvent) => {
             switch (e.key) {
@@ -275,7 +283,7 @@ export function SlashCommandMenu({
 
     // Click outside to close
     useEffect(() => {
-        if (!isOpen) return;
+        if (!isOpen) {return;}
 
         const handleClickOutside = (e: MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -287,7 +295,7 @@ export function SlashCommandMenu({
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [isOpen, onClose]);
 
-    if (!isOpen) return null;
+    if (!isOpen) {return null;}
 
     return (
         <div

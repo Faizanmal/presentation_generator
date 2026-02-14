@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Presentation Analytics Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#137fec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101922",
+                        "surface-dark": "#1a2632",
+                        "surface-light": "#ffffff",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        /* Custom scrollbar for better look in dark mode */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #111a22;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #233648;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #344a61;
+        }
+        .chart-gradient {
+            background: linear-gradient(180deg, rgba(19, 127, 236, 0.2) 0%, rgba(19, 127, 236, 0) 100%);
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white font-display antialiased overflow-x-hidden">
+<div class="flex flex-col min-h-screen">
+<!-- Top Navigation -->
+<header class="sticky top-0 z-50 flex items-center justify-between whitespace-nowrap border-b border-solid border-slate-200 dark:border-[#233648] bg-white dark:bg-[#111a22] px-6 py-3">
+<div class="flex items-center gap-8">
+<div class="flex items-center gap-3 text-slate-900 dark:text-white">
+<div class="size-8 rounded-lg bg-primary flex items-center justify-center text-white">
+<span class="material-symbols-outlined text-xl">analytics</span>
+</div>
+<h2 class="text-lg font-bold leading-tight tracking-tight">SlideAI Analytics</h2>
+</div>
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-slate-500 dark:text-slate-400 hover:text-primary dark:hover:text-white text-sm font-medium transition-colors" href="#">Dashboard</a>
+<a class="text-primary dark:text-white text-sm font-medium transition-colors border-b-2 border-primary py-4 -my-4" href="#">Presentations</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-primary dark:hover:text-white text-sm font-medium transition-colors" href="#">Team</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-primary dark:hover:text-white text-sm font-medium transition-colors" href="#">Settings</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative hidden sm:block">
+<span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+<span class="material-symbols-outlined text-[20px]">search</span>
+</span>
+<input class="h-9 w-64 rounded-lg bg-slate-100 dark:bg-[#233648] border-none pl-10 pr-4 text-sm text-slate-900 dark:text-white placeholder-slate-500 focus:ring-2 focus:ring-primary" placeholder="Search decks..." type="text"/>
+</div>
+<div class="h-8 w-8 rounded-full bg-slate-200 dark:bg-slate-700 bg-center bg-cover border border-slate-300 dark:border-slate-600" data-alt="User profile picture" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDGBq_uJqR8998gzZ0GtskcOVMHPRenN7eNPYm729Wjvac0hpCwF02u-BvysJ1d7ZyVmmYHcy8jNJe_5whFz0AKhrmDkQV97MWIw7bgxkD7BMwe3evxhkBhyBJiXZSr-ynA2xUB86JHbp6YZ8VWuhwptcVF9tevS98exibIZdzhS-bR-TKQUa8pUSESMcSSd6mZx0-Sg7t5MysGrnwaFKjhpPkSazjz-_yX510J6HxPhXKajiBiVuH02O03j1BJjS5h-NRo9MBraTV0');"></div>
+</div>
+</header>
+<!-- Main Content Layout -->
+<main class="flex-1 w-full max-w-[1600px] mx-auto p-6 lg:p-8 flex flex-col lg:flex-row gap-8">
+<!-- Left Column: Analytics & Charts (2/3) -->
+<div class="flex-1 flex flex-col gap-8 min-w-0">
+<!-- Breadcrumb & Header -->
+<div class="flex flex-col gap-4">
+<div class="flex items-center gap-2 text-sm text-slate-500 dark:text-[#92adc9]">
+<a class="hover:text-primary transition-colors" href="#">Home</a>
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+<a class="hover:text-primary transition-colors" href="#">Presentations</a>
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+<span class="text-slate-900 dark:text-white font-medium">Q3 Marketing Strategy</span>
+</div>
+<div class="flex flex-wrap items-center justify-between gap-4">
+<div>
+<h1 class="text-3xl font-black tracking-tight text-slate-900 dark:text-white">Q3 Marketing Strategy Deck</h1>
+<p class="mt-1 text-sm text-slate-500 dark:text-[#92adc9]">Last updated 2 hours ago • Created by Sarah J.</p>
+</div>
+<div class="flex items-center gap-3">
+<button class="h-10 px-4 rounded-lg border border-slate-200 dark:border-[#344a61] bg-white dark:bg-[#233648] text-slate-700 dark:text-white text-sm font-medium hover:bg-slate-50 dark:hover:bg-[#2d465e] transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-[20px]">calendar_today</span>
+                                Last 30 Days
+                            </button>
+<button class="h-10 px-4 rounded-lg bg-primary hover:bg-blue-600 text-white text-sm font-bold shadow-sm hover:shadow transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-[20px]">download</span>
+                                Export Report
+                            </button>
+</div>
+</div>
+</div>
+<!-- KPI Cards -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<!-- Total Views -->
+<div class="bg-white dark:bg-[#1a2632] rounded-xl p-6 border border-slate-200 dark:border-[#233648] shadow-sm">
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center gap-2 text-slate-500 dark:text-[#92adc9]">
+<span class="material-symbols-outlined text-[20px]">visibility</span>
+<span class="text-sm font-medium">Total Views</span>
+</div>
+<span class="bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">trending_up</span>
+                                12%
+                            </span>
+</div>
+<div class="text-3xl font-bold text-slate-900 dark:text-white">1,245</div>
+<div class="mt-2 h-1 w-full bg-slate-100 dark:bg-[#233648] rounded-full overflow-hidden">
+<div class="h-full bg-emerald-500 w-[75%] rounded-full"></div>
+</div>
+</div>
+<!-- Avg Completion Rate -->
+<div class="bg-white dark:bg-[#1a2632] rounded-xl p-6 border border-slate-200 dark:border-[#233648] shadow-sm">
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center gap-2 text-slate-500 dark:text-[#92adc9]">
+<span class="material-symbols-outlined text-[20px]">pie_chart</span>
+<span class="text-sm font-medium">Avg. Completion Rate</span>
+</div>
+<span class="bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">trending_up</span>
+                                5%
+                            </span>
+</div>
+<div class="flex items-end gap-3">
+<div class="text-3xl font-bold text-slate-900 dark:text-white">68%</div>
+<span class="text-sm text-slate-400 dark:text-slate-500 mb-1">of slides viewed</span>
+</div>
+<div class="mt-2 h-1 w-full bg-slate-100 dark:bg-[#233648] rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[68%] rounded-full"></div>
+</div>
+</div>
+<!-- Total Time Spent -->
+<div class="bg-white dark:bg-[#1a2632] rounded-xl p-6 border border-slate-200 dark:border-[#233648] shadow-sm">
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center gap-2 text-slate-500 dark:text-[#92adc9]">
+<span class="material-symbols-outlined text-[20px]">schedule</span>
+<span class="text-sm font-medium">Avg. Time Spent</span>
+</div>
+<span class="bg-rose-100 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">trending_down</span>
+                                2%
+                            </span>
+</div>
+<div class="flex items-end gap-3">
+<div class="text-3xl font-bold text-slate-900 dark:text-white">4m 12s</div>
+<span class="text-sm text-slate-400 dark:text-slate-500 mb-1">per session</span>
+</div>
+<div class="mt-2 h-1 w-full bg-slate-100 dark:bg-[#233648] rounded-full overflow-hidden">
+<div class="h-full bg-rose-500 w-[42%] rounded-full"></div>
+</div>
+</div>
+</div>
+<!-- Main Chart Area -->
+<div class="bg-white dark:bg-[#1a2632] rounded-xl p-6 border border-slate-200 dark:border-[#233648] shadow-sm">
+<div class="flex items-center justify-between mb-6">
+<h3 class="text-lg font-bold text-slate-900 dark:text-white">Engagement Over Time</h3>
+<div class="flex gap-2">
+<span class="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+<span class="block size-2 rounded-full bg-primary"></span> Views
+                            </span>
+<span class="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+<span class="block size-2 rounded-full bg-slate-300 dark:bg-slate-600"></span> Unique
+                            </span>
+</div>
+</div>
+<!-- Simulated Chart Area -->
+<div class="relative h-64 w-full flex items-end justify-between gap-1 pt-8">
+<!-- Y-Axis Grid Lines -->
+<div class="absolute inset-0 flex flex-col justify-between pointer-events-none">
+<div class="w-full border-t border-slate-100 dark:border-[#233648]/50"></div>
+<div class="w-full border-t border-slate-100 dark:border-[#233648]/50"></div>
+<div class="w-full border-t border-slate-100 dark:border-[#233648]/50"></div>
+<div class="w-full border-t border-slate-100 dark:border-[#233648]/50"></div>
+<div class="w-full border-t border-slate-100 dark:border-[#233648]/50"></div>
+</div>
+<!-- Simulated Data Points (SVG for smooth line) -->
+<svg class="absolute inset-0 w-full h-full" preserveaspectratio="none">
+<defs>
+<lineargradient id="gradientPrimary" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#137fec" stop-opacity="0.2"></stop>
+<stop offset="100%" stop-color="#137fec" stop-opacity="0"></stop>
+</lineargradient>
+</defs>
+<!-- Line Path -->
+<path class="fill-current text-primary opacity-20" d="M0,200 C50,200 80,150 120,140 C160,130 200,180 240,160 C280,140 320,80 360,90 C400,100 440,120 480,100 C520,80 560,40 600,50 C640,60 680,80 720,70 C760,60 800,20 840,30 C880,40 920,80 960,60 L960,256 L0,256 Z" fill="url(#gradientPrimary)"></path>
+<path d="M0,200 C50,200 80,150 120,140 C160,130 200,180 240,160 C280,140 320,80 360,90 C400,100 440,120 480,100 C520,80 560,40 600,50 C640,60 680,80 720,70 C760,60 800,20 840,30 C880,40 920,80 960,60" fill="none" stroke="#137fec" stroke-width="3"></path>
+</svg>
+<!-- X-Axis Labels -->
+<div class="absolute -bottom-6 w-full flex justify-between text-xs text-slate-400 px-2">
+<span>Sep 1</span>
+<span>Sep 5</span>
+<span>Sep 10</span>
+<span>Sep 15</span>
+<span>Sep 20</span>
+<span>Sep 25</span>
+<span>Sep 30</span>
+</div>
+</div>
+</div>
+<!-- Slide Engagement -->
+<div class="flex flex-col gap-4 mt-4">
+<h3 class="text-xl font-bold text-slate-900 dark:text-white">Slide-by-Slide Engagement</h3>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-4">
+<!-- Slide 1 -->
+<div class="group bg-white dark:bg-[#1a2632] rounded-xl overflow-hidden border border-slate-200 dark:border-[#233648] hover:border-primary/50 transition-all cursor-pointer">
+<div class="flex flex-row h-full">
+<div class="w-1/3 min-w-[120px] bg-slate-100 dark:bg-slate-800 relative">
+<div class="absolute inset-0 bg-cover bg-center" data-alt="Cover slide showing title and logo" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBKkjwBUQq3VM_ArvZZlJD_YperOBRFZiRMs2_LjaYJn5F-XRLSFbQBLMWsJlYDXfMU8H_yTp1p6VtdR6zKm_pLLa9W1xA_x_XVPckrrefAU4y-ZKSCR27LWlWzchH2xujxBNOvDe5g0J77P6q4o7h4nBl1FV3kZfnZWaHzbE4AWzIsHSqzUkt-c9ONCBzt6KVzuzBXp_5DSozP4Bn9rXUjPDR7AEBS0ovKFKZvXTWl_g4bhTs6aI187iUq7A57UtkQKVEbVo4YjA-T');"></div>
+<div class="absolute top-2 left-2 bg-black/60 text-white text-xs font-bold px-2 py-1 rounded backdrop-blur-sm">Slide 1</div>
+</div>
+<div class="flex-1 p-4 flex flex-col justify-between">
+<div class="flex justify-between items-start">
+<div>
+<h4 class="text-sm font-semibold text-slate-900 dark:text-white">Introduction</h4>
+<p class="text-xs text-slate-500 dark:text-slate-400">Avg. 15s</p>
+</div>
+<span class="text-xs font-bold text-emerald-500">0% Drop-off</span>
+</div>
+<div class="mt-4">
+<div class="flex justify-between text-xs mb-1 text-slate-400">
+<span>Engagement</span>
+<span>98%</span>
+</div>
+<div class="h-2 w-full bg-slate-100 dark:bg-[#233648] rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[98%] rounded-full"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Slide 2 -->
+<div class="group bg-white dark:bg-[#1a2632] rounded-xl overflow-hidden border border-slate-200 dark:border-[#233648] hover:border-primary/50 transition-all cursor-pointer">
+<div class="flex flex-row h-full">
+<div class="w-1/3 min-w-[120px] bg-slate-100 dark:bg-slate-800 relative">
+<div class="absolute inset-0 bg-cover bg-center" data-alt="Data chart slide" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBTbHe_OXHTR6PB_Oor_cUsICB5mfB9ZLQuUjHGYhbOKor-wCKLfQPZ8TGhBjiAc5L0CrZc1CFWv1jISm_W5eVsb9XBithPjE92LM1gb6qFb-mGHzUv8NFzrDx98IgNPko9Uar57zbKR_SRd-826eYrHLEbhnxqoDBnIY8M6DB_9bp_tPPrgTuxMzE_xn8crADc77YYks3GsFh4hO-VtIY4Q0Y2r4GDC4L2AOpCKG8viLBkNoKpmEAj37CEmrGljxcKkuYTodxo8LAc');"></div>
+<div class="absolute top-2 left-2 bg-black/60 text-white text-xs font-bold px-2 py-1 rounded backdrop-blur-sm">Slide 2</div>
+</div>
+<div class="flex-1 p-4 flex flex-col justify-between">
+<div class="flex justify-between items-start">
+<div>
+<h4 class="text-sm font-semibold text-slate-900 dark:text-white">Market Analysis</h4>
+<p class="text-xs text-slate-500 dark:text-slate-400">Avg. 45s</p>
+</div>
+<span class="text-xs font-bold text-emerald-500">2% Drop-off</span>
+</div>
+<div class="mt-4">
+<div class="flex justify-between text-xs mb-1 text-slate-400">
+<span>Engagement</span>
+<span>92%</span>
+</div>
+<div class="h-2 w-full bg-slate-100 dark:bg-[#233648] rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[92%] rounded-full"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Slide 3 -->
+<div class="group bg-white dark:bg-[#1a2632] rounded-xl overflow-hidden border border-slate-200 dark:border-[#233648] hover:border-primary/50 transition-all cursor-pointer">
+<div class="flex flex-row h-full">
+<div class="w-1/3 min-w-[120px] bg-slate-100 dark:bg-slate-800 relative">
+<div class="absolute inset-0 bg-cover bg-center" data-alt="Meeting room presentation slide" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCxytIaR-xnMWvtNBqqm8hmpA8At89AB8ld7NFL329YmfMGjlSdjVnyCmJ1bG4OT2anpi8vY1ll8HhzSUF4Ab76Ce46_IDOnw8zZy5zyYvllZ0KhKEKKCL030r_GlG7tIl9R2alod8dK9pDmiWMq7lT3875r31nmKRfDaHB_8Pve8vFV1nMdLFKry7HUCb62uXNgATrrB1nz5EZtcwSVfi7blZiifWja7oPks0ZVuh7z8wqC6mjHQZCOd2oxMF_6AzLXqYtrUBGKijt');"></div>
+<div class="absolute top-2 left-2 bg-black/60 text-white text-xs font-bold px-2 py-1 rounded backdrop-blur-sm">Slide 3</div>
+</div>
+<div class="flex-1 p-4 flex flex-col justify-between">
+<div class="flex justify-between items-start">
+<div>
+<h4 class="text-sm font-semibold text-slate-900 dark:text-white">Our Solution</h4>
+<p class="text-xs text-slate-500 dark:text-slate-400">Avg. 1m 12s</p>
+</div>
+<span class="text-xs font-bold text-yellow-500">5% Drop-off</span>
+</div>
+<div class="mt-4">
+<div class="flex justify-between text-xs mb-1 text-slate-400">
+<span>Engagement</span>
+<span>85%</span>
+</div>
+<div class="h-2 w-full bg-slate-100 dark:bg-[#233648] rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[85%] rounded-full"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Slide 4 - Problematic -->
+<div class="group bg-white dark:bg-[#1a2632] rounded-xl overflow-hidden border border-rose-200 dark:border-rose-900/50 hover:border-rose-500 transition-all cursor-pointer relative">
+<div class="absolute top-0 right-0 p-2 z-10">
+<span class="material-symbols-outlined text-rose-500 text-lg bg-white dark:bg-[#1a2632] rounded-full p-0.5" title="High drop-off detected">warning</span>
+</div>
+<div class="flex flex-row h-full">
+<div class="w-1/3 min-w-[120px] bg-slate-100 dark:bg-slate-800 relative">
+<div class="absolute inset-0 bg-cover bg-center" data-alt="Complex text heavy slide" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCgmKVk6s2TzxH1S5gKdB6IDqmXB6Er3DAWwMU_H4r_ZrQsNWxSCRij_QRbj2UGI6hmiVlEV9pgaN1TufL3LI3xgLB7jquMf8JR7vBGbLA6MUfREaZdyD705aS4Xpcbv0nQkajJ26RXtuHTMIIMjS-w-vsUeLCEb-cTtVF_rPrXFIJPbyg6ospHIyRBQSVIsQx5xzSkBBrBZmWQz9MG5wbxImUtw13n82aPYJAPLXjLqRc1Bic2Il4CoJtHg1TnbAJF_vwu73T9NYgk');"></div>
+<div class="absolute top-2 left-2 bg-black/60 text-white text-xs font-bold px-2 py-1 rounded backdrop-blur-sm">Slide 4</div>
+</div>
+<div class="flex-1 p-4 flex flex-col justify-between">
+<div class="flex justify-between items-start">
+<div>
+<h4 class="text-sm font-semibold text-slate-900 dark:text-white">Problem Statement</h4>
+<p class="text-xs text-slate-500 dark:text-slate-400">Avg. 18s</p>
+</div>
+<span class="text-xs font-bold text-rose-500">15% Drop-off</span>
+</div>
+<div class="mt-4">
+<div class="flex justify-between text-xs mb-1 text-slate-400">
+<span>Engagement</span>
+<span>45%</span>
+</div>
+<div class="h-2 w-full bg-slate-100 dark:bg-[#233648] rounded-full overflow-hidden">
+<div class="h-full bg-rose-500 w-[45%] rounded-full"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: AI Insights Panel (1/3) -->
+<aside class="w-full lg:w-[360px] flex flex-col gap-6 flex-shrink-0">
+<!-- AI Header -->
+<div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl p-6 text-white shadow-lg relative overflow-hidden">
+<div class="absolute -right-4 -top-4 opacity-20">
+<span class="material-symbols-outlined text-[120px]">auto_awesome</span>
+</div>
+<div class="relative z-10">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-yellow-300">auto_awesome</span>
+<h3 class="font-bold text-lg">AI Insights</h3>
+</div>
+<p class="text-sm text-white/90 leading-relaxed">
+                            I've analyzed your deck performance. Here are 3 actionable tips to improve engagement.
+                        </p>
+</div>
+</div>
+<!-- Insight Cards -->
+<div class="flex flex-col gap-4">
+<!-- Insight 1: Critical -->
+<div class="bg-white dark:bg-[#1a2632] rounded-xl p-5 border border-l-4 border-l-rose-500 border-y-slate-200 border-r-slate-200 dark:border-y-[#233648] dark:border-r-[#233648] shadow-sm">
+<div class="flex gap-3 mb-2">
+<div class="mt-0.5 min-w-[20px]">
+<span class="material-symbols-outlined text-rose-500 text-[20px]">warning</span>
+</div>
+<div>
+<h4 class="text-sm font-bold text-slate-900 dark:text-white">Engagement Bottleneck</h4>
+<p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Slide 4 has a 15% drop-off rate, significantly higher than the average.</p>
+</div>
+</div>
+<div class="pl-8 mt-3">
+<button class="text-xs font-semibold text-primary hover:text-blue-400 flex items-center gap-1 transition-colors">
+                                View Slide 4 Analysis
+                                <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Insight 2: Suggestion -->
+<div class="bg-white dark:bg-[#1a2632] rounded-xl p-5 border border-l-4 border-l-amber-400 border-y-slate-200 border-r-slate-200 dark:border-y-[#233648] dark:border-r-[#233648] shadow-sm">
+<div class="flex gap-3 mb-2">
+<div class="mt-0.5 min-w-[20px]">
+<span class="material-symbols-outlined text-amber-400 text-[20px]">lightbulb</span>
+</div>
+<div>
+<h4 class="text-sm font-bold text-slate-900 dark:text-white">Content Density Warning</h4>
+<p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Slide 7 has high dwell time but low completion. Consider splitting into two slides.</p>
+</div>
+</div>
+<div class="pl-8 mt-3 flex gap-2">
+<button class="px-3 py-1.5 rounded bg-slate-100 dark:bg-[#233648] text-xs font-medium text-slate-700 dark:text-white hover:bg-slate-200 dark:hover:bg-[#344a61] transition-colors">
+                                Auto-Split Slide
+                            </button>
+</div>
+</div>
+<!-- Insight 3: Success -->
+<div class="bg-white dark:bg-[#1a2632] rounded-xl p-5 border border-l-4 border-l-emerald-500 border-y-slate-200 border-r-slate-200 dark:border-y-[#233648] dark:border-r-[#233648] shadow-sm">
+<div class="flex gap-3 mb-2">
+<div class="mt-0.5 min-w-[20px]">
+<span class="material-symbols-outlined text-emerald-500 text-[20px]">check_circle</span>
+</div>
+<div>
+<h4 class="text-sm font-bold text-slate-900 dark:text-white">High Performing Asset</h4>
+<p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Slide 2 is retaining 92% of viewers. The chart visualization is very effective.</p>
+</div>
+</div>
+<div class="pl-8 mt-3">
+<button class="text-xs font-semibold text-primary hover:text-blue-400 flex items-center gap-1 transition-colors">
+                                Save as Template
+                                <span class="material-symbols-outlined text-[14px]">save</span>
+</button>
+</div>
+</div>
+<!-- Upgrade / Contextual Promo -->
+<div class="mt-auto bg-[#1a2632] border border-[#233648] rounded-xl p-4 flex flex-col items-center text-center gap-3">
+<div class="size-10 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-white">
+<span class="material-symbols-outlined">psychology</span>
+</div>
+<div>
+<h4 class="text-sm font-bold text-white">Want deeper insights?</h4>
+<p class="text-xs text-slate-400 mt-1">Upgrade to Pro to see individual viewer journeys.</p>
+</div>
+<button class="w-full py-2 rounded-lg border border-[#344a61] text-xs font-bold text-white hover:bg-[#233648] transition-colors">
+                            Upgrade Plan
+                        </button>
+</div>
+</div>
+</aside>
+</main>
+</div>
+</body></html>

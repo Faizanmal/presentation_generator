@@ -40,7 +40,7 @@ export class SlidesController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async create(
-    @CurrentUser() user: any,
+    @CurrentUser() user: { id: string },
     @Body() createSlideDto: CreateSlideDto,
   ) {
     return this.slidesService.create(user.id, createSlideDto);
@@ -67,7 +67,7 @@ export class SlidesController {
    */
   @Patch(':id')
   async update(
-    @CurrentUser() user: any,
+    @CurrentUser() user: { id: string },
     @Param('id') id: string,
     @Body() updateSlideDto: UpdateSlideDto,
   ) {
@@ -79,7 +79,7 @@ export class SlidesController {
    */
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
-  async remove(@CurrentUser() user: any, @Param('id') id: string) {
+  async remove(@CurrentUser() user: { id: string }, @Param('id') id: string) {
     return this.slidesService.remove(user.id, id);
   }
 
@@ -89,7 +89,7 @@ export class SlidesController {
   @Post('reorder/:projectId')
   @HttpCode(HttpStatus.OK)
   async reorder(
-    @CurrentUser() user: any,
+    @CurrentUser() user: { id: string },
     @Param('projectId') projectId: string,
     @Body() reorderDto: ReorderSlidesDto,
   ) {
@@ -101,7 +101,10 @@ export class SlidesController {
    */
   @Post(':id/duplicate')
   @HttpCode(HttpStatus.CREATED)
-  async duplicate(@CurrentUser() user: any, @Param('id') id: string) {
+  async duplicate(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+  ) {
     return this.slidesService.duplicate(user.id, id);
   }
 }

@@ -1,7 +1,6 @@
-import { Controller, Post, Get, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PresentationCoachService } from './presentation-coach.service';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @Controller('ai/coach')
 @UseGuards(JwtAuthGuard)

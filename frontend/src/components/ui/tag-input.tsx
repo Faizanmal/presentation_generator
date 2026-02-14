@@ -55,7 +55,7 @@ export function TagInput({ selectedTags, onChange, className }: TagInputProps) {
   });
 
   const handleCreateTag = async () => {
-    if (!newTagName.trim()) return;
+    if (!newTagName.trim()) {return;}
     
     try {
       const color = TAG_COLORS[Math.floor(Math.random() * TAG_COLORS.length)];

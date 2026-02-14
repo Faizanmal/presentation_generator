@@ -9,7 +9,11 @@ import {
   Patch,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { NarrationExportService, VoiceId, ExportFormat } from './narration-export.service';
+import {
+  NarrationExportService,
+  VoiceId,
+  ExportFormat,
+} from './narration-export.service';
 
 // DTOs
 class GenerateSpeakerNotesDto {
@@ -50,7 +54,7 @@ export class NarrationExportController {
   async generateSpeakerNotes(
     @Param('projectId') projectId: string,
     @Body() dto: GenerateSpeakerNotesDto,
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
   ) {
     return this.narrationService.generateSpeakerNotes(
       projectId,
@@ -63,7 +67,7 @@ export class NarrationExportController {
   async updateSpeakerNotes(
     @Param('slideId') slideId: string,
     @Body() dto: UpdateSpeakerNotesDto,
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
   ) {
     return this.narrationService.updateSpeakerNotes(
       slideId,
@@ -76,7 +80,7 @@ export class NarrationExportController {
   async generateNarration(
     @Param('projectId') projectId: string,
     @Body() dto: GenerateNarrationDto,
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
   ) {
     return this.narrationService.generateNarration(projectId, req.user.id, dto);
   }
@@ -92,7 +96,7 @@ export class NarrationExportController {
   async exportVideo(
     @Param('projectId') projectId: string,
     @Body() dto: ExportVideoDto,
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
   ) {
     return this.narrationService.exportVideo(projectId, req.user.id, dto);
   }

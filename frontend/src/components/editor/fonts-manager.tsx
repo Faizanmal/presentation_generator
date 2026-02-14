@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -30,15 +30,11 @@ import {
   Star,
   StarOff,
   Trash2,
-  Check,
   Plus,
   Globe,
-  Download,
-  Eye,
   Filter,
   Grid,
   List,
-  ArrowUpDown,
 } from 'lucide-react';
 
 interface CustomFont {
@@ -107,16 +103,16 @@ export function FontsManager({ onFontSelect, selectedFontFamily }: FontsManagerP
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
-  const [sortBy, setSortBy] = useState<SortBy>('popularity');
+  const [sortBy, ] = useState<SortBy>('popularity');
   const [installedFonts, setInstalledFonts] = useState<CustomFont[]>([...SYSTEM_FONTS]);
-  const [favoriteFonts, setFavoriteFonts] = useState<Set<string>>(new Set());
+  const [] = useState<Set<string>>(new Set());
   const [loadedGoogleFonts, setLoadedGoogleFonts] = useState<Set<string>>(new Set());
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [] = useState<File[]>([]);
   const [previewText, setPreviewText] = useState('The quick brown fox jumps over the lazy dog');
 
   // Load Google Font dynamically
   const loadGoogleFont = useCallback((fontFamily: string) => {
-    if (loadedGoogleFonts.has(fontFamily)) return;
+    if (loadedGoogleFonts.has(fontFamily)) {return;}
 
     const link = document.createElement('link');
     link.href = `https://fonts.googleapis.com/css2?family=${fontFamily.replace(/ /g, '+')}:wght@100;200;300;400;500;600;700;800;900&display=swap`;
@@ -141,7 +137,7 @@ export function FontsManager({ onFontSelect, selectedFontFamily }: FontsManagerP
     };
 
     setInstalledFonts((prev) => {
-      if (prev.some((f) => f.id === newFont.id)) return prev;
+      if (prev.some((f) => f.id === newFont.id)) {return prev;}
       return [...prev, newFont];
     });
   }, [loadGoogleFont]);
@@ -234,7 +230,7 @@ export function FontsManager({ onFontSelect, selectedFontFamily }: FontsManagerP
     const isInstalled = installedFonts.some(
       (f) => f.name.toLowerCase() === font.family.toLowerCase()
     );
-    if (isInstalled) return false;
+    if (isInstalled) {return false;}
 
     if (searchQuery && !font.family.toLowerCase().includes(searchQuery.toLowerCase())) {
       return false;

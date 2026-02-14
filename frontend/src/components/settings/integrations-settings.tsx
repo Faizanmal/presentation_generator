@@ -16,7 +16,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
+// import { Switch } from '@/components/ui/switch';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,7 +41,7 @@ interface IntegrationConfig {
 
 const integrations: IntegrationConfig[] = [
   {
-    provider: 'zoom',
+    provider: 'ZOOM',
     name: 'Zoom',
     description: 'Present directly in Zoom meetings',
     icon: Video,
@@ -49,7 +49,7 @@ const integrations: IntegrationConfig[] = [
     features: ['Create meetings', 'Share presentations', 'Live presenting'],
   },
   {
-    provider: 'slack',
+    provider: 'SLACK',
     name: 'Slack',
     description: 'Share presentations in Slack channels',
     icon: MessageSquare,
@@ -57,7 +57,7 @@ const integrations: IntegrationConfig[] = [
     features: ['Share to channels', 'Notifications', 'Quick preview'],
   },
   {
-    provider: 'teams',
+    provider: 'TEAMS',
     name: 'Microsoft Teams',
     description: 'Integrate with Microsoft Teams',
     icon: Users,
@@ -65,7 +65,7 @@ const integrations: IntegrationConfig[] = [
     features: ['Create meetings', 'Share in channels', 'Co-authoring'],
   },
   {
-    provider: 'google_drive',
+    provider: 'GOOGLE_DRIVE',
     name: 'Google Drive',
     description: 'Sync with Google Drive',
     icon: Cloud,
@@ -73,7 +73,7 @@ const integrations: IntegrationConfig[] = [
     features: ['Export to Slides', 'Import files', 'Auto backup'],
   },
   {
-    provider: 'figma',
+    provider: 'FIGMA',
     name: 'Figma',
     description: 'Import designs from Figma',
     icon: Palette,
@@ -81,7 +81,7 @@ const integrations: IntegrationConfig[] = [
     features: ['Import frames', 'Sync designs', 'Live updates'],
   },
   {
-    provider: 'notion',
+    provider: 'NOTION',
     name: 'Notion',
     description: 'Connect with Notion pages',
     icon: FileText,
@@ -107,9 +107,9 @@ export function IntegrationsSettings() {
   }>({ open: false, provider: null, name: '' });
 
   const handleDisconnect = () => {
-    if (!disconnectDialog.provider) return;
+    if (!disconnectDialog.provider) {return;}
     const integration = connectedIntegrations?.find(
-      (i) => i.provider === disconnectDialog.provider
+      (i) => disconnectDialog.provider && i.provider === disconnectDialog.provider
     );
     if (integration) {
       disconnectIntegration(integration.id);

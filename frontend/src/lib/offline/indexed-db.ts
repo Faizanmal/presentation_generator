@@ -33,8 +33,8 @@ class OfflineDB {
   private initPromise: Promise<IDBDatabase> | null = null;
 
   async init(): Promise<IDBDatabase> {
-    if (this.db) return this.db;
-    if (this.initPromise) return this.initPromise;
+    if (this.db) {return this.db;}
+    if (this.initPromise) {return this.initPromise;}
 
     this.initPromise = new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);

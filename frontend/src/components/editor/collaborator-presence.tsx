@@ -1,10 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect } from "react";
 import {
     Users,
-    Circle,
-    MousePointer2,
     Eye,
     Edit3,
     MessageSquare,
@@ -239,7 +237,6 @@ function ActivityBadge({ activity }: { activity: Collaborator["activity"] }) {
 export function CollaboratorCursors({
     collaborators,
     currentUserId,
-    containerRef,
 }: {
     collaborators: Collaborator[];
     currentUserId: string;
@@ -267,7 +264,7 @@ function CollaboratorCursor({
 }: {
     collaborator: Collaborator;
 }) {
-    if (!collaborator.cursor) return null;
+    if (!collaborator.cursor) {return null;}
 
     return (
         <div
@@ -307,7 +304,6 @@ function CollaboratorCursor({
 // Selection highlight for collaborative editing
 export function CollaboratorSelection({
     collaborator,
-    selection,
 }: {
     collaborator: Collaborator;
     selection: { start: number; end: number; blockId: string };
@@ -341,11 +337,11 @@ export function useCollaboratorCursor(
 
     useEffect(() => {
         const container = containerRef.current;
-        if (!container) return;
+        if (!container) {return;}
 
         const handleMouseMove = (e: MouseEvent) => {
             const now = Date.now();
-            if (now - lastBroadcast < throttleMs) return;
+            if (now - lastBroadcast < throttleMs) {return;}
 
             const rect = container.getBoundingClientRect();
             const x = e.clientX - rect.left;
@@ -366,7 +362,7 @@ export function TypingIndicator({
 }: {
     users: { id: string; name: string; color: string }[];
 }) {
-    if (users.length === 0) return null;
+    if (users.length === 0) {return null;}
 
     const names =
         users.length === 1

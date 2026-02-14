@@ -8,7 +8,6 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { UploadService } from '../upload/upload.service';
 import { AIService } from '../ai/ai.service';
-import OpenAI from 'openai';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -27,24 +26,19 @@ export interface TranscriptionResult {
 export interface VoiceGenerationResult {
   recordingId: string;
   transcription: string;
-  presentation: any;
+  presentation: unknown;
 }
 
 @Injectable()
 export class VoiceService {
   private readonly logger = new Logger(VoiceService.name);
-  private openai: OpenAI;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly uploadService: UploadService,
     private readonly aiService: AIService,
-  ) {
-    this.openai = new OpenAI({
-      apiKey: this.configService.get<string>('OPENAI_API_KEY'),
-    });
-  }
+  ) {}
 
   /**
    * Upload and start processing a voice recording
@@ -86,9 +80,9 @@ export class VoiceService {
     });
 
     // Start async processing
-    this.processRecording(recording.id, file).catch((error) => {
+    void this.processRecording(recording.id, file).catch((error) => {
       this.logger.error(`Failed to process recording ${recording.id}`, error);
-      this.updateRecordingStatus(recording.id, 'FAILED');
+      void this.updateRecordingStatus(recording.id, 'FAILED');
     });
 
     return recording;
@@ -141,21 +135,26 @@ export class VoiceService {
       );
       fs.writeFileSync(tempPath, file.buffer);
 
-      const transcription = await this.openai.audio.transcriptions.create({
-        file: fs.createReadStream(tempPath),
-        model: 'whisper-1',
-        response_format: 'verbose_json',
-        language: 'en', // Auto-detect if not specified
-      });
+      const transcription = await this.aiService.transcribeAudio(
+        fs.createReadStream(tempPath),
+        'en', // Auto-detect if not specified
+      );
 
       // Clean up temp file
       fs.unlinkSync(tempPath);
 
+      const transcriptionResult = transcription as {
+        text: string;
+        duration?: number;
+        language?: string;
+        segments?: Array<{ start: number; end: number; text: string }>;
+      };
+
       return {
-        text: transcription.text,
-        duration: transcription.duration || 0,
-        language: transcription.language || 'en',
-        segments: transcription.segments?.map((seg: any) => ({
+        text: transcriptionResult.text,
+        duration: transcriptionResult.duration || 0,
+        language: transcriptionResult.language || 'en',
+        segments: transcriptionResult.segments?.map((seg) => ({
           start: seg.start,
           end: seg.end,
           text: seg.text,
@@ -264,13 +263,7 @@ export class VoiceService {
     });
   }
 
-  /**
-   * Real-time streaming transcription (for live recording)
-   */
-  async startLiveTranscription(
-    userId: string,
-    onTranscript: (text: string, isFinal: boolean) => void,
-  ) {
+  async startLiveTranscription(userId: string) {
     // This would integrate with a streaming ASR service
     // For now, we'll use batch processing with Whisper
     // In production, consider using:
@@ -279,6 +272,7 @@ export class VoiceService {
     // - Deepgram real-time API
 
     this.logger.log(`Starting live transcription for user ${userId}`);
+    await Promise.resolve(); // Simulate async work
 
     return {
       stop: () => {

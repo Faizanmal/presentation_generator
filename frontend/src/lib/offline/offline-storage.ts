@@ -1,19 +1,8 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
-import { offlineDB, PresentationCache } from './indexed-db';
+import type { Presentation, Slide } from '@/types';
+import type { PresentationCache } from './indexed-db';
+import { offlineDB } from './indexed-db';
 import { syncManager } from './sync-manager';
 import { cacheManager } from './cache-manager';
-
-interface Slide {
-  id: string;
-  [key: string]: unknown;
-}
-
-interface Presentation {
-  id: string;
-  slides?: Slide[];
-  [key: string]: unknown;
-}
 
 interface OfflinePresentation {
   id: string;
@@ -50,7 +39,7 @@ class OfflineStorage {
     }
 
     // Cache assets
-    await cacheManager.preloadPresentationAssets(data as any);
+    await cacheManager.preloadPresentationAssets(data);
 
     // Queue for sync
     await syncManager.queueChange('update', 'presentation', data.id, data);
@@ -59,7 +48,7 @@ class OfflineStorage {
   // Get offline presentation
   async getPresentation(id: string): Promise<Presentation | null> {
     const cached = await offlineDB.getPresentation(id);
-    if (!cached) return null;
+    if (!cached) {return null;}
 
     // Also load slides
     const slides = await offlineDB.getSlidesByPresentation(id);
@@ -79,8 +68,8 @@ class OfflineStorage {
       return {
         id: p.id,
         projectId: p.projectId,
-        name: (data.name as string) || 'Untitled',
-        thumbnailUrl: data.thumbnailUrl as string | undefined,
+        name: (data.title as string) || 'Untitled',
+        thumbnailUrl: (data as unknown as Record<string, unknown>).thumbnailUrl as string | undefined,
         lastModified: new Date(p.lastModified),
         synced: p.synced,
         slideCount: data.slides?.length || 0,
@@ -186,11 +175,11 @@ class OfflineStorage {
   }
 
   private formatBytes(bytes: number): string {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0) {return '0 Bytes';}
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))  } ${  sizes[i]}`;
   }
 
   // Clear all offline data

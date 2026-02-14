@@ -46,8 +46,8 @@ describe('SecurityService', () => {
     });
 
     it('should handle null/undefined input', () => {
-      expect(service.sanitizeInput(null as any)).toBeNull();
-      expect(service.sanitizeInput(undefined as any)).toBeUndefined();
+      expect(service.sanitizeInput(null)).toBeNull();
+      expect(service.sanitizeInput(undefined)).toBeUndefined();
     });
   });
 

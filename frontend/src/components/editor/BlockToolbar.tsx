@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
+import type { ComponentType } from "react";
 import {
   Plus,
   Type,
@@ -26,7 +27,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Slide, BlockType } from "@/types";
+import type { Slide, BlockType, BlockContent } from "@/types";
 import { api } from "@/lib/api";
 import { useEditorStore } from "@/stores/editor-store";
 
@@ -35,7 +36,7 @@ interface BlockToolbarProps {
   slide?: Slide;
 }
 
-const BLOCK_TYPES = [
+const BLOCK_TYPES: { type: BlockType; label: string; icon: ComponentType<{ className?: string }>; content: BlockContent }[] = [
   { type: "HEADING" as BlockType, label: "Heading", icon: Heading1, content: { text: "Heading" } },
   { type: "SUBHEADING" as BlockType, label: "Subheading", icon: Heading2, content: { text: "Subheading" } },
   { type: "PARAGRAPH" as BlockType, label: "Paragraph", icon: Type, content: { text: "Start typing..." } },
@@ -50,17 +51,19 @@ const BLOCK_TYPES = [
 ];
 
 export default function BlockToolbar({ projectId, slide }: BlockToolbarProps) {
-  const queryClient = useQueryClient();
+
   const { addBlock } = useEditorStore();
   const [isAdding, setIsAdding] = useState(false);
 
   // Add block mutation
   const addBlockMutation = useMutation({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    mutationFn: (data: { projectId: string; blockType: BlockType; content: any; order: number }) =>
-      api.blocks.create(projectId, slide!.id, data),
+
+    mutationFn: (data: { projectId: string; blockType: BlockType; content: BlockContent; order: number }) => {
+      if (!slide?.id) { throw new Error("Slide not found"); }
+      return api.blocks.create(projectId, slide.id, data);
+    },
     onSuccess: (newBlock) => {
-      addBlock(slide!.id, newBlock);
+      if (slide?.id) { addBlock(slide.id, newBlock); }
       toast.success("Block added");
     },
     onError: () => {
@@ -71,18 +74,18 @@ export default function BlockToolbar({ projectId, slide }: BlockToolbarProps) {
     },
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleAddBlock = (type: BlockType, content: any) => {
-    if (!slide) return;
+
+  const handleAddBlock = (type: BlockType, content: BlockContent) => {
+    if (!slide) { return; }
     setIsAdding(true);
     const order = slide.blocks?.length || 0;
     addBlockMutation.mutate({ projectId, blockType: type, content, order });
   };
 
-  if (!slide) return null;
+  if (!slide) { return null; }
 
   return (
-    <div className="h-12 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex items-center px-4 gap-2 flex-shrink-0">
+    <div className="h-12 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex items-center px-4 gap-2 shrink-0">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" disabled={isAdding}>

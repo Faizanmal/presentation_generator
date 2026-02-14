@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -36,18 +36,13 @@ import {
   Pause,
   Play,
   Download,
-  Settings,
-  Camera,
   Trash2,
   Share2,
   Clock,
-  CheckCircle,
-  AlertCircle,
   RotateCcw,
-  Maximize2,
-  PictureInPicture,
   Volume2,
 } from 'lucide-react';
+import Image from 'next/image';
 
 interface RecordingSettings {
   includeWebcam: boolean;
@@ -116,7 +111,7 @@ export function PresentationRecorder() {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     webcamStreamRef.current?.getTracks().forEach((track) => track.stop());
     audioContextRef.current?.close();
-    if (timerRef.current) clearInterval(timerRef.current);
+    if (timerRef.current) {clearInterval(timerRef.current);}
   }, []);
 
   const processRecording = useCallback(() => {
@@ -153,7 +148,7 @@ export function PresentationRecorder() {
     if (mediaRecorderRef.current) {
       mediaRecorderRef.current.stop();
       stopAllStreams();
-      if (timerRef.current) clearInterval(timerRef.current);
+      if (timerRef.current) {clearInterval(timerRef.current);}
       setRecordingState('processing');
     }
   }, [stopAllStreams]);
@@ -248,7 +243,7 @@ export function PresentationRecorder() {
     if (mediaRecorderRef.current?.state === 'recording') {
       mediaRecorderRef.current.pause();
       setRecordingState('paused');
-      if (timerRef.current) clearInterval(timerRef.current);
+      if (timerRef.current) {clearInterval(timerRef.current);}
     }
   }, []);
 
@@ -328,7 +323,7 @@ export function PresentationRecorder() {
 
   // Audio level monitoring
   useEffect(() => {
-    if (!settings.includeAudio || !selectedDevices.microphone) return;
+    if (!settings.includeAudio || !selectedDevices.microphone) {return;}
 
     let animationFrame: number;
 
@@ -643,7 +638,7 @@ export function PresentationRecorder() {
                       <CardContent className="p-4">
                         <div className="flex items-center gap-4">
                           {recording.thumbnailUrl ? (
-                            <img
+                            <Image
                               src={recording.thumbnailUrl}
                               alt=""
                               className="w-32 h-18 rounded object-cover"

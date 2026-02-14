@@ -9,9 +9,20 @@ import {
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger, UseGuards } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { Inject } from '@nestjs/common';
+import { Redis } from 'ioredis';
 import { CollaborationService } from './collaboration.service';
+
+interface AuthenticatedSocket extends Socket {
+  data: {
+    userId: string;
+    userName: string;
+    projectId?: string;
+    color: string;
+  };
+}
 
 interface CursorPosition {
   x: number;
@@ -66,17 +77,20 @@ export class CollaborationGateway
   constructor(
     private readonly collaborationService: CollaborationService,
     private readonly jwtService: JwtService,
+    @Inject('REDIS_CLIENT') private readonly redis: Redis,
   ) {}
 
-  afterInit(server: Server) {
+  afterInit() {
     this.logger.log('Collaboration WebSocket Gateway initialized');
   }
 
-  async handleConnection(client: Socket) {
+  handleConnection(client: Socket) {
+    const authClient = client as unknown as AuthenticatedSocket;
     try {
       const token =
-        client.handshake.auth.token ||
-        client.handshake.headers.authorization?.split(' ')[1];
+        (client.handshake.auth.token as string) ||
+        (client.handshake.headers.authorization &&
+          client.handshake.headers.authorization.split(' ')[1]);
 
       if (!token) {
         this.logger.warn(`Client ${client.id} connection rejected - no token`);
@@ -84,22 +98,34 @@ export class CollaborationGateway
         return;
       }
 
-      const payload = this.jwtService.verify(token);
-      client.data.userId = payload.sub;
-      client.data.userName = payload.name;
-      client.data.color =
+      interface JwtPayload {
+        sub: string;
+        name: string;
+      }
+      const payload = this.jwtService.verify(token) as unknown as JwtPayload;
+      authClient.data.userId = payload.sub;
+      authClient.data.userName = payload.name;
+      authClient.data.color =
         this.userColors[Math.floor(Math.random() * this.userColors.length)];
 
-      this.logger.log(`Client connected: ${client.id} (User: ${payload.sub})`);
-    } catch (error) {
-      this.logger.warn(
-        `Client ${client.id} connection rejected - invalid token`,
+      this.logger.log(
+        `Client connected: ${client.id} (User: ${authClient.data.userId})`,
       );
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.warn(
+          `Client ${client.id} connection rejected - invalid token: ${error.message}`,
+        );
+      } else {
+        this.logger.warn(
+          `Client ${client.id} connection rejected - invalid token`,
+        );
+      }
       client.disconnect();
     }
   }
 
-  async handleDisconnect(client: Socket) {
+  async handleDisconnect(client: AuthenticatedSocket) {
     const userId = client.data.userId;
     const projectId = client.data.projectId;
 
@@ -112,7 +138,7 @@ export class CollaborationGateway
 
       // Notify other users in the room
       client.to(projectId).emit('user:left', {
-        userId,
+        userId: userId,
         userName: client.data.userName,
         socketId: client.id,
       });
@@ -123,7 +149,7 @@ export class CollaborationGateway
 
   @SubscribeMessage('project:join')
   async handleJoinProject(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { projectId: string },
   ) {
     const { projectId } = data;
@@ -167,7 +193,7 @@ export class CollaborationGateway
 
   @SubscribeMessage('project:leave')
   async handleLeaveProject(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { projectId: string },
   ) {
     const { projectId } = data;
@@ -182,14 +208,14 @@ export class CollaborationGateway
       socketId: client.id,
     });
 
-    client.data.projectId = null;
+    client.data.projectId = undefined;
 
     return { success: true };
   }
 
   @SubscribeMessage('cursor:move')
   async handleCursorMove(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: CursorPosition,
   ) {
     const projectId = client.data.projectId;
@@ -213,8 +239,8 @@ export class CollaborationGateway
   }
 
   @SubscribeMessage('block:update')
-  async handleBlockUpdate(
-    @ConnectedSocket() client: Socket,
+  handleBlockUpdate(
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: BlockUpdate,
   ) {
     const projectId = client.data.projectId;
@@ -228,12 +254,12 @@ export class CollaborationGateway
     });
 
     // Optionally persist to database
-    await this.collaborationService.logBlockChange(data);
+    this.collaborationService.logBlockChange(data);
   }
 
   @SubscribeMessage('slide:update')
-  async handleSlideUpdate(
-    @ConnectedSocket() client: Socket,
+  handleSlideUpdate(
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: SlideUpdate,
   ) {
     const projectId = client.data.projectId;
@@ -248,23 +274,23 @@ export class CollaborationGateway
   }
 
   @SubscribeMessage('slide:add')
-  async handleSlideAdd(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: { projectId: string; slide: any },
+  handleSlideAdd(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { projectId: string; slide: unknown },
   ) {
     const projectId = client.data.projectId;
     if (!projectId || projectId !== data.projectId) return;
 
     client.to(projectId).emit('slide:added', {
-      slide: data.slide,
+      slide: data.slide as Record<string, unknown>,
       userId: client.data.userId,
       userName: client.data.userName,
     });
   }
 
   @SubscribeMessage('slide:delete')
-  async handleSlideDelete(
-    @ConnectedSocket() client: Socket,
+  handleSlideDelete(
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { projectId: string; slideId: string },
   ) {
     const projectId = client.data.projectId;
@@ -278,8 +304,8 @@ export class CollaborationGateway
   }
 
   @SubscribeMessage('slide:reorder')
-  async handleSlideReorder(
-    @ConnectedSocket() client: Socket,
+  handleSlideReorder(
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody()
     data: { projectId: string; fromIndex: number; toIndex: number },
   ) {
@@ -296,7 +322,7 @@ export class CollaborationGateway
 
   @SubscribeMessage('comment:add')
   async handleCommentAdd(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody()
     data: {
       projectId: string;
@@ -306,7 +332,8 @@ export class CollaborationGateway
     },
   ) {
     const projectId = client.data.projectId;
-    if (!projectId || projectId !== data.projectId) return;
+    if (!projectId || projectId !== data.projectId)
+      return { success: false, error: 'User not in project' };
 
     const comment = await this.collaborationService.createComment({
       projectId,
@@ -327,7 +354,7 @@ export class CollaborationGateway
 
   @SubscribeMessage('comment:resolve')
   async handleCommentResolve(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { projectId: string; commentId: string },
   ) {
     const projectId = client.data.projectId;
@@ -345,15 +372,16 @@ export class CollaborationGateway
 
   @SubscribeMessage('version:save')
   async handleVersionSave(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: { projectId: string; snapshot: any; message?: string },
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody()
+    data: { projectId: string; snapshot: unknown; message?: string },
   ) {
     const projectId = client.data.projectId;
     if (!projectId || projectId !== data.projectId) return;
 
     const version = await this.collaborationService.createVersion({
       projectId,
-      snapshot: data.snapshot,
+      snapshot: data.snapshot as Record<string, unknown>,
       message: data.message,
       createdBy: client.data.userId,
     });
@@ -401,17 +429,17 @@ export class CollaborationGateway
   > = new Map();
 
   @SubscribeMessage('qa:start')
-  async handleQAStart(
-    @ConnectedSocket() client: Socket,
+  handleQAStart(
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { projectId: string },
   ) {
     const projectId = client.data.projectId;
     if (!projectId || projectId !== data.projectId) return;
 
-    // Initialize Q&A for this project
-    if (!this.qaQuestions.has(projectId)) {
-      this.qaQuestions.set(projectId, []);
-    }
+    // Initialize Q&A for this project (Redis check not strictly needed as we push to list)
+    // if (!this.qaQuestions.has(projectId)) {
+    //   this.qaQuestions.set(projectId, []);
+    // }
 
     this.server.to(projectId).emit('qa:started', {
       startedBy: client.data.userName,
@@ -426,13 +454,13 @@ export class CollaborationGateway
 
   @SubscribeMessage('qa:askQuestion')
   async handleAskQuestion(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { projectId: string; question: string },
   ) {
     const projectId = client.data.projectId;
     if (!projectId || projectId !== data.projectId) return;
 
-    const questions = this.qaQuestions.get(projectId) || [];
+    const key = `qa:${projectId}`;
 
     const newQuestion = {
       id: `q_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -445,8 +473,9 @@ export class CollaborationGateway
       timestamp: new Date(),
     };
 
-    questions.push(newQuestion);
-    this.qaQuestions.set(projectId, questions);
+    await this.redis.rpush(key, JSON.stringify(newQuestion));
+    // Set 24h expiry for clean up
+    await this.redis.expire(key, 86400);
 
     this.server.to(projectId).emit('qa:newQuestion', {
       question: newQuestion,
@@ -460,22 +489,39 @@ export class CollaborationGateway
 
   @SubscribeMessage('qa:upvoteQuestion')
   async handleUpvoteQuestion(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { projectId: string; questionId: string },
   ) {
     const projectId = client.data.projectId;
     if (!projectId || projectId !== data.projectId) return;
 
-    const questions = this.qaQuestions.get(projectId) || [];
-    const question = questions.find((q) => q.id === data.questionId);
+    // Retrieve questions from Redis
+    const key = `qa:${projectId}`;
+    const rawQuestions = await this.redis.lrange(key, 0, -1);
+    const questions = rawQuestions.map((q) => JSON.parse(q));
 
-    if (question && !question.upvotedBy.includes(client.data.userId)) {
-      question.upvotes++;
-      question.upvotedBy.push(client.data.userId);
+    // Find and update
+    const questionIndex = questions.findIndex(
+      (q: unknown) => (q as any).id === data.questionId,
+    );
+
+    if (
+      questionIndex !== -1 &&
+      !questions[questionIndex].upvotedBy.includes(client.data.userId)
+    ) {
+      questions[questionIndex].upvotes++;
+      questions[questionIndex].upvotedBy.push(client.data.userId);
+
+      // Update in Redis
+      await this.redis.lset(
+        key,
+        questionIndex,
+        JSON.stringify(questions[questionIndex]),
+      );
 
       this.server.to(projectId).emit('qa:questionUpvoted', {
         questionId: data.questionId,
-        upvotes: question.upvotes,
+        upvotes: questions[questionIndex].upvotes,
         upvotedBy: client.data.userName,
       });
     }
@@ -485,17 +531,31 @@ export class CollaborationGateway
 
   @SubscribeMessage('qa:answerQuestion')
   async handleAnswerQuestion(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { projectId: string; questionId: string },
   ) {
     const projectId = client.data.projectId;
     if (!projectId || projectId !== data.projectId) return;
 
-    const questions = this.qaQuestions.get(projectId) || [];
-    const question = questions.find((q) => q.id === data.questionId);
+    // Retrieve questions from Redis
+    const key = `qa:${projectId}`;
+    const rawQuestions = await this.redis.lrange(key, 0, -1);
+    const questions = rawQuestions.map((q) => JSON.parse(q));
 
-    if (question) {
-      question.answered = true;
+    // Find and update
+    const questionIndex = questions.findIndex(
+      (q: unknown) => (q as any).id === (data as any).questionId,
+    );
+
+    if (questionIndex !== -1) {
+      questions[questionIndex].answered = true;
+
+      // Update in Redis
+      await this.redis.lset(
+        key,
+        questionIndex,
+        JSON.stringify(questions[questionIndex]),
+      );
 
       this.server.to(projectId).emit('qa:questionAnswered', {
         questionId: data.questionId,
@@ -508,41 +568,43 @@ export class CollaborationGateway
 
   @SubscribeMessage('qa:getQuestions')
   async handleGetQuestions(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { projectId: string },
   ) {
     const projectId = client.data.projectId;
     if (!projectId || projectId !== data.projectId) return;
 
-    const questions = this.qaQuestions.get(projectId) || [];
+    const key = `qa:${projectId}`;
+    const rawQuestions = await this.redis.lrange(key, 0, -1);
+    const questions = rawQuestions
+      .map((q) => JSON.parse(q))
+      .sort((a: unknown, b: unknown) => {
+        const aTyped = a as any;
+        const bTyped = b as any;
+        if (bTyped.upvotes !== aTyped.upvotes)
+          return bTyped.upvotes - aTyped.upvotes;
+        return (
+          new Date(bTyped.timestamp).getTime() -
+          new Date(aTyped.timestamp).getTime()
+        );
+      });
 
-    // Sort by upvotes (most upvoted first), then by timestamp
-    const sortedQuestions = [...questions].sort((a, b) => {
-      if (b.upvotes !== a.upvotes) return b.upvotes - a.upvotes;
-      return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
-    });
-
-    return { success: true, questions: sortedQuestions };
+    return { success: true, questions };
   }
 
   @SubscribeMessage('qa:end')
   async handleQAEnd(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { projectId: string },
   ) {
     const projectId = client.data.projectId;
     if (!projectId || projectId !== data.projectId) return;
 
-    const questions = this.qaQuestions.get(projectId) || [];
+    const key = `qa:${projectId}`;
+    // const rawQuestions = await this.redis.lrange(key, 0, -1); // Not needed for clearing
 
-    this.server.to(projectId).emit('qa:ended', {
-      endedBy: client.data.userName,
-      totalQuestions: questions.length,
-      answeredQuestions: questions.filter((q) => q.answered).length,
-    });
-
-    // Optionally clear questions or archive them
-    this.qaQuestions.delete(projectId);
+    // Clear functionality
+    await this.redis.del(key);
 
     return { success: true };
   }
@@ -550,7 +612,7 @@ export class CollaborationGateway
   // Poll functionality
   @SubscribeMessage('poll:create')
   async handlePollCreate(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody()
     data: {
       projectId: string;
@@ -582,7 +644,14 @@ export class CollaborationGateway
         : undefined,
     };
 
-    this.activePolls.set(pollId, poll);
+    const activePollsKey = `polls:${projectId}`;
+    const pollKey = `poll:${pollId}`;
+
+    await this.redis.hset(pollKey, 'data', JSON.stringify(poll));
+    await this.redis.expire(pollKey, 86400); // 24h
+    await this.redis.sadd(activePollsKey, pollId);
+
+    // this.activePolls.set(pollId, poll);
 
     this.server.to(projectId).emit('poll:created', {
       poll: {
@@ -596,7 +665,7 @@ export class CollaborationGateway
     if (data.durationMinutes) {
       setTimeout(
         () => {
-          this.endPoll(pollId, projectId);
+          void this.endPoll(pollId, projectId);
         },
         data.durationMinutes * 60 * 1000,
       );
@@ -608,14 +677,18 @@ export class CollaborationGateway
 
   @SubscribeMessage('poll:vote')
   async handlePollVote(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody()
     data: { projectId: string; pollId: string; optionId: string },
   ) {
     const projectId = client.data.projectId;
     if (!projectId || projectId !== data.projectId) return;
 
-    const poll = this.activePolls.get(data.pollId);
+    const pollKey = `poll:${data.pollId}`;
+    const rawPoll = await this.redis.hget(pollKey, 'data');
+    if (!rawPoll) return { success: false, error: 'Poll not found' };
+
+    const poll = JSON.parse(rawPoll);
 
     if (!poll || !poll.isActive) {
       return { success: false, error: 'Poll not found or inactive' };
@@ -630,8 +703,10 @@ export class CollaborationGateway
       return { success: false, error: 'Invalid option' };
     }
 
-    option.votes++;
     poll.voters.push(client.data.userId);
+
+    // Save back to Redis
+    await this.redis.hset(pollKey, 'data', JSON.stringify(poll));
 
     // Broadcast updated vote counts
     this.server.to(projectId).emit('poll:voteReceived', {
@@ -652,21 +727,29 @@ export class CollaborationGateway
 
   @SubscribeMessage('poll:end')
   async handlePollEnd(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { projectId: string; pollId: string },
   ) {
     const projectId = client.data.projectId;
     if (!projectId || projectId !== data.projectId) return;
 
-    this.endPoll(data.pollId, projectId);
+    await this.endPoll(data.pollId, projectId);
     return { success: true };
   }
 
-  private endPoll(pollId: string, projectId: string) {
-    const poll = this.activePolls.get(pollId);
-    if (!poll) return;
+  private async endPoll(pollId: string, projectId: string) {
+    const pollKey = `poll:${pollId}`;
+    const rawPoll = await this.redis.hget(pollKey, 'data');
+    if (!rawPoll) return;
+
+    const poll = JSON.parse(rawPoll);
 
     poll.isActive = false;
+    await this.redis.hset(pollKey, 'data', JSON.stringify(poll));
+
+    // Remove from active polls list
+    const activePollsKey = `polls:${projectId}`;
+    await this.redis.srem(activePollsKey, pollId);
 
     // Send final results
     this.server.to(projectId).emit('poll:ended', {
@@ -691,31 +774,44 @@ export class CollaborationGateway
 
   @SubscribeMessage('poll:getActive')
   async handleGetActivePolls(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { projectId: string },
   ) {
     const projectId = client.data.projectId;
     if (!projectId || projectId !== data.projectId) return;
 
-    const activePolls = Array.from(this.activePolls.values())
-      .filter((p) => p.projectId === projectId && p.isActive)
-      .map((poll) => ({
-        id: poll.id,
-        question: poll.question,
-        options: poll.options.map((o) => ({ id: o.id, text: o.text })),
-        hasVoted: poll.voters.includes(client.data.userId),
-        totalVotes: poll.voters.length,
-        createdAt: poll.createdAt,
-        endsAt: poll.endsAt,
-      }));
+    const activePollsKey = `polls:${projectId}`;
+    const activePollIds = await this.redis.smembers(activePollsKey);
+    const activePolls: unknown[] = [];
+
+    for (const pollId of activePollIds) {
+      const rawPoll = await this.redis.hget(`poll:${pollId}`, 'data');
+      if (rawPoll) {
+        const poll = JSON.parse(rawPoll);
+        if (poll.isActive) {
+          activePolls.push({
+            id: poll.id,
+            question: poll.question,
+            options: poll.options.map((o: any) => ({
+              id: o.id,
+              text: o.text,
+            })),
+            hasVoted: poll.voters.includes(client.data.userId),
+            totalVotes: poll.voters.length,
+            createdAt: poll.createdAt,
+            endsAt: poll.endsAt,
+          });
+        }
+      }
+    }
 
     return { success: true, polls: activePolls };
   }
 
   // Presentation mode controls
   @SubscribeMessage('presentation:start')
-  async handlePresentationStart(
-    @ConnectedSocket() client: Socket,
+  handlePresentationStart(
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { projectId: string },
   ) {
     const projectId = client.data.projectId;
@@ -731,8 +827,8 @@ export class CollaborationGateway
   }
 
   @SubscribeMessage('presentation:navigate')
-  async handlePresentationNavigate(
-    @ConnectedSocket() client: Socket,
+  handlePresentationNavigate(
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { projectId: string; slideIndex: number },
   ) {
     const projectId = client.data.projectId;
@@ -747,8 +843,8 @@ export class CollaborationGateway
   }
 
   @SubscribeMessage('presentation:end')
-  async handlePresentationEnd(
-    @ConnectedSocket() client: Socket,
+  handlePresentationEnd(
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { projectId: string },
   ) {
     const projectId = client.data.projectId;
@@ -762,8 +858,8 @@ export class CollaborationGateway
   }
 
   @SubscribeMessage('reaction:send')
-  async handleReaction(
-    @ConnectedSocket() client: Socket,
+  handleReaction(
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { projectId: string; reaction: string },
   ) {
     const projectId = client.data.projectId;

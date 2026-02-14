@@ -5,6 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma, BlockType } from '@prisma/client';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
 type SyncOperation = 'CREATE' | 'UPDATE' | 'DELETE';
@@ -14,15 +15,39 @@ interface SyncData {
   operation: SyncOperation;
   resource: string;
   resourceId?: string;
-  data: any;
+  data: Record<string, unknown>;
   timestamp: number;
 }
 
 export interface ConflictResolution {
   strategy: 'server-wins' | 'client-wins' | 'merge' | 'manual';
-  serverVersion?: any;
-  clientVersion?: any;
-  mergedVersion?: any;
+  serverVersion?: Record<string, unknown>;
+  clientVersion?: Record<string, unknown>;
+  mergedVersion?: Record<string, unknown>;
+}
+
+interface ProjectData {
+  id: string;
+  title: string;
+  description?: string;
+  status?: string;
+  isPublic?: boolean;
+}
+
+interface SlideData {
+  id: string;
+  projectId: string;
+  order: number;
+  layout: string;
+}
+
+interface BlockData {
+  id: string;
+  projectId: string;
+  slideId: string;
+  blockType: string; // Block type as string - will be cast when used
+  content: Prisma.JsonValue;
+  order: number;
 }
 
 @Injectable()
@@ -52,7 +77,7 @@ export class SyncService {
   async cacheProject(
     userId: string,
     projectId: string,
-    data: any,
+    data: Prisma.InputJsonValue,
     version: number,
   ) {
     return this.prisma.offlineCache.upsert({
@@ -60,7 +85,7 @@ export class SyncService {
         userId_projectId: { userId, projectId },
       },
       update: {
-        data,
+        data: data,
         version,
         lastSynced: new Date(),
         pendingSync: false,
@@ -123,14 +148,14 @@ export class SyncService {
     userId: string,
     projectId: string,
     operation: SyncOperation,
-    data: any,
+    data: Prisma.InputJsonValue,
   ) {
     return this.prisma.syncQueue.create({
       data: {
         userId,
         projectId,
         operation,
-        data,
+        data: data,
         priority: this.getOperationPriority(operation),
       },
     });
@@ -142,9 +167,9 @@ export class SyncService {
   async queueBatchSync(userId: string, operations: SyncData[]) {
     const createMany = operations.map((op, index) => ({
       userId,
-      projectId: op.data.projectId,
+      projectId: op.data.projectId as string,
       operation: op.operation,
-      data: op.data,
+      data: op.data as Prisma.InputJsonValue,
       priority: this.getOperationPriority(op.operation) + index,
     }));
 
@@ -197,16 +222,16 @@ export class SyncService {
 
         processed++;
         results.push({ id: op.id, success: true });
-      } catch (error: any) {
+      } catch (error: unknown) {
         const attempts = op.attempts + 1;
         const status = attempts >= 3 ? 'FAILED' : 'PENDING';
 
         await this.prisma.syncQueue.update({
           where: { id: op.id },
           data: {
-            status,
+            status: status as SyncStatus,
             attempts,
-            error: error.message,
+            error: error instanceof Error ? error.message : 'Unknown error',
           },
         });
 
@@ -214,7 +239,11 @@ export class SyncService {
           failed++;
         }
 
-        results.push({ id: op.id, success: false, error: error.message });
+        results.push({
+          id: op.id,
+          success: false,
+          error: (error as Error).message,
+        });
       }
     }
 
@@ -234,22 +263,27 @@ export class SyncService {
   /**
    * Execute a single sync operation
    */
-  private async executeSyncOperation(op: any) {
+  private async executeSyncOperation(op: {
+    operation: SyncOperation;
+    data: Prisma.JsonValue;
+  }) {
     const { operation, data } = op;
+    const typedData = data as Record<string, unknown>;
+    const resource = typedData.resource as string;
 
-    switch (data.resource) {
+    switch (resource) {
       case 'project':
-        return this.syncProject(operation, data);
+        return this.syncProject(operation, typedData as unknown as ProjectData);
       case 'slide':
-        return this.syncSlide(operation, data);
+        return this.syncSlide(operation, typedData as unknown as SlideData);
       case 'block':
-        return this.syncBlock(operation, data);
+        return this.syncBlock(operation, typedData as unknown as BlockData);
       default:
-        throw new BadRequestException(`Unknown resource: ${data.resource}`);
+        throw new BadRequestException(`Unknown resource: ${resource}`);
     }
   }
 
-  private async syncProject(operation: SyncOperation, data: any) {
+  private async syncProject(operation: SyncOperation, data: ProjectData) {
     switch (operation) {
       case 'UPDATE':
         return this.prisma.project.update({
@@ -257,7 +291,12 @@ export class SyncService {
           data: {
             title: data.title,
             description: data.description,
-            status: data.status,
+            ...(data.status !== undefined
+              ? {
+                  status:
+                    data.status as unknown as Prisma.EnumProjectStatusFieldUpdateOperationsInput,
+                }
+              : {}),
             isPublic: data.isPublic,
           },
         });
@@ -267,7 +306,7 @@ export class SyncService {
     }
   }
 
-  private async syncSlide(operation: SyncOperation, data: any) {
+  private async syncSlide(operation: SyncOperation, data: SlideData) {
     switch (operation) {
       case 'CREATE':
         return this.prisma.slide.create({
@@ -293,7 +332,7 @@ export class SyncService {
     }
   }
 
-  private async syncBlock(operation: SyncOperation, data: any) {
+  private async syncBlock(operation: SyncOperation, data: BlockData) {
     switch (operation) {
       case 'CREATE':
         return this.prisma.block.create({
@@ -301,8 +340,8 @@ export class SyncService {
             id: data.id,
             projectId: data.projectId,
             slideId: data.slideId,
-            blockType: data.blockType,
-            content: data.content,
+            blockType: data.blockType as BlockType,
+            content: data.content as Prisma.InputJsonValue,
             order: data.order,
           },
         });
@@ -310,7 +349,7 @@ export class SyncService {
         return this.prisma.block.update({
           where: { id: data.id },
           data: {
-            content: data.content,
+            content: data.content as Prisma.InputJsonValue,
             order: data.order,
           },
         });
@@ -345,7 +384,7 @@ export class SyncService {
     userId: string,
     projectId: string,
     clientVersion: number,
-    clientData: any,
+    clientData: Record<string, unknown>,
   ): Promise<ConflictResolution | null> {
     const cache = await this.getCachedProject(userId, projectId);
     const serverProject = await this.prisma.project.findUnique({
@@ -359,7 +398,8 @@ export class SyncService {
 
     // Get server version (using updatedAt timestamp as version proxy)
     const serverVersion = serverProject.updatedAt.getTime();
-    const cachedVersion = cache?.version || 0;
+    // unused
+    // const cachedVersion = cache?.version || 0;
 
     // No conflict if client is up to date
     if (clientVersion >= serverVersion) {
@@ -368,33 +408,36 @@ export class SyncService {
 
     // Check if the same fields were modified
     const conflictingFields = this.findConflictingFields(
-      serverProject,
+      serverProject as unknown as Record<string, unknown>,
       clientData,
-      cache?.data || {},
+      (cache?.data as Record<string, unknown>) || {},
     );
 
     if (conflictingFields.length === 0) {
       // No actual conflicts, can merge
       return {
         strategy: 'merge',
-        serverVersion: serverProject,
-        clientVersion: clientData,
-        mergedVersion: this.mergeVersions(serverProject, clientData),
+        serverVersion: serverProject as unknown as Record<string, any>,
+        clientVersion: clientData as Record<string, any>,
+        mergedVersion: this.mergeVersions(
+          serverProject as unknown as Record<string, unknown>,
+          clientData,
+        ),
       };
     }
 
     // Return conflict info for manual resolution
     return {
       strategy: 'manual',
-      serverVersion: serverProject,
+      serverVersion: serverProject as unknown as Record<string, unknown>,
       clientVersion: clientData,
     };
   }
 
   private findConflictingFields(
-    server: any,
-    client: any,
-    cached: any,
+    server: Record<string, unknown>,
+    client: Record<string, unknown>,
+    cached: Record<string, unknown>,
   ): string[] {
     const conflicts: string[] = [];
 
@@ -419,14 +462,17 @@ export class SyncService {
     return conflicts;
   }
 
-  private mergeVersions(server: any, client: any): any {
+  private mergeVersions(
+    server: Record<string, unknown>,
+    client: Record<string, unknown>,
+  ): Record<string, unknown> {
     // Simple last-write-wins merge for non-conflicting changes
     return {
       ...server,
       ...client,
-      id: server.id,
-      createdAt: server.createdAt,
-      ownerId: server.ownerId,
+      id: server.id as string,
+      createdAt: server.createdAt as Date,
+      ownerId: server.ownerId as string,
     };
   }
 
@@ -441,38 +487,47 @@ export class SyncService {
     switch (resolution.strategy) {
       case 'server-wins':
         // Just update cache with server version
+        if (!resolution.serverVersion) {
+          throw new BadRequestException('Server version is missing');
+        }
         await this.cacheProject(
           userId,
           projectId,
-          resolution.serverVersion,
+          resolution.serverVersion as Prisma.InputJsonValue,
           Date.now(),
         );
         return resolution.serverVersion;
 
       case 'client-wins':
+        if (!resolution.clientVersion) {
+          throw new BadRequestException('Client version is missing');
+        }
         // Apply client changes to server
         await this.prisma.project.update({
           where: { id: projectId },
-          data: resolution.clientVersion,
+          data: resolution.clientVersion as Prisma.ProjectUpdateInput,
         });
         await this.cacheProject(
           userId,
           projectId,
-          resolution.clientVersion,
+          resolution.clientVersion as Prisma.InputJsonValue,
           Date.now(),
         );
         return resolution.clientVersion;
 
       case 'merge':
+        if (!resolution.mergedVersion) {
+          throw new BadRequestException('Merged version is missing');
+        }
         // Apply merged version
         await this.prisma.project.update({
           where: { id: projectId },
-          data: resolution.mergedVersion,
+          data: resolution.mergedVersion as Prisma.ProjectUpdateInput,
         });
         await this.cacheProject(
           userId,
           projectId,
-          resolution.mergedVersion,
+          resolution.mergedVersion as Prisma.InputJsonValue,
           Date.now(),
         );
         return resolution.mergedVersion;

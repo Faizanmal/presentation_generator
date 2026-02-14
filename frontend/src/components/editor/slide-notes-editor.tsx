@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import {
   StickyNote,
@@ -11,10 +11,7 @@ import {
   Copy,
   ChevronDown,
   ChevronUp,
-  Mic,
-  Volume2,
   RotateCcw,
-  Save,
   BookOpen,
   Target,
   MessageSquare,
@@ -52,7 +49,6 @@ interface TimingMarker {
 }
 
 export function SlideNotesEditor({
-  slideId,
   slideContent,
   initialNotes = '',
   onNotesChange,
@@ -60,7 +56,7 @@ export function SlideNotesEditor({
 }: SlideNotesEditorProps) {
   const [notes, setNotes] = useState(initialNotes);
   const [isExpanded, setIsExpanded] = useState(true);
-  const [timingMarkers, setTimingMarkers] = useState<TimingMarker[]>([]);
+  const [] = useState<TimingMarker[]>([]);
   const [showTimingHelpers, setShowTimingHelpers] = useState(false);
 
   // Calculate estimated speaking time (average 150 words per minute) - moved to useMemo
@@ -127,12 +123,12 @@ export function SlideNotesEditor({
       transition: '[TRANSITION]',
       interaction: '[ASK AUDIENCE]',
     };
-    
+
     const textarea = document.getElementById('slide-notes') as HTMLTextAreaElement;
     if (textarea) {
       const start = textarea.selectionStart;
       const end = textarea.selectionEnd;
-      const newNotes = notes.substring(0, start) + markers[type] + ' ' + notes.substring(end);
+      const newNotes = `${notes.substring(0, start) + markers[type]} ${notes.substring(end)}`;
       setNotes(newNotes);
       onNotesChange(newNotes);
     }
@@ -323,12 +319,13 @@ export function SlideNotesEditor({
                 <div className="prose prose-sm dark:prose-invert max-w-none p-2">
                   {notes ? (
                     <div className="whitespace-pre-wrap">
-                      {notes.split(/(\[.*?\])/).map((part, i) => {
+                      {notes.split(/(\[.*?\])/).map((part, _i) => {
                         if (part.match(/^\[.*\]$/)) {
                           const type = part.slice(1, -1).toLowerCase();
                           return (
                             <Badge
-                              key={i}
+
+                              key={part}
                               variant="outline"
                               className={cn(
                                 'mx-1 my-0.5',
@@ -342,7 +339,8 @@ export function SlideNotesEditor({
                             </Badge>
                           );
                         }
-                        return <span key={i}>{part}</span>;
+
+                        return <span key={part}>{part}</span>;
                       })}
                     </div>
                   ) : (
@@ -380,8 +378,9 @@ export function SlideNotesEditor({
                     </h4>
                     <ul className="mt-2 space-y-1">
                       {summarizeNotesMutation.data.talkingPoints?.map(
-                        (point: string, i: number) => (
-                          <li key={i} className="flex items-start gap-2 text-sm">
+                        (point: string, _i: number) => (
+
+                          <li key={point} className="flex items-start gap-2 text-sm">
                             <span className="text-primary">•</span>
                             <span>{point}</span>
                           </li>
@@ -423,7 +422,8 @@ export function SlideNotesEditor({
                     {generateKeyPointsMutation.data.keyPoints.map(
                       (point: { point: string; importance: string }, i: number) => (
                         <div
-                          key={i}
+
+                          key={point.point}
                           className="flex items-start gap-2 rounded border p-2"
                         >
                           <Badge
@@ -431,8 +431,8 @@ export function SlideNotesEditor({
                               point.importance === 'high'
                                 ? 'default'
                                 : point.importance === 'medium'
-                                ? 'secondary'
-                                : 'outline'
+                                  ? 'secondary'
+                                  : 'outline'
                             }
                             className="mt-0.5"
                           >
@@ -455,24 +455,26 @@ export function SlideNotesEditor({
 
 // Compact notes display for presentation mode
 export function CompactNotesDisplay({ notes }: { notes: string }) {
-  if (!notes) return null;
+  if (!notes) { return null; }
 
   return (
     <div className="rounded-lg bg-black/80 p-4 text-white">
       <ScrollArea className="h-32">
         <div className="text-sm leading-relaxed">
-          {notes.split(/(\[.*?\])/).map((part, i) => {
+          {notes.split(/(\[.*?\])/).map((part, _i) => {
             if (part.match(/^\[.*\]$/)) {
               return (
                 <span
-                  key={i}
+
+                  key={part}
                   className="mx-1 rounded bg-white/20 px-1 py-0.5 text-xs uppercase"
                 >
                   {part.slice(1, -1)}
                 </span>
               );
             }
-            return <span key={i}>{part}</span>;
+
+            return <span key={part}>{part}</span>;
           })}
         </div>
       </ScrollArea>

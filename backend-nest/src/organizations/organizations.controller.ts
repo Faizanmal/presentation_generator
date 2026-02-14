@@ -23,13 +23,13 @@ export class OrganizationsController {
   // ============================================
 
   @Get()
-  async getUserOrganizations(@Request() req: any) {
+  async getUserOrganizations(@Request() req: { user: { id: string } }) {
     return this.organizationsService.getUserOrganizations(req.user.id);
   }
 
   @Post()
   async createOrganization(
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
     @Body() body: { name: string; slug: string; domain?: string },
   ) {
     return this.organizationsService.createOrganization(req.user.id, body);
@@ -42,7 +42,7 @@ export class OrganizationsController {
 
   @Patch(':id')
   async updateOrganization(
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
     @Param('id') id: string,
     @Body()
     body: {
@@ -53,14 +53,17 @@ export class OrganizationsController {
       secondaryColor?: string;
       customCss?: string;
       customDomain?: string;
-      settings?: any;
+      settings?: Record<string, unknown>;
     },
   ) {
     return this.organizationsService.updateOrganization(id, req.user.id, body);
   }
 
   @Delete(':id')
-  async deleteOrganization(@Request() req: any, @Param('id') id: string) {
+  async deleteOrganization(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+  ) {
     return this.organizationsService.deleteOrganization(id, req.user.id);
   }
 
@@ -69,13 +72,16 @@ export class OrganizationsController {
   // ============================================
 
   @Get(':id/members')
-  async getMembers(@Request() req: any, @Param('id') id: string) {
+  async getMembers(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+  ) {
     return this.organizationsService.getMembers(id, req.user.id);
   }
 
   @Post(':id/members/invite')
   async inviteMember(
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
     @Param('id') id: string,
     @Body() body: { email: string; role?: 'OWNER' | 'ADMIN' | 'MEMBER' },
   ) {
@@ -84,7 +90,7 @@ export class OrganizationsController {
 
   @Patch(':id/members/:memberId')
   async updateMemberRole(
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
     @Param('id') id: string,
     @Param('memberId') memberId: string,
     @Body() body: { role: 'OWNER' | 'ADMIN' | 'MEMBER' },
@@ -99,7 +105,7 @@ export class OrganizationsController {
 
   @Delete(':id/members/:memberId')
   async removeMember(
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
     @Param('id') id: string,
     @Param('memberId') memberId: string,
   ) {
@@ -112,7 +118,7 @@ export class OrganizationsController {
 
   @Post(':id/sso')
   async configureSso(
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
     @Param('id') id: string,
     @Body()
     body: {
@@ -130,7 +136,7 @@ export class OrganizationsController {
 
   @Patch(':id/sso/:ssoId/toggle')
   async toggleSso(
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
     @Param('id') id: string,
     @Param('ssoId') ssoId: string,
     @Body() body: { isActive: boolean },
@@ -158,7 +164,7 @@ export class OrganizationsController {
 
   @Get(':id/audit-logs')
   async getAuditLogs(
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
     @Param('id') id: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
@@ -185,7 +191,10 @@ export class InvitationsController {
 
   @Post(':token/accept')
   @UseGuards(JwtAuthGuard)
-  async acceptInvitation(@Request() req: any, @Param('token') token: string) {
+  async acceptInvitation(
+    @Request() req: { user: { id: string } },
+    @Param('token') token: string,
+  ) {
     return this.organizationsService.acceptInvitation(token, req.user.id);
   }
 }

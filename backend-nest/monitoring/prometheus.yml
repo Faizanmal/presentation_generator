@@ -1,0 +1,24 @@
+# Prometheus configuration for scraping NestJS backend metrics
+# Deploy this alongside the backend in production
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'presentation-designer-backend'
+    metrics_path: '/monitoring/metrics'
+    static_configs:
+      - targets: ['localhost:3001']
+        labels:
+          app: 'presentation-designer'
+          env: 'development'
+
+  # Uncomment for production with service discovery
+  # - job_name: 'presentation-designer-prod'
+  #   metrics_path: '/monitoring/metrics'
+  #   dns_sd_configs:
+  #     - names:
+  #         - 'backend.presentation-designer.svc.cluster.local'
+  #       type: 'A'
+  #       port: 3001

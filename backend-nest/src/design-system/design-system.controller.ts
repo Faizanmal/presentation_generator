@@ -9,9 +9,9 @@ import {
   Patch,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { 
-  DesignSystemService, 
-  ColorToken, 
+import {
+  DesignSystemService,
+  ColorToken,
   TypographyToken,
   SpacingToken,
   ShadowToken,
@@ -52,7 +52,7 @@ export class DesignSystemController {
   @Post()
   async createDesignSystem(
     @Body() dto: CreateDesignSystemDto,
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
   ) {
     return this.designSystemService.createDesignSystem(req.user.id, dto);
   }
@@ -63,7 +63,7 @@ export class DesignSystemController {
   }
 
   @Get('my-systems')
-  async getUserDesignSystems(@Request() req: any) {
+  async getUserDesignSystems(@Request() req: { user: { id: string } }) {
     return this.designSystemService.getUserDesignSystems(req.user.id);
   }
 
@@ -76,7 +76,7 @@ export class DesignSystemController {
   async updateTokens(
     @Param('systemId') systemId: string,
     @Body() dto: UpdateTokensDto,
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
   ) {
     return this.designSystemService.updateTokens(systemId, req.user.id, dto);
   }
@@ -85,7 +85,7 @@ export class DesignSystemController {
   async updateColor(
     @Param('systemId') systemId: string,
     @Body() dto: UpdateColorDto,
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
   ) {
     return this.designSystemService.updateColor(
       systemId,
@@ -99,14 +99,17 @@ export class DesignSystemController {
   async applyToProject(
     @Param('systemId') systemId: string,
     @Param('projectId') projectId: string,
-    @Request() req: any,
+    // @Request() req: { user: { id: string } },
   ) {
-    return this.designSystemService.applyToProject(systemId, projectId, req.user.id);
+    return this.designSystemService.applyToProject(systemId, projectId);
   }
 
   @Post('generate-palette')
   generateColorPalette(@Body() dto: GeneratePaletteDto) {
-    return this.designSystemService.generateColorPalette(dto.baseColor, dto.name);
+    return this.designSystemService.generateColorPalette(
+      dto.baseColor,
+      dto.name,
+    );
   }
 
   @Get(':systemId/export/css')
@@ -119,6 +122,7 @@ export class DesignSystemController {
   @Get(':systemId/export/tailwind')
   async exportAsTailwind(@Param('systemId') systemId: string) {
     const system = await this.designSystemService.getDesignSystem(systemId);
+
     return this.designSystemService.exportAsTailwindConfig(system);
   }
 }

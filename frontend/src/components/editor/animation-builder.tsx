@@ -19,7 +19,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
-import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -36,7 +35,6 @@ import {
   ArrowUp,
   Zap,
   Layers,
-  Clock,
   Eye,
   EyeOff,
   Copy,
@@ -158,7 +156,6 @@ const TRANSITION_PRESETS: { type: SlideTransition['type']; label: string }[] = [
 ];
 
 export function AnimationBuilder({
-  slideId,
   elements,
   onSaveAnimations,
   onSaveTransition,
@@ -176,7 +173,7 @@ export function AnimationBuilder({
 
   const addAnimation = useCallback((elementId: string, type: AnimationType) => {
     const element = elements.find((e) => e.id === elementId);
-    if (!element) return;
+    if (!element) {return;}
 
     const newAnimation: Animation = {
       id: `anim_${Date.now()}`,
@@ -226,9 +223,9 @@ export function AnimationBuilder({
   const moveAnimation = useCallback((id: string, direction: 'up' | 'down') => {
     setAnimations((prev) => {
       const index = prev.findIndex((a) => a.id === id);
-      if (index === -1) return prev;
-      if (direction === 'up' && index === 0) return prev;
-      if (direction === 'down' && index === prev.length - 1) return prev;
+      if (index === -1) {return prev;}
+      if (direction === 'up' && index === 0) {return prev;}
+      if (direction === 'down' && index === prev.length - 1) {return prev;}
 
       const newAnimations = [...prev];
       const swapIndex = direction === 'up' ? index - 1 : index + 1;
@@ -263,7 +260,7 @@ export function AnimationBuilder({
   }, [animations]);
 
   const getTotalDuration = () => {
-    if (animations.length === 0) return 0;
+    if (animations.length === 0) {return 0;}
     return Math.max(...animations.map((a) => a.delay + a.duration));
   };
 

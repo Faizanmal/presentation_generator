@@ -1,17 +1,17 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { X, ExternalLink, Play, Pause, Volume2, VolumeX } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { X, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+// import {
+//   Select,
+//   SelectContent,
+//   SelectItem,
+//   SelectTrigger,
+//   SelectValue,
+// } from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -89,7 +89,7 @@ const EMBED_CONFIGS: Record<EmbedType, {
 
 function detectEmbedType(url: string): { type: EmbedType; embedUrl: string } | null {
   for (const [type, config] of Object.entries(EMBED_CONFIGS)) {
-    if (type === 'custom') continue;
+    if (type === 'custom') {continue;}
     const match = url.match(config.pattern);
     if (match) {
       return {
@@ -111,8 +111,8 @@ export function EmbedBlock({
   const [url, setUrl] = useState(data.url || '');
   const [title, setTitle] = useState(data.title || '');
   const [embedUrl, setEmbedUrl] = useState('');
-  const [isPlaying, setIsPlaying] = useState(data.autoplay || false);
-  const [isMuted, setIsMuted] = useState(data.muted || true);
+  const [isPlaying, ] = useState(data.autoplay || false);
+  const [isMuted, ] = useState(data.muted || true);
   const [showDialog, setShowDialog] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -261,7 +261,6 @@ function EmbedForm({
   embedType,
   onUrlChange,
   onTitleChange,
-  onTypeChange,
   onSave,
 }: {
   url: string;

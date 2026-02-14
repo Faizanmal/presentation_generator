@@ -1,65 +1,13 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import type { Integration, GoogleDriveFile, FigmaFile, NotionPage, ZoomMeeting, SlackChannel, IntegrationProvider } from '@/types';
 
-export type IntegrationProvider =
-  | 'zoom'
-  | 'slack'
-  | 'teams'
-  | 'google_drive'
-  | 'figma'
-  | 'notion';
-
-interface Integration {
-  id: string;
-  provider: IntegrationProvider;
-  name: string;
-  email?: string;
-  connected: boolean;
-  connectedAt: Date;
-  expiresAt?: Date;
-  scopes: string[];
-}
-
-interface ZoomMeeting {
-  id: string;
-  topic: string;
-  startUrl: string;
-  joinUrl: string;
-  startTime: Date;
-  duration: number;
-}
-
-interface SlackChannel {
-  id: string;
-  name: string;
-  isPrivate: boolean;
-}
-
-interface GoogleDriveFile {
-  id: string;
-  name: string;
-  mimeType: string;
-  webViewLink: string;
-  thumbnailLink?: string;
-}
-
-interface NotionPage {
-  id: string;
-  title: string;
-  icon?: string;
-  lastEdited: Date;
-}
-
-interface FigmaFile {
-  id: string;
-  name: string;
-  thumbnailUrl: string;
-  lastModified: Date;
-}
+// Re-export types for convenience
+export type { IntegrationProvider } from '@/types';
 
 export function useIntegrations() {
   const queryClient = useQueryClient();
@@ -122,7 +70,7 @@ export function useIntegrations() {
   // Check if specific provider is connected
   const isConnected = useCallback(
     (provider: IntegrationProvider) =>
-      integrations?.some((i) => i.provider === provider && i.connected) ?? false,
+      integrations?.some((i) => i.provider === provider) ?? false,
     [integrations]
   );
 
@@ -169,11 +117,11 @@ export function useZoomIntegration() {
   const { data: meetings, isLoading: isLoadingMeetings } = useQuery<ZoomMeeting[]>({
     queryKey: ['zoom', 'meetings'],
     queryFn: () => api.getZoomMeetings(),
-    enabled: isConnected('zoom'),
+    enabled: isConnected('ZOOM'),
   });
 
   return {
-    isConnected: isConnected('zoom'),
+    isConnected: isConnected('ZOOM'),
     meetings,
     isLoadingMeetings,
     createMeeting: createMeetingMutation.mutate,
@@ -189,7 +137,7 @@ export function useSlackIntegration() {
   const { data: channels, isLoading: isLoadingChannels } = useQuery<SlackChannel[]>({
     queryKey: ['slack', 'channels'],
     queryFn: () => api.getSlackChannels(),
-    enabled: isConnected('slack'),
+    enabled: isConnected('SLACK'),
   });
 
   // Send presentation to channel
@@ -205,7 +153,7 @@ export function useSlackIntegration() {
   });
 
   return {
-    isConnected: isConnected('slack'),
+    isConnected: isConnected('SLACK'),
     channels,
     isLoadingChannels,
     sendToChannel: sendMutation.mutate,
@@ -221,7 +169,7 @@ export function useTeamsIntegration() {
   const { data: teams, isLoading: isLoadingTeams } = useQuery({
     queryKey: ['teams', 'list'],
     queryFn: () => api.getTeamsList(),
-    enabled: isConnected('teams'),
+    enabled: isConnected('TEAMS'),
   });
 
   // Send to Teams
@@ -249,7 +197,7 @@ export function useTeamsIntegration() {
   });
 
   return {
-    isConnected: isConnected('teams'),
+    isConnected: isConnected('TEAMS'),
     teams,
     isLoadingTeams,
     sendToTeams: sendMutation.mutate,
@@ -267,8 +215,17 @@ export function useGoogleDriveIntegration() {
   // List files
   const { data: files, isLoading: isLoadingFiles } = useQuery<GoogleDriveFile[]>({
     queryKey: ['google-drive', 'files'],
-    queryFn: () => api.getGoogleDriveFiles(),
-    enabled: isConnected('google_drive'),
+    queryFn: async () => {
+      const apiFiles = await api.getGoogleDriveFiles();
+      return apiFiles.map(file => ({
+        id: file.id,
+        name: file.name,
+        mimeType: file.mimeType,
+        webViewLink: '', // API doesn't provide this
+        thumbnailLink: undefined,
+      }));
+    },
+    enabled: isConnected('GOOGLE_DRIVE'),
   });
 
   // Export to Google Drive
@@ -296,7 +253,7 @@ export function useGoogleDriveIntegration() {
   });
 
   return {
-    isConnected: isConnected('google_drive'),
+    isConnected: isConnected('GOOGLE_DRIVE'),
     files,
     isLoadingFiles,
     exportToGoogleDrive: exportMutation.mutate,
@@ -313,8 +270,16 @@ export function useFigmaIntegration() {
   // List recent files
   const { data: files, isLoading: isLoadingFiles } = useQuery<FigmaFile[]>({
     queryKey: ['figma', 'files'],
-    queryFn: () => api.getFigmaFiles(),
-    enabled: isConnected('figma'),
+    queryFn: async () => {
+      const apiFiles = await api.getFigmaFiles();
+      return apiFiles.map(file => ({
+        id: file.id,
+        name: file.name,
+        thumbnailUrl: '', // API doesn't provide this
+        lastModified: new Date(file.lastModified),
+      }));
+    },
+    enabled: isConnected('FIGMA'),
   });
 
   // Import Figma frames as slides
@@ -342,7 +307,7 @@ export function useFigmaIntegration() {
   });
 
   return {
-    isConnected: isConnected('figma'),
+    isConnected: isConnected('FIGMA'),
     files,
     isLoadingFiles,
     importFromFigma: importMutation.mutate,
@@ -359,8 +324,16 @@ export function useNotionIntegration() {
   // List pages
   const { data: pages, isLoading: isLoadingPages } = useQuery<NotionPage[]>({
     queryKey: ['notion', 'pages'],
-    queryFn: () => api.getNotionPages(),
-    enabled: isConnected('notion'),
+    queryFn: async () => {
+      const apiPages = await api.getNotionPages();
+      return apiPages.map(page => ({
+        id: page.id,
+        title: page.title,
+        icon: undefined,
+        lastEdited: new Date(page.lastEditedTime),
+      }));
+    },
+    enabled: isConnected('NOTION'),
   });
 
   // Import from Notion
@@ -387,7 +360,7 @@ export function useNotionIntegration() {
   });
 
   return {
-    isConnected: isConnected('notion'),
+    isConnected: isConnected('NOTION'),
     pages,
     isLoadingPages,
     importFromNotion: importMutation.mutate,

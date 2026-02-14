@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useMutation } from "@tanstack/react-query";
@@ -42,42 +42,52 @@ const PLANS = [
   {
     id: "PRO",
     name: "Pro",
-    price: 12,
+    price: 29,
     icon: Crown,
-    description: "Perfect for professionals",
+    description: "For power users — covers heavier AI usage",
     popular: true,
     features: [
-      "50 presentations",
-      "500 AI generations per month",
+      "100 presentations",
+      "1,000 standard AI generations per month",
+      "5 Thinking (high‑quality) generations per month",
       "All themes including premium",
       "Export to PDF/HTML/JSON",
       "Priority support",
       "Custom branding (coming soon)",
     ],
     priceId: "price_pro_monthly", // Replace with actual Stripe price ID
+    thinkingCreditsIncluded: 5,
   },
   {
     id: "ENTERPRISE",
     name: "Enterprise",
-    price: 49,
+    price: 199,
     icon: Building2,
-    description: "For teams and organizations",
+    description: "For teams and large organizations — optimized for AI workloads",
     features: [
-      "1000 presentations",
-      "10,000 AI generations per month",
+      "1,000 presentations (expandable)",
+      "50,000 standard AI generations per month",
+      "250 Thinking (high‑quality) generations per month",
       "All Pro features",
       "Team collaboration",
       "SSO & advanced security",
-      "Dedicated support",
+      "Dedicated support & onboarding",
       "Custom integrations",
     ],
     priceId: "price_enterprise_monthly", // Replace with actual Stripe price ID
-  },
+    thinkingCreditsIncluded: 250,
+  }
 ];
 
 export default function BillingPage() {
   const router = useRouter();
   const { subscription, isAuthenticated, isLoading: authLoading } = useAuthStore();
+
+  // Compute renewal date to avoid calling Date.now() during render
+  const renewalDate = useMemo(() => {
+    if (!subscription?.currentPeriodEnd) { return null; }
+    return new Date(subscription.currentPeriodEnd).toLocaleDateString();
+  }, [subscription]);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -109,7 +119,7 @@ export default function BillingPage() {
   });
 
   const handleUpgrade = (planId: string, priceId?: string) => {
-    if (!priceId) return;
+    if (!priceId) { return; }
     checkoutMutation.mutate(priceId);
   };
 
@@ -140,7 +150,7 @@ export default function BillingPage() {
                 </Link>
               </Button>
               <Link href="/" className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                <div className="h-8 w-8 rounded-lg bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center">
                   <Sparkles className="h-5 w-5 text-white" />
                 </div>
                 <span className="text-xl font-bold text-slate-900 dark:text-white">
@@ -174,7 +184,7 @@ export default function BillingPage() {
                   </h3>
                   <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
                     {subscription.status === "ACTIVE"
-                      ? `Renews on ${new Date(subscription.currentPeriodEnd!).toLocaleDateString()}`
+                      ? `Renews on ${renewalDate}`
                       : `Status: ${subscription.status}`}
                   </p>
                 </div>
@@ -284,8 +294,8 @@ export default function BillingPage() {
                   </div>
 
                   <ul className="space-y-3 mb-6">
-                    {plan.features.map((feature, i) => (
-                      <li key={i} className="flex items-start gap-2">
+                    {plan.features.map((feature) => (
+                      <li key={feature} className="flex items-start gap-2">
                         <Check className="h-5 w-5 text-green-500 flex-shrink-0" />
                         <span className="text-sm text-slate-700 dark:text-slate-300">{feature}</span>
                       </li>

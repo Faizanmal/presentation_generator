@@ -1,8 +1,32 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
+import { Server } from 'http';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+
+interface AuthResponse {
+  access_token: string;
+  user: {
+    id: string;
+    email: string;
+  };
+}
+
+interface ProjectItem {
+  id: string;
+  title: string;
+  description?: string;
+}
+
+interface ProjectList {
+  data: ProjectItem[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+  };
+}
 
 describe('Projects (e2e)', () => {
   let app: INestApplication;
@@ -31,7 +55,7 @@ describe('Projects (e2e)', () => {
     prisma = app.get(PrismaService);
 
     // Create a test user and get auth token
-    const registerResponse = await request(app.getHttpServer())
+    const registerResponse = await request(app.getHttpServer() as Server)
       .post('/api/auth/register')
       .send({
         email: 'projects-test@test-e2e.com',
@@ -39,8 +63,9 @@ describe('Projects (e2e)', () => {
         name: 'Projects Test User',
       });
 
-    authToken = registerResponse.body.access_token;
-    testUserId = registerResponse.body.user.id;
+    const body = registerResponse.body as AuthResponse;
+    authToken = body.access_token;
+    testUserId = body.user.id;
   });
 
   afterAll(async () => {
@@ -58,7 +83,7 @@ describe('Projects (e2e)', () => {
 
   describe('POST /api/projects', () => {
     it('should create a new project', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(app.getHttpServer() as Server)
         .post('/api/projects')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -67,15 +92,16 @@ describe('Projects (e2e)', () => {
         })
         .expect(201);
 
-      expect(response.body).toHaveProperty('id');
-      expect(response.body.title).toBe('Test Project');
-      expect(response.body.description).toBe('A test project for e2e testing');
+      const body = response.body as ProjectItem;
+      expect(body).toHaveProperty('id');
+      expect(body.title).toBe('Test Project');
+      expect(body.description).toBe('A test project for e2e testing');
 
-      testProjectId = response.body.id;
+      testProjectId = body.id;
     });
 
     it('should reject project creation without auth', async () => {
-      await request(app.getHttpServer())
+      await request(app.getHttpServer() as Server)
         .post('/api/projects')
         .send({
           title: 'Unauthorized Project',
@@ -86,42 +112,45 @@ describe('Projects (e2e)', () => {
 
   describe('GET /api/projects', () => {
     it('should list user projects', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(app.getHttpServer() as Server)
         .get('/api/projects')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
-      expect(Array.isArray(response.body.data)).toBe(true);
-      expect(response.body.data.length).toBeGreaterThan(0);
-      expect(response.body.data[0].title).toBe('Test Project');
+      const body = response.body as ProjectList;
+      expect(Array.isArray(body.data)).toBe(true);
+      expect(body.data.length).toBeGreaterThan(0);
+      expect(body.data[0].title).toBe('Test Project');
     });
 
     it('should support pagination', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(app.getHttpServer() as Server)
         .get('/api/projects?page=1&limit=10')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
-      expect(response.body).toHaveProperty('meta');
-      expect(response.body.meta).toHaveProperty('total');
-      expect(response.body.meta).toHaveProperty('page');
-      expect(response.body.meta).toHaveProperty('limit');
+      const body = response.body as ProjectList;
+      expect(body).toHaveProperty('meta');
+      expect(body.meta).toHaveProperty('total');
+      expect(body.meta).toHaveProperty('page');
+      expect(body.meta).toHaveProperty('limit');
     });
   });
 
   describe('GET /api/projects/:id', () => {
     it('should get a specific project', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(app.getHttpServer() as Server)
         .get(`/api/projects/${testProjectId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
-      expect(response.body.id).toBe(testProjectId);
-      expect(response.body.title).toBe('Test Project');
+      const body = response.body as ProjectItem;
+      expect(body.id).toBe(testProjectId);
+      expect(body.title).toBe('Test Project');
     });
 
     it('should return 404 for non-existent project', async () => {
-      await request(app.getHttpServer())
+      await request(app.getHttpServer() as Server)
         .get('/api/projects/non-existent-id')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(404);
@@ -130,7 +159,7 @@ describe('Projects (e2e)', () => {
 
   describe('PATCH /api/projects/:id', () => {
     it('should update a project', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(app.getHttpServer() as Server)
         .patch(`/api/projects/${testProjectId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -139,45 +168,45 @@ describe('Projects (e2e)', () => {
         })
         .expect(200);
 
-      expect(response.body.title).toBe('Updated Test Project');
-      expect(response.body.description).toBe('Updated description');
+      const body = response.body as ProjectItem;
+      expect(body.title).toBe('Updated Test Project');
+      expect(body.description).toBe('Updated description');
     });
   });
 
   describe('POST /api/projects/:id/duplicate', () => {
     it('should duplicate a project', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(app.getHttpServer() as Server)
         .post(`/api/projects/${testProjectId}/duplicate`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(201);
 
-      expect(response.body.title).toContain('Copy');
-      expect(response.body.id).not.toBe(testProjectId);
+      const body = response.body as ProjectItem;
+      expect(body.title).toContain('Copy');
+      expect(body.id).not.toBe(testProjectId);
 
       // Clean up duplicated project
-      await prisma.project
-        .delete({ where: { id: response.body.id } })
-        .catch(() => {});
+      await prisma.project.delete({ where: { id: body.id } }).catch(() => {});
     });
   });
 
   describe('DELETE /api/projects/:id', () => {
     it('should delete a project', async () => {
       // Create a project to delete
-      const createResponse = await request(app.getHttpServer())
+      const createResponse = await request(app.getHttpServer() as Server)
         .post('/api/projects')
         .set('Authorization', `Bearer ${authToken}`)
         .send({ title: 'Project to Delete' });
 
-      const projectToDeleteId = createResponse.body.id;
+      const projectToDeleteId = (createResponse.body as ProjectItem).id;
 
-      await request(app.getHttpServer())
+      await request(app.getHttpServer() as Server)
         .delete(`/api/projects/${projectToDeleteId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
       // Verify deletion
-      await request(app.getHttpServer())
+      await request(app.getHttpServer() as Server)
         .get(`/api/projects/${projectToDeleteId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(404);

@@ -1,17 +1,16 @@
 "use client";
 
-import { useState } from "react";
+// import { useState } from "react";
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/constants/button_variant";
 import {
     Zap,
     Save,
-    Trash2,
-    Copy,
     Download,
     Share2,
     Play,
@@ -19,7 +18,7 @@ import {
     Redo,
     Plus,
     Wand2,
-    Image,
+    Image as ImageIcon,
     Link,
     Settings,
     Maximize,
@@ -30,12 +29,7 @@ import {
     Mic,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { useMemo } from "react";
 
 interface QuickAction {
     id: string;
@@ -96,7 +90,7 @@ export function QuickActionsToolbar({
     position = "bottom",
     compact = false,
 }: QuickActionsToolbarProps) {
-    const primaryActions: QuickAction[] = [
+    const primaryActions: QuickAction[] = useMemo(() => [
         {
             id: "undo",
             name: "Undo",
@@ -136,9 +130,9 @@ export function QuickActionsToolbar({
             action: onPresent || (() => { }),
             variant: "primary",
         },
-    ];
+    ], [onUndo, onRedo, onAddSlide, onAIGenerate, onPresent, canUndo, canRedo]);
 
-    const secondaryActions: QuickAction[] = [
+    const secondaryActions: QuickAction[] = useMemo(() => [
         {
             id: "save",
             name: isSaving ? "Saving..." : "Save",
@@ -160,13 +154,13 @@ export function QuickActionsToolbar({
             icon: <Share2 className="h-4 w-4" />,
             action: onShare || (() => { }),
         },
-    ];
+    ], [isSaving, onSave, onExport, onShare]);
 
     const insertActions: QuickAction[] = [
         {
             id: "add-image",
             name: "Add Image",
-            icon: <Image className="h-4 w-4" />,
+            icon: <ImageIcon className="h-4 w-4" />,
             action: onAddImage || (() => { }),
         },
         {
@@ -226,142 +220,124 @@ export function QuickActionsToolbar({
     };
 
     return (
-        <TooltipProvider>
-            <div
-                className={cn(
-                    "z-50 flex items-center gap-1 p-2 bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700",
-                    positionClasses[position],
-                    position === "left" || position === "right" ? "flex-col" : "flex-row"
-                )}
-            >
-                {/* Primary Actions */}
-                <div className={cn(
-                    "flex items-center gap-1",
-                    (position === "left" || position === "right") && "flex-col"
-                )}>
-                    {primaryActions.map((action) => (
-                        <QuickActionButton key={action.id} action={action} compact={compact} />
-                    ))}
-                </div>
-
-                <Divider vertical={position === "left" || position === "right"} />
-
-                {/* Secondary Actions */}
-                <div className={cn(
-                    "flex items-center gap-1",
-                    (position === "left" || position === "right") && "flex-col"
-                )}>
-                    {secondaryActions.map((action) => (
-                        <QuickActionButton key={action.id} action={action} compact={compact} />
-                    ))}
-                </div>
-
-                {!compact && (
-                    <>
-                        <Divider vertical={position === "left" || position === "right"} />
-
-                        {/* Insert Actions - shown in popover on compact */}
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                    <Plus className="h-4 w-4" />
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-48 p-2" side={position === "bottom" ? "top" : "bottom"}>
-                                <div className="space-y-1">
-                                    <p className="text-xs font-medium text-slate-500 px-2 mb-2">Insert</p>
-                                    {insertActions.map((action) => (
-                                        <Button
-                                            key={action.id}
-                                            variant="ghost"
-                                            size="sm"
-                                            className="w-full justify-start gap-2"
-                                            onClick={action.action}
-                                        >
-                                            {action.icon}
-                                            {action.name}
-                                        </Button>
-                                    ))}
-                                </div>
-                            </PopoverContent>
-                        </Popover>
-
-                        {/* View Actions - shown in popover */}
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                    <Settings className="h-4 w-4" />
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-48 p-2" side={position === "bottom" ? "top" : "bottom"}>
-                                <div className="space-y-1">
-                                    <p className="text-xs font-medium text-slate-500 px-2 mb-2">View</p>
-                                    {viewActions.map((action) => (
-                                        <Button
-                                            key={action.id}
-                                            variant="ghost"
-                                            size="sm"
-                                            className="w-full justify-start gap-2"
-                                            onClick={action.action}
-                                        >
-                                            {action.icon}
-                                            {action.name}
-                                        </Button>
-                                    ))}
-                                </div>
-                            </PopoverContent>
-                        </Popover>
-                    </>
-                )}
-
-                {/* Collaboration indicator */}
-                {isCollaborating && (
-                    <>
-                        <Divider vertical={position === "left" || position === "right"} />
-                        <div className="flex items-center gap-1 px-2">
-                            <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                            <span className="text-xs text-slate-500">Live</span>
-                        </div>
-                    </>
-                )}
+        <div
+            className={cn(
+                "z-50 flex items-center gap-1 p-2 bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700",
+                positionClasses[position],
+                position === "left" || position === "right" ? "flex-col" : "flex-row"
+            )}
+        >
+            {/* Primary Actions */}
+            <div className={cn(
+                "flex items-center gap-1",
+                (position === "left" || position === "right") && "flex-col"
+            )}>
+                {primaryActions.map((action) => (
+                    <QuickActionButton key={action.id} action={action} compact={compact} />
+                ))}
             </div>
-        </TooltipProvider>
+
+            <Divider vertical={position === "left" || position === "right"} />
+
+            {/* Secondary Actions */}
+            <div className={cn(
+                "flex items-center gap-1",
+                (position === "left" || position === "right") && "flex-col"
+            )}>
+                {secondaryActions.map((action) => (
+                    <QuickActionButton key={action.id} action={action} compact={compact} />
+                ))}
+            </div>
+
+            {!compact && (
+                <>
+                    <Divider vertical={position === "left" || position === "right"} />
+
+                    {/* Insert Actions - shown in popover on compact */}
+                    <Popover>
+                        <PopoverTrigger className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "h-8 w-8")}>
+                            <Plus className="h-4 w-4" />
+                        </PopoverTrigger>
+                        <PopoverContent className="w-48 p-2" side={position === "bottom" ? "top" : "bottom"}>
+                            <div className="space-y-1">
+                                <p className="text-xs font-medium text-slate-500 px-2 mb-2">Insert</p>
+                                {insertActions.map((action) => (
+                                    <Button
+                                        key={action.id}
+                                        variant="ghost"
+                                        size="sm"
+                                        className="w-full justify-start gap-2"
+                                        onClick={action.action}
+                                    >
+                                        {action.icon}
+                                        {action.name}
+                                    </Button>
+                                ))}
+                            </div>
+                        </PopoverContent>
+                    </Popover>
+
+                    {/* View Actions - shown in popover */}
+                    <Popover>
+                        <PopoverTrigger className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "h-8 w-8")}>
+                            <Settings className="h-4 w-4" />
+                        </PopoverTrigger>
+                        <PopoverContent className="w-48 p-2" side={position === "bottom" ? "top" : "bottom"}>
+                            <div className="space-y-1">
+                                <p className="text-xs font-medium text-slate-500 px-2 mb-2">View</p>
+                                {viewActions.map((action) => (
+                                    <Button
+                                        key={action.id}
+                                        variant="ghost"
+                                        size="sm"
+                                        className="w-full justify-start gap-2"
+                                        onClick={action.action}
+                                    >
+                                        {action.icon}
+                                        {action.name}
+                                    </Button>
+                                ))}
+                            </div>
+                        </PopoverContent>
+                    </Popover>
+                </>
+            )}
+
+            {/* Collaboration indicator */}
+            {isCollaborating && (
+                <>
+                    <Divider vertical={position === "left" || position === "right"} />
+                    <div className="flex items-center gap-1 px-2">
+                        <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                        <span className="text-xs text-slate-500">Live</span>
+                    </div>
+                </>
+            )}
+        </div>
     );
 }
 
 function QuickActionButton({
     action,
-    compact,
 }: {
     action: QuickAction;
     compact?: boolean;
 }) {
     return (
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <Button
-                    variant={action.variant === "primary" ? "default" : "ghost"}
-                    size="icon"
-                    className={cn(
-                        "h-8 w-8",
-                        action.variant === "primary" && "bg-blue-600 hover:bg-blue-700 text-white",
-                        action.variant === "danger" && "hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-950"
-                    )}
-                    onClick={action.action}
-                    disabled={action.disabled}
-                >
-                    {action.icon}
-                </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top" className="flex items-center gap-2">
-                <span>{action.name}</span>
-                {action.shortcut && (
-                    <kbd className="px-1.5 py-0.5 text-xs bg-slate-200 dark:bg-slate-700 rounded">
-                        {action.shortcut}
-                    </kbd>
-                )}
-            </TooltipContent>
-        </Tooltip>
+        <button
+            className={cn(
+                buttonVariants({ variant: action.variant === "primary" ? "default" : "ghost", size: "icon" }),
+                "h-8 w-8",
+                action.variant === "primary" && "bg-blue-600 hover:bg-blue-700 text-white",
+                action.variant === "danger" && "hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-950"
+            )}
+            onClick={action.action}
+            disabled={action.disabled}
+            title={action.name}
+            type="button"
+        >
+            {action.icon}
+        </button>
     );
 }
 
@@ -385,7 +361,7 @@ export function QuickActionsFAB({
     return (
         <Button
             size="icon"
-            className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg bg-gradient-to-br from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+            className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg bg-linear-to-br from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
             onClick={onPress}
         >
             <Zap className="h-6 w-6 text-white" />

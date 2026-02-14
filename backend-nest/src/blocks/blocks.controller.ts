@@ -15,28 +15,94 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { BlockType } from '@prisma/client';
 
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsObject,
+  IsNumber,
+  IsArray,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+
 class CreateBlockDto {
+  @IsString()
   projectId: string;
+
+  @IsString()
+  @IsOptional()
   slideId?: string;
+
+  @IsEnum(BlockType)
   blockType: BlockType;
-  content: any;
+
+  @IsObject()
+  content: Record<string, any>;
+
+  @IsNumber()
   order: number;
-  style?: any;
+
+  @IsObject()
+  @IsOptional()
+  style?: Record<string, any>;
 }
 
 class UpdateBlockDto {
-  content?: any;
+  @IsObject()
+  @IsOptional()
+  content?: Record<string, any>;
+
+  @IsNumber()
+  @IsOptional()
   order?: number;
-  style?: any;
+
+  @IsObject()
+  @IsOptional()
+  style?: Record<string, any>;
+
+  @IsEnum(BlockType)
+  @IsOptional()
   blockType?: BlockType;
 }
 
+class ReorderBlockItem {
+  @IsString()
+  id: string;
+
+  @IsNumber()
+  order: number;
+}
+
 class ReorderBlocksDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ReorderBlockItem)
   blocks: Array<{ id: string; order: number }>;
 }
 
+class BatchUpdateBlockItem {
+  @IsString()
+  id: string;
+
+  @IsObject()
+  @IsOptional()
+  content?: Record<string, any>;
+
+  @IsObject()
+  @IsOptional()
+  style?: Record<string, any>;
+}
+
 class BatchUpdateDto {
-  blocks: Array<{ id: string; content?: any; style?: any }>;
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BatchUpdateBlockItem)
+  blocks: Array<{
+    id: string;
+    content?: Record<string, any>;
+    style?: Record<string, any>;
+  }>;
 }
 
 @Controller('blocks')
@@ -50,7 +116,7 @@ export class BlocksController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async create(
-    @CurrentUser() user: any,
+    @CurrentUser() user: { id: string },
     @Body() createBlockDto: CreateBlockDto,
   ) {
     return this.blocksService.create(user.id, createBlockDto);
@@ -69,7 +135,7 @@ export class BlocksController {
    */
   @Patch(':id')
   async update(
-    @CurrentUser() user: any,
+    @CurrentUser() user: { id: string },
     @Param('id') id: string,
     @Body() updateBlockDto: UpdateBlockDto,
   ) {
@@ -81,7 +147,7 @@ export class BlocksController {
    */
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
-  async remove(@CurrentUser() user: any, @Param('id') id: string) {
+  async remove(@CurrentUser() user: { id: string }, @Param('id') id: string) {
     return this.blocksService.remove(user.id, id);
   }
 
@@ -91,7 +157,7 @@ export class BlocksController {
   @Post('reorder/:projectId')
   @HttpCode(HttpStatus.OK)
   async reorder(
-    @CurrentUser() user: any,
+    @CurrentUser() user: { id: string },
     @Param('projectId') projectId: string,
     @Body() reorderDto: ReorderBlocksDto,
   ) {
@@ -104,7 +170,7 @@ export class BlocksController {
   @Post('batch/:projectId')
   @HttpCode(HttpStatus.OK)
   async batchUpdate(
-    @CurrentUser() user: any,
+    @CurrentUser() user: { id: string },
     @Param('projectId') projectId: string,
     @Body() batchUpdateDto: BatchUpdateDto,
   ) {

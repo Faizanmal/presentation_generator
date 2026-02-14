@@ -1,21 +1,32 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  Body,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { ThemesService } from './themes.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ColorPaletteService, ColorPalette } from './color-palette.service';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @Controller('themes')
 export class ThemesController {
-  constructor(private readonly themesService: ThemesService) {}
+  constructor(
+    private readonly themesService: ThemesService,
+    private readonly colorPaletteService: ColorPaletteService,
+  ) {}
 
   /**
    * Get all available themes
    */
   @Get()
   @UseGuards(OptionalJwtAuthGuard)
-  async findAll(@CurrentUser() user: any) {
-    // Include premium themes if user is authenticated
-    // (availability check happens when applying theme)
+  async findAll() {
     return this.themesService.findAll(true);
   }
 
@@ -33,5 +44,83 @@ export class ThemesController {
   @Get('default')
   async getDefault() {
     return this.themesService.getDefault();
+  }
+
+  /**
+   * Extract color palette from an image
+   */
+  @Post('extract-palette')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async extractPalette(
+    @Body() body: { imageUrl: string },
+  ): Promise<ColorPalette> {
+    const palette = await this.colorPaletteService.extractFromImage(
+      body.imageUrl,
+    );
+    return palette;
+  }
+
+  /**
+   * Create a theme from extracted palette
+   */
+  @Post('create-from-palette')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.CREATED)
+  async createFromPalette(
+    @CurrentUser() user: { id: string },
+    @Body()
+    body: {
+      themeName: string;
+      palette: {
+        primary: string;
+        secondary: string;
+        background: string;
+        surface: string;
+        text: string;
+        textMuted: string;
+        accent: string;
+      };
+    },
+  ) {
+    const theme = await this.colorPaletteService.createThemeFromPalette(
+      user.id,
+      { ...body.palette, colors: [] },
+      body.themeName,
+    );
+    return theme;
+  }
+
+  /**
+   * Generate color harmonies from a base color
+   */
+  @Post('harmonies')
+  @HttpCode(HttpStatus.OK)
+  generateHarmonies(@Body() body: { baseColor: string }) {
+    const harmonies = this.colorPaletteService.generateHarmonies(
+      body.baseColor,
+    );
+    return harmonies;
+  }
+
+  /**
+   * Get accessible text colors for a background
+   */
+  @Post('accessible-text')
+  @HttpCode(HttpStatus.OK)
+  getAccessibleText(@Body() body: { backgroundColor: string }) {
+    const textColors = this.colorPaletteService.getAccessibleTextColor(
+      body.backgroundColor,
+    );
+    return textColors;
+  }
+
+  /**
+   * Get predefined color palettes
+   */
+  @Get('palettes/predefined')
+  @HttpCode(HttpStatus.OK)
+  getPredefinedPalettes() {
+    return this.colorPaletteService.getPredefinedPalettes();
   }
 }

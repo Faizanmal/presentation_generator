@@ -47,7 +47,7 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
 
   updateProject: (data: Partial<Project>) => {
     const { project } = get();
-    if (!project) return;
+    if (!project) { return; }
 
     set({
       project: { ...project, ...data },
@@ -55,7 +55,7 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
     });
 
     // Auto-save after 2 seconds
-    if (saveTimeout) clearTimeout(saveTimeout);
+    if (saveTimeout) { clearTimeout(saveTimeout); }
     saveTimeout = setTimeout(() => {
       set({ isDirty: false });
     }, 2000);
@@ -67,7 +67,7 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
 
   setTheme: (theme: Theme) => {
     const { project } = get();
-    if (!project) return;
+    if (!project) { return; }
 
     set({
       project: { ...project, theme, themeId: theme.id },
@@ -77,7 +77,7 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
 
   addSlide: (slide: Slide) => {
     const { project } = get();
-    if (!project) return;
+    if (!project) { return; }
 
     const updatedSlides = [...(project.slides || []), slide].sort(
       (a, b) => a.order - b.order
@@ -91,7 +91,7 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
 
   deleteSlide: (slideId: string) => {
     const { project, currentSlideIndex } = get();
-    if (!project) return;
+    if (!project) { return; }
 
     const slideIndex = project.slides?.findIndex((s) => s.id === slideId) ?? -1;
     const updatedSlides = project.slides?.filter((s) => s.id !== slideId) || [];
@@ -114,12 +114,13 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
 
   duplicateSlide: (slideId: string) => {
     const { project } = get();
-    if (!project) return;
+    if (!project) { return; }
 
     const slideIndex = project.slides?.findIndex((s) => s.id === slideId) ?? -1;
-    if (slideIndex === -1) return;
+    if (slideIndex === -1) { return; }
 
-    const slideToDuplicate = project.slides![slideIndex];
+    const slideToDuplicate = project.slides?.[slideIndex];
+    if (!slideToDuplicate) {return;}
     const newSlide: Slide = {
       ...slideToDuplicate,
       id: `${slideId}-copy-${Date.now()}`,
@@ -139,7 +140,7 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
 
   reorderSlides: (fromIndex: number, toIndex: number) => {
     const { project } = get();
-    if (!project || !project.slides) return;
+    if (!project || !project.slides) { return; }
 
     const slides = [...project.slides];
     const [movedSlide] = slides.splice(fromIndex, 1);
@@ -156,10 +157,10 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
 
   addBlock: (slideId: string, block: Block) => {
     const { project } = get();
-    if (!project) return;
+    if (!project) { return; }
 
     const updatedSlides = project.slides?.map((slide) => {
-      if (slide.id !== slideId) return slide;
+      if (slide.id !== slideId) { return slide; }
       const updatedBlocks = [...(slide.blocks || []), block].sort(
         (a, b) => a.order - b.order
       );
@@ -174,10 +175,10 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
 
   updateBlock: (slideId: string, blockId: string, data: Partial<Block>) => {
     const { project } = get();
-    if (!project) return;
+    if (!project) { return; }
 
     const updatedSlides = project.slides?.map((slide) => {
-      if (slide.id !== slideId) return slide;
+      if (slide.id !== slideId) { return slide; }
       const updatedBlocks = slide.blocks?.map((block) =>
         block.id === blockId ? { ...block, ...data } : block
       );
@@ -192,10 +193,10 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
 
   deleteBlock: (slideId: string, blockId: string) => {
     const { project } = get();
-    if (!project) return;
+    if (!project) { return; }
 
     const updatedSlides = project.slides?.map((slide) => {
-      if (slide.id !== slideId) return slide;
+      if (slide.id !== slideId) { return slide; }
       const updatedBlocks = slide.blocks?.filter((b) => b.id !== blockId) || [];
       return { ...slide, blocks: updatedBlocks };
     });
@@ -208,10 +209,10 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
 
   reorderBlocks: (slideId: string, fromIndex: number, toIndex: number) => {
     const { project } = get();
-    if (!project) return;
+    if (!project) { return; }
 
     const updatedSlides = project.slides?.map((slide) => {
-      if (slide.id !== slideId || !slide.blocks) return slide;
+      if (slide.id !== slideId || !slide.blocks) { return slide; }
 
       const blocks = [...slide.blocks];
       const [movedBlock] = blocks.splice(fromIndex, 1);
@@ -228,7 +229,7 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
   },
 
   reset: () => {
-    if (saveTimeout) clearTimeout(saveTimeout);
+    if (saveTimeout) { clearTimeout(saveTimeout); }
     set({
       project: null,
       currentSlideIndex: 0,

@@ -1,0 +1,43 @@
+# Doppler Configuration
+# Required: npm install -g doppler-cli
+
+project: "presentation-designer"
+config: "dev"
+
+# Environment mappings
+environments:
+  development:
+    config: "dev"
+  staging:
+    config: "stg"
+  production:
+    config: "prd"
+
+# Secrets syncing
+sync:
+  enabled: true
+  max_frequency: "30m"
+
+# Secret redaction in logs
+redaction:
+  enabled: true
+  patterns:
+    - "sk-.*"
+    - "pk-.*"
+    - ".*_KEY"
+    - ".*_SECRET"
+    - ".*_TOKEN"
+    - ".*_PASSWORD"
+
+# Fallback behavior
+fallback:
+  enabled: true
+  directory: ".secrets"
+
+# Required secrets (will warn if missing)
+required_secrets:
+  - DATABASE_URL
+  - JWT_SECRET
+  - OPENAI_API_KEY
+  - STRIPE_SECRET_KEY
+  - NEW_RELIC_LICENSE_KEY

@@ -24,6 +24,7 @@ A Gamma-like SaaS application for creating beautiful AI-powered presentations. B
 - 📱 **PWA & Offline Support**: Install as app, work offline with background sync
 
 ### 🆕 Latest Features (V2.0)
+- 🖼️ **AI Image Generation & Stock Integration**: Choose between unique AI-generated illustrations (DALL-E 3) or high-quality stock photos for your slides.
 - 🎯 **AI Audience Adaptation**: Automatically adapt presentations for different audiences (executives, sales, technical, investors, etc.) with tone, complexity, and length adjustments
 - 📊 **Interactive Embeds**: Live polls, Q&A sessions, forms, quizzes, and word clouds with real-time results via WebSocket
 - 📈 **Data-Driven Charts**: Connect live data from CSV, Google Sheets, or APIs with auto-refresh and AI-suggested chart types
@@ -284,112 +285,21 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 ## Subscription Plans
 
-| Feature | Free | Pro ($12/mo) | Enterprise ($49/mo) |
-|---------|------|--------------|---------------------|
-| Presentations | 3 | 50 | 1000 |
-| AI Generations | 10/month | 500/month | 10,000/month |
+| Feature | Free | Pro ($29/mo) | Enterprise ($199/mo) |
+|---------|------|--------------:|---------------------:|
+| Presentations | 3 | 100 | 1,000 |
+| Standard AI Generations | 10/month | 1,000/month | 50,000/month |
+| Thinking (high‑quality) generations (included) | 0 | 5 / month | 250 / month |
 | Themes | Basic | All | All |
 | Export PDF | ❌ | ✅ | ✅ |
 | Priority Support | ❌ | ✅ | ✅ |
 | Team Features | ❌ | ❌ | ✅ |
 
-## API Endpoints
+Notes:
+- "Standard AI Generations" are the lower‑cost quick generations. "Thinking" runs are higher‑cost, multi‑step generations (use credits).
+- You can purchase additional Thinking credits or upgrade plans for higher quotas.
 
-### Authentication
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - Login user
-- `GET /api/auth/me` - Get current user
-- `GET /api/auth/google` - Google OAuth login
 
-### Projects
-- `GET /api/projects` - List user's projects
-- `POST /api/projects` - Create new project
-- `POST /api/projects/generate` - Generate project with AI
-- `GET /api/projects/:id` - Get project details
-- `PATCH /api/projects/:id` - Update project
-- `DELETE /api/projects/:id` - Delete project
-- `POST /api/projects/:id/duplicate` - Duplicate project
-
-### Slides
-- `POST /api/slides` - Create slide
-- `PATCH /api/slides/:id` - Update slide
-- `DELETE /api/slides/:id` - Delete slide
-- `POST /api/slides/reorder/:projectId` - Reorder slides
-
-### Blocks
-- `POST /api/blocks` - Create block
-- `PATCH /api/blocks/:id` - Update block
-- `DELETE /api/blocks/:id` - Delete block
-- `POST /api/blocks/reorder/:slideId` - Reorder blocks
-- `POST /api/blocks/batch/:projectId` - Batch update blocks
-
-### Themes
-- `GET /api/themes` - List all themes
-- `GET /api/themes/:id` - Get theme details
-
-### Export
-- `GET /api/export/:projectId` - Export project
-- `GET /api/export/can-export` - Check export eligibility
-
-### Payments
-- `POST /api/payments/checkout` - Create checkout session
-- `POST /api/payments/portal` - Create customer portal session
-- `POST /api/payments/webhook` - Stripe webhook
-
-### Collaboration (WebSocket)
-- `WS /collaboration` - Real-time collaboration gateway
-  - `join-session` - Join a project editing session
-  - `leave-session` - Leave a session
-  - `cursor-move` - Broadcast cursor position
-  - `block-update` - Real-time block updates
-  - `slide-update` - Real-time slide updates
-  - `add-comment` - Add comments
-  - `save-version` - Save version snapshot
-
-### Voice-to-Slides
-- `POST /api/voice/upload` - Upload voice recording
-- `GET /api/voice/recording/:id` - Get recording status
-- `POST /api/voice/transcribe` - Direct transcription
-- `POST /api/voice/generate/:recordingId` - Generate slides from recording
-
-### Analytics
-- `GET /api/analytics/overview/:projectId` - Get analytics overview
-- `GET /api/analytics/slides/:projectId` - Get per-slide analytics
-- `GET /api/analytics/sessions/:projectId` - Get viewer sessions
-- `GET /api/analytics/insights/:projectId` - Get AI insights
-- `POST /api/analytics/track/view/:projectId` - Track presentation view
-- `POST /api/analytics/track/slide/:projectId/:slideId` - Track slide view
-
-### Integrations
-- `GET /api/integrations` - List connected integrations
-- `POST /api/integrations/connect` - Initiate OAuth connection
-- `DELETE /api/integrations/:id` - Disconnect integration
-- `POST /api/integrations/zoom/meeting` - Create Zoom meeting
-- `POST /api/integrations/slack/send` - Send to Slack
-- `POST /api/integrations/figma/import` - Import from Figma
-- `POST /api/integrations/notion/import` - Import from Notion
-
-### Personalization
-- `GET /api/personalization/brand-profiles` - List brand profiles
-- `POST /api/personalization/brand-profiles` - Create brand profile
-- `PATCH /api/personalization/brand-profiles/:id` - Update brand profile
-- `POST /api/personalization/training-documents` - Upload training document
-- `GET /api/personalization/ai-settings` - Get AI personalization
-- `PATCH /api/personalization/ai-settings` - Update AI settings
-
-### Organizations (Enterprise)
-- `GET /api/organizations/current` - Get current organization
-- `POST /api/organizations` - Create organization
-- `GET /api/organizations/:id/members` - List members
-- `POST /api/organizations/:id/invitations` - Send invitation
-- `POST /api/organizations/:id/sso/saml` - Configure SAML SSO
-- `GET /api/organizations/:id/audit-logs` - Get audit logs
-- `PATCH /api/organizations/:id/white-label` - Update white-label settings
-
-### Sync (Offline)
-- `GET /api/sync/cache/:projectId` - Get cached project
-- `POST /api/sync/queue` - Add to sync queue
-- `POST /api/sync/resolve` - Resolve sync conflict
 
 ## License
 

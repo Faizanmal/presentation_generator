@@ -178,7 +178,7 @@ const ChartTooltipContent = React.forwardRef<
     <div
       ref={ref}
       className={cn(
-        "grid min-w-[8rem] items-start gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl",
+        "grid min-w-32 items-start gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl",
         className as string
       )}
       {...rest}
@@ -191,8 +191,13 @@ const ChartTooltipContent = React.forwardRef<
           const indicatorColor = color || ((item.payload as Record<string, unknown>)?.fill as string) || (item.color as string)
 
           return (
+             
+             
+             
+             
+             
             <div
-              key={`${key}-${index}`}
+              key={`${item.name}-${key}`}
               className={cn(
                 "flex w-full flex-wrap items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5 [&>svg]:text-muted-foreground",
                 indicator === "dot" && "items-center"
@@ -208,7 +213,7 @@ const ChartTooltipContent = React.forwardRef<
                       !hideIndicator && (
                         <div
                           className={cn(
-                            "shrink-0 rounded-[2px] border-[--color-border] bg-[--color-bg]",
+                            "shrink-0 rounded-xs border-[--color-border] bg-[--color-bg]",
                             {
                               "h-2.5 w-2.5": indicator === "dot",
                               "w-1": indicator === "line",
@@ -289,10 +294,16 @@ const ChartLegendContent = React.forwardRef<
         {payload.map((item: Record<string, unknown>, index: number) => {
           const key = `${nameKey || (item.dataKey as string) || "value"}`
           const itemConfig = getPayloadConfigFromPayload(config, item, key)
+          const uniqueKey = `${key}-${(item.payload as Record<string, string | number>)?.id || index}`
 
           return (
+             
+             
+             
+             
+             
             <div
-              key={`${key}-${index}`}
+              key={uniqueKey}
               className={cn(
                 "flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-muted-foreground"
               )}
@@ -301,7 +312,7 @@ const ChartLegendContent = React.forwardRef<
                 <itemConfig.icon />
               ) : (
                 <div
-                  className="h-2 w-2 shrink-0 rounded-[2px]"
+                  className="h-2 w-2 shrink-0 rounded-xs"
                   style={{
                     backgroundColor: item.color as string,
                   }}

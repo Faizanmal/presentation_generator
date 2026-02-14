@@ -6,11 +6,17 @@ import {
   Param,
   UseGuards,
   Request,
-  Delete,
-  Patch,
 } from '@nestjs/common';
+
+interface AuthenticatedRequest {
+  user: { id: string };
+}
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { InteractiveEmbedsService, FormField, QuizQuestion } from './interactive-embeds.service';
+import {
+  InteractiveEmbedsService,
+  FormField,
+  QuizQuestion,
+} from './interactive-embeds.service';
 
 // DTOs
 class CreatePollDto {
@@ -81,16 +87,13 @@ export class InteractiveEmbedsController {
     @Param('projectId') projectId: string,
     @Param('slideId') slideId: string,
     @Body() dto: CreatePollDto,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ) {
     return this.embedsService.createPoll(projectId, slideId, req.user.id, dto);
   }
 
   @Post('poll/:embedId/vote')
-  async votePoll(
-    @Param('embedId') embedId: string,
-    @Body() dto: VotePollDto,
-  ) {
+  async votePoll(@Param('embedId') embedId: string, @Body() dto: VotePollDto) {
     return this.embedsService.votePoll(embedId, dto.optionIds, dto.voterId);
   }
 
@@ -101,16 +104,21 @@ export class InteractiveEmbedsController {
     @Param('projectId') projectId: string,
     @Param('slideId') slideId: string,
     @Body() dto: CreateQASessionDto,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ) {
-    return this.embedsService.createQASession(projectId, slideId, req.user.id, dto);
+    return this.embedsService.createQASession(
+      projectId,
+      slideId,
+      req.user.id,
+      dto,
+    );
   }
 
   @Post('qa/:embedId/question')
   async submitQuestion(
     @Param('embedId') embedId: string,
     @Body() dto: SubmitQuestionDto,
-    @Request() req: any,
+    @Request() req: Partial<AuthenticatedRequest>,
   ) {
     return this.embedsService.submitQuestion(
       embedId,
@@ -124,9 +132,8 @@ export class InteractiveEmbedsController {
   async upvoteQuestion(
     @Param('embedId') embedId: string,
     @Param('questionId') questionId: string,
-    @Request() req: any,
   ) {
-    return this.embedsService.upvoteQuestion(embedId, questionId, req.user?.id);
+    return this.embedsService.upvoteQuestion(embedId, questionId);
   }
 
   @Post('qa/:embedId/question/:questionId/answer')
@@ -135,14 +142,8 @@ export class InteractiveEmbedsController {
     @Param('embedId') embedId: string,
     @Param('questionId') questionId: string,
     @Body() dto: AnswerQuestionDto,
-    @Request() req: any,
   ) {
-    return this.embedsService.answerQuestion(
-      embedId,
-      questionId,
-      dto.answer,
-      req.user.id,
-    );
+    return this.embedsService.answerQuestion(embedId, questionId, dto.answer);
   }
 
   // Forms
@@ -152,7 +153,7 @@ export class InteractiveEmbedsController {
     @Param('projectId') projectId: string,
     @Param('slideId') slideId: string,
     @Body() dto: CreateFormDto,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ) {
     return this.embedsService.createForm(projectId, slideId, req.user.id, dto);
   }
@@ -161,7 +162,7 @@ export class InteractiveEmbedsController {
   async submitFormResponse(
     @Param('embedId') embedId: string,
     @Body() dto: SubmitFormDto,
-    @Request() req: any,
+    @Request() req: Partial<AuthenticatedRequest>,
   ) {
     return this.embedsService.submitFormResponse(
       embedId,
@@ -177,7 +178,7 @@ export class InteractiveEmbedsController {
     @Param('projectId') projectId: string,
     @Param('slideId') slideId: string,
     @Body() dto: CreateQuizDto,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ) {
     return this.embedsService.createQuiz(projectId, slideId, req.user.id, dto);
   }
@@ -186,7 +187,7 @@ export class InteractiveEmbedsController {
   async submitQuizAnswers(
     @Param('embedId') embedId: string,
     @Body() dto: SubmitQuizDto,
-    @Request() req: any,
+    @Request() req: Partial<AuthenticatedRequest>,
   ) {
     return this.embedsService.submitQuizAnswers(
       embedId,
@@ -202,16 +203,21 @@ export class InteractiveEmbedsController {
     @Param('projectId') projectId: string,
     @Param('slideId') slideId: string,
     @Body() dto: CreateWordCloudDto,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ) {
-    return this.embedsService.createWordCloud(projectId, slideId, req.user.id, dto);
+    return this.embedsService.createWordCloud(
+      projectId,
+      slideId,
+      req.user.id,
+      dto,
+    );
   }
 
   @Post('wordcloud/:embedId/submit')
   async submitWords(
     @Param('embedId') embedId: string,
     @Body() dto: SubmitWordsDto,
-    @Request() req: any,
+    @Request() req: Partial<AuthenticatedRequest>,
   ) {
     return this.embedsService.submitWords(embedId, dto.words, req.user?.id);
   }

@@ -1,49 +1,8 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-
-export interface AnalyticsOverview {
-  totalViews: number;
-  uniqueViews: number;
-  averageDuration: number;
-  completionRate: number;
-  dropOffSlide: number | null;
-  topSlides: any[];
-  viewsByDay: any[];
-  insights: string[];
-}
-
-export interface SlideAnalytics {
-  slideId: string;
-  slideNumber: number;
-  slideTitle?: string;
-  views: number;
-  avgDuration: number;
-  dropOffRate: number; // Percentage 0-100
-  clicks: number;
-}
-
-export interface ViewerSession {
-  id: string;
-  viewerName?: string;
-  viewerEmail?: string;
-  startTime: string;
-  duration: number;
-  slidesViewed: number;
-  completionRate: number; // Percentage 0-100
-  device: 'desktop' | 'mobile' | 'tablet';
-  location?: string;
-}
-
-export interface HeatmapData {
-  slideId: string;
-  x: number;
-  y: number;
-  clickCount: number;
-}
+import type { AnalyticsOverview, SlideAnalytics, ViewerSession, HeatmapData } from '@/types';
 
 interface UseAnalyticsOptions {
   projectId: string;
@@ -97,6 +56,22 @@ export function useAnalytics({
     staleTime: 60 * 1000, // 1 minute
   });
 
+  // Get AI insights
+  const {
+    data: insightsData,
+    isLoading: isLoadingInsights,
+    error: insightsError,
+  } = useQuery<{
+    insights: string[];
+    recommendations: string[];
+    score: number;
+  }>({
+    queryKey: ['analytics', 'insights', projectId],
+    queryFn: () => api.getAIInsights(projectId),
+    enabled: enabled && !!projectId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
   // Get per-slide analytics
   const {
     data: slideAnalytics,
@@ -116,7 +91,13 @@ export function useAnalytics({
     error: sessionsError,
   } = useQuery<{ data: ViewerSession[]; total: number }>({
     queryKey: ['analytics', 'sessions', projectId, timeRange],
-    queryFn: () => api.getViewerSessions(projectId, 1, 50),
+    queryFn: async () => {
+      const response = await api.getViewerSessions(projectId, 1, 50);
+      return {
+        data: response.data,
+        total: response.meta.total,
+      };
+    },
     enabled: enabled && !!projectId,
     staleTime: 60 * 1000,
   });
@@ -147,6 +128,7 @@ export function useAnalytics({
     queryClient.invalidateQueries({ queryKey: ['analytics', 'slides', projectId] });
     queryClient.invalidateQueries({ queryKey: ['analytics', 'sessions', projectId] });
     queryClient.invalidateQueries({ queryKey: ['analytics', 'stats', projectId] });
+    queryClient.invalidateQueries({ queryKey: ['analytics', 'insights', projectId] });
   };
 
   // Export analytics as CSV/PDF
@@ -175,8 +157,8 @@ export function useAnalytics({
 
     // Slides needing improvement (high drop-off)
     lowPerformingSlides: slideAnalytics
-      ?.filter((s) => s.dropOffRate > 30)
-      .sort((a, b) => b.dropOffRate - a.dropOffRate),
+      ?.filter((s) => s.dropoffRate > 30)
+      .sort((a, b) => b.dropoffRate - a.dropoffRate),
 
     // Average session duration
     avgSessionDuration: (() => {
@@ -204,7 +186,9 @@ export function useAnalytics({
     overviewError,
 
     // Insights
-    insights: overview?.insights || [],
+    insights: insightsData?.insights || [],
+    isLoadingInsights,
+    insightsError,
 
     // Slide analytics
     slideAnalytics,
@@ -247,7 +231,7 @@ export function useViewTracking(projectId: string, sessionId?: string) {
   const trackViewStart = async () => {
     try {
       const result = await api.trackViewStart(projectId, sessionIdRef.current);
-      presentationViewIdRef.current = result.id;
+      presentationViewIdRef.current = result.viewId;
       return result;
     } catch (error) {
       console.error('Error tracking view start:', error);
@@ -256,10 +240,10 @@ export function useViewTracking(projectId: string, sessionId?: string) {
 
   // Track slide enter
   const trackSlideEnter = async (slideId: string, slideIndex: number) => {
-    if (!presentationViewIdRef.current) return;
+    if (!presentationViewIdRef.current) {return;}
 
     try {
-      const result = await api.trackSlideEnter(presentationViewIdRef.current, slideId, slideIndex);
+      const result = await api.trackSlideEnter(presentationViewIdRef.current, slideId, slideIndex) as { id: string };
       currentSlideViewIdRef.current = result.id;
       return result;
     } catch (error) {
@@ -269,7 +253,7 @@ export function useViewTracking(projectId: string, sessionId?: string) {
 
   // Track slide exit
   const trackSlideExit = async () => {
-    if (!currentSlideViewIdRef.current) return;
+    if (!currentSlideViewIdRef.current) {return;}
 
     try {
       await api.trackSlideExit(currentSlideViewIdRef.current);
@@ -281,7 +265,7 @@ export function useViewTracking(projectId: string, sessionId?: string) {
 
   // Track slide interaction
   const trackInteraction = async () => {
-    if (!currentSlideViewIdRef.current) return;
+    if (!currentSlideViewIdRef.current) {return;}
 
     try {
       await api.trackSlideInteraction(currentSlideViewIdRef.current);
@@ -301,7 +285,7 @@ export function useViewTracking(projectId: string, sessionId?: string) {
 
   // Track presentation end
   const trackViewEnd = async () => {
-    if (!presentationViewIdRef.current) return;
+    if (!presentationViewIdRef.current) {return;}
 
     try {
       await api.trackViewEnd(presentationViewIdRef.current);

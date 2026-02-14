@@ -47,8 +47,8 @@ export function CommentsPanel({
   const filteredComments = comments.filter((comment) => {
     if (!comment.parentId) {
       // Top-level comments only
-      if (filter === 'open') return !comment.resolved;
-      if (filter === 'resolved') return comment.resolved;
+      if (filter === 'open') {return !comment.resolved;}
+      if (filter === 'resolved') {return comment.resolved;}
       return true;
     }
     return false;
@@ -58,7 +58,7 @@ export function CommentsPanel({
   const commentsBySlide = filteredComments.reduce(
     (acc, comment) => {
       const slideId = comment.slideId || 'general';
-      if (!acc[slideId]) acc[slideId] = [];
+      if (!acc[slideId]) {acc[slideId] = [];}
       acc[slideId].push(comment);
       return acc;
     },
@@ -66,19 +66,19 @@ export function CommentsPanel({
   );
 
   const handleSubmitComment = () => {
-    if (!newComment.trim()) return;
+    if (!newComment.trim()) {return;}
     onAddComment(newComment, selectedSlideId);
     setNewComment('');
   };
 
   const handleSubmitReply = (parentId: string) => {
-    if (!replyContent.trim()) return;
+    if (!replyContent.trim()) {return;}
     onAddComment(replyContent, undefined, undefined, parentId);
     setReplyContent('');
     setReplyingTo(null);
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {return null;}
 
   return (
     <div className="w-80 border-l bg-background flex flex-col h-full">

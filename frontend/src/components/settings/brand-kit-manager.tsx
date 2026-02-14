@@ -5,19 +5,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Palette,
   Type,
-  Image,
+  Image as ImageIcon,
   Plus,
-  Trash2,
   Edit,
   Check,
-  X,
   Upload,
   Eye,
-  Copy,
   Wand2,
-  Loader2,
-  ChevronDown,
-  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,13 +19,10 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+// import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from '@/components/ui/card';
 import {
   Dialog,
@@ -137,20 +128,26 @@ export function BrandKitManager() {
   const [selectedKit, setSelectedKit] = useState<BrandKit | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [newKitName, setNewKitName] = useState('');
-  const [editingColor, setEditingColor] = useState<keyof ColorPalette | null>(null);
+  const [] = useState<keyof ColorPalette | null>(null);
 
   // Fetch brand kits
-  const { data: brandKits, isLoading } = useQuery({
+  const { data: brandKits } = useQuery<BrandKit[]>({
     queryKey: ['brand-kits'],
-    queryFn: () => api.get('/themes/brand-kits'),
+    queryFn: async () => {
+      const response = await api.get('/themes/brand-kits');
+      return response.data as BrandKit[];
+    },
   });
 
   // Create brand kit mutation
   const createMutation = useMutation({
-    mutationFn: (data: { name: string }) => api.post('/themes/brand-kits', data),
-    onSuccess: (data) => {
+    mutationFn: async (data: { name: string }) => {
+      const response = await api.post('/themes/brand-kits', data);
+      return response.data as BrandKit;
+    },
+    onSuccess: (data: BrandKit) => {
       queryClient.invalidateQueries({ queryKey: ['brand-kits'] });
-      setSelectedKit(data as unknown as BrandKit | null);
+      setSelectedKit(data);
       setIsCreating(false);
       setNewKitName('');
       toast.success('Brand kit created');
@@ -168,21 +165,21 @@ export function BrandKitManager() {
   });
 
   // Delete brand kit mutation
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/themes/brand-kits/${id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['brand-kits'] });
-      setSelectedKit(null);
-      toast.success('Brand kit deleted');
-    },
-  });
+  // const deleteMutation = useMutation({
+  //   mutationFn: (id: string) => api.delete(`/themes/brand-kits/${id}`),
+  //   onSuccess: () => {
+  //     queryClient.invalidateQueries({ queryKey: ['brand-kits'] });
+  //     setSelectedKit(null);
+  //     toast.success('Brand kit deleted');
+  //   },
+  // });
 
   const handleColorChange = (colorKey: keyof ColorPalette, value: string) => {
-    if (!selectedKit) return;
+    if (!selectedKit) {return;}
 
     const updatedColors = { ...selectedKit.colors, [colorKey]: value };
     setSelectedKit({ ...selectedKit, colors: updatedColors });
-    
+
     updateMutation.mutate({
       id: selectedKit.id,
       updates: { colors: updatedColors },
@@ -190,11 +187,11 @@ export function BrandKitManager() {
   };
 
   const handleFontChange = (type: 'headingFont' | 'bodyFont', value: string) => {
-    if (!selectedKit) return;
+    if (!selectedKit) {return;}
 
     const updatedTypography = { ...selectedKit.typography, [type]: value };
     setSelectedKit({ ...selectedKit, typography: updatedTypography });
-    
+
     updateMutation.mutate({
       id: selectedKit.id,
       updates: { typography: updatedTypography },
@@ -202,17 +199,17 @@ export function BrandKitManager() {
   };
 
   const handleSetDefault = () => {
-    if (!selectedKit) return;
+    if (!selectedKit) {return;}
     toast.success('Set as default brand kit');
   };
 
   const handleApplyToProject = () => {
-    if (!selectedKit) return;
+    if (!selectedKit) {return;}
     toast.success('Brand kit applied to current project');
   };
 
   // Mock data for initial render
-  const mockBrandKits: BrandKit[] = brandKits?.data || [
+  const mockBrandKits: BrandKit[] = (brandKits as BrandKit[]) || [
     {
       id: 'brand-1',
       name: 'Corporate Brand',
@@ -253,7 +250,7 @@ export function BrandKitManager() {
             Brand Kits
           </h2>
         </div>
-        
+
         <ScrollArea className="flex-1">
           <div className="p-2 space-y-1">
             {mockBrandKits.map((kit) => (
@@ -480,7 +477,7 @@ export function BrandKitManager() {
                 {/* Logos */}
                 <section>
                   <h3 className="font-medium mb-4 flex items-center gap-2">
-                    <Image className="h-4 w-4" />
+                    <ImageIcon className="h-4 w-4" />
                     Logos
                   </h3>
                   <div className="grid grid-cols-4 gap-4">

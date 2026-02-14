@@ -24,7 +24,7 @@ export class VersionControlController {
   @Post()
   async createVersion(
     @Param('projectId') projectId: string,
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
     @Body()
     body: { name?: string; description?: string; isMilestone?: boolean },
   ): Promise<PresentationVersion> {
@@ -63,7 +63,7 @@ export class VersionControlController {
   async restoreVersion(
     @Param('projectId') projectId: string,
     @Param('versionId') versionId: string,
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
   ): Promise<{ success: boolean; message: string }> {
     await this.versionControlService.restoreVersion(
       projectId,
@@ -104,7 +104,7 @@ export class VersionControlController {
   async createBranch(
     @Param('projectId') projectId: string,
     @Param('versionId') versionId: string,
-    @Request() req: any,
+    @Request() req: { user: { id: string } },
     @Body() body: { name: string },
   ): Promise<{ branchId: string; projectId: string }> {
     return this.versionControlService.createBranch(
