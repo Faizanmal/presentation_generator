@@ -57,8 +57,8 @@ jobs:
     - name: Run Linter
       run: npm run lint
 
-    # - name: Run Tests
-    #   run: npm run test # Uncomment when frontend tests are ready
+    - name: Run Tests
+      run: npm run test
 
     - name: Build
       run: npm run build

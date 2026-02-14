@@ -10,6 +10,10 @@ import {
 import { PaymentsService } from './payments.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import {
+  ThrottlePayment,
+  ThrottleModerate,
+} from '../common/decorators/throttle.decorator';
 
 class CreateCheckoutDto {
   plan: 'pro' | 'enterprise';
@@ -25,6 +29,7 @@ export class PaymentsController {
    */
   @Post('checkout')
   @HttpCode(HttpStatus.OK)
+  @ThrottlePayment()
   async createCheckout(
     @CurrentUser() user: { id: string },
     @Body() body: CreateCheckoutDto,
@@ -37,6 +42,7 @@ export class PaymentsController {
    */
   @Post('portal')
   @HttpCode(HttpStatus.OK)
+  @ThrottleModerate()
   async createPortal(@CurrentUser() user: { id: string }) {
     return this.paymentsService.createPortalSession(user.id);
   }
@@ -54,6 +60,7 @@ export class PaymentsController {
    */
   @Post('cancel')
   @HttpCode(HttpStatus.OK)
+  @ThrottlePayment()
   async cancelSubscription(@CurrentUser() user: { id: string }) {
     return this.paymentsService.cancelSubscription(user.id);
   }
@@ -63,6 +70,7 @@ export class PaymentsController {
    */
   @Post('resume')
   @HttpCode(HttpStatus.OK)
+  @ThrottlePayment()
   async resumeSubscription(@CurrentUser() user: { id: string }) {
     return this.paymentsService.resumeSubscription(user.id);
   }

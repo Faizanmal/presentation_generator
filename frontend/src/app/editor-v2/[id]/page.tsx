@@ -49,6 +49,14 @@ import { ViewerAnalyticsWidget } from "@/components/editor/viewer-analytics-widg
 import { BrandKitManager } from "@/components/editor/brand-kit-manager";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
+// New feature components
+import { AISuggestionsPanel } from "@/components/editor/ai-suggestions-panel";
+import { AIRefineButton } from "@/components/editor/ai-refine-button";
+import { MagicLayoutButton } from "@/components/editor/magic-layout-button";
+import { SlideDesignControls } from "@/components/editor/slide-design-controls";
+import { CommentsPanel } from "@/components/editor/comments-panel";
+import { CollaboratorPresence } from "@/components/editor/collaborator-presence";
+
 
 export default function EditorPageV2() {
     const params = useParams();
@@ -80,6 +88,42 @@ export default function EditorPageV2() {
     const [showURLImportDialog, setShowURLImportDialog] = useState(false);
     const [showAnalyticsDialog, setShowAnalyticsDialog] = useState(false);
     const [showBrandKitDialog, setShowBrandKitDialog] = useState(false);
+    const [isCommentsPanelOpen, setIsCommentsPanelOpen] = useState(false);
+    const [comments, setComments] = useState<import('@/types').Comment[]>([]);
+
+    // Mock collaborators for demo
+    const [collaborators] = useState([
+        {
+            id: 'collab-1',
+            name: 'Sarah Chen',
+            email: 'sarah@company.com',
+            avatar: '',
+            color: '#EF4444',
+            status: 'online' as const,
+            activity: 'editing' as const,
+            lastSeen: new Date(),
+        },
+        {
+            id: 'collab-2',
+            name: 'Mike Ross',
+            email: 'mike@company.com',
+            avatar: '',
+            color: '#3B82F6',
+            status: 'online' as const,
+            activity: 'viewing' as const,
+            lastSeen: new Date(),
+        },
+        {
+            id: 'collab-3',
+            name: 'Jessica Park',
+            email: 'jessica@company.com',
+            avatar: '',
+            color: '#F59E0B',
+            status: 'away' as const,
+            activity: 'commenting' as const,
+            lastSeen: new Date(Date.now() - 300000),
+        },
+    ]);
 
     const {
         undo,
@@ -249,6 +293,62 @@ export default function EditorPageV2() {
         window.open(`/present/${projectId}`, "_blank");
     };
 
+    // Comment handlers
+    const handleAddComment = (content: string, slideId?: string, blockId?: string, parentId?: string) => {
+        const newComment: import('@/types').Comment = {
+            id: `comment-${Date.now()}`,
+            projectId,
+            userId: user?.id || 'current-user',
+            user: {
+                id: user?.id || 'current-user',
+                name: user?.name || 'You',
+                image: user?.image || null,
+            },
+            slideId,
+            blockId,
+            content,
+            resolved: false,
+            parentId,
+            replies: [],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        };
+
+        if (parentId) {
+            setComments(prev => prev.map(c => {
+                if (c.id === parentId) {
+                    return { ...c, replies: [...(c.replies || []), newComment] };
+                }
+                return c;
+            }));
+        } else {
+            setComments(prev => [...prev, newComment]);
+        }
+        toast.success("Comment added");
+    };
+
+    const handleResolveComment = (commentId: string) => {
+        setComments(prev => prev.map(c =>
+            c.id === commentId ? { ...c, resolved: true } : c
+        ));
+    };
+
+    const handleDeleteComment = (commentId: string) => {
+        setComments(prev => prev.filter(c => c.id !== commentId));
+        toast.success("Comment deleted");
+    };
+
+    // AI Refine handler
+    const handleRefineComplete = (result: unknown) => {
+        queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+    };
+
+    // AI Suggestion handler
+    const handleApplySuggestion = (action: string, data?: Record<string, unknown>) => {
+        toast.success(`Applying: ${action}`);
+        // Future: apply the action to the slide
+    };
+
     if (authLoading || projectLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900">
@@ -297,15 +397,12 @@ export default function EditorPageV2() {
                 </div>
 
                 <div className="flex items-center gap-4">
-                    {/* Avatars Mock */}
-                    <div className="flex -space-x-2 mr-2">
-                        <div className="h-8 w-8 rounded-full ring-2 ring-white dark:ring-slate-900 bg-slate-200 flex items-center justify-center text-xs ml-auto">
-                            {user?.name?.charAt(0) || "U"}
-                        </div>
-                        <button className="flex items-center justify-center size-8 rounded-full ring-2 ring-white dark:ring-slate-900 bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-gray-300 text-xs font-medium hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors">
-                            +
-                        </button>
-                    </div>
+                    {/* Real Collaborator Presence */}
+                    <CollaboratorPresence
+                        collaborators={collaborators}
+                        currentUserId={user?.id || 'current-user'}
+                        maxVisible={3}
+                    />
                     <div className="h-6 w-px bg-gray-200 dark:bg-slate-800 mx-1" />
 
                     {/* Undo/Redo */}
@@ -317,6 +414,20 @@ export default function EditorPageV2() {
                             <span className="material-symbols-outlined text-[20px]">redo</span>
                         </button>
                     </div>
+
+                    {/* Comments Toggle */}
+                    <button
+                        onClick={() => setIsCommentsPanelOpen(!isCommentsPanelOpen)}
+                        className="relative flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+                    >
+                        <span className="material-symbols-outlined text-[20px]">add_comment</span>
+                        <span className="hidden sm:inline">Comments</span>
+                        {comments.filter(c => !c.resolved).length > 0 && (
+                            <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center font-bold">
+                                {comments.filter(c => !c.resolved).length}
+                            </span>
+                        )}
+                    </button>
 
                     <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors">
                         <span className="material-symbols-outlined text-[20px]">share</span>
@@ -351,6 +462,16 @@ export default function EditorPageV2() {
                         <span className="material-symbols-outlined text-[18px]">style</span>
                         <span className="hidden sm:inline">Templates</span>
                     </button>
+
+                    {/* AI Refine Button */}
+                    <AIRefineButton
+                        projectId={projectId}
+                        slideId={currentSlide?.id}
+                        blocks={currentSlide?.blocks}
+                        slideTitle={currentSlide?.title}
+                        onRefineComplete={handleRefineComplete}
+                    />
+
                     <button
                         onClick={handlePresent}
                         className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/20"
@@ -430,7 +551,7 @@ export default function EditorPageV2() {
                     </div>
 
                     {/* Floating Quick Actions Toolbar */}
-                    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-40">
+                    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3">
                         <QuickActionsToolbar
                             onUndo={undo}
                             onRedo={redo}
@@ -442,11 +563,23 @@ export default function EditorPageV2() {
                             isSaving={saveMutation.isPending}
                             position="bottom"
                         />
+
+                        {/* Magic Layout Button */}
+                        <MagicLayoutButton
+                            projectId={projectId}
+                            slideId={currentSlide?.id}
+                            blocks={currentSlide?.blocks}
+                            heading={currentSlide?.title}
+                            onApplyLayout={(layout) => {
+                                toast.success(`Applied "${layout.name}" layout`);
+                                queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+                            }}
+                        />
                     </div>
                 </main>
 
                 {/* Right Sidebar: Inspector & AI */}
-                <aside className="w-80 bg-white dark:bg-slate-950 border-l border-slate-200 dark:border-slate-800 flex flex-col z-10 shadow-xl">
+                <aside className={`${isCommentsPanelOpen ? 'w-0 overflow-hidden' : 'w-80'} bg-white dark:bg-slate-950 border-l border-slate-200 dark:border-slate-800 flex flex-col z-10 shadow-xl transition-all duration-300`}>
                     <div className="flex border-b border-slate-200 dark:border-slate-800">
                         <button
                             onClick={() => setActiveTab("design")}
@@ -465,70 +598,77 @@ export default function EditorPageV2() {
                     <div className="flex-1 overflow-y-auto p-5 space-y-8">
                         {activeTab === "design" ? (
                             <>
-                                {/* AI Assistant Section */}
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2 text-blue-600 font-semibold">
-                                            <span className="material-symbols-outlined">colors_spark</span>
-                                            <h3>AI Assistant</h3>
-                                        </div>
-                                        <Button variant="ghost" size="sm" onClick={() => setIsAIChatOpen(true)}>
-                                            Open Chat
-                                        </Button>
-                                    </div>
-                                    <div className="bg-linear-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-900 rounded-xl p-4 border border-blue-100 dark:border-slate-700">
-                                        <div className="flex gap-3 mb-3">
-                                            <div className="size-8 rounded-full bg-white dark:bg-slate-950 flex items-center justify-center shadow-sm text-blue-600">
-                                                <span className="material-symbols-outlined text-[18px]">smart_toy</span>
-                                            </div>
-                                            <div className="bg-white dark:bg-slate-950 p-3 rounded-r-xl rounded-bl-xl shadow-sm text-sm text-gray-700 dark:text-gray-200 border border-gray-100 dark:border-slate-800">
-                                                I can help improve this slide. Open chat to get started!
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                {/* AI Suggestions Panel */}
+                                <AISuggestionsPanel
+                                    projectId={projectId}
+                                    slideId={currentSlide?.id}
+                                    blocks={currentSlide?.blocks}
+                                    slideTitle={currentSlide?.title}
+                                    onApplySuggestion={handleApplySuggestion}
+                                    onOpenChat={() => setIsAIChatOpen(true)}
+                                />
+
                                 <hr className="border-slate-100 dark:border-slate-800" />
-                                {/* Theme Controls */}
-                                <div className="space-y-4">
-                                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-gray-400">style</span>
-                                        Slide Theme Area
-                                    </h3>
-                                    <p className="text-xs text-gray-500">Pick a theme from the library</p>
-                                    <div className="grid grid-cols-2 gap-3 pb-8">
-                                        {themes?.map(theme => (
-                                            <button
-                                                key={theme.id}
-                                                onClick={() => handleThemeChange(theme)}
-                                                className={`p-3 border rounded-xl flex flex-col gap-3 group transition-all text-xs font-medium hover:shadow-md ${project?.themeId === theme.id ? "border-blue-600 bg-blue-50 dark:bg-blue-900/20 ring-1 ring-blue-600" : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-900"}`}
-                                            >
-                                                <div
-                                                    className="w-full aspect-video rounded-lg shadow-sm"
-                                                    style={{
-                                                        backgroundColor: theme.colors.background,
-                                                        borderColor: theme.colors.primary,
-                                                        borderWidth: 1,
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center'
-                                                    }}
-                                                >
-                                                    <div className="w-8 h-1 rounded-full" style={{ backgroundColor: theme.colors.primary }} />
-                                                </div>
-                                                <span className="truncate w-full text-center text-slate-700 dark:text-slate-300">{theme.name}</span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
+
+                                {/* Slide Design Controls (Theme, Density, Tone, Export) */}
+                                <SlideDesignControls
+                                    projectId={projectId}
+                                    slideId={currentSlide?.id}
+                                    themes={themes?.map(t => ({
+                                        id: t.id,
+                                        name: t.name,
+                                        colors: { background: t.colors.background, primary: t.colors.primary, text: t.colors.text },
+                                    }))}
+                                    currentThemeId={project?.themeId || undefined}
+                                    onThemeChange={(themeId) => {
+                                        const theme = themes?.find(t => t.id === themeId);
+                                        if (theme) handleThemeChange(theme);
+                                    }}
+                                    onExportPdf={() => handleExport("pdf")}
+                                />
                             </>
                         ) : (
                             <div className="space-y-4">
                                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Properties</h3>
-                                <p className="text-sm text-gray-500">Select an element to view properties.</p>
+                                <p className="text-sm text-gray-500">Select an element to view and edit its properties.</p>
+
+                                {/* Block properties when a block is selected */}
+                                {currentSlide?.blocks && currentSlide.blocks.length > 0 && (
+                                    <div className="space-y-3 mt-4">
+                                        <h4 className="text-xs font-medium text-gray-400 uppercase tracking-wider">Blocks on this slide</h4>
+                                        {currentSlide.blocks.map((block, i) => (
+                                            <div key={block.id} className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                                        {block.type.replace('_', ' ')}
+                                                    </span>
+                                                    <span className="text-xs text-slate-400">#{i + 1}</span>
+                                                </div>
+                                                <p className="text-xs text-slate-500 mt-1 truncate">
+                                                    {block.content?.text || block.content?.url || `${block.content?.items?.length || 0} items`}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
                 </aside>
+
+                {/* Comments Panel (slides out from right) */}
+                {isCommentsPanelOpen && (
+                    <CommentsPanel
+                        comments={comments}
+                        currentUserId={user?.id || 'current-user'}
+                        onAddComment={handleAddComment}
+                        onResolveComment={handleResolveComment}
+                        onDeleteComment={handleDeleteComment}
+                        selectedSlideId={currentSlide?.id}
+                        isOpen={isCommentsPanelOpen}
+                        onClose={() => setIsCommentsPanelOpen(false)}
+                    />
+                )}
             </div>
 
             {/* Command Palette */}

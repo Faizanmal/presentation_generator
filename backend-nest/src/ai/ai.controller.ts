@@ -19,6 +19,11 @@ import { AutoLayoutService } from './auto-layout.service';
 import { AIChatService, SlideContext } from './ai-chat.service';
 import { URLImportService } from './url-import.service';
 import { RealTimeDataService } from './realtime-data.service';
+import {
+  ThrottleAIGeneration,
+  ThrottleImageGeneration,
+  ThrottleModerate,
+} from '../common/decorators/throttle.decorator';
 
 class EnhanceContentDto {
   content: string;
@@ -71,6 +76,7 @@ export class AIController {
    */
   @Post('enhance')
   @HttpCode(HttpStatus.OK)
+  @ThrottleAIGeneration()
   async enhanceContent(
     @CurrentUser() user: { id: string },
     @Body() body: EnhanceContentDto,
@@ -96,6 +102,7 @@ export class AIController {
    */
   @Post('speaker-notes')
   @HttpCode(HttpStatus.OK)
+  @ThrottleAIGeneration()
   async generateSpeakerNotes(
     @CurrentUser() user: { id: string },
     @Body() body: SpeakerNotesDto,
@@ -270,6 +277,7 @@ Format as a numbered list with clear structure.`;
    */
   @Post('generate-image')
   @HttpCode(HttpStatus.OK)
+  @ThrottleImageGeneration()
   async generateImage(
     @CurrentUser() user: { id: string },
     @Body()

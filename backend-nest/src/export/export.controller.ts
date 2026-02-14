@@ -3,6 +3,11 @@ import type { Response } from 'express';
 import { ExportService } from './export.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import {
+  ThrottleExportPDF,
+  ThrottleExportHTML,
+  ThrottleRelaxed,
+} from '../common/decorators/throttle.decorator';
 
 @Controller('export')
 @UseGuards(JwtAuthGuard)
@@ -22,6 +27,7 @@ export class ExportController {
    * Export project to specified format
    */
   @Get(':projectId')
+  @ThrottleExportPDF() // Default to PDF rate limit (can be overridden per format)
   async exportProject(
     @CurrentUser() user: { id: string },
     @Param('projectId') projectId: string,

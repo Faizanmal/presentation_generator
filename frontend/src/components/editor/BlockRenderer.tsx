@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { ChartBlock } from "./chart-block";
+import { ImageAIControls } from "./image-ai-controls";
 
 interface BlockRendererProps {
   block: Block;
@@ -200,13 +201,18 @@ export default function BlockRenderer({
       case "IMAGE":
         return (
           <div className="relative">
-            {content?.url ? (
-              <Image
-                src={content.url}
-                alt={content.alt || "Image"}
-                className="max-w-full h-auto rounded-lg"
-              />
-            ) : (
+            <ImageAIControls
+              imageUrl={content?.url}
+              imageAlt={content?.alt || "Image"}
+              blockId={block.id}
+              slideId={block.slideId || ""}
+              projectId={block.projectId}
+              onImageUpdate={(newUrl, newAlt) => {
+                setContent({ ...content, url: newUrl, alt: newAlt || content?.alt });
+              }}
+              onDelete={onDelete}
+            />
+            {!content?.url && (
               <div className="aspect-video bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center">
                 <span className="text-slate-500">Click to add image</span>
               </div>

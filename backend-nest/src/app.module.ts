@@ -47,6 +47,7 @@ import { ContentLibraryModule } from './library/content-library.module';
 import { CacheModule } from './common/cache/cache.module';
 import { SecurityModule } from './common/security/security.module';
 import { MonitoringModule } from './common/monitoring/monitoring.module';
+import { CsrfModule } from './common/csrf/csrf.module';
 
 // Services for seeding
 import { ThemesService } from './themes/themes.service';
@@ -145,6 +146,7 @@ import { RedisModule } from './common/redis/redis.module';
     CacheModule,
     SecurityModule,
     MonitoringModule,
+    CsrfModule,
   ],
   providers: [
     // Global rate limiting

@@ -1,13 +1,17 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import compression from 'compression';
+import * as cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { LoggerService } from './common/logger/logger.service';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { CacheInterceptor } from './common/interceptors/cache.interceptor';
 import { SanitizationMiddleware } from './common/middleware/security.middleware';
+import { CsrfMiddleware } from './common/middleware/csrf.middleware';
 import {
   initializeNewRelic,
   createNewRelicMiddleware,
@@ -71,6 +75,15 @@ async function bootstrap() {
 
   // Request sanitization
   app.use(new SanitizationMiddleware().use.bind(new SanitizationMiddleware()));
+
+  // Cookie parser (required for CSRF)
+  app.use(cookieParser());
+
+  // CSRF protection
+  if (configService.get<boolean>('CSRF_ENABLED', true)) {
+    app.use(new CsrfMiddleware().use.bind(new CsrfMiddleware()));
+    logger.log('🛡️  CSRF protection enabled');
+  }
 
   // Compression
   app.use(compression());
@@ -138,6 +151,14 @@ async function bootstrap() {
   // Logging interceptor
   app.useGlobalInterceptors(new LoggingInterceptor(logger));
 
+  // Cache interceptor (requires CacheService and Reflector)
+  const reflector = app.get('Reflector');
+  const cacheService = app.get('CacheService');
+  if (cacheService && reflector) {
+    app.useGlobalInterceptors(new CacheInterceptor(cacheService, reflector));
+    logger.log('🗄️  Response caching enabled');
+  }
+
   // ========================================
   // ROUTES CONFIGURATION
   // ========================================
@@ -146,6 +167,53 @@ async function bootstrap() {
   app.setGlobalPrefix('api', {
     exclude: ['health', 'metrics'], // Health check endpoints
   });
+
+  // ========================================
+  // SWAGGER/OPENAPI DOCUMENTATION
+  // ========================================
+
+  if (environment !== 'production') {
+    const config = new DocumentBuilder()
+      .setTitle('Presentation Generator API')
+      .setDescription('AI-powered presentation creation platform with real-time collaboration, analytics, and enterprise features')
+      .setVersion('2.0')
+      .addBearerAuth(
+        {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          name: 'JWT',
+          description: 'Enter JWT token',
+          in: 'header',
+        },
+        'JWT-auth',
+      )
+      .addTag('Auth', 'Authentication and authorization')
+      .addTag('Projects', 'Presentation projects management')
+      .addTag('Slides', 'Slide operations')
+      .addTag('AI', 'AI-powered generation and personalization')
+      .addTag('Collaboration', 'Real-time collaboration features')
+      .addTag('Analytics', 'Presentation and engagement analytics')
+      .addTag('Export', 'Export presentations to various formats')
+      .addTag('Themes', 'Theme and design management')
+      .addTag('Organizations', 'Organization and team management')
+      .addTag('Payments', 'Subscription and payment processing')
+      .addTag('Integrations', 'Third-party integrations')
+      .addServer(`http://localhost:${port}/api`, 'Development')
+      .build();
+
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document, {
+      swaggerOptions: {
+        persistAuthorization: true,
+        tagsSorter: 'alpha',
+        operationsSorter: 'alpha',
+      },
+      customSiteTitle: 'Presentation Generator API Documentation',
+    });
+
+    logger.log(`📚 Swagger documentation available at http://localhost:${port}/api/docs`);
+  }
 
   // ========================================
   // GRACEFUL SHUTDOWN

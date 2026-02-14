@@ -38,6 +38,10 @@ model User {
   emailPreferences    EmailPreferences?
   otpLogs             OtpLog[]
 
+  @@index([createdAt])
+  @@index([subscriptionTier])
+  @@index([subscriptionStatus])
+  @@index([role])
   @@map("users")
 }
 
@@ -98,6 +102,8 @@ model Account {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@index([provider])
   @@map("accounts")
 }
 
@@ -108,6 +114,8 @@ model Session {
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+  @@index([expires])
   @@map("sessions")
 }
 
@@ -177,7 +185,12 @@ model Project {
   projectVersions ProjectVersion[]
 
   @@index([ownerId])
+  @@index([ownerId, createdAt])
   @@index([shareToken])
+  @@index([status])
+  @@index([visibility])
+  @@index([themeId])
+  @@index([createdAt])
   @@map("projects")
 }
 
@@ -196,6 +209,8 @@ model Slide {
   blocks  Block[]
 
   @@index([projectId])
+  @@index([projectId, order])
+  @@index([createdAt])
   @@map("slides")
 }
 
@@ -332,6 +347,9 @@ model AIGeneration {
   createdAt DateTime @default(now())
 
   @@index([userId])
+  @@index([userId, createdAt])
+  @@index([createdAt])
+  @@index([model])
   @@map("ai_generations")
 }
 
@@ -346,6 +364,8 @@ model Asset {
   createdAt DateTime @default(now())
 
   @@index([userId])
+  @@index([createdAt])
+  @@index([mimeType])
   @@map("assets")
 }
 
@@ -371,6 +391,8 @@ model CollaborationSession {
 
   @@index([projectId])
   @@index([userId])
+  @@index([isActive])
+  @@index([startedAt])
   @@map("collaboration_sessions")
 }
 
@@ -412,6 +434,10 @@ model Comment {
 
   @@index([projectId])
   @@index([slideId])
+  @@index([userId])
+  @@index([resolved])
+  @@index([createdAt])
+  @@index([parentId])
   @@map("comments")
 }
 

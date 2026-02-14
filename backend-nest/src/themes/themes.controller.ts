@@ -13,6 +13,7 @@ import { ColorPaletteService, ColorPalette } from './color-palette.service';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { CacheVeryLong, CacheLong } from '../common/decorators/cache.decorator';
 
 @Controller('themes')
 export class ThemesController {
@@ -26,6 +27,7 @@ export class ThemesController {
    */
   @Get()
   @UseGuards(OptionalJwtAuthGuard)
+  @CacheVeryLong() // Themes rarely change - cache for 1 hour
   async findAll() {
     return this.themesService.findAll(true);
   }
@@ -34,6 +36,7 @@ export class ThemesController {
    * Get a single theme
    */
   @Get(':id')
+  @CacheVeryLong()
   async findOne(@Param('id') id: string) {
     return this.themesService.findOne(id);
   }
@@ -42,6 +45,7 @@ export class ThemesController {
    * Get the default theme
    */
   @Get('default')
+  @CacheVeryLong()
   async getDefault() {
     return this.themesService.getDefault();
   }

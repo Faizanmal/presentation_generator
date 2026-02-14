@@ -4,9 +4,16 @@ import { Toaster } from "sonner";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
+import { ErrorBoundary } from "@/components/providers/error-boundary";
 import { NotificationProvider } from "@/components/ui/enhanced-ui";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { setupErrorTracking } from "@/lib/sentry";
 import "./globals.css";
+
+// Initialize error tracking
+if (typeof window !== 'undefined') {
+  setupErrorTracking();
+}
 
 const inter = Inter({
   variable: "--font-inter",
@@ -40,12 +47,14 @@ export default function RootLayout({
         >
           <QueryProvider>
             <AuthProvider>
-              <NotificationProvider>
-                <TooltipProvider>
-                  {children}
-                  <Toaster position="top-right" richColors />
-                </TooltipProvider>
-              </NotificationProvider>
+              <ErrorBoundary>
+                <NotificationProvider>
+                  <TooltipProvider>
+                    {children}
+                    <Toaster position="top-right" richColors />
+                  </TooltipProvider>
+                </NotificationProvider>
+              </ErrorBoundary>
             </AuthProvider>
           </QueryProvider>
         </ThemeProvider>

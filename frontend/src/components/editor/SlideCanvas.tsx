@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import type {
   DragEndEvent
@@ -18,10 +18,11 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { toast } from "sonner";
-import type { Slide, Theme, UpdateBlockInput, BlockContent } from "@/types";
+import type { Slide, Theme, UpdateBlockInput, BlockContent, BlockType } from "@/types";
 import { api } from "@/lib/api";
 import { useEditorStore } from "@/stores/editor-store";
 import BlockRenderer from "./BlockRenderer";
+import { SlashCommandMenu, useSlashCommands } from "./slash-commands";
 
 interface SlideCanvasProps {
   projectId: string;
@@ -33,6 +34,66 @@ export default function SlideCanvas({ projectId, slide, theme }: SlideCanvasProp
 
   const { updateBlock, deleteBlock, reorderBlocks } = useEditorStore();
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+
+  // Slash command block type mapping
+  const COMMAND_TO_BLOCK: Record<string, { type: BlockType; content: BlockContent }> = {
+    heading1: { type: "HEADING", content: { text: "Heading" } },
+    heading2: { type: "SUBHEADING", content: { text: "Subheading" } },
+    paragraph: { type: "PARAGRAPH", content: { text: "Start typing..." } },
+    bulletList: { type: "BULLET_LIST", content: { items: ["Item 1", "Item 2", "Item 3"] } },
+    numberedList: { type: "NUMBERED_LIST", content: { items: ["Item 1", "Item 2", "Item 3"] } },
+    quote: { type: "QUOTE", content: { text: "Quote text...", author: "" } },
+    code: { type: "CODE", content: { code: "// Your code here", language: "javascript" } },
+    image: { type: "IMAGE", content: { url: "", alt: "" } },
+    video: { type: "EMBED", content: { url: "" } },
+    chart: { type: "EMBED", content: { url: "" } },
+    table: { type: "TABLE", content: { rows: [["Header 1", "Header 2", "Header 3"], ["Cell 1", "Cell 2", "Cell 3"]] } },
+    divider: { type: "DIVIDER", content: {} },
+    columns: { type: "PARAGRAPH", content: { text: "Column layout" } },
+    link: { type: "PARAGRAPH", content: { text: "Link text" } },
+    aiGenerate: { type: "PARAGRAPH", content: { text: "AI Generated content..." } },
+  };
+
+  // Add block from slash command
+  const addBlockMutation = useMutation({
+    mutationFn: (data: { blockType: BlockType; content: BlockContent; order: number }) =>
+      api.blocks.create(projectId, slide.id, { projectId, ...data }),
+    onSuccess: (newBlock) => {
+      const { addBlock } = useEditorStore.getState();
+      addBlock(slide.id, newBlock);
+      toast.success("Block added");
+    },
+    onError: () => {
+      toast.error("Failed to add block");
+    },
+  });
+
+  const handleInsertBlock = useCallback((commandId: string) => {
+    const blockDef = COMMAND_TO_BLOCK[commandId];
+    if (blockDef) {
+      const order = slide.blocks?.length || 0;
+      addBlockMutation.mutate({ blockType: blockDef.type, content: blockDef.content, order });
+    }
+  }, [slide.blocks?.length, slide.id, addBlockMutation]);
+
+  // Slash commands integration
+  const {
+    isOpen: isSlashMenuOpen,
+    position: slashMenuPosition,
+    handleKeyDown: slashHandleKeyDown,
+    handleSelect: slashHandleSelect,
+    handleClose: slashHandleClose,
+  } = useSlashCommands(handleInsertBlock);
+
+  // Attach slash commands keyboard listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      slashHandleKeyDown(e);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [slashHandleKeyDown]);
 
   // Theme colors
   const bgColor = theme?.colors?.background || "#ffffff";
@@ -119,7 +180,8 @@ export default function SlideCanvas({ projectId, slide, theme }: SlideCanvasProp
       onDragEnd={handleBlockReorder}
     >
       <div
-        className="w-full max-w-4xl aspect-16/10 rounded-lg shadow-xl overflow-hidden"
+        ref={canvasRef}
+        className="w-full max-w-4xl aspect-16/10 rounded-lg shadow-xl overflow-hidden relative"
         style={{
           backgroundColor: bgColor,
           color: textColor,
@@ -133,7 +195,16 @@ export default function SlideCanvas({ projectId, slide, theme }: SlideCanvasProp
           >
             {sortedBlocks.length === 0 ? (
               <div className="h-full flex items-center justify-center text-slate-400">
-                <p>Click the + button above to add content</p>
+                <div className="text-center">
+                  <p className="mb-2">Click the + button above to add content</p>
+                  <p className="text-sm">
+                    or type{" "}
+                    <span className="bg-gray-100 dark:bg-slate-700 px-1.5 py-0.5 rounded border border-gray-200 dark:border-slate-600 text-gray-500 dark:text-gray-300 font-mono text-xs">
+                      /
+                    </span>{" "}
+                    for commands
+                  </p>
+                </div>
               </div>
             ) : (
               <div className="space-y-4">
@@ -149,10 +220,27 @@ export default function SlideCanvas({ projectId, slide, theme }: SlideCanvasProp
                     onDelete={() => handleBlockDelete(block.id)}
                   />
                 ))}
+
+                {/* Slash command hint at end of content */}
+                <div className="text-slate-400 italic text-sm py-2">
+                  Type{" "}
+                  <span className="bg-gray-100 dark:bg-slate-700 px-1 rounded border border-gray-200 dark:border-slate-600 text-gray-500 dark:text-gray-300 font-mono text-xs">
+                    /
+                  </span>{" "}
+                  for commands
+                </div>
               </div>
             )}
           </SortableContext>
         </div>
+
+        {/* Slash Command Menu */}
+        <SlashCommandMenu
+          isOpen={isSlashMenuOpen}
+          position={slashMenuPosition}
+          onClose={slashHandleClose}
+          onSelect={slashHandleSelect}
+        />
       </div>
     </DndContext>
   );

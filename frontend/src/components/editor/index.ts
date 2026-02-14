@@ -110,3 +110,18 @@ export { ViewerAnalyticsWidget } from "./viewer-analytics-widget";
 
 // Smart Transition Suggestions
 export { SmartTransitionSuggestions } from "./smart-transition-suggestions";
+
+// AI Suggestions Panel (contextual AI helper for sidebar)
+export { AISuggestionsPanel } from "./ai-suggestions-panel";
+
+// Image AI Controls (regenerate, enhance on hover)
+export { ImageAIControls } from "./image-ai-controls";
+
+// Magic Layout Button (floating AI layout tool)
+export { MagicLayoutButton } from "./magic-layout-button";
+
+// AI Refine Button (header quick-refine dropdown)
+export { AIRefineButton } from "./ai-refine-button";
+
+// Slide Design Controls (density, tone, theme, export)
+export { SlideDesignControls } from "./slide-design-controls";
