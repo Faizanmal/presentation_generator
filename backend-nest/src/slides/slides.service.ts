@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { CollaborationService } from '../collaboration/collaboration.service';
 
 interface CreateSlideDto {
   projectId: string;
@@ -26,13 +27,16 @@ interface ReorderSlidesDto {
 export class SlidesService {
   private readonly logger = new Logger(SlidesService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly collaborationService: CollaborationService,
+  ) {}
 
   /**
    * Create a new slide
    */
   async create(userId: string, createSlideDto: CreateSlideDto) {
-    // Verify project ownership
+    // Verify project ownership / collaborator role
     const project = await this.prisma.project.findUnique({
       where: { id: createSlideDto.projectId },
     });
@@ -42,7 +46,10 @@ export class SlidesService {
     }
 
     if (project.ownerId !== userId) {
-      throw new ForbiddenException('You cannot edit this project');
+      const role = await this.collaborationService.getUserRole(createSlideDto.projectId, userId);
+      if (role !== 'EDITOR') {
+        throw new ForbiddenException('You cannot edit this project');
+      }
     }
 
     // Shift existing slides if inserting in middle
@@ -133,7 +140,10 @@ export class SlidesService {
     }
 
     if (slide.project.ownerId !== userId) {
-      throw new ForbiddenException('You cannot edit this slide');
+      const role = await this.collaborationService.getUserRole(slide.projectId, userId);
+      if (role !== 'EDITOR') {
+        throw new ForbiddenException('You cannot edit this slide');
+      }
     }
 
     const updated = await this.prisma.slide.update({
@@ -172,7 +182,10 @@ export class SlidesService {
     }
 
     if (slide.project.ownerId !== userId) {
-      throw new ForbiddenException('You cannot delete this slide');
+      const role = await this.collaborationService.getUserRole(slide.projectId, userId);
+      if (role !== 'EDITOR') {
+        throw new ForbiddenException('You cannot delete this slide');
+      }
     }
 
     // Delete the slide (blocks are cascade deleted)
@@ -210,7 +223,7 @@ export class SlidesService {
     projectId: string,
     reorderDto: ReorderSlidesDto,
   ) {
-    // Verify project ownership
+    // Verify project ownership or editor role
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
     });
@@ -220,7 +233,21 @@ export class SlidesService {
     }
 
     if (project.ownerId !== userId) {
-      throw new ForbiddenException('You cannot edit this project');
+      const role = await this.collaborationService.getUserRole(projectId, userId);
+      if (role !== 'EDITOR') {
+        throw new ForbiddenException('You cannot edit this project');
+      }
+    }
+
+    // Validate that all slide IDs belong to this project
+    const slideIds = reorderDto.slides.map(s => s.id);
+    const existingSlides = await this.prisma.slide.findMany({
+      where: { id: { in: slideIds }, projectId },
+      select: { id: true },
+    });
+    
+    if (existingSlides.length !== slideIds.length) {
+      throw new ForbiddenException('Invalid slide IDs provided');
     }
 
     // Update all slide orders in a transaction
@@ -259,7 +286,10 @@ export class SlidesService {
     }
 
     if (slide.project.ownerId !== userId) {
-      throw new ForbiddenException('You cannot edit this slide');
+      const role = await this.collaborationService.getUserRole(slide.projectId, userId);
+      if (role !== 'EDITOR') {
+        throw new ForbiddenException('You cannot edit this slide');
+      }
     }
 
     // Shift slides after the duplicated one
@@ -273,28 +303,33 @@ export class SlidesService {
       },
     });
 
-    // Create new slide
-    const newSlide = await this.prisma.slide.create({
-      data: {
-        projectId: slide.projectId,
-        order: slide.order + 1,
-        layout: slide.layout,
-      },
-    });
-
-    // Duplicate blocks
-    for (const block of slide.blocks) {
-      await this.prisma.block.create({
+    // Use transaction for atomic slide duplication
+    const newSlide = await this.prisma.$transaction(async (tx) => {
+      // Create new slide
+      const createdSlide = await tx.slide.create({
         data: {
           projectId: slide.projectId,
-          slideId: newSlide.id,
-          blockType: block.blockType,
-          content: block.content as Prisma.InputJsonValue,
-          style: block.style as Prisma.InputJsonValue,
-          order: block.order,
+          order: slide.order + 1,
+          layout: slide.layout,
         },
       });
-    }
+
+      // Duplicate blocks atomically using createMany
+      if (slide.blocks.length > 0) {
+        await tx.block.createMany({
+          data: slide.blocks.map((block) => ({
+            projectId: slide.projectId,
+            slideId: createdSlide.id,
+            blockType: block.blockType,
+            content: block.content as Prisma.InputJsonValue,
+            style: block.style as Prisma.InputJsonValue,
+            order: block.order,
+          })),
+        });
+      }
+
+      return createdSlide;
+    });
 
     // Update project timestamp
     await this.prisma.project.update({

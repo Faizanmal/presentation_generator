@@ -248,72 +248,104 @@ export class CollaborationGateway
   }
 
   @SubscribeMessage('block:update')
-  handleBlockUpdate(
+  async handleBlockUpdate(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: BlockUpdate,
   ) {
     const projectId = client.data.projectId;
     if (!projectId || projectId !== data.projectId) return;
 
+    const userId = client.data.userId;
+    const isOwner = await this.collaborationService.isProjectOwner(projectId, userId);
+    const role = await this.collaborationService.getUserRole(projectId, userId);
+    if (!isOwner && role !== 'EDITOR') {
+      this.logger.warn(`Unauthorized block:update attempt by ${userId} on project ${projectId}`);
+      return;
+    }
+
     // Broadcast block update to others
     client.to(projectId).emit('block:updated', {
       ...data,
-      userId: client.data.userId,
+      userId,
       userName: client.data.userName,
     });
 
-    // Optionally persist to database
+    // Persist audit/log
     this.collaborationService.logBlockChange(data);
   }
 
   @SubscribeMessage('slide:update')
-  handleSlideUpdate(
+  async handleSlideUpdate(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: SlideUpdate,
   ) {
     const projectId = client.data.projectId;
     if (!projectId || projectId !== data.projectId) return;
 
+    const userId = client.data.userId;
+    const isOwner = await this.collaborationService.isProjectOwner(projectId, userId);
+    const role = await this.collaborationService.getUserRole(projectId, userId);
+    if (!isOwner && role !== 'EDITOR') {
+      this.logger.warn(`Unauthorized slide:update attempt by ${userId} on ${projectId}`);
+      return;
+    }
+
     // Broadcast slide update to others
     client.to(projectId).emit('slide:updated', {
       ...data,
-      userId: client.data.userId,
+      userId,
       userName: client.data.userName,
     });
   }
 
   @SubscribeMessage('slide:add')
-  handleSlideAdd(
+  async handleSlideAdd(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { projectId: string; slide: unknown },
   ) {
     const projectId = client.data.projectId;
     if (!projectId || projectId !== data.projectId) return;
 
+    const userId = client.data.userId;
+    const isOwner = await this.collaborationService.isProjectOwner(projectId, userId);
+    const role = await this.collaborationService.getUserRole(projectId, userId);
+    if (!isOwner && role !== 'EDITOR') {
+      this.logger.warn(`Unauthorized slide:add by ${userId} on ${projectId}`);
+      return;
+    }
+
     client.to(projectId).emit('slide:added', {
       slide: data.slide as Record<string, unknown>,
-      userId: client.data.userId,
+      userId,
       userName: client.data.userName,
     });
   }
 
   @SubscribeMessage('slide:delete')
-  handleSlideDelete(
+  async handleSlideDelete(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { projectId: string; slideId: string },
   ) {
     const projectId = client.data.projectId;
     if (!projectId || projectId !== data.projectId) return;
 
+    const userId = client.data.userId;
+    const isOwner = await this.collaborationService.isProjectOwner(projectId, userId);
+    const role = await this.collaborationService.getUserRole(projectId, userId);
+    if (!isOwner && role !== 'EDITOR') {
+      this.logger.warn(`Unauthorized slide:delete by ${userId} on ${projectId}`);
+      return;
+    }
+
     client.to(projectId).emit('slide:deleted', {
       slideId: data.slideId,
-      userId: client.data.userId,
+      userId,
       userName: client.data.userName,
     });
   }
 
   @SubscribeMessage('slide:reorder')
-  handleSlideReorder(
+  async handleSlideReorder(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody()
     data: { projectId: string; fromIndex: number; toIndex: number },
@@ -321,10 +353,18 @@ export class CollaborationGateway
     const projectId = client.data.projectId;
     if (!projectId || projectId !== data.projectId) return;
 
+    const userId = client.data.userId;
+    const isOwner = await this.collaborationService.isProjectOwner(projectId, userId);
+    const role = await this.collaborationService.getUserRole(projectId, userId);
+    if (!isOwner && role !== 'EDITOR') {
+      this.logger.warn(`Unauthorized slide:reorder by ${userId} on ${projectId}`);
+      return;
+    }
+
     client.to(projectId).emit('slide:reordered', {
       fromIndex: data.fromIndex,
       toIndex: data.toIndex,
-      userId: client.data.userId,
+      userId,
       userName: client.data.userName,
     });
   }
@@ -344,11 +384,19 @@ export class CollaborationGateway
     if (!projectId || projectId !== data.projectId)
       return { success: false, error: 'User not in project' };
 
+    const userId = client.data.userId;
+    const isOwner = await this.collaborationService.isProjectOwner(projectId, userId);
+    const role = await this.collaborationService.getUserRole(projectId, userId);
+    if (!isOwner && role !== 'COMMENTER' && role !== 'EDITOR') {
+      this.logger.warn(`Unauthorized comment:add by ${userId} on project ${projectId}`);
+      return { success: false, error: 'Not allowed' };
+    }
+
     const comment = await this.collaborationService.createComment({
       projectId,
       slideId: data.slideId,
       blockId: data.blockId,
-      userId: client.data.userId,
+      userId,
       content: data.content,
     });
 
@@ -369,11 +417,19 @@ export class CollaborationGateway
     const projectId = client.data.projectId;
     if (!projectId || projectId !== data.projectId) return;
 
+    const userId = client.data.userId;
+    const isOwner = await this.collaborationService.isProjectOwner(projectId, userId);
+    const role = await this.collaborationService.getUserRole(projectId, userId);
+    if (!isOwner && role !== 'EDITOR') {
+      this.logger.warn(`Unauthorized comment:resolve by ${userId} on ${projectId}`);
+      return { success: false, error: 'Not allowed' };
+    }
+
     await this.collaborationService.resolveComment(data.commentId);
 
     this.server.to(projectId).emit('comment:resolved', {
       commentId: data.commentId,
-      userId: client.data.userId,
+      userId,
     });
 
     return { success: true };
@@ -388,11 +444,19 @@ export class CollaborationGateway
     const projectId = client.data.projectId;
     if (!projectId || projectId !== data.projectId) return;
 
+    const userId = client.data.userId;
+    const isOwner = await this.collaborationService.isProjectOwner(projectId, userId);
+    const role = await this.collaborationService.getUserRole(projectId, userId);
+    if (!isOwner && role !== 'EDITOR') {
+      this.logger.warn(`Unauthorized version:save by ${userId} on ${projectId}`);
+      return { success: false, error: 'Not allowed' };
+    }
+
     const version = await this.collaborationService.createVersion({
       projectId,
       snapshot: data.snapshot as Record<string, unknown>,
       message: data.message,
-      createdBy: client.data.userId,
+      createdBy: userId,
     });
 
     this.server.to(projectId).emit('version:saved', {

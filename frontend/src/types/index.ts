@@ -869,6 +869,459 @@ export interface ThinkingGenerationResult {
 }
 
 // ============================================
+// AI RESEARCH TYPES
+// ============================================
+
+export interface ContentResearch {
+  id: string;
+  projectId: string;
+  topic: string;
+  status: string;
+  sources: ContentResearchSource[];
+  keyFindings: string[];
+  suggestedContent: object[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContentResearchSource {
+  id: string;
+  title: string;
+  url: string;
+  sourceType: string;
+  content: string;
+  relevanceScore: number;
+  credibilityScore: number;
+}
+
+export interface ContentBlock {
+  type: string;
+  title: string;
+  content: string;
+  suggestedVisuals: string[];
+  talkingPoints: string[];
+}
+
+// ============================================
+// STORYBOARDING TYPES
+// ============================================
+
+export interface Storyboard {
+  id: string;
+  projectId: string;
+  title: string;
+  narrativeArc: string;
+  status: string;
+  sections: StoryboardSection[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StoryboardSection {
+  id: string;
+  title: string;
+  content: string;
+  order: number;
+  speakerNotes: string;
+  duration: number;
+  transition: string;
+}
+
+// ============================================
+// A/B TESTING TYPES
+// ============================================
+
+export interface ABTest {
+  id: string;
+  projectId: string;
+  name: string;
+  status: string;
+  variants: ABTestVariant[];
+  metrics: object;
+  results: object;
+  startedAt: string;
+  endedAt?: string;
+}
+
+export interface ABTestVariant {
+  id: string;
+  name: string;
+  config: object;
+  impressions: number;
+  engagementScore: number;
+}
+
+// ============================================
+// VR/AR TYPES
+// ============================================
+
+export interface VRExport {
+  id: string;
+  projectId: string;
+  format: string;
+  status: string;
+  outputUrl?: string;
+  settings: object;
+}
+
+// ============================================
+// HOLOGRAPHIC TYPES
+// ============================================
+
+export interface HolographicPreview {
+  id: string;
+  projectId: string;
+  format: string;
+  status: string;
+  outputUrl?: string;
+  settings: object;
+}
+
+// ============================================
+// BLOCKCHAIN/NFT TYPES
+// ============================================
+
+export interface NFTCollection {
+  id: string;
+  name: string;
+  chain: string;
+  contractAddress?: string;
+  status: string;
+  nfts: NFTToken[];
+}
+
+export interface NFTToken {
+  id: string;
+  tokenId?: string;
+  name: string;
+  status: string;
+  txHash?: string;
+  metadata: object;
+}
+
+// ============================================
+// AI COPILOT TYPES
+// ============================================
+
+export interface AIChatSession {
+  id: string;
+  projectId: string;
+  messages: AIChatMessage[];
+  createdAt: string;
+}
+
+export interface AIChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  metadata?: object;
+  timestamp: string;
+}
+
+// ============================================
+// LIVE Q&A TYPES
+// ============================================
+
+export interface LiveQASession {
+  id: string;
+  projectId: string;
+  status: string;
+  settings: object;
+  questions: LiveQAQuestion[];
+  createdAt: string;
+}
+
+export interface LiveQAQuestion {
+  id: string;
+  content: string;
+  author: string;
+  votes: number;
+  status: string;
+  aiAnswer?: string;
+  createdAt: string;
+}
+
+// ============================================
+// CROSS-PLATFORM SYNC TYPES
+// ============================================
+
+export interface DeviceSync {
+  id: string;
+  deviceName: string;
+  deviceType: string;
+  lastSyncedAt: string;
+  status: string;
+}
+
+export interface SyncConflict {
+  id: string;
+  type: string;
+  deviceA: string;
+  deviceB: string;
+  conflictData: object;
+  resolution?: string;
+}
+
+// ============================================
+// PREDICTIVE ANALYTICS TYPES
+// ============================================
+
+export interface PredictiveInsight {
+  id: string;
+  projectId: string;
+  type: string;
+  prediction: object;
+  score: number;
+  factors: object[];
+  recommendations: string[];
+  createdAt: string;
+}
+
+// ============================================
+// SENTIMENT ANALYSIS TYPES
+// ============================================
+
+export interface SentimentSession {
+  id: string;
+  projectId: string;
+  status: string;
+  overallSentiment: number;
+  timeline: SentimentDataPoint[];
+  alerts: object[];
+}
+
+export interface SentimentDataPoint {
+  timestamp: string;
+  sentiment: number;
+  engagement: number;
+  dominantEmotion: string;
+}
+
+// ============================================
+// LEARNING PATHS TYPES
+// ============================================
+
+export interface LearningPath {
+  id: string;
+  title: string;
+  description: string;
+  difficulty: string;
+  estimatedHours: number;
+  modules: LearningModule[];
+  progress?: number;
+  status: string;
+}
+
+export interface LearningModule {
+  id: string;
+  title: string;
+  type: string;
+  content: object;
+  order: number;
+  completed?: boolean;
+}
+
+// ============================================
+// SIGN LANGUAGE TYPES
+// ============================================
+
+export interface SignLanguageConfig {
+  id: string;
+  projectId: string;
+  language: string;
+  avatarStyle: string;
+  position: string;
+  size: string;
+  translations: object[];
+}
+
+// ============================================
+// COGNITIVE ACCESSIBILITY TYPES
+// ============================================
+
+export interface CognitiveAccessibilityProfile {
+  id: string;
+  name: string;
+  preset?: string;
+  settings: {
+    fontSize: string;
+    fontFamily: string;
+    lineSpacing: number;
+    colorScheme: string;
+    reducedMotion: boolean;
+    simplifiedLayout: boolean;
+    readingGuide: boolean;
+    textToSpeech: boolean;
+  };
+}
+
+// ============================================
+// UNIVERSAL DESIGN TYPES
+// ============================================
+
+export interface UniversalDesignReport {
+  id: string;
+  projectId: string;
+  score: number;
+  issues: DesignIssue[];
+  suggestions: string[];
+  wcagLevel: string;
+}
+
+export interface DesignIssue {
+  type: string;
+  severity: 'critical' | 'major' | 'minor';
+  element: string;
+  description: string;
+  suggestion: string;
+}
+
+// ============================================
+// PUBLIC API TYPES
+// ============================================
+
+export interface APIKey {
+  id: string;
+  name: string;
+  key: string;
+  scopes: string[];
+  lastUsedAt?: string;
+  expiresAt?: string;
+  status: string;
+  usage: { count: number; limit: number };
+}
+
+// ============================================
+// WHITE-LABEL SDK TYPES
+// ============================================
+
+export interface SDKConfiguration {
+  id: string;
+  sdkKey: string;
+  name: string;
+  branding: {
+    logoUrl?: string;
+    primaryColor: string;
+    secondaryColor: string;
+    fontFamily: string;
+  };
+  features: string[];
+  status: string;
+  instances: SDKInstance[];
+}
+
+export interface SDKInstance {
+  id: string;
+  name: string;
+  domain: string;
+  status: string;
+  usage: object;
+}
+
+// ============================================
+// IOT INTEGRATION TYPES
+// ============================================
+
+export interface IoTDevice {
+  id: string;
+  name: string;
+  deviceType: string;
+  capabilities: object;
+  manufacturer?: string;
+  model?: string;
+  status: string;
+  state: { connected: boolean; battery?: number };
+  lastConnectedAt?: string;
+}
+
+// ============================================
+// ECO-FRIENDLY TYPES
+// ============================================
+
+export interface EcoSettings {
+  lowPowerMode: boolean;
+  reducedAnimations: boolean;
+  compressImages: boolean;
+  darkModePreferred: boolean;
+  offlineFirst: boolean;
+  streamQuality: 'low' | 'medium' | 'high' | 'auto';
+  cacheStrategy: 'aggressive' | 'moderate' | 'minimal';
+}
+
+export interface EcoOptimizationResult {
+  presentationId: string;
+  originalSize: number;
+  optimizedSize: number;
+  savingsKB: number;
+  savingsPercent: number;
+  optimizations: string[];
+  energyImpact: object;
+}
+
+// ============================================
+// PRESENTER WELLNESS TYPES
+// ============================================
+
+export interface WellnessSession {
+  id: string;
+  presentationId: string;
+  startTime: string;
+  endTime?: string;
+  wellnessScore: number;
+  metrics: {
+    speakingPaceWPM: number;
+    pauseFrequency: number;
+    fillerWordCount: number;
+    stressIndicators: number;
+    volumeVariation: number;
+  };
+  breaksTaken: number;
+  recommendations?: object[];
+}
+
+export interface WellnessTrends {
+  trend: string;
+  recentAverageScore: number;
+  historicalAverageScore: number;
+  totalSessions: number;
+  insights: string[];
+}
+
+// ============================================
+// CARBON FOOTPRINT TYPES
+// ============================================
+
+export interface CarbonFootprint {
+  presentationId: string;
+  emissions: {
+    dataTransfer: number;
+    compute: number;
+    storage: number;
+    streaming: number;
+    total: number;
+  };
+  comparisons: { item: string; equivalent: string }[];
+  recommendations: string[];
+}
+
+export interface CarbonOffset {
+  id: string;
+  provider: string;
+  project: string;
+  amount: number;
+  cost: number;
+  status: string;
+  certificateUrl?: string;
+}
+
+export interface EcoBadge {
+  badge: string;
+  description: string;
+  earnedAt?: string;
+  requirement?: string;
+}
+
+// ============================================
 // TYPE ALIASES
 // ============================================
 

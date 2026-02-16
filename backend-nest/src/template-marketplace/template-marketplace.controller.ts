@@ -9,6 +9,7 @@ import {
   Request,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { AdminGuard } from '../auth/guards/roles.guard';
 import {
   TemplateMarketplaceService,
   TemplateCategory,
@@ -165,12 +166,11 @@ export class TemplateMarketplaceController {
   }
 
   @Post('admin/templates/:templateId/moderate')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async moderateTemplate(
     @Param('templateId') templateId: string,
     @Body() dto: ModerateTemplateDto,
   ) {
-    // TODO: Add admin guard
     return this.marketplaceService.moderateTemplate(
       templateId,
       dto.action,

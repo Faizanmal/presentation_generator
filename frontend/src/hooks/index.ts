@@ -9,3 +9,4 @@ export * from './use-toast';
 export * from './use-voice-recorder';
 export * from './use-offline-mode';
 export * from './use-service-worker';
+export * from './use-new-features';

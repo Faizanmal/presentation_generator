@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { BlockType } from '@prisma/client';
 import { AdvancedCacheService } from '../common/cache/advanced-cache.service';
+import { CollaborationService } from '../collaboration/collaboration.service';
 
 interface CreateBlockDto {
   projectId: string;
@@ -36,13 +37,14 @@ export class BlocksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cacheService: AdvancedCacheService,
+    private readonly collaborationService: CollaborationService,
   ) {}
 
   /**
    * Create a new block
    */
   async create(userId: string, createBlockDto: CreateBlockDto) {
-    // Verify project ownership
+    // Verify project ownership / collaborator role
     const project = await this.prisma.project.findUnique({
       where: { id: createBlockDto.projectId },
     });
@@ -52,7 +54,10 @@ export class BlocksService {
     }
 
     if (project.ownerId !== userId) {
-      throw new ForbiddenException('You cannot edit this project');
+      const role = await this.collaborationService.getUserRole(createBlockDto.projectId, userId);
+      if (role !== 'EDITOR') {
+        throw new ForbiddenException('You cannot edit this project');
+      }
     }
 
     const block = await this.prisma.block.create({
@@ -115,7 +120,10 @@ export class BlocksService {
     }
 
     if (block.project.ownerId !== userId) {
-      throw new ForbiddenException('You cannot edit this block');
+      const role = await this.collaborationService.getUserRole(block.projectId, userId);
+      if (role !== 'EDITOR') {
+        throw new ForbiddenException('You cannot edit this block');
+      }
     }
 
     // Optimistic locking: Check version if provided
@@ -185,7 +193,10 @@ export class BlocksService {
     }
 
     if (block.project.ownerId !== userId) {
-      throw new ForbiddenException('You cannot delete this block');
+      const role = await this.collaborationService.getUserRole(block.projectId, userId);
+      if (role !== 'EDITOR') {
+        throw new ForbiddenException('You cannot delete this block');
+      }
     }
 
     await this.prisma.block.delete({
@@ -222,7 +233,7 @@ export class BlocksService {
     projectId: string,
     reorderDto: ReorderBlocksDto,
   ) {
-    // Verify project ownership
+    // Verify project ownership / collaborator role
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
     });
@@ -232,7 +243,10 @@ export class BlocksService {
     }
 
     if (project.ownerId !== userId) {
-      throw new ForbiddenException('You cannot edit this project');
+      const role = await this.collaborationService.getUserRole(projectId, userId);
+      if (role !== 'EDITOR') {
+        throw new ForbiddenException('You cannot edit this project');
+      }
     }
 
     // Update all block orders in a transaction
@@ -266,7 +280,7 @@ export class BlocksService {
       style?: Record<string, any>;
     }>,
   ) {
-    // Verify project ownership
+    // Verify project ownership / collaborator role
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
     });
@@ -276,7 +290,10 @@ export class BlocksService {
     }
 
     if (project.ownerId !== userId) {
-      throw new ForbiddenException('You cannot edit this project');
+      const role = await this.collaborationService.getUserRole(projectId, userId);
+      if (role !== 'EDITOR') {
+        throw new ForbiddenException('You cannot edit this project');
+      }
     }
 
     // Update all blocks in a transaction

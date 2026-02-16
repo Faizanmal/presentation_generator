@@ -67,6 +67,7 @@ import {
   useRecentProjects,
   FavoritesRecentPanel,
 } from "@/components/ui/favorites-recent";
+import { FeaturesHub } from "@/components/dashboard/features-hub";
 
 
 export default function DashboardPage() {
@@ -306,6 +307,9 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* Features Hub */}
+        <FeaturesHub />
 
         {/* Favorites & Recent Panel */}
         {(favorites.length > 0 || recent.length > 0) && projects && (

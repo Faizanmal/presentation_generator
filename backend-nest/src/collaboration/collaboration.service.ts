@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 
@@ -266,6 +266,34 @@ export class CollaborationService {
     });
 
     return collaborator?.role || null;
+  }
+
+  /**
+   * Return true if the provided userId is the owner of the project.
+   */
+  async isProjectOwner(projectId: string, userId: string): Promise<boolean> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { ownerId: true },
+    });
+    return !!project && project.ownerId === userId;
+  }
+
+  /**
+   * Assert that user is owner or has one of the allowed roles; throws if not.
+   */
+  async assertOwnerOrRole(
+    projectId: string,
+    userId: string,
+    allowedRoles: Array<'VIEWER' | 'COMMENTER' | 'EDITOR'>,
+  ): Promise<void> {
+    const isOwner = await this.isProjectOwner(projectId, userId);
+    if (isOwner) return;
+
+    const role = await this.getUserRole(projectId, userId);
+    if (!role || !allowedRoles.includes(role as any)) {
+      throw new ForbiddenException('You do not have permission to perform this action');
+    }
   }
 
   // ============================================

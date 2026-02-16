@@ -201,8 +201,6 @@ export class UsersService {
    * Check if user can generate AI content
    */
   async canGenerateAI(userId: string): Promise<boolean> {
-    return true; // Limits removed for development
-
     const subscription = await this.getSubscription(userId);
 
     if (
@@ -219,8 +217,6 @@ export class UsersService {
    * Check if user can create more projects
    */
   async canCreateProject(userId: string): Promise<boolean> {
-    return true; // Limits removed for development
-
     const subscription = await this.getSubscription(userId);
 
     if (
@@ -231,7 +227,7 @@ export class UsersService {
     }
 
     const projectCount = await this.prisma.project.count({
-      where: { ownerId: userId },
+      where: { ownerId: userId, deletedAt: null },
     });
 
     return projectCount < subscription.projectsLimit;

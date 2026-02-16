@@ -36,6 +36,7 @@ import { InteractiveEmbedsModule } from './interactive-embeds/interactive-embeds
 import { DataChartsModule } from './data-charts/data-charts.module';
 import { TemplateMarketplaceModule } from './template-marketplace/template-marketplace.module';
 import { DesignSystemModule } from './design-system/design-system.module';
+import { BrandKitModule } from './brand-kit/brand-kit.module';
 import { AccessibilityModule } from './accessibility/accessibility.module';
 import { MultilingualModule } from './multilingual/multilingual.module';
 import { NarrationExportModule } from './narration-export/narration-export.module';
@@ -44,6 +45,35 @@ import { TeamAnalyticsModule } from './team-analytics/team-analytics.module';
 import { ContentLibraryModule } from './library/content-library.module';
 import { ImageAcquisitionModule } from './image-acquisition/image-acquisition.module';
 import { ImageRecognitionModule } from './image-recognition/image-recognition.module';
+
+// New AI-Enhanced Creativity & Immersive Tech modules
+import { AIResearchModule } from './ai-research/ai-research.module';
+import { StoryboardingModule } from './storyboarding/storyboarding.module';
+import { ABTestingModule } from './ab-testing/ab-testing.module';
+import { VRARModule } from './vr-ar/vr-ar.module';
+import { HolographicModule } from './holographic/holographic.module';
+import { BlockchainModule } from './blockchain/blockchain.module';
+
+// Advanced Collaboration & Analytics modules
+import { AICopilotModule } from './ai-copilot/ai-copilot.module';
+import { LiveQAModule } from './live-qa/live-qa.module';
+import { CrossPlatformSyncModule } from './cross-platform-sync/cross-platform-sync.module';
+import { PredictiveAnalyticsModule } from './predictive-analytics/predictive-analytics.module';
+import { SentimentAnalysisModule } from './sentiment-analysis/sentiment-analysis.module';
+import { LearningPathsModule } from './learning-paths/learning-paths.module';
+
+// Accessibility & Enterprise modules
+import { SignLanguageModule } from './sign-language/sign-language.module';
+import { CognitiveAccessibilityModule } from './cognitive-accessibility/cognitive-accessibility.module';
+import { UniversalDesignModule } from './universal-design/universal-design.module';
+import { PublicAPIModule } from './public-api/public-api.module';
+import { WhiteLabelSDKModule } from './white-label-sdk/white-label-sdk.module';
+
+// Sustainability & Wellness modules
+import { IoTIntegrationModule } from './iot-integration/iot-integration.module';
+import { EcoFriendlyModule } from './eco-friendly/eco-friendly.module';
+import { PresenterWellnessModule } from './presenter-wellness/presenter-wellness.module';
+import { CarbonFootprintModule } from './carbon-footprint/carbon-footprint.module';
 
 // Common modules for production
 import { CacheModule } from './common/cache/cache.module';
@@ -140,6 +170,7 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
     DataChartsModule,
     TemplateMarketplaceModule,
     DesignSystemModule,
+    BrandKitModule,
     AccessibilityModule,
     MultilingualModule,
     NarrationExportModule,
@@ -148,6 +179,35 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
     ContentLibraryModule,
     ImageAcquisitionModule,
     ImageRecognitionModule,
+
+    // AI-Enhanced Creativity & Immersive Tech
+    AIResearchModule,
+    StoryboardingModule,
+    ABTestingModule,
+    VRARModule,
+    HolographicModule,
+    BlockchainModule,
+
+    // Advanced Collaboration & Analytics
+    AICopilotModule,
+    LiveQAModule,
+    CrossPlatformSyncModule,
+    PredictiveAnalyticsModule,
+    SentimentAnalysisModule,
+    LearningPathsModule,
+
+    // Accessibility & Enterprise
+    SignLanguageModule,
+    CognitiveAccessibilityModule,
+    UniversalDesignModule,
+    PublicAPIModule,
+    WhiteLabelSDKModule,
+
+    // Sustainability & Wellness
+    IoTIntegrationModule,
+    EcoFriendlyModule,
+    PresenterWellnessModule,
+    CarbonFootprintModule,
 
     // Production modules
     CacheModule,

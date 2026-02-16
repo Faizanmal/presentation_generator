@@ -906,6 +906,57 @@ model SSOConfig {
   @@map("sso_configs")
 }
 
+// Brand Kit for Organization Branding
+model BrandKit {
+  id             String   @id @default(cuid())
+  organizationId String?
+  userId         String?  // For personal brand kits
+  name           String
+  isDefault      Boolean  @default(false)
+
+  // Colors
+  primaryColor     String?
+  secondaryColor   String?
+  accentColor      String?
+  backgroundColor  String?
+  textColor        String?
+  colorPalette     Json?   // Array of additional brand colors
+
+  // Typography
+  headingFont      String? // Font family for headings
+  bodyFont         String? // Font family for body text
+  fontSizes        Json?   // Custom font size scale
+
+  // Logo & Images
+  logoUrl          String?
+  logoLight        String? // Logo for light backgrounds
+  logoDark         String? // Logo for dark backgrounds
+  favicon          String?
+  coverImages      Json?   // Array of approved cover images
+
+  // Assets
+  icons            Json?   // Custom icon set URLs
+  patterns         Json?   // Background patterns
+  watermark        String? // Watermark image URL
+  watermarkOpacity Float?  @default(0.3)
+
+  // Voice & Tone
+  voiceDescription String? @db.Text // Description of brand voice
+  toneKeywords     Json?   // Array of tone keywords
+
+  // Guidelines
+  doList           Json?   // Array of do's
+  dontList         Json?   // Array of don'ts
+  styleGuideUrl    String? // Link to full style guide
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([userId])
+  @@map("brand_kits")
+}
+
 enum SSOProvider {
   SAML
   OIDC
@@ -1599,4 +1650,965 @@ model AuthorEarnings {
   @@index([authorId])
   @@index([templateId])
   @@map("author_earnings")
+}
+
+// ============================================
+// AI CONTENT RESEARCH ASSISTANT
+// ============================================
+
+model ContentResearch {
+  id           String   @id @default(cuid())
+  userId       String
+  projectId    String?
+  topic        String
+  query        String   @db.Text
+  status       String   @default("pending") // pending, researching, completed, failed
+  results      Json?    // Array of research results
+  sources      ContentResearchSource[]
+  summary      String?  @db.Text
+  keywords     String[] @default([])
+  metadata     Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  completedAt  DateTime?
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([status])
+  @@map("content_research")
+}
+
+model ContentResearchSource {
+  id            String   @id @default(cuid())
+  researchId    String
+  sourceType    String   // web, wikipedia, academic, news, custom_kb
+  title         String
+  url           String?
+  content       String?  @db.Text
+  snippet       String?  @db.Text
+  relevanceScore Float?
+  credibilityScore Float?
+  publishedDate DateTime?
+  author        String?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+
+  research ContentResearch @relation(fields: [researchId], references: [id], onDelete: Cascade)
+
+  @@index([researchId])
+  @@index([sourceType])
+  @@map("content_research_sources")
+}
+
+// ============================================
+// AI STORYBOARDING & NARRATIVE
+// ============================================
+
+model Storyboard {
+  id              String   @id @default(cuid())
+  userId          String
+  projectId       String?
+  title           String
+  audienceType    String   // executive, technical, educational, marketing, creative
+  presentationType String  // summary, deep_dive, pitch, tutorial
+  duration        Int?     // estimated minutes
+  narrativeArc    Json     // story structure
+  sections        StoryboardSection[]
+  pacing          Json?    // timing recommendations
+  transitions     Json?    // suggested transitions
+  status          String   @default("draft") // draft, generating, completed
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+  @@index([projectId])
+  @@map("storyboards")
+}
+
+model StoryboardSection {
+  id             String   @id @default(cuid())
+  storyboardId   String
+  title          String
+  order          Int
+  type           String   // intro, rising_action, climax, resolution, call_to_action
+  duration       Int?     // seconds
+  keyPoints      Json     // Array of key points
+  suggestedLayout String?
+  speakerNotes   String?  @db.Text
+  transitionIn   String?
+  transitionOut  String?
+  createdAt      DateTime @default(now())
+
+  storyboard Storyboard @relation(fields: [storyboardId], references: [id], onDelete: Cascade)
+
+  @@index([storyboardId])
+  @@map("storyboard_sections")
+}
+
+// ============================================
+// AI A/B TESTING FOR DESIGNS
+// ============================================
+
+model ABTest {
+  id            String   @id @default(cuid())
+  userId        String
+  projectId     String
+  name          String
+  description   String?
+  status        String   @default("draft") // draft, running, completed, paused
+  goalMetric    String   @default("engagement") // engagement, completion, click_through
+  variants      ABTestVariant[]
+  results       ABTestResult[]
+  winnerVariantId String?
+  sampleSize    Int      @default(100)
+  currentSample Int      @default(0)
+  confidenceLevel Float  @default(0.95)
+  startedAt     DateTime?
+  endedAt       DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([status])
+  @@map("ab_tests")
+}
+
+model ABTestVariant {
+  id           String   @id @default(cuid())
+  testId       String
+  name         String
+  description  String?
+  themeConfig  Json     // Theme configuration
+  isControl    Boolean  @default(false)
+  traffic      Float    @default(50) // Percentage of traffic
+  impressions  Int      @default(0)
+  conversions  Int      @default(0)
+  engagementScore Float @default(0)
+  avgViewTime  Float?   // Average view time in seconds
+  bounceRate   Float?
+  createdAt    DateTime @default(now())
+
+  test    ABTest         @relation(fields: [testId], references: [id], onDelete: Cascade)
+  results ABTestResult[]
+
+  @@index([testId])
+  @@map("ab_test_variants")
+}
+
+model ABTestResult {
+  id          String   @id @default(cuid())
+  testId      String
+  variantId   String
+  sessionId   String
+  viewerId    String?
+  engaged     Boolean  @default(false)
+  completed   Boolean  @default(false)
+  viewTime    Int?     // seconds
+  interactions Int     @default(0)
+  dropOffSlide Int?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  test    ABTest        @relation(fields: [testId], references: [id], onDelete: Cascade)
+  variant ABTestVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([testId])
+  @@index([variantId])
+  @@index([sessionId])
+  @@map("ab_test_results")
+}
+
+// ============================================
+// VR/AR PRESENTATION MODE
+// ============================================
+
+model VRExport {
+  id              String   @id @default(cuid())
+  userId          String
+  projectId       String
+  format          String   @default("webxr") // webxr, a-frame, threejs
+  status          String   @default("pending") // pending, processing, completed, failed
+  config          Json     // VR configuration
+  scenes          VRScene[]
+  outputUrl       String?
+  previewUrl      String?
+  optimizedFor    String[] @default([]) // oculus, htc_vive, browser_vr
+  fileSize        Int?
+  error           String?
+  createdAt       DateTime @default(now())
+  completedAt     DateTime?
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([status])
+  @@map("vr_exports")
+}
+
+model VRScene {
+  id           String   @id @default(cuid())
+  vrExportId   String
+  slideId      String
+  order        Int
+  environment  String   @default("default") // skybox preset
+  background360 String?  // 360 background URL
+  objects3d    Json?    // 3D objects in scene
+  transitions  Json?    // 3D transition config
+  hotspots     Json?    // Interactive hotspots
+  spatialAudio Json?    // Spatial audio config
+  createdAt    DateTime @default(now())
+
+  vrExport VRExport @relation(fields: [vrExportId], references: [id], onDelete: Cascade)
+
+  @@index([vrExportId])
+  @@map("vr_scenes")
+}
+
+model AROverlay {
+  id           String   @id @default(cuid())
+  userId       String
+  projectId    String
+  slideId      String?
+  name         String
+  type         String   // marker, surface, face, image_tracking
+  markerUrl    String?
+  content3d    Json     // 3D content configuration
+  animations   Json?    // Animation sequences
+  interactions Json?    // Touch/gesture interactions
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+  @@index([projectId])
+  @@map("ar_overlays")
+}
+
+// ============================================
+// HOLOGRAPHIC PREVIEWS
+// ============================================
+
+model HolographicPreview {
+  id              String   @id @default(cuid())
+  userId          String
+  projectId       String
+  displayType     String   @default("looking_glass") // looking_glass, pepper_ghost, webgl_3d
+  status          String   @default("pending") // pending, rendering, completed, failed
+  config          Json     // Display-specific configuration
+  quilts          Json?    // Quilt images for holographic display
+  outputUrl       String?
+  previewUrl      String?
+  depth           Float    @default(1.0)
+  viewAngle       Float    @default(45)
+  error           String?
+  createdAt       DateTime @default(now())
+  completedAt     DateTime?
+
+  @@index([userId])
+  @@index([projectId])
+  @@map("holographic_previews")
+}
+
+// ============================================
+// BLOCKCHAIN & NFT OWNERSHIP
+// ============================================
+
+model NFTCollection {
+  id              String   @id @default(cuid())
+  userId          String
+  name            String
+  symbol          String
+  description     String?  @db.Text
+  contractAddress String?  @unique
+  chainId         String   @default("ethereum") // ethereum, polygon, solana
+  status          String   @default("draft") // draft, deploying, deployed
+  mintPrice       Float?
+  royaltyPercent  Float    @default(2.5)
+  maxSupply       Int?
+  mintedCount     Int      @default(0)
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  nfts NFTMint[]
+
+  @@index([userId])
+  @@index([contractAddress])
+  @@map("nft_collections")
+}
+
+model NFTMint {
+  id              String   @id @default(cuid())
+  collectionId    String?
+  userId          String
+  projectId       String?
+  templateId      String?
+  tokenId         String?  @unique
+  transactionHash String?
+  status          String   @default("pending") // pending, minting, minted, failed
+  price           Float?
+  chainId         String   @default("ethereum")
+  ownerAddress    String?
+  metadata        Json     // NFT metadata (name, description, image, attributes)
+  ipfsHash        String?
+  error           String?
+  mintedAt        DateTime?
+  createdAt       DateTime @default(now())
+
+  collection NFTCollection? @relation(fields: [collectionId], references: [id])
+  ownership  NFTOwnership[]
+  royalties  NFTRoyalty[]
+
+  @@index([collectionId])
+  @@index([userId])
+  @@index([projectId])
+  @@index([tokenId])
+  @@map("nft_mints")
+}
+
+model NFTOwnership {
+  id            String   @id @default(cuid())
+  nftId         String
+  ownerAddress  String
+  acquiredAt    DateTime @default(now())
+  price         Float?
+  transactionHash String?
+  previousOwner String?
+  isCurrentOwner Boolean @default(true)
+
+  nft NFTMint @relation(fields: [nftId], references: [id], onDelete: Cascade)
+
+  @@index([nftId])
+  @@index([ownerAddress])
+  @@map("nft_ownership")
+}
+
+model NFTRoyalty {
+  id              String   @id @default(cuid())
+  nftId           String
+  creatorAddress  String
+  amount          Float
+  transactionHash String?
+  paidAt          DateTime @default(now())
+
+  nft NFTMint @relation(fields: [nftId], references: [id], onDelete: Cascade)
+
+  @@index([nftId])
+  @@index([creatorAddress])
+  @@map("nft_royalties")
+}
+
+// ============================================
+// AI CO-PILOT CHAT INTERFACE
+// ============================================
+
+model AIChatSession {
+  id           String   @id @default(cuid())
+  userId       String
+  projectId    String?
+  slideId      String?
+  title        String?
+  context      Json?    // Session context for AI
+  messages     AIChatMessage[]
+  status       String   @default("active") // active, archived
+  totalTokens  Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+  @@index([projectId])
+  @@map("ai_chat_sessions")
+}
+
+model AIChatMessage {
+  id           String   @id @default(cuid())
+  sessionId    String
+  role         String   // user, assistant, system
+  content      String   @db.Text
+  tokens       Int      @default(0)
+  metadata     Json?    // Action metadata, suggestions
+  feedback     String?  // thumbs_up, thumbs_down
+  createdAt    DateTime @default(now())
+
+  session AIChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("ai_chat_messages")
+}
+
+// ============================================
+// LIVE Q&A WITH AI MODERATION
+// ============================================
+
+model LiveQASession {
+  id              String   @id @default(cuid())
+  projectId       String
+  hostUserId      String
+  title           String?
+  status          String   @default("pending") // pending, live, paused, ended
+  moderationLevel String   @default("medium") // low, medium, high, strict
+  anonymousAllowed Boolean @default(true)
+  maxQuestions    Int?
+  questions       LiveQuestion[]
+  aiSummary       String?  @db.Text
+  participantCount Int     @default(0)
+  startedAt       DateTime?
+  endedAt         DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([hostUserId])
+  @@index([status])
+  @@map("live_qa_sessions")
+}
+
+model LiveQuestion {
+  id            String   @id @default(cuid())
+  sessionId     String
+  userId        String?
+  anonymousName String?
+  content       String   @db.Text
+  status        String   @default("pending") // pending, approved, rejected, answered, spam
+  moderationScore Float? // AI moderation score
+  moderationReason String?
+  upvotes       Int      @default(0)
+  isHighlighted Boolean  @default(false)
+  isPinned      Boolean  @default(false)
+  answer        String?  @db.Text
+  answeredBy    String?
+  answeredAt    DateTime?
+  createdAt     DateTime @default(now())
+
+  session LiveQASession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([status])
+  @@map("live_questions")
+}
+
+// ============================================
+// CROSS-PLATFORM SYNC & OFFLINE
+// ============================================
+
+model OperationalTransform {
+  id            String   @id @default(cuid())
+  projectId     String
+  userId        String
+  operation     String   // insert, delete, update, move
+  path          String   // JSON path to the changed element
+  oldValue      Json?
+  newValue      Json?
+  vectorClock   Json     // Vector clock for conflict resolution
+  serverSeq     Int      // Server sequence number
+  clientSeq     Int      // Client sequence number
+  isApplied     Boolean  @default(false)
+  conflictWith  String?  // ID of conflicting operation
+  resolvedBy    String?  // merge, theirs, ours
+  createdAt     DateTime @default(now())
+
+  @@index([projectId])
+  @@index([userId])
+  @@index([serverSeq])
+  @@map("operational_transforms")
+}
+
+model DeviceSync {
+  id           String   @id @default(cuid())
+  userId       String
+  deviceId     String   @unique
+  deviceName   String?
+  deviceType   String   // mobile, tablet, desktop, web
+  platform     String?  // ios, android, windows, macos, web
+  lastSyncAt   DateTime @default(now())
+  syncVersion  Int      @default(0)
+  offlineData  Json?    // Cached offline changes
+  isOnline     Boolean  @default(true)
+  pushToken    String?  // For push notifications
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+  @@index([deviceId])
+  @@map("device_syncs")
+}
+
+// ============================================
+// PREDICTIVE ANALYTICS
+// ============================================
+
+model PredictiveInsight {
+  id              String   @id @default(cuid())
+  projectId       String
+  type            String   // engagement, dropoff, length, visual
+  prediction      Json     // Prediction details
+  confidence      Float    // 0-1 confidence score
+  recommendations Json     // Array of recommendations
+  mlModelVersion  String?
+  dataPoints      Int      @default(0)
+  isActioned      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  expiresAt       DateTime?
+
+  @@index([projectId])
+  @@index([type])
+  @@map("predictive_insights")
+}
+
+model EngagementPrediction {
+  id              String   @id @default(cuid())
+  projectId       String
+  slideId         String?
+  predictedScore  Float    // 0-100
+  actualScore     Float?   // After measurement
+  factors         Json     // Contributing factors
+  suggestions     Json     // Improvement suggestions
+  calculatedAt    DateTime @default(now())
+  measuredAt      DateTime?
+
+  @@index([projectId])
+  @@index([slideId])
+  @@map("engagement_predictions")
+}
+
+// ============================================
+// AUDIENCE SENTIMENT ANALYSIS
+// ============================================
+
+model SentimentSession {
+  id              String   @id @default(cuid())
+  projectId       String
+  presenterId     String
+  status          String   @default("pending") // pending, active, completed
+  webcamEnabled   Boolean  @default(false)
+  feedbackEnabled Boolean  @default(true)
+  snapshots       SentimentSnapshot[]
+  overallSentiment Json?
+  heatmapData     Json?    // Confusion vs engagement heatmap
+  startedAt       DateTime?
+  endedAt         DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([projectId])
+  @@index([presenterId])
+  @@map("sentiment_sessions")
+}
+
+model SentimentSnapshot {
+  id           String   @id @default(cuid())
+  sessionId    String
+  slideIndex   Int
+  timestamp    DateTime @default(now())
+  sentiment    String   // positive, neutral, negative, confused, engaged
+  confidence   Float
+  faceCount    Int      @default(0)
+  emotions     Json?    // Detailed emotion breakdown
+  feedbackData Json?    // Text/poll feedback
+  
+  session SentimentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([slideIndex])
+  @@map("sentiment_snapshots")
+}
+
+// ============================================
+// PERSONALIZED LEARNING PATHS
+// ============================================
+
+model LearningPath {
+  id              String   @id @default(cuid())
+  userId          String
+  projectId       String
+  title           String
+  description     String?  @db.Text
+  modules         LearningModule[]
+  prerequisites   String[] @default([])
+  estimatedTime   Int?     // minutes
+  difficulty      String   @default("beginner") // beginner, intermediate, advanced
+  category        String?
+  isPublished     Boolean  @default(false)
+  completionRate  Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+  @@index([projectId])
+  @@map("learning_paths")
+}
+
+model LearningModule {
+  id            String   @id @default(cuid())
+  pathId        String
+  slideId       String?
+  title         String
+  content       String?  @db.Text
+  order         Int
+  type          String   @default("lesson") // lesson, quiz, assignment, resource
+  resources     Json?    // Additional resources
+  quizConfig    Json?    // Quiz configuration
+  completionCriteria Json? // What counts as complete
+  createdAt     DateTime @default(now())
+
+  path LearningPath @relation(fields: [pathId], references: [id], onDelete: Cascade)
+  progress LearnerProgress[]
+
+  @@index([pathId])
+  @@map("learning_modules")
+}
+
+model LearnerProgress {
+  id            String   @id @default(cuid())
+  userId        String
+  moduleId      String
+  pathId        String
+  status        String   @default("not_started") // not_started, in_progress, completed
+  progress      Float    @default(0) // 0-100
+  quizScore     Float?
+  timeSpent     Int      @default(0) // seconds
+  attempts      Int      @default(0)
+  lastAccessedAt DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  module LearningModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, moduleId])
+  @@index([userId])
+  @@index([pathId])
+  @@map("learner_progress")
+}
+
+// ============================================
+// SIGN LANGUAGE AVATARS
+// ============================================
+
+model SignLanguageConfig {
+  id              String   @id @default(cuid())
+  projectId       String
+  enabled         Boolean  @default(false)
+  language        String   @default("ASL") // ASL, BSL, ISL, etc.
+  avatarStyle     String   @default("realistic") // realistic, cartoon, minimal
+  avatarPosition  String   @default("bottom-right")
+  avatarSize      String   @default("medium") // small, medium, large
+  backgroundColor String?
+  transparency    Float    @default(0.9)
+  autoGenerate    Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  translations SignLanguageTranslation[]
+
+  @@unique([projectId])
+  @@index([projectId])
+  @@map("sign_language_configs")
+}
+
+model SignLanguageTranslation {
+  id            String   @id @default(cuid())
+  configId      String
+  slideId       String
+  blockId       String?
+  sourceText    String   @db.Text
+  signSequence  Json     // Array of sign animations
+  videoUrl      String?
+  duration      Float?   // seconds
+  status        String   @default("pending") // pending, processing, completed, failed
+  createdAt     DateTime @default(now())
+
+  config SignLanguageConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+
+  @@index([configId])
+  @@index([slideId])
+  @@map("sign_language_translations")
+}
+
+// ============================================
+// COGNITIVE ACCESSIBILITY
+// ============================================
+
+model CognitiveAccessibilityProfile {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  dyslexiaMode        Boolean  @default(false)
+  dyslexiaFont        String   @default("OpenDyslexic")
+  reducedMotion       Boolean  @default(false)
+  simplifiedLayout    Boolean  @default(false)
+  highContrast        Boolean  @default(false)
+  largerText          Boolean  @default(false)
+  textSpacing         Float    @default(1.0)
+  lineHeight          Float    @default(1.5)
+  focusHighlight      Boolean  @default(true)
+  voiceNavigation     Boolean  @default(false)
+  readingGuide        Boolean  @default(false)
+  colorOverlay        String?  // Color for dyslexia overlay
+  preferences         Json?    // Additional preferences
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([userId])
+  @@map("cognitive_accessibility_profiles")
+}
+
+// ============================================
+// UNIVERSAL DESIGN CHECKER
+// ============================================
+
+model UniversalDesignReport {
+  id                String   @id @default(cuid())
+  projectId         String
+  overallScore      Float    // 0-100
+  accessibilityScore Float
+  culturalScore     Float
+  readabilityScore  Float
+  issues            Json     // Array of issues
+  culturalIssues    CulturalIssue[]
+  suggestions       Json     // Improvement suggestions
+  targetRegions     String[] @default([])
+  checkedAt         DateTime @default(now())
+
+  @@index([projectId])
+  @@map("universal_design_reports")
+}
+
+model CulturalIssue {
+  id          String   @id @default(cuid())
+  reportId    String
+  slideId     String?
+  blockId     String?
+  type        String   // color_symbolism, imagery, text, gesture
+  severity    String   // low, medium, high, critical
+  region      String   // Affected region/culture
+  description String   @db.Text
+  suggestion  String?  @db.Text
+  isResolved  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  report UniversalDesignReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@map("cultural_issues")
+}
+
+// ============================================
+// THIRD-PARTY API & SDK
+// ============================================
+
+model APIKey {
+  id              String   @id @default(cuid())
+  userId          String
+  organizationId  String?
+  name            String
+  key             String   @unique
+  hashedKey       String   // For secure storage
+  permissions     String[] @default([])
+  rateLimit       Int      @default(1000) // requests per hour
+  usageCount      Int      @default(0)
+  lastUsedAt      DateTime?
+  expiresAt       DateTime?
+  isActive        Boolean  @default(true)
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  usageLogs APIUsageLog[]
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([key])
+  @@map("api_keys")
+}
+
+model APIUsageLog {
+  id          String   @id @default(cuid())
+  apiKeyId    String
+  endpoint    String
+  method      String
+  statusCode  Int
+  latency     Int      // milliseconds
+  requestSize Int?
+  responseSize Int?
+  ipAddress   String?
+  userAgent   String?
+  error       String?
+  createdAt   DateTime @default(now())
+
+  apiKey APIKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@index([apiKeyId])
+  @@index([endpoint])
+  @@index([createdAt])
+  @@map("api_usage_logs")
+}
+
+// ============================================
+// WHITE-LABEL SDK
+// ============================================
+
+model SDKConfiguration {
+  id              String   @id @default(cuid())
+  organizationId  String   @unique
+  name            String
+  version         String   @default("1.0.0")
+  isHeadless      Boolean  @default(false)
+  customBranding  Json?    // Logo, colors, fonts
+  customDomain    String?
+  allowedOrigins  String[] @default([])
+  features        Json     // Enabled features
+  theme           Json?    // Theme overrides
+  apiEndpoint     String?
+  webhookUrl      String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  instances SDKInstance[]
+
+  @@index([organizationId])
+  @@map("sdk_configurations")
+}
+
+model SDKInstance {
+  id            String   @id @default(cuid())
+  configId      String
+  instanceKey   String   @unique
+  domain        String
+  status        String   @default("active") // active, suspended, revoked
+  usageStats    Json?
+  lastActiveAt  DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  config SDKConfiguration @relation(fields: [configId], references: [id], onDelete: Cascade)
+
+  @@index([configId])
+  @@index([instanceKey])
+  @@map("sdk_instances")
+}
+
+// ============================================
+// IOT DEVICE INTEGRATION
+// ============================================
+
+model IoTDevice {
+  id            String   @id @default(cuid())
+  userId        String
+  deviceType    String   // alexa, google_home, fitbit, custom
+  deviceId      String   @unique
+  name          String
+  capabilities  String[] @default([])
+  authToken     String?
+  status        String   @default("connected") // connected, disconnected, error
+  lastPing      DateTime?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  commands IoTCommand[]
+
+  @@index([userId])
+  @@index([deviceId])
+  @@map("iot_devices")
+}
+
+model IoTCommand {
+  id            String   @id @default(cuid())
+  deviceId      String
+  projectId     String?
+  command       String   // next_slide, previous_slide, pause, resume, goto_slide
+  parameters    Json?
+  status        String   @default("pending") // pending, executed, failed
+  executedAt    DateTime?
+  createdAt     DateTime @default(now())
+
+  device IoTDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId])
+  @@index([projectId])
+  @@map("iot_commands")
+}
+
+// ============================================
+// ECO-FRIENDLY MODE & SUSTAINABILITY
+// ============================================
+
+model EcoReport {
+  id                String   @id @default(cuid())
+  projectId         String
+  userId            String
+  ecoScore          Float    // 0-100
+  fileSize          Int      // bytes
+  compressedSize    Int?     // bytes after optimization
+  estimatedEnergy   Float?   // kWh per view
+  animationCount    Int      @default(0)
+  heavyMediaCount   Int      @default(0)
+  optimizations     Json     // Applied optimizations
+  suggestions       Json     // Suggested improvements
+  createdAt         DateTime @default(now())
+
+  @@index([projectId])
+  @@index([userId])
+  @@map("eco_reports")
+}
+
+model CarbonFootprint {
+  id              String   @id @default(cuid())
+  userId          String
+  projectId       String?
+  periodStart     DateTime
+  periodEnd       DateTime
+  dataTransferKb  Float    @default(0)
+  viewCount       Int      @default(0)
+  deviceViews     Json?    // Breakdown by device type
+  regionViews     Json?    // Breakdown by region
+  estimatedCO2g   Float    @default(0) // grams of CO2
+  offset          Float    @default(0) // Offset purchased
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([periodStart, periodEnd])
+  @@map("carbon_footprints")
+}
+
+// ============================================
+// PRESENTER WELLNESS TOOLS
+// ============================================
+
+model WellnessSession {
+  id              String   @id @default(cuid())
+  userId          String
+  projectId       String?
+  status          String   @default("active") // active, paused, completed
+  webcamEnabled   Boolean  @default(false)
+  duration        Int      @default(0) // seconds
+  breaksTaken     Int      @default(0)
+  hydrationReminders Int   @default(0)
+  metrics         WellnessMetric[]
+  summary         Json?
+  recommendations Json?
+  startedAt       DateTime @default(now())
+  endedAt         DateTime?
+
+  @@index([userId])
+  @@index([projectId])
+  @@map("wellness_sessions")
+}
+
+model WellnessMetric {
+  id            String   @id @default(cuid())
+  sessionId     String
+  timestamp     DateTime @default(now())
+  metricType    String   // stress, fatigue, voice_strain, posture
+  value         Float    // 0-100
+  raw           Json?    // Raw sensor/analysis data
+  alert         String?  // break_suggested, hydrate, posture_check
+  acknowledged  Boolean  @default(false)
+
+  session WellnessSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([metricType])
+  @@map("wellness_metrics")
 }

@@ -2,8 +2,13 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AIService } from '../ai/ai.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { v4 as uuidv4 } from 'uuid';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 
 export type VoiceId = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
 export type ExportFormat = 'mp3' | 'mp4' | 'webm';
@@ -103,7 +108,21 @@ export class NarrationExportService {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly aiService: AIService,
-  ) {}
+  ) {
+    // Initialize S3 client
+    this.s3Client = new S3Client({
+      region: this.configService.get<string>('AWS_S3_REGION') || 'us-east-1',
+      credentials: {
+        accessKeyId: this.configService.get<string>('AWS_ACCESS_KEY_ID') || '',
+        secretAccessKey: this.configService.get<string>('AWS_SECRET_ACCESS_KEY') || '',
+      },
+    });
+    this.bucketName = this.configService.get<string>('AWS_S3_BUCKET') || '';
+  }
+
+  private s3Client: S3Client;
+  private bucketName: string;
+  private execAsync = promisify(exec);
 
   /**
    * Get available voice options
@@ -304,20 +323,34 @@ Return only the speaker notes, ready to be read aloud.
       const wordCount = speakerNotes.split(/\s+/).length;
       const estimatedDuration = ((wordCount / 150) * 60) / speed;
 
-      // In production, upload to S3
-      // For now, save locally and return path
-      const filename = `narration_${slideId}_${Date.now()}.mp3`;
-      const uploadsDir = path.join(process.cwd(), 'uploads', 'narrations');
-
-      if (!fs.existsSync(uploadsDir)) {
-        fs.mkdirSync(uploadsDir, { recursive: true });
+      // Upload to S3
+      const filename = `narration_${slideId}_${uuidv4()}.mp3`;
+      const key = `narrations/${filename}`;
+      
+      let audioUrl: string;
+      
+      if (this.bucketName) {
+        // Upload to S3
+        await this.s3Client.send(
+          new PutObjectCommand({
+            Bucket: this.bucketName,
+            Key: key,
+            Body: buffer,
+            ContentType: 'audio/mpeg',
+            ACL: 'public-read',
+          }),
+        );
+        audioUrl = `https://${this.bucketName}.s3.amazonaws.com/${key}`;
+      } else {
+        // Fallback to local storage for development
+        const uploadsDir = path.join(process.cwd(), 'uploads', 'narrations');
+        if (!fs.existsSync(uploadsDir)) {
+          fs.mkdirSync(uploadsDir, { recursive: true });
+        }
+        const filePath = path.join(uploadsDir, filename);
+        fs.writeFileSync(filePath, buffer);
+        audioUrl = `/uploads/narrations/${filename}`;
       }
-
-      const filePath = path.join(uploadsDir, filename);
-      fs.writeFileSync(filePath, buffer);
-
-      // In production, this would be an S3 URL
-      const audioUrl = `/uploads/narrations/${filename}`;
 
       return {
         audioUrl,
@@ -571,35 +604,149 @@ Return only the speaker notes, ready to be read aloud.
         include: {
           narrationProject: {
             include: {
-              slides: {
-                include: { blocks: true },
-                orderBy: { order: 'asc' },
+              project: {
+                include: {
+                  slides: {
+                    include: { blocks: true },
+                    orderBy: { order: 'asc' },
+                  },
+                  theme: true,
+                },
               },
+              slides: true,
             },
           },
         },
       });
 
-      if (!job || !job.narrationProject) return;
+      if (!job || !job.narrationProject) {
+        throw new Error('Job or narration project not found');
+      }
 
-      // In production, this would use FFmpeg or a video generation service
-      // For now, we'll simulate the progress
-      const totalSlides = job.narrationProject.slides.length;
+      const project = job.narrationProject.project;
+      const slides = project.slides;
+      const narrationSlides = job.narrationProject.slides;
+      
+      // Create temp directory for video processing
+      const tempDir = path.join(os.tmpdir(), `video_export_${jobId}`);
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
 
+      // Get resolution settings
+      const resolutions: Record<string, { width: number; height: number }> = {
+        '720p': { width: 1280, height: 720 },
+        '1080p': { width: 1920, height: 1080 },
+        '4k': { width: 3840, height: 2160 },
+      };
+      const res = resolutions[job.resolution] || resolutions['1080p'];
+
+      // Check if FFmpeg is available
+      let ffmpegAvailable = false;
+      try {
+        await this.execAsync('which ffmpeg');
+        ffmpegAvailable = true;
+      } catch {
+        this.logger.warn('FFmpeg not available, using fallback video generation');
+      }
+
+      const totalSlides = slides.length;
+      const slideDuration = job.slideDuration || 5;
+      
+      // Generate slide images (simplified - in production use HTML to image)
+      const slideImages: string[] = [];
       for (let i = 0; i < totalSlides; i++) {
-        // Simulate processing time
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
+        // Update progress
         await this.prisma.videoExportJob.update({
           where: { id: jobId },
           data: {
-            progress: Math.round(((i + 1) / totalSlides) * 100),
+            progress: Math.round(((i + 1) / totalSlides) * 30),
           },
         });
+        
+        // Create a simple slide image placeholder
+        // In production, use puppeteer to screenshot actual rendered slides
+        slideImages.push(`slide_${i}.png`);
       }
 
-      // In production, this would be the actual video URL
-      const outputUrl = `/exports/video_${job.narrationProject.projectId}_${Date.now()}.${job.format}`;
+      let outputUrl: string;
+      
+      if (ffmpegAvailable && job.includeNarration) {
+        // Generate video with FFmpeg
+        try {
+          // Create concat file for FFmpeg
+          const concatFile = path.join(tempDir, 'concat.txt');
+          let concatContent = '';
+          
+          for (let i = 0; i < totalSlides; i++) {
+            const duration = narrationSlides[i]?.duration || slideDuration;
+            concatContent += `file 'slide_${i}.png'\nduration ${duration}\n`;
+          }
+          fs.writeFileSync(concatFile, concatContent);
+          
+          // Generate video
+          const outputFile = path.join(tempDir, `output.${job.format}`);
+          const ffmpegCmd = `ffmpeg -f concat -safe 0 -i ${concatFile} -vf "scale=${res.width}:${res.height}" -c:v libx264 -pix_fmt yuv420p ${outputFile}`;
+          
+          await this.execAsync(ffmpegCmd);
+          
+          // Upload to S3
+          if (this.bucketName && fs.existsSync(outputFile)) {
+            const videoBuffer = fs.readFileSync(outputFile);
+            const key = `exports/video_${project.id}_${Date.now()}.${job.format}`;
+            
+            await this.s3Client.send(
+              new PutObjectCommand({
+                Bucket: this.bucketName,
+                Key: key,
+                Body: videoBuffer,
+                ContentType: job.format === 'mp4' ? 'video/mp4' : 'video/webm',
+                ACL: 'public-read',
+              }),
+            );
+            
+            outputUrl = `https://${this.bucketName}.s3.amazonaws.com/${key}`;
+          } else {
+            outputUrl = `/exports/video_${project.id}_${Date.now()}.${job.format}`;
+          }
+        } catch (ffmpegError) {
+          this.logger.error('FFmpeg processing failed:', ffmpegError);
+          throw new Error('Video processing failed');
+        }
+      } else {
+        // Fallback: Create a slideshow-style export using HTML
+        // This generates a downloadable HTML presentation with autoplay
+        const htmlContent = this.generateVideoFallbackHtml(project, narrationSlides, slideDuration);
+        const filename = `video_${project.id}_${Date.now()}.html`;
+        
+        if (this.bucketName) {
+          const key = `exports/${filename}`;
+          await this.s3Client.send(
+            new PutObjectCommand({
+              Bucket: this.bucketName,
+              Key: key,
+              Body: htmlContent,
+              ContentType: 'text/html',
+              ACL: 'public-read',
+            }),
+          );
+          outputUrl = `https://${this.bucketName}.s3.amazonaws.com/${key}`;
+        } else {
+          const exportsDir = path.join(process.cwd(), 'exports');
+          if (!fs.existsSync(exportsDir)) {
+            fs.mkdirSync(exportsDir, { recursive: true });
+          }
+          fs.writeFileSync(path.join(exportsDir, filename), htmlContent);
+          outputUrl = `/exports/${filename}`;
+        }
+      }
+
+      // Cleanup temp directory
+      try {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      } catch {
+        // Ignore cleanup errors
+      }
 
       await this.prisma.videoExportJob.update({
         where: { id: jobId },
@@ -645,5 +792,145 @@ Return only the speaker notes, ready to be read aloud.
     }
 
     return textParts.join('\n\n');
+  }
+
+  /**
+   * Generate an HTML-based video fallback with auto-advancing slides
+   */
+  private generateVideoFallbackHtml(
+    project: { title: string; slides: Array<{ blocks?: Array<{ blockType: string; content: unknown }> }> },
+    narrationSlides: Array<{ duration?: number; audioUrl?: string }>,
+    defaultDuration: number,
+  ): string {
+    const slidesHtml = project.slides.map((slide, index) => {
+      const content = this.extractSlideContent(slide);
+      const duration = narrationSlides[index]?.duration || defaultDuration;
+      const audioUrl = narrationSlides[index]?.audioUrl;
+      
+      return `
+        <div class="slide" data-duration="${duration * 1000}" ${audioUrl ? `data-audio="${audioUrl}"` : ''}>
+          <div class="slide-content">
+            <div class="slide-number">${index + 1} / ${project.slides.length}</div>
+            <pre>${this.escapeHtml(content)}</pre>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${this.escapeHtml(project.title)} - Video Export</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: #1a1a1a; color: white; }
+    .slide { display: none; width: 100vw; height: 100vh; align-items: center; justify-content: center; padding: 40px; }
+    .slide.active { display: flex; }
+    .slide-content { max-width: 1200px; text-align: center; }
+    .slide-number { position: fixed; bottom: 20px; right: 20px; opacity: 0.5; }
+    pre { white-space: pre-wrap; font-size: 24px; line-height: 1.6; }
+    .progress { position: fixed; bottom: 0; left: 0; height: 4px; background: #3b82f6; transition: width 0.1s; }
+    .controls { position: fixed; top: 20px; right: 20px; display: flex; gap: 10px; }
+    button { padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    button:hover { background: #2563eb; }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <button onclick="togglePlay()">Play/Pause</button>
+    <button onclick="prevSlide()">Prev</button>
+    <button onclick="nextSlide()">Next</button>
+  </div>
+  ${slidesHtml}
+  <div class="progress" id="progress"></div>
+  
+  <script>
+    const slides = document.querySelectorAll('.slide');
+    let currentSlide = 0;
+    let isPlaying = true;
+    let timer;
+    let progressTimer;
+    
+    function showSlide(index) {
+      slides.forEach(s => s.classList.remove('active'));
+      slides[index].classList.add('active');
+      currentSlide = index;
+      
+      // Play audio if available
+      const audioUrl = slides[index].dataset.audio;
+      if (audioUrl && isPlaying) {
+        const audio = new Audio(audioUrl);
+        audio.play().catch(() => {});
+      }
+      
+      if (isPlaying) startSlideTimer();
+    }
+    
+    function startSlideTimer() {
+      clearTimeout(timer);
+      clearInterval(progressTimer);
+      
+      const duration = parseInt(slides[currentSlide].dataset.duration) || 5000;
+      const progressEl = document.getElementById('progress');
+      let elapsed = 0;
+      
+      progressTimer = setInterval(() => {
+        elapsed += 100;
+        progressEl.style.width = (elapsed / duration * 100) + '%';
+      }, 100);
+      
+      timer = setTimeout(() => {
+        if (currentSlide < slides.length - 1) {
+          showSlide(currentSlide + 1);
+        } else {
+          isPlaying = false;
+          clearInterval(progressTimer);
+        }
+      }, duration);
+    }
+    
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      if (isPlaying) startSlideTimer();
+      else {
+        clearTimeout(timer);
+        clearInterval(progressTimer);
+      }
+    }
+    
+    function nextSlide() {
+      if (currentSlide < slides.length - 1) showSlide(currentSlide + 1);
+    }
+    
+    function prevSlide() {
+      if (currentSlide > 0) showSlide(currentSlide - 1);
+    }
+    
+    // Keyboard controls
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ') nextSlide();
+      if (e.key === 'ArrowLeft') prevSlide();
+      if (e.key === 'p') togglePlay();
+    });
+    
+    // Start
+    showSlide(0);
+  </script>
+</body>
+</html>`;
+  }
+
+  /**
+   * Escape HTML characters to prevent XSS
+   */
+  private escapeHtml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -28,6 +28,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { api } from "@/lib/api";
+import { useCollaboration } from "@/hooks/use-collaboration";
 import { useAuthStore } from "@/stores/auth-store";
 import { useEditorStore } from "@/stores/editor-store";
 import type { Project, Theme, Slide, Block, Comment } from "@/types";
@@ -90,39 +91,48 @@ export default function EditorPageV2() {
     const [isCommentsPanelOpen, setIsCommentsPanelOpen] = useState(false);
     const [comments, setComments] = useState<Comment[]>([]);
 
-    // Mock collaborators for demo
-    const [collaborators] = useState(() => [
-        {
-            id: 'collab-1',
-            name: 'Sarah Chen',
-            email: 'sarah@company.com',
-            avatar: '',
-            color: '#EF4444',
-            status: 'online' as const,
-            activity: 'editing' as const,
-            lastSeen: new Date(),
+    // Real-time collaboration hook
+    const token = api.getToken() || '';
+    const {
+        isConnected: isCollaborationConnected,
+        collaborators: wsCollaborators,
+        cursors,
+        sendCursorPosition,
+        sendBlockUpdate,
+        sendSlideAdd,
+        sendSlideDelete,
+        sendSlideReorder,
+        addComment: addCollaborationComment,
+    } = useCollaboration({
+        projectId,
+        token,
+        onUserJoined: (user) => {
+            toast.info(`${user.userName} joined the presentation`);
         },
-        {
-            id: 'collab-2',
-            name: 'Mike Ross',
-            email: 'mike@company.com',
+        onUserLeft: (user) => {
+            toast.info(`${user.userName} left the presentation`);
+        },
+    });
+
+    // Map WebSocket collaborators to UI format
+    const collaborators = useMemo(() => {
+        return wsCollaborators.map((c) => ({
+            id: c.userId,
+            name: c.userName,
+            email: '',
             avatar: '',
-            color: '#3B82F6',
+            color: c.color,
             status: 'online' as const,
             activity: 'viewing' as const,
             lastSeen: new Date(),
-        },
-        {
-            id: 'collab-3',
-            name: 'Jessica Park',
-            email: 'jessica@company.com',
-            avatar: '',
-            color: '#F59E0B',
-            status: 'away' as const,
-            activity: 'commenting' as const,
-            lastSeen: new Date(Date.now() - 300000),
-        },
-    ]);
+            cursor: c.cursorX !== undefined && c.cursorY !== undefined
+                ? { x: c.cursorX, y: c.cursorY }
+                : undefined,
+            currentSlideId: c.cursorSlide !== undefined
+                ? project?.slides?.[c.cursorSlide]?.id
+                : undefined,
+        }));
+    }, [wsCollaborators, project?.slides]);
 
     const {
         undo,
@@ -210,6 +220,8 @@ export default function EditorPageV2() {
                 projectId,
                 reordered.map((s, i) => ({ id: s.id, order: i }))
             );
+            // Broadcast reorder to collaborators
+            sendSlideReorder(oldIndex, newIndex);
         }
     };
 
@@ -221,6 +233,8 @@ export default function EditorPageV2() {
             });
             addSlide(newSlide);
             setCurrentSlideIndex((project?.slides?.length || 0));
+            // Broadcast new slide to collaborators
+            sendSlideAdd(newSlide);
         } catch {
             toast.error("Failed to add slide");
         }
@@ -234,6 +248,8 @@ export default function EditorPageV2() {
         try {
             await api.slides.delete(projectId, slideId);
             deleteSlide(slideId);
+            // Broadcast delete to collaborators
+            sendSlideDelete(slideId);
         } catch {
             toast.error("Failed to delete slide");
         }
@@ -396,6 +412,17 @@ export default function EditorPageV2() {
                 </div>
 
                 <div className="flex items-center gap-4">
+                    {/* Connection Status */}
+                    <div className="flex items-center gap-2">
+                        <span
+                            className={`h-2 w-2 rounded-full ${isCollaborationConnected ? 'bg-green-500' : 'bg-gray-400'}`}
+                            title={isCollaborationConnected ? 'Connected' : 'Disconnected'}
+                        />
+                        <span className="text-xs text-gray-500">
+                            {isCollaborationConnected ? 'Live' : 'Offline'}
+                        </span>
+                    </div>
+
                     {/* Real Collaborator Presence */}
                     <CollaboratorPresence
                         collaborators={collaborators}
@@ -528,7 +555,40 @@ export default function EditorPageV2() {
                 )}
 
                 {/* Central Canvas */}
-                <main className="flex-1 bg-slate-100 dark:bg-slate-900 relative flex flex-col items-center justify-center p-8 overflow-hidden">
+                <main 
+                    className="flex-1 bg-slate-100 dark:bg-slate-900 relative flex flex-col items-center justify-center p-8 overflow-hidden"
+                    onMouseMove={(e) => {
+                        // Send cursor position to collaborators
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const x = ((e.clientX - rect.left) / rect.width) * 100;
+                        const y = ((e.clientY - rect.top) / rect.height) * 100;
+                        sendCursorPosition({ x, y, slideIndex: currentSlideIndex });
+                    }}
+                >
+                    {/* Collaborator Cursors */}
+                    {Array.from(cursors.entries()).map(([cursorUserId, cursor]) => (
+                        cursor.slideIndex === currentSlideIndex && (
+                            <div
+                                key={cursorUserId}
+                                className="absolute pointer-events-none z-50 transition-all duration-75"
+                                style={{
+                                    left: `${cursor.x}%`,
+                                    top: `${cursor.y}%`,
+                                }}
+                            >
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill={cursor.color}>
+                                    <path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 01.35-.15h6.87a.5.5 0 00.35-.85L6.35 2.86a.5.5 0 00-.85.35z" />
+                                </svg>
+                                <span
+                                    className="ml-2 px-2 py-0.5 text-xs text-white rounded whitespace-nowrap"
+                                    style={{ backgroundColor: cursor.color }}
+                                >
+                                    {cursor.userName}
+                                </span>
+                            </div>
+                        )
+                    ))}
+
                     {/* Block Toolbar - Floating */}
                     <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30">
                         <BlockToolbar projectId={projectId} slide={currentSlide} />

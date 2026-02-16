@@ -37,6 +37,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
 import type { Project } from "@/types";
+import { FeaturesHub } from "@/components/dashboard/features-hub";
 
 // New usability components
 import { CommandPalette } from "@/components/ui/command-palette";
@@ -344,6 +345,9 @@ export default function DashboardPage() {
                             </div>
                         </div>
                     </div>
+
+                    {/* Features Hub */}
+                    <FeaturesHub />
 
                     {/* Starred Section */}
                     {starredProjects && starredProjects.length > 0 && (

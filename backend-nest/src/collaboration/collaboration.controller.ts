@@ -2,12 +2,14 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Delete,
   Param,
   Body,
   UseGuards,
   Request,
   Query,
+  ForbiddenException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CollaborationService } from './collaboration.service';
@@ -49,8 +51,44 @@ export class CollaborationController {
   async removeCollaborator(
     @Param('projectId') projectId: string,
     @Param('userId') userId: string,
+    @Request() req: { user: { id: string } },
   ) {
-    return this.collaborationService.removeCollaborator(projectId, userId);
+    // Only project owner may remove collaborators
+    const isOwner = await this.collaborationService.isProjectOwner(
+      projectId,
+      req.user.id,
+    );
+    if (!isOwner) {
+      throw new ForbiddenException('Only project owner can remove collaborators');
+    }
+
+    return this.collaborationService.removeCollaborator(
+      projectId,
+      userId,
+      req.user.id,
+    );
+  }
+
+  @Patch(':projectId/collaborators/:collaboratorId')
+  async updateCollaboratorRole(
+    @Param('projectId') projectId: string,
+    @Param('collaboratorId') collaboratorId: string,
+    @Body() body: { role: 'VIEWER' | 'COMMENTER' | 'EDITOR' },
+    @Request() req: { user: { id: string } },
+  ) {
+    const isOwner = await this.collaborationService.isProjectOwner(
+      projectId,
+      req.user.id,
+    );
+    if (!isOwner) {
+      throw new ForbiddenException('Only project owner can update collaborator roles');
+    }
+
+    return this.collaborationService.updateCollaboratorRole(
+      collaboratorId,
+      body.role,
+      req.user.id,
+    );
   }
 
   // ============================================

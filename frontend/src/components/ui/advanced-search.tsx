@@ -440,12 +440,32 @@ function SearchResultItem({
     );
 }
 
-// Helper to highlight search matches
-function highlightMatches(text: string, query: string): string[] {
-    if (!query) {return [text];}
+// Helper to escape HTML to prevent XSS
+function escapeHtml(text: string): string {
+    const div = typeof document !== 'undefined' ? document.createElement('div') : null;
+    if (div) {
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    // Server-side fallback
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
 
-    const regex = new RegExp(`(${escapeRegExp(query)})`, "gi");
-    const highlighted = text.replace(
+// Helper to highlight search matches (XSS-safe)
+function highlightMatches(text: string, query: string): string[] {
+    if (!query) {return [escapeHtml(text)];}
+
+    // First escape HTML in the text to prevent XSS
+    const safeText = escapeHtml(text);
+    const safeQuery = escapeHtml(query);
+    
+    const regex = new RegExp(`(${escapeRegExp(safeQuery)})`, "gi");
+    const highlighted = safeText.replace(
         regex,
         '<mark class="bg-yellow-200 dark:bg-yellow-900/50">$1</mark>'
     );

@@ -2478,6 +2478,580 @@ class ApiClient {
     return data;
   }
 
+  // ============================================
+  // AI RESEARCH API
+  // ============================================
+
+  async startResearch(projectId: string, input: { topic: string; depth?: string; sources?: string[] }) {
+    const { data } = await this.client.post(`/ai-research/research/${projectId}`, input);
+    return data;
+  }
+
+  async getResearch(id: string) {
+    const { data } = await this.client.get(`/ai-research/research/${id}`);
+    return data;
+  }
+
+  async listResearch(projectId: string) {
+    const { data } = await this.client.get(`/ai-research/research/project/${projectId}`);
+    return data;
+  }
+
+  async generateContentBlocks(id: string) {
+    const { data } = await this.client.post(`/ai-research/research/${id}/generate-blocks`);
+    return data;
+  }
+
+  async factCheck(id: string) {
+    const { data } = await this.client.post(`/ai-research/research/${id}/fact-check`);
+    return data;
+  }
+
+  // ============================================
+  // STORYBOARDING API
+  // ============================================
+
+  async createStoryboard(projectId: string, input: { title: string; narrativeArc?: string; audienceType?: string; slidesCount?: number }) {
+    const { data } = await this.client.post(`/storyboarding/storyboards/${projectId}`, input);
+    return data;
+  }
+
+  async getStoryboard(id: string) {
+    const { data } = await this.client.get(`/storyboarding/storyboards/${id}`);
+    return data;
+  }
+
+  async listStoryboards(projectId: string) {
+    const { data } = await this.client.get(`/storyboarding/storyboards/project/${projectId}`);
+    return data;
+  }
+
+  async applyStoryboard(id: string) {
+    const { data } = await this.client.post(`/storyboarding/storyboards/${id}/apply`);
+    return data;
+  }
+
+  // ============================================
+  // A/B TESTING API
+  // ============================================
+
+  async createABTest(projectId: string, input: { name: string; variants: object[] }) {
+    const { data } = await this.client.post(`/ab-testing/tests/${projectId}`, input);
+    return data;
+  }
+
+  async getABTest(id: string) {
+    const { data } = await this.client.get(`/ab-testing/tests/${id}`);
+    return data;
+  }
+
+  async listABTests(projectId: string) {
+    const { data } = await this.client.get(`/ab-testing/tests/project/${projectId}`);
+    return data;
+  }
+
+  async recordABImpression(testId: string, variantId: string) {
+    const { data } = await this.client.post(`/ab-testing/tests/${testId}/impression`, { variantId });
+    return data;
+  }
+
+  async getABResults(testId: string) {
+    const { data } = await this.client.get(`/ab-testing/tests/${testId}/results`);
+    return data;
+  }
+
+  // ============================================
+  // VR/AR API
+  // ============================================
+
+  async exportToVR(projectId: string, options?: object) {
+    const { data } = await this.client.post(`/vr-ar/export/${projectId}`, options || {});
+    return data;
+  }
+
+  async getVRExport(id: string) {
+    const { data } = await this.client.get(`/vr-ar/exports/${id}`);
+    return data;
+  }
+
+  async generateARMarker(projectId: string) {
+    const { data } = await this.client.post(`/vr-ar/ar-marker/${projectId}`);
+    return data;
+  }
+
+  // ============================================
+  // HOLOGRAPHIC API
+  // ============================================
+
+  async createHolographicPreview(projectId: string, input: { format: string; settings?: object }) {
+    const { data } = await this.client.post(`/holographic/preview/${projectId}`, input);
+    return data;
+  }
+
+  async getHolographicPreview(id: string) {
+    const { data } = await this.client.get(`/holographic/preview/${id}`);
+    return data;
+  }
+
+  async getHolographicFormats() {
+    const { data } = await this.client.get('/holographic/formats');
+    return data;
+  }
+
+  // ============================================
+  // BLOCKCHAIN/NFT API
+  // ============================================
+
+  async createNFTCollection(input: { name: string; chain: string; description?: string }) {
+    const { data } = await this.client.post('/blockchain/collections', input);
+    return data;
+  }
+
+  async listNFTCollections() {
+    const { data } = await this.client.get('/blockchain/collections');
+    return data;
+  }
+
+  async mintNFT(collectionId: string, input: { presentationId: string; name: string; description?: string }) {
+    const { data } = await this.client.post(`/blockchain/collections/${collectionId}/mint`, input);
+    return data;
+  }
+
+  async verifyNFTOwnership(tokenId: string) {
+    const { data } = await this.client.get(`/blockchain/verify/${tokenId}`);
+    return data;
+  }
+
+  // ============================================
+  // AI COPILOT API
+  // ============================================
+
+  async createChatSession(projectId: string) {
+    const { data } = await this.client.post(`/ai-copilot/sessions/${projectId}`);
+    return data;
+  }
+
+  async sendChatMessage(sessionId: string, message: string) {
+    const { data } = await this.client.post(`/ai-copilot/sessions/${sessionId}/message`, { message });
+    return data;
+  }
+
+  async getChatHistory(sessionId: string) {
+    const { data } = await this.client.get(`/ai-copilot/sessions/${sessionId}/history`);
+    return data;
+  }
+
+  async executeCopilotAction(sessionId: string, action: string, params?: object) {
+    const { data } = await this.client.post(`/ai-copilot/sessions/${sessionId}/action`, { action, params });
+    return data;
+  }
+
+  // ============================================
+  // LIVE Q&A API
+  // ============================================
+
+  async createLiveQASession(projectId: string, settings?: object) {
+    const { data } = await this.client.post(`/live-qa/sessions/${projectId}`, settings);
+    return data;
+  }
+
+  async getQASession(id: string) {
+    const { data } = await this.client.get(`/live-qa/sessions/${id}`);
+    return data;
+  }
+
+  async endQASession(sessionId: string) {
+    const { data } = await this.client.post(`/live-qa/sessions/${sessionId}/end`);
+    return data;
+  }
+
+  async getQASummary(sessionId: string) {
+    const { data } = await this.client.get(`/live-qa/sessions/${sessionId}/summary`);
+    return data;
+  }
+
+  // ============================================
+  // CROSS-PLATFORM SYNC API
+  // ============================================
+
+  async registerSyncDevice(input: { deviceName: string; deviceType: string; platform: string }) {
+    const { data } = await this.client.post('/sync/devices', input);
+    return data;
+  }
+
+  async listSyncDevices() {
+    const { data } = await this.client.get('/sync/devices');
+    return data;
+  }
+
+  async getSyncStatus(projectId: string) {
+    const { data } = await this.client.get(`/sync/status/${projectId}`);
+    return data;
+  }
+
+  async resolveConflict(conflictId: string, resolution: string) {
+    const { data } = await this.client.post(`/sync/conflicts/${conflictId}/resolve`, { resolution });
+    return data;
+  }
+
+  // ============================================
+  // PREDICTIVE ANALYTICS API
+  // ============================================
+
+  async getPredictiveInsights(projectId: string) {
+    const { data } = await this.client.get(`/predictive-analytics/insights/${projectId}`);
+    return data;
+  }
+
+  async getPredictiveRecommendations(projectId: string) {
+    const { data } = await this.client.get(`/predictive-analytics/recommendations/${projectId}`);
+    return data;
+  }
+
+  async getPredictiveBenchmarks(projectId: string) {
+    const { data } = await this.client.get(`/predictive-analytics/benchmarks/${projectId}`);
+    return data;
+  }
+
+  // ============================================
+  // SENTIMENT ANALYSIS API
+  // ============================================
+
+  async startSentimentSession(projectId: string, options?: object) {
+    const { data } = await this.client.post(`/sentiment-analysis/sessions/${projectId}`, options);
+    return data;
+  }
+
+  async getSentimentSession(id: string) {
+    const { data } = await this.client.get(`/sentiment-analysis/sessions/${id}`);
+    return data;
+  }
+
+  async getSentimentSummary(sessionId: string) {
+    const { data } = await this.client.get(`/sentiment-analysis/sessions/${sessionId}/summary`);
+    return data;
+  }
+
+  // ============================================
+  // LEARNING PATHS API
+  // ============================================
+
+  async createLearningPath(presentationId: string) {
+    const { data } = await this.client.post(`/learning-paths/paths/${presentationId}`);
+    return data;
+  }
+
+  async getLearningPath(id: string) {
+    const { data } = await this.client.get(`/learning-paths/paths/${id}`);
+    return data;
+  }
+
+  async listLearningPaths() {
+    const { data } = await this.client.get('/learning-paths/paths');
+    return data;
+  }
+
+  async updateLearningProgress(pathId: string, moduleId: string, completed: boolean) {
+    const { data } = await this.client.post(`/learning-paths/paths/${pathId}/progress`, { moduleId, completed });
+    return data;
+  }
+
+  async getLearningCertificate(pathId: string) {
+    const { data } = await this.client.get(`/learning-paths/paths/${pathId}/certificate`);
+    return data;
+  }
+
+  // ============================================
+  // SIGN LANGUAGE API
+  // ============================================
+
+  async translateToSignLanguage(input: { text: string; language?: string }) {
+    const { data } = await this.client.post('/sign-language/translate', input);
+    return data;
+  }
+
+  async getSignLanguageConfig(projectId: string) {
+    const { data } = await this.client.get(`/sign-language/config/${projectId}`);
+    return data;
+  }
+
+  async updateSignLanguageConfig(projectId: string, config: object) {
+    const { data } = await this.client.put(`/sign-language/config/${projectId}`, config);
+    return data;
+  }
+
+  async getSupportedSignLanguages() {
+    const { data } = await this.client.get('/sign-language/languages');
+    return data;
+  }
+
+  // ============================================
+  // COGNITIVE ACCESSIBILITY API
+  // ============================================
+
+  async getCognitiveProfile() {
+    const { data } = await this.client.get('/cognitive-accessibility/profile');
+    return data;
+  }
+
+  async updateCognitiveProfile(settings: object) {
+    const { data } = await this.client.put('/cognitive-accessibility/profile', settings);
+    return data;
+  }
+
+  async getCognitivePresets() {
+    const { data } = await this.client.get('/cognitive-accessibility/presets');
+    return data;
+  }
+
+  async applyPreset(presetName: string) {
+    const { data } = await this.client.post(`/cognitive-accessibility/presets/${presetName}/apply`);
+    return data;
+  }
+
+  async simplifyText(text: string, level?: string) {
+    const { data } = await this.client.post('/cognitive-accessibility/simplify', { text, level });
+    return data;
+  }
+
+  // ============================================
+  // UNIVERSAL DESIGN CHECKER API
+  // ============================================
+
+  async checkDesign(projectId: string, options?: object) {
+    const { data } = await this.client.post(`/universal-design/check/${projectId}`, options);
+    return data;
+  }
+
+  async getDesignReport(reportId: string) {
+    const { data } = await this.client.get(`/universal-design/reports/${reportId}`);
+    return data;
+  }
+
+  async getCulturalGuide(region: string) {
+    const { data } = await this.client.get(`/universal-design/cultural-guide/${region}`);
+    return data;
+  }
+
+  // ============================================
+  // PUBLIC API KEYS MANAGEMENT
+  // ============================================
+
+  async createAPIKey(input: { name: string; scopes: string[]; expiresInDays?: number }) {
+    const { data } = await this.client.post('/public-api/keys', input);
+    return data;
+  }
+
+  async listAPIKeys() {
+    const { data } = await this.client.get('/public-api/keys');
+    return data;
+  }
+
+  async revokeAPIKey(id: string) {
+    const { data } = await this.client.delete(`/public-api/keys/${id}`);
+    return data;
+  }
+
+  async getAPIUsage(keyId: string) {
+    const { data } = await this.client.get(`/public-api/keys/${keyId}/usage`);
+    return data;
+  }
+
+  async getAPIDocs() {
+    const { data } = await this.client.get('/public-api/docs');
+    return data;
+  }
+
+  // ============================================
+  // WHITE-LABEL SDK API
+  // ============================================
+
+  async createSDKConfig(input: { name: string; branding?: object; features?: string[] }) {
+    const { data } = await this.client.post('/white-label-sdk/configurations', input);
+    return data;
+  }
+
+  async listSDKConfigs() {
+    const { data } = await this.client.get('/white-label-sdk/configurations');
+    return data;
+  }
+
+  async getSDKConfig(id: string) {
+    const { data } = await this.client.get(`/white-label-sdk/configurations/${id}`);
+    return data;
+  }
+
+  async updateSDKConfig(id: string, updates: object) {
+    const { data } = await this.client.put(`/white-label-sdk/configurations/${id}`, updates);
+    return data;
+  }
+
+  async getSDKEmbedCode(id: string) {
+    const { data } = await this.client.get(`/white-label-sdk/configurations/${id}/embed`);
+    return data;
+  }
+
+  async getSDKReactComponent(id: string) {
+    const { data } = await this.client.get(`/white-label-sdk/configurations/${id}/react`);
+    return data;
+  }
+
+  // ============================================
+  // IOT INTEGRATION API
+  // ============================================
+
+  async registerIoTDevice(input: { name: string; type: string; capabilities: object }) {
+    const { data } = await this.client.post('/iot/devices', input);
+    return data;
+  }
+
+  async listIoTDevices() {
+    const { data } = await this.client.get('/iot/devices');
+    return data;
+  }
+
+  async getIoTDevice(id: string) {
+    const { data } = await this.client.get(`/iot/devices/${id}`);
+    return data;
+  }
+
+  async sendIoTCommand(deviceId: string, command: { action: string; payload?: object }) {
+    const { data } = await this.client.post(`/iot/devices/${deviceId}/command`, command);
+    return data;
+  }
+
+  async getIoTDeviceTypes() {
+    const { data } = await this.client.get('/iot/device-types');
+    return data;
+  }
+
+  async revokeIoTDevice(id: string) {
+    const { data } = await this.client.delete(`/iot/devices/${id}`);
+    return data;
+  }
+
+  // ============================================
+  // ECO-FRIENDLY API
+  // ============================================
+
+  async getEcoSettings() {
+    const { data } = await this.client.get('/eco/settings');
+    return data;
+  }
+
+  async updateEcoSettings(settings: object) {
+    const { data } = await this.client.put('/eco/settings', settings);
+    return data;
+  }
+
+  async getEcoPreset(preset: string) {
+    const { data } = await this.client.get(`/eco/presets/${preset}`);
+    return data;
+  }
+
+  async optimizePresentation(presentationId: string, options: object) {
+    const { data } = await this.client.post(`/eco/optimize/${presentationId}`, options);
+    return data;
+  }
+
+  async getEcoTips() {
+    const { data } = await this.client.get('/eco/tips');
+    return data;
+  }
+
+  async trackEcoMetrics(metrics: object) {
+    const { data } = await this.client.post('/eco/track', metrics);
+    return data;
+  }
+
+  // ============================================
+  // PRESENTER WELLNESS API
+  // ============================================
+
+  async startWellnessSession(presentationId: string) {
+    const { data } = await this.client.post(`/wellness/sessions/${presentationId}`);
+    return data;
+  }
+
+  async updateWellnessMetrics(sessionId: string, metrics: object) {
+    const { data } = await this.client.put(`/wellness/sessions/${sessionId}/metrics`, metrics);
+    return data;
+  }
+
+  async endWellnessSession(sessionId: string) {
+    const { data } = await this.client.post(`/wellness/sessions/${sessionId}/end`);
+    return data;
+  }
+
+  async recordWellnessBreak(sessionId: string, breakType: string) {
+    const { data } = await this.client.post(`/wellness/sessions/${sessionId}/break`, { breakType });
+    return data;
+  }
+
+  async analyzeSpeakingPace(audioMetrics: object) {
+    const { data } = await this.client.post('/wellness/analyze/pace', audioMetrics);
+    return data;
+  }
+
+  async detectStress(voiceMetrics: object) {
+    const { data } = await this.client.post('/wellness/analyze/stress', voiceMetrics);
+    return data;
+  }
+
+  async getWellnessHistory() {
+    const { data } = await this.client.get('/wellness/history');
+    return data;
+  }
+
+  async getWellnessTrends() {
+    const { data } = await this.client.get('/wellness/trends');
+    return data;
+  }
+
+  async getBreakReminders() {
+    const { data } = await this.client.get('/wellness/break-reminders');
+    return data;
+  }
+
+  // ============================================
+  // CARBON FOOTPRINT API
+  // ============================================
+
+  async getCarbonFootprint(presentationId: string) {
+    const { data } = await this.client.get(`/carbon/presentation/${presentationId}`);
+    return data;
+  }
+
+  async calculateSessionCarbon(sessionData: object) {
+    const { data } = await this.client.post('/carbon/session', sessionData);
+    return data;
+  }
+
+  async getEcoReport(period: string) {
+    const { data } = await this.client.get(`/carbon/report?period=${period}`);
+    return data;
+  }
+
+  async getCarbonOffsetOptions(emissionsKg: number) {
+    const { data } = await this.client.get(`/carbon/offset-options?emissions=${emissionsKg}`);
+    return data;
+  }
+
+  async purchaseCarbonOffset(offsetData: object) {
+    const { data } = await this.client.post('/carbon/offset', offsetData);
+    return data;
+  }
+
+  async getCarbonOffsetHistory() {
+    const { data } = await this.client.get('/carbon/offset-history');
+    return data;
+  }
+
+  async getEcoBadges() {
+    const { data } = await this.client.get('/carbon/badges');
+    return data;
+  }
+
 
   // ============================================
   // NAMESPACED API (for cleaner usage)
@@ -2591,6 +3165,167 @@ class ApiClient {
     delete: (id: string) => this.deleteTag(id),
     addToProject: (tagId: string, projectId: string) => this.addTagToProject(tagId, projectId),
     removeFromProject: (tagId: string, projectId: string) => this.removeTagFromProject(tagId, projectId),
+  };
+
+  readonly research = {
+    start: (projectId: string, input: { topic: string; depth?: string; sources?: string[] }) => this.startResearch(projectId, input),
+    get: (id: string) => this.getResearch(id),
+    list: (projectId: string) => this.listResearch(projectId),
+    generateBlocks: (id: string) => this.generateContentBlocks(id),
+    factCheck: (id: string) => this.factCheck(id),
+  };
+
+  readonly storyboard = {
+    create: (projectId: string, input: { title: string; narrativeArc?: string; audienceType?: string }) => this.createStoryboard(projectId, input),
+    get: (id: string) => this.getStoryboard(id),
+    list: (projectId: string) => this.listStoryboards(projectId),
+    apply: (id: string) => this.applyStoryboard(id),
+  };
+
+  readonly abTesting = {
+    create: (projectId: string, input: { name: string; variants: object[] }) => this.createABTest(projectId, input),
+    get: (id: string) => this.getABTest(id),
+    list: (projectId: string) => this.listABTests(projectId),
+    recordImpression: (testId: string, variantId: string) => this.recordABImpression(testId, variantId),
+    getResults: (testId: string) => this.getABResults(testId),
+  };
+
+  readonly vr = {
+    export: (projectId: string, options?: object) => this.exportToVR(projectId, options),
+    get: (id: string) => this.getVRExport(id),
+    generateMarker: (projectId: string) => this.generateARMarker(projectId),
+  };
+
+  readonly holographic = {
+    create: (projectId: string, input: { format: string; settings?: object }) => this.createHolographicPreview(projectId, input),
+    get: (id: string) => this.getHolographicPreview(id),
+    getFormats: () => this.getHolographicFormats(),
+  };
+
+  readonly blockchain = {
+    createCollection: (input: { name: string; chain: string; description?: string }) => this.createNFTCollection(input),
+    listCollections: () => this.listNFTCollections(),
+    mint: (collectionId: string, input: { presentationId: string; name: string; description?: string }) => this.mintNFT(collectionId, input),
+    verify: (tokenId: string) => this.verifyNFTOwnership(tokenId),
+  };
+
+  readonly copilot = {
+    createSession: (projectId: string) => this.createChatSession(projectId),
+    sendMessage: (sessionId: string, message: string) => this.sendChatMessage(sessionId, message),
+    getHistory: (sessionId: string) => this.getChatHistory(sessionId),
+    executeAction: (sessionId: string, action: string, params?: object) => this.executeCopilotAction(sessionId, action, params),
+  };
+
+  readonly qa = {
+    createSession: (projectId: string, settings?: object) => this.createLiveQASession(projectId, settings),
+    getSession: (id: string) => this.getQASession(id),
+    endSession: (sessionId: string) => this.endQASession(sessionId),
+    getSummary: (sessionId: string) => this.getQASummary(sessionId),
+  };
+
+  readonly crossSync = {
+    registerDevice: (input: object) => this.registerSyncDevice(input as any),
+    listDevices: () => this.listSyncDevices(),
+    getSyncStatus: () => this.getSyncStatus(''),
+    resolveConflict: (conflictId: string) => this.resolveConflict(conflictId, 'accept'),
+  };
+
+  readonly predictive = {
+    getInsights: (projectId: string) => this.getPredictiveInsights(projectId),
+    getRecommendations: (projectId: string) => this.getPredictiveRecommendations(projectId),
+    getBenchmarks: (projectId: string) => this.getPredictiveBenchmarks(projectId),
+  };
+
+  readonly sentiment = {
+    startSession: (projectId: string, options?: object) => this.startSentimentSession(projectId, options as any),
+    getSession: (id: string) => this.getSentimentSession(id),
+    getSummary: (sessionId: string) => this.getSentimentSummary(sessionId),
+  };
+
+  readonly learningPaths = {
+    create: (input: object) => this.createLearningPath(input as any),
+    get: (id: string) => this.getLearningPath(id),
+    list: () => this.listLearningPaths(),
+    updateProgress: (pathId: string, moduleId: string, completed: boolean) => this.updateLearningProgress(pathId, moduleId, completed),
+    getCertificate: (pathId: string) => this.getLearningCertificate(pathId),
+  };
+
+  readonly signLanguage = {
+    translate: (input: { text: string; language?: string }) => this.translateToSignLanguage(input),
+    getConfig: (projectId?: string) => this.getSignLanguageConfig(projectId || ''),
+    updateConfig: (projectId: string, config: object) => this.updateSignLanguageConfig(projectId, config),
+    getLanguages: () => this.getSupportedSignLanguages(),
+  };
+
+  readonly cognitiveAccess = {
+    getProfile: () => this.getCognitiveProfile(),
+    updateProfile: (settings: object) => this.updateCognitiveProfile(settings),
+    getPresets: () => this.getCognitivePresets(),
+    applyPreset: (name: string) => this.applyPreset(name),
+    simplifyText: (text: string, level?: string) => this.simplifyText(text, level),
+  };
+
+  readonly universalDesign = {
+    check: (projectId: string, options?: object) => this.checkDesign(projectId, options as any),
+    getReport: (projectId: string) => this.getDesignReport(projectId),
+    getCulturalGuide: (projectId: string) => this.getCulturalGuide(projectId),
+  };
+
+  readonly apiKeys = {
+    create: (input: { name: string; scopes: string[]; expiresInDays?: number }) => this.createAPIKey(input),
+    list: () => this.listAPIKeys(),
+    revoke: (id: string) => this.revokeAPIKey(id),
+    getUsage: () => this.getAPIUsage(''),
+    getDocs: () => this.getAPIDocs(),
+  };
+
+  readonly sdk = {
+    create: (input: object) => this.createSDKConfig(input as any),
+    list: () => this.listSDKConfigs(),
+    get: (id: string) => this.getSDKConfig(id),
+    update: (id: string, updates: object) => this.updateSDKConfig(id, updates),
+    getEmbedCode: (id: string) => this.getSDKEmbedCode(id),
+    getReactComponent: (id: string) => this.getSDKReactComponent(id),
+  };
+
+  readonly iot = {
+    register: (input: object) => this.registerIoTDevice(input as any),
+    list: () => this.listIoTDevices(),
+    get: (id: string) => this.getIoTDevice(id),
+    sendCommand: (deviceId: string, command: { action: string; payload?: object }) => this.sendIoTCommand(deviceId, command),
+    getDeviceTypes: () => this.getIoTDeviceTypes(),
+    revoke: (id: string) => this.revokeIoTDevice(id),
+  };
+
+  readonly eco = {
+    getSettings: () => this.getEcoSettings(),
+    updateSettings: (settings: object) => this.updateEcoSettings(settings),
+    getPreset: (preset: string) => this.getEcoPreset(preset),
+    optimize: (presentationId: string, options: object) => this.optimizePresentation(presentationId, options),
+    getTips: () => this.getEcoTips(),
+    trackMetrics: (metrics: object) => this.trackEcoMetrics(metrics),
+  };
+
+  readonly wellness = {
+    startSession: (input: object) => this.startWellnessSession(input as any),
+    updateMetrics: (sessionId: string, metrics: object) => this.updateWellnessMetrics(sessionId, metrics),
+    endSession: (sessionId: string) => this.endWellnessSession(sessionId),
+    recordBreak: (input: object) => this.recordWellnessBreak((input as any).sessionId, (input as any).type || 'short'),
+    analyzePace: (sessionId: string) => this.analyzeSpeakingPace({ sessionId } as any),
+    detectStress: (sessionId: string) => this.detectStress({ sessionId } as any),
+    getHistory: () => this.getWellnessHistory(),
+    getTrends: () => this.getWellnessTrends(),
+    getBreakReminders: () => this.getBreakReminders(),
+  };
+
+  readonly carbon = {
+    getFootprint: (presentationId: string) => this.getCarbonFootprint(presentationId),
+    calculateSession: (sessionData: object) => this.calculateSessionCarbon(sessionData),
+    getReport: (period: string) => this.getEcoReport(period),
+    getOffsetOptions: () => this.getCarbonOffsetOptions(0),
+    purchaseOffset: (offsetData: object) => this.purchaseCarbonOffset(offsetData),
+    getOffsetHistory: () => this.getCarbonOffsetHistory(),
+    getBadges: () => this.getEcoBadges(),
   };
 }
 
