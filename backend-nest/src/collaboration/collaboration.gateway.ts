@@ -14,6 +14,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Inject } from '@nestjs/common';
 import { Redis } from 'ioredis';
 import { CollaborationService } from './collaboration.service';
+import { WebSocketConfig } from '../common/config/concurrency.config';
 
 interface AuthenticatedSocket extends Socket {
   data: {
@@ -51,6 +52,14 @@ interface SlideUpdate {
     credentials: true,
   },
   namespace: 'collaboration',
+  pingInterval: WebSocketConfig.pingInterval,
+  pingTimeout: WebSocketConfig.pingTimeout,
+  maxHttpBufferSize: 1e6, // 1MB max message size
+  transports: WebSocketConfig.transports,
+  perMessageDeflate: WebSocketConfig.perMessageDeflate,
+  upgradeTimeout: WebSocketConfig.upgradeTimeout,
+  // Enable adapter for horizontal scaling
+  adapter: process.env.REDIS_HOST ? undefined : undefined, // Redis adapter configured separately
 })
 export class CollaborationGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect

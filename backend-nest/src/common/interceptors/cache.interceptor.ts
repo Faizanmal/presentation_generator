@@ -61,12 +61,17 @@ export class CacheInterceptor implements NestInterceptor {
       tap((response) => {
         if (response && request.method === 'GET') {
           this.cacheService.set(cacheKey, response, cacheTTL);
-          this.logger.debug(`Cached response for ${cacheKey} (TTL: ${cacheTTL}s)`);
-          
+          this.logger.debug(
+            `Cached response for ${cacheKey} (TTL: ${cacheTTL}s)`,
+          );
+
           // Add cache header
           const httpResponse = context.switchToHttp().getResponse();
           httpResponse.setHeader('X-Cache-Status', 'MISS');
-          httpResponse.setHeader('Cache-Control', `public, max-age=${cacheTTL}`);
+          httpResponse.setHeader(
+            'Cache-Control',
+            `public, max-age=${cacheTTL}`,
+          );
         }
       }),
     );
@@ -78,12 +83,12 @@ export class CacheInterceptor implements NestInterceptor {
   private generateCacheKey(request: any): string {
     const url = request.url;
     const userId = request.user?.id || 'anonymous';
-    
+
     // For more complex cache key generation, you can include:
     // - Query parameters
     // - User roles/permissions
     // - Organization ID for multi-tenant apps
-    
+
     const queryString = JSON.stringify(request.query);
     return `http_cache:${userId}:${url}:${queryString}`;
   }

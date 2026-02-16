@@ -1,7 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { EnhancedPresentation, EnhancedSection } from './thinking-agent.types';
+import { AIService } from '../ai.service';
 
 interface CreateProjectFromThinkingResult {
   projectId: string;
@@ -13,7 +16,12 @@ interface CreateProjectFromThinkingResult {
 export class ThinkingProjectService {
   private readonly logger = new Logger(ThinkingProjectService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => AIService))
+    private aiService: AIService,
+    @InjectQueue('image-generation') private imageQueue: Queue,
+  ) {}
 
   /**
    * Create a project from the thinking agent's generated presentation
@@ -25,9 +33,16 @@ export class ThinkingProjectService {
       title?: string;
       description?: string;
       themeId?: string;
+      generateImages?: boolean;
     },
   ): Promise<CreateProjectFromThinkingResult> {
     this.logger.log(`Creating project from thinking result for user ${userId}`);
+
+    const imageGenerationJobs: Array<{
+      blockId: string;
+      prompt: string;
+      style: string;
+    }> = [];
 
     // Create the project with slides and blocks in a transaction
     const result = await this.prisma.$transaction(async (tx) => {
@@ -64,9 +79,32 @@ export class ThinkingProjectService {
         // 3. Create blocks for this slide
         const blocks = this.convertSectionToBlocks(section, slideIndex);
 
+        // Prepare generated image placeholder if requested
+        if (options?.generateImages && section.suggestedImage) {
+          // Insert after heading/subheading (index 1 or 2)
+          let insertIndex = 0;
+          if (blocks.length > 0 && blocks[0].type === 'heading') insertIndex++;
+          if (blocks.length > 1 && blocks[1].type === 'subheading')
+            insertIndex++;
+
+          blocks.splice(insertIndex, 0, {
+            type: 'image',
+            content: {
+              url: '', // Placeholder
+              alt: section.suggestedImage.prompt,
+              status: 'generating',
+            },
+            style: { width: '100%', borderRadius: '8px' },
+            // @ts-expect-error - Adding temporary property for job creation
+            isGeneratedImage: true,
+            generationPrompt: section.suggestedImage.prompt,
+            generationStyle: section.suggestedImage.style || 'vivid',
+          });
+        }
+
         for (let blockIndex = 0; blockIndex < blocks.length; blockIndex++) {
           const block = blocks[blockIndex];
-          await tx.block.create({
+          const createdBlock = await tx.block.create({
             data: {
               projectId: project.id,
               slideId: slide.id,
@@ -77,6 +115,15 @@ export class ThinkingProjectService {
             },
           });
           totalBlockCount++;
+
+          // Collect job info if this was our placeholder
+          if ((block as any).isGeneratedImage) {
+            imageGenerationJobs.push({
+              blockId: createdBlock.id,
+              prompt: (block as any).generationPrompt,
+              style: (block as any).generationStyle,
+            });
+          }
         }
       }
 
@@ -86,6 +133,24 @@ export class ThinkingProjectService {
         blockCount: totalBlockCount,
       };
     });
+
+    // Queue image generation jobs
+    if (imageGenerationJobs.length > 0) {
+      this.logger.log(
+        `Queueing ${imageGenerationJobs.length} image generation jobs`,
+      );
+      await Promise.all(
+        imageGenerationJobs.map((job) =>
+          this.imageQueue.add('generate-image', job, {
+            attempts: 3,
+            backoff: {
+              type: 'exponential',
+              delay: 1000,
+            },
+          }),
+        ),
+      );
+    }
 
     this.logger.log(
       `Created project ${result.projectId} with ${result.slideCount} slides and ${result.blockCount} blocks`,

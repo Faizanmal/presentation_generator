@@ -4,8 +4,12 @@ import { Logger } from '@nestjs/common';
 import { AIService } from './ai.service';
 import { GenerateProjectDto } from '../projects/dto/generate-project.dto';
 import { ProjectsService } from '../projects/projects.service';
+import { ConcurrencyConfig } from '../common/config/concurrency.config';
 
-@Processor('generation')
+@Processor('generation', {
+  concurrency: ConcurrencyConfig.aiGeneration.concurrency,
+  limiter: ConcurrencyConfig.aiGeneration.limiter,
+})
 export class GenerationProcessor extends WorkerHost {
   private readonly logger = new Logger(GenerationProcessor.name);
 

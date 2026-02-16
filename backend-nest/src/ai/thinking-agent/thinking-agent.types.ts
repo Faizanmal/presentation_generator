@@ -314,4 +314,5 @@ export interface GenerationMetadata {
   totalTimeMs: number;
   modelUsed: string;
   fallbackUsed: boolean;
+  generateImages?: boolean;
 }

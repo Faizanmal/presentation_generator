@@ -116,7 +116,7 @@ export function AISuggestionsPanel({
                     heading: slideTitle,
                 }),
             });
-            if (!response.ok) return DEFAULT_SUGGESTIONS;
+            if (!response.ok) { return DEFAULT_SUGGESTIONS; }
             return response.json();
         },
         onSuccess: (data: AISuggestion[]) => {
@@ -172,7 +172,7 @@ export function AISuggestionsPanel({
     }, [onApplySuggestion, slideId, blocks]);
 
     const handleSendPrompt = () => {
-        if (!aiPrompt.trim()) return;
+        if (!aiPrompt.trim()) { return; }
         applyPromptMutation.mutate(aiPrompt);
     };
 

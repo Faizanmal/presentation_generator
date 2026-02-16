@@ -211,8 +211,7 @@ export function SmartTransitionSuggestions({
                 <CardContent className="space-y-2">
                     {smartSuggestions.map((suggestion, index) => (
                         <button
-                            // eslint-disable-next-line react/no-array-index-key
-                            key={`${suggestion.type}-${suggestion.score}-${index}`}
+                            key={suggestion.type}
                             onClick={() => setSelectedType(suggestion.type)}
                             className={cn(
                                 'flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-all',

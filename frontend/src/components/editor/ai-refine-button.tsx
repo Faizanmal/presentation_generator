@@ -5,15 +5,8 @@ import { useMutation } from '@tanstack/react-query';
 import {
     Sparkles,
     Loader2,
-    Check,
-    RefreshCw,
-    Wand2,
-    Type,
-    Layout,
-    Palette,
     ChevronDown,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import {
     Popover,
     PopoverContent,

@@ -41,7 +41,9 @@ const mockGoogleGenerativeAI = {
 
 jest.mock('@google/generative-ai', () => {
   return {
-    GoogleGenerativeAI: jest.fn().mockImplementation(() => mockGoogleGenerativeAI),
+    GoogleGenerativeAI: jest
+      .fn()
+      .mockImplementation(() => mockGoogleGenerativeAI),
   };
 });
 

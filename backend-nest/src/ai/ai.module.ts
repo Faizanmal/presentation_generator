@@ -17,7 +17,9 @@ import { ProjectsModule } from '../projects/projects.module';
 import { GenerationProcessor } from './generation.processor';
 import { RealTimeDataService } from './realtime-data.service';
 import { DataImportService } from './data-import.service';
+import { DataImportService } from './data-import.service';
 import { DataImportController } from './data-import.controller';
+import { ImageRecognitionService } from './image-recognition.service';
 
 @Module({
   imports: [
@@ -26,7 +28,11 @@ import { DataImportController } from './data-import.controller';
     forwardRef(() => ThinkingAgentModule),
     forwardRef(() => ProjectsModule),
   ],
-  controllers: [AIController, PresentationCoachController, DataImportController],
+  controllers: [
+    AIController,
+    PresentationCoachController,
+    DataImportController,
+  ],
   providers: [
     AIService,
     PresentationCoachService,
@@ -39,7 +45,9 @@ import { DataImportController } from './data-import.controller';
     URLImportService,
     GenerationProcessor,
     RealTimeDataService,
+    RealTimeDataService,
     DataImportService,
+    ImageRecognitionService,
   ],
   exports: [
     AIService,
@@ -52,7 +60,9 @@ import { DataImportController } from './data-import.controller';
     AIChatService,
     URLImportService,
     RealTimeDataService,
+    RealTimeDataService,
     DataImportService,
+    ImageRecognitionService,
   ],
 })
-export class AIModule { }
+export class AIModule {}

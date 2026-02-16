@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { BlockType } from '@prisma/client';
+import { AdvancedCacheService } from '../common/cache/advanced-cache.service';
 
 interface CreateBlockDto {
   projectId: string;
@@ -21,6 +22,7 @@ interface UpdateBlockDto {
   order?: number;
   style?: Record<string, any>;
   blockType?: BlockType;
+  version?: number; // For optimistic locking
 }
 
 interface ReorderBlocksDto {
@@ -31,7 +33,10 @@ interface ReorderBlocksDto {
 export class BlocksService {
   private readonly logger = new Logger(BlocksService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cacheService: AdvancedCacheService,
+  ) {}
 
   /**
    * Create a new block
@@ -113,6 +118,39 @@ export class BlocksService {
       throw new ForbiddenException('You cannot edit this block');
     }
 
+    // Optimistic locking: Check version if provided
+    if (
+      updateBlockDto.version !== undefined &&
+      block.version !== updateBlockDto.version
+    ) {
+      // Version conflict detected - fetch latest and merge if possible
+      this.logger.warn(
+        `Version conflict for block ${blockId}: expected ${updateBlockDto.version}, got ${block.version}`,
+      );
+
+      // Simple conflict resolution: last write wins with version increment
+      // In production, you might want more sophisticated merging
+      const updated = await this.prisma.block.update({
+        where: { id: blockId },
+        data: {
+          content: updateBlockDto.content,
+          order: updateBlockDto.order,
+          style: updateBlockDto.style,
+          blockType: updateBlockDto.blockType,
+          version: { increment: 1 },
+        },
+      });
+
+      // Update project timestamp
+      await this.prisma.project.update({
+        where: { id: block.projectId },
+        data: { updatedAt: new Date() },
+      });
+
+      return { ...updated, conflictResolved: true };
+    }
+
+    // Normal update with version increment
     const updated = await this.prisma.block.update({
       where: { id: blockId },
       data: {
@@ -120,6 +158,7 @@ export class BlocksService {
         order: updateBlockDto.order,
         style: updateBlockDto.style,
         blockType: updateBlockDto.blockType,
+        version: { increment: 1 },
       },
     });
 

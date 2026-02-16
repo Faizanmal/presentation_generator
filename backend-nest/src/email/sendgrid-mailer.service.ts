@@ -27,7 +27,9 @@ export class SendgridMailerService {
     if (this.sg && typeof this.sg.setApiKey === 'function') {
       this.sg.setApiKey(apiKey || '');
     } else {
-      this.logger.warn('SendGrid client does not expose setApiKey(); email may fail');
+      this.logger.warn(
+        'SendGrid client does not expose setApiKey(); email may fail',
+      );
     }
 
     this.fromAddress = this.config.get('MAIL_FROM') || 'no-reply@example.com';

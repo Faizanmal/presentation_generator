@@ -193,7 +193,7 @@ export class VersionControlService {
     });
 
     for (const slide of version.snapshot.slides) {
-      const { blocks, ...slideData } = slide;
+      const { blocks, content, ...slideData } = slide;
       await this.prisma.slide.create({
         data: {
           ...slideData,
@@ -323,7 +323,7 @@ export class VersionControlService {
     // Copy slides
     // Copy slides
     for (const slide of version.snapshot.slides) {
-      const { blocks, ...slideData } = slide;
+      const { blocks, content, ...slideData } = slide;
       await this.prisma.slide.create({
         data: {
           ...slideData,
@@ -387,9 +387,10 @@ export class VersionControlService {
       }
 
       if (!targetSlideIds.has(slide.id)) {
+        const { content, ...slideData } = slide;
         await this.prisma.slide.create({
           data: {
-            ...slide,
+            ...slideData,
             id: undefined,
             projectId: targetProjectId,
             blocks: undefined, // Don't copy blocks for now in simple merge

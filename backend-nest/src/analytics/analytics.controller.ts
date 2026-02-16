@@ -224,7 +224,8 @@ export class AnalyticsController {
   @Get(':projectId/ai-insights/structured')
   @UseGuards(JwtAuthGuard)
   async getStructuredInsights(@Param('projectId') projectId: string) {
-    const insights = await this.analyticsService.getStructuredInsights(projectId);
+    const insights =
+      await this.analyticsService.getStructuredInsights(projectId);
     return {
       insights,
       generatedAt: new Date().toISOString(),
@@ -273,7 +274,10 @@ export class AnalyticsController {
     @Param('projectId') projectId: string,
     @Body() body: { slideId?: string },
   ) {
-    return this.analyticsService.getContentOptimization(projectId, body.slideId);
+    return this.analyticsService.getContentOptimization(
+      projectId,
+      body.slideId,
+    );
   }
 
   /**

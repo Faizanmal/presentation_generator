@@ -56,12 +56,14 @@ const phaseConfig: Record<
 interface ThinkingModeGeneratorProps {
   onComplete?: (result: ThinkingGenerationResult) => void;
   onError?: (error: Error) => void;
+  onOpenInEditor?: () => void;
   className?: string;
 }
 
 export function ThinkingModeGenerator({
   onComplete,
   onError,
+  onOpenInEditor,
   className = '',
 }: ThinkingModeGeneratorProps) {
   // Form state
@@ -560,7 +562,7 @@ export function ThinkingModeGenerator({
           )}
 
           <div className="result-actions">
-            <button className="btn-primary">View Presentation</button>
+            <button className="btn-primary" onClick={onOpenInEditor}>Open in Editor</button>
             <button className="btn-secondary">Export</button>
           </div>
         </div>

@@ -3,10 +3,8 @@
 import { useState } from 'react';
 import {
     Download,
-    ChevronDown,
     Loader2,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 interface SlideDesignControlsProps {
@@ -25,8 +23,6 @@ interface SlideDesignControlsProps {
 }
 
 export function SlideDesignControls({
-    projectId,
-    slideId,
     themes = [],
     currentThemeId,
     onThemeChange,
@@ -51,15 +47,15 @@ export function SlideDesignControls({
     };
 
     const getDensityLabel = (value: number) => {
-        if (value < 33) return 'Spacious';
-        if (value < 66) return 'Balanced';
+        if (value < 33) { return 'Spacious'; }
+        if (value < 66) { return 'Balanced'; }
         return 'Compact';
     };
 
     const getToneLabel = (value: number) => {
-        if (value < 25) return 'Casual';
-        if (value < 50) return 'Neutral';
-        if (value < 75) return 'Professional';
+        if (value < 25) { return 'Casual'; }
+        if (value < 50) { return 'Neutral'; }
+        if (value < 75) { return 'Professional'; }
         return 'Formal';
     };
 
@@ -98,7 +94,7 @@ export function SlideDesignControls({
                                     className="w-full h-8 rounded flex overflow-hidden border"
                                     style={{
                                         backgroundColor: theme.colors.background,
-                                        borderColor: theme.colors.primary + '40'
+                                        borderColor: `${theme.colors.primary}40`
                                     }}
                                 >
                                     <div

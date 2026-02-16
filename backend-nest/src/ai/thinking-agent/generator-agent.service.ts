@@ -544,7 +544,12 @@ Return JSON:
 
     interface ParsedRefinement {
       heading: string;
-      blocks: Array<{ type: string; content: string; formatting?: unknown }>;
+      blocks: Array<{
+        type: string;
+        content: string;
+        formatting?: unknown;
+        chartData?: unknown;
+      }>;
       layout: string;
       speakerNotes?: string;
     }
@@ -555,6 +560,7 @@ Return JSON:
         type: string;
         content: string;
         formatting?: unknown;
+        chartData?: unknown;
       }>,
       layout: section.layout,
     });
@@ -569,6 +575,7 @@ Return JSON:
             type: (b.type || 'paragraph') as EnhancedBlock['type'],
             content: b.content || '',
             formatting: b.formatting as EnhancedBlock['formatting'],
+            chartData: b.chartData as ChartData | undefined,
           })) || section.blocks,
         layout: (parsed.layout as LayoutType) || section.layout,
         speakerNotes: parsed.speakerNotes || section.speakerNotes,

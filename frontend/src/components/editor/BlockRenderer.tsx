@@ -5,7 +5,6 @@ import { CSS } from "@dnd-kit/utilities";
 import { useState, useRef, useEffect } from "react";
 import type { Block, Theme } from "@/types";
 import { GripVertical, Trash2, MoreHorizontal } from "lucide-react";
-import Image from "next/image";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,6 +34,19 @@ export default function BlockRenderer({
   onChange,
   onDelete,
 }: BlockRendererProps) {
+  const normalizeKeyPart = (value: string) =>
+    value.trim().replace(/\s+/g, "-").replace(/[^a-zA-Z0-9-_]/g, "").toLowerCase().slice(0, 24) || "empty";
+
+  const buildKeyedTextItems = (items: string[], prefix: string) => {
+    const seen = new Map<string, number>();
+    return items.map((item) => {
+      const normalized = normalizeKeyPart(item);
+      const count = (seen.get(normalized) || 0) + 1;
+      seen.set(normalized, count);
+      return { item, key: `${prefix}-${normalized}-${count}` };
+    });
+  };
+
   const {
     attributes,
     listeners,
@@ -145,56 +157,58 @@ export default function BlockRenderer({
         );
 
       case "BULLET_LIST":
+        const bulletItems = content?.items || ["Item 1", "Item 2", "Item 3"];
+        const keyedBulletItems = buildKeyedTextItems(bulletItems, "bullet");
         return (
           <ul className="list-disc list-inside space-y-2">
-            {(content?.items || ["Item 1", "Item 2", "Item 3"]).map(
-              (item: string, i: number) => (
-                <li
-                  key={`bullet-${i}-${item.substring(0, 20)}`}
-                   
-                  contentEditable
-                  suppressContentEditableWarning
-                  onInput={(e) => {
-                    const items = [...(content?.items || [])] as string[];
-                    items[i] = (e.target as HTMLElement).innerText;
-                    setContent({ ...content, items });
-                  }}
-                  onFocus={onFocus}
-                  onBlur={onBlur}
-                  className="text-lg outline-none"
-                  style={{ fontFamily: theme?.fonts?.body || "system-ui" }}
-                >
-                  {item}
-                </li>
-              )
-            )}
+            {keyedBulletItems.map(({ item, key }, i: number) => {
+                return (
+                  <li
+                    key={key}
+                    contentEditable
+                    suppressContentEditableWarning
+                    onInput={(e) => {
+                      const items = [...bulletItems] as string[];
+                      items[i] = (e.target as HTMLElement).innerText;
+                      setContent({ ...content, items });
+                    }}
+                    onFocus={onFocus}
+                    onBlur={onBlur}
+                    className="text-lg outline-none"
+                    style={{ fontFamily: theme?.fonts?.body || "system-ui" }}
+                  >
+                    {item}
+                  </li>
+                );
+              })}
           </ul>
         );
 
       case "NUMBERED_LIST":
+        const numberedItems = content?.items || ["Item 1", "Item 2", "Item 3"];
+        const keyedNumberedItems = buildKeyedTextItems(numberedItems, "numbered");
         return (
           <ol className="list-decimal list-inside space-y-2">
-            {(content?.items || ["Item 1", "Item 2", "Item 3"]).map(
-              (item: string, i: number) => (
-                <li
-                  key={`numbered-${i}-${item.substring(0, 20)}`}
-                   
-                  contentEditable
-                  suppressContentEditableWarning
-                  onInput={(e) => {
-                    const items = [...(content?.items || [])] as string[];
-                    items[i] = (e.target as HTMLElement).innerText;
-                    setContent({ ...content, items });
-                  }}
-                  onFocus={onFocus}
-                  onBlur={onBlur}
-                  className="text-lg outline-none"
-                  style={{ fontFamily: theme?.fonts?.body || "system-ui" }}
-                >
-                  {item}
-                </li>
-              )
-            )}
+            {keyedNumberedItems.map(({ item, key }, i: number) => {
+                return (
+                  <li
+                    key={key}
+                    contentEditable
+                    suppressContentEditableWarning
+                    onInput={(e) => {
+                      const items = [...numberedItems] as string[];
+                      items[i] = (e.target as HTMLElement).innerText;
+                      setContent({ ...content, items });
+                    }}
+                    onFocus={onFocus}
+                    onBlur={onBlur}
+                    className="text-lg outline-none"
+                    style={{ fontFamily: theme?.fonts?.body || "system-ui" }}
+                  >
+                    {item}
+                  </li>
+                );
+              })}
           </ol>
         );
 
@@ -280,39 +294,55 @@ export default function BlockRenderer({
           ["Cell 1", "Cell 2", "Cell 3"],
           ["Cell 4", "Cell 5", "Cell 6"],
         ];
+        const seenRows = new Map<string, number>();
+        const keyedRows = rows.map((row) => {
+          const rowSignature = normalizeKeyPart(row.join("|"));
+          const rowCount = (seenRows.get(rowSignature) || 0) + 1;
+          seenRows.set(rowSignature, rowCount);
+
+          const seenCells = new Map<string, number>();
+          const cells = row.map((cell) => {
+            const cellSignature = normalizeKeyPart(cell);
+            const cellCount = (seenCells.get(cellSignature) || 0) + 1;
+            seenCells.set(cellSignature, cellCount);
+            return { value: cell, key: `cell-${cellSignature}-${cellCount}` };
+          });
+
+          return { row, cells, key: `row-${rowSignature}-${rowCount}` };
+        });
         return (
           <table className="w-full border-collapse">
             <tbody>
-              {rows.map((row: string[], rowIndex: number) => (
-                <tr
-                  key={`row-${rowIndex}-${row[0]?.substring(0, 10)}`}
-                 
-                >
-                  {row.map((cell: string, cellIndex: number) => (
-                    <td
-                      key={`cell-${cellIndex}-${cell.substring(0, 10)}`}
-                       
-                      contentEditable
-                      suppressContentEditableWarning
-                      onInput={(e) => {
-                        const newRows = [...rows] as string[][];
-                        newRows[rowIndex][cellIndex] = (e.target as HTMLElement).innerText;
-                        setContent({ ...content, rows: newRows });
-                      }}
-                      onFocus={onFocus}
-                      onBlur={onBlur}
-                      className={`border p-2 outline-none ${rowIndex === 0 ? "font-semibold bg-slate-100 dark:bg-slate-800" : ""
-                        }`}
-                      style={{
-                        borderColor: theme?.colors?.secondary || "#e2e8f0",
-                        fontFamily: theme?.fonts?.body || "system-ui",
-                      }}
-                    >
-                      {cell}
-                    </td>
-                  ))}
-                </tr>
-              ))}
+              {keyedRows.map(({ cells, key: rowKey }, rowIndex: number) => {
+                return (
+                  <tr key={rowKey}>
+                    {cells.map(({ value, key: cellKey }, cellIndex: number) => {
+                      return (
+                        <td
+                          key={`${rowKey}-${cellKey}`}
+                          contentEditable
+                          suppressContentEditableWarning
+                          onInput={(e) => {
+                            const newRows = [...rows] as string[][];
+                            newRows[rowIndex][cellIndex] = (e.target as HTMLElement).innerText;
+                            setContent({ ...content, rows: newRows });
+                          }}
+                          onFocus={onFocus}
+                          onBlur={onBlur}
+                          className={`border p-2 outline-none ${rowIndex === 0 ? "font-semibold bg-slate-100 dark:bg-slate-800" : ""
+                            }`}
+                          style={{
+                            borderColor: theme?.colors?.secondary || "#e2e8f0",
+                            fontFamily: theme?.fonts?.body || "system-ui",
+                          }}
+                        >
+                          {value}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
             </tbody>
           </table >
         );

@@ -117,7 +117,9 @@ export class AIService {
       });
     }
 
-    const googleApiKey = this.configService.get<string>('GOOGLE_GENERATIVE_AI_API_KEY');
+    const googleApiKey = this.configService.get<string>(
+      'GOOGLE_GENERATIVE_AI_API_KEY',
+    );
     if (googleApiKey) {
       this.google = new GoogleGenerativeAI(googleApiKey);
     }
@@ -193,12 +195,12 @@ export class AIService {
     // 2. Try Google next (if available) - Good balance of speed/quality
     if (this.google) {
       try {
-        return (await this.retryOperation(
+        return await this.retryOperation(
           () => this.callGoogleAI(options),
           'Google AI',
           2,
           1000,
-        )) as OpenAI.Chat.Completions.ChatCompletion;
+        );
       } catch (error) {
         this.logger.warn(
           `Google AI failed after retries: ${(error as Error).message}. Falling back to OpenAI.`,
@@ -388,10 +390,11 @@ AVAILABLE BLOCK TYPES:
 - "quote" - For impactful quotes or statistics
 - "numbered" - For numbered/ordered lists
 
-${isPresentation
-        ? 'For presentations: Keep each section focused on ONE key idea. Use bullet points for easy scanning. Limit content per slide.'
-        : 'For documents: Provide more detailed content. Use paragraphs for explanations. Structure with clear headings.'
-      }`;
+${
+  isPresentation
+    ? 'For presentations: Keep each section focused on ONE key idea. Use bullet points for easy scanning. Limit content per slide.'
+    : 'For documents: Provide more detailed content. Use paragraphs for explanations. Structure with clear headings.'
+}`;
   }
 
   /**
@@ -1146,19 +1149,19 @@ Generate the complete ${type} with all metadata.`;
             typeof s.speakerNotes === 'string' ? s.speakerNotes : undefined,
           blocks: Array.isArray(s.blocks)
             ? s.blocks.map((block: unknown) => {
-              const b = block as Record<string, unknown>;
-              return {
-                type: typeof b.type === 'string' ? b.type : 'paragraph',
-                content: typeof b.content === 'string' ? b.content : '',
-                chartData: b.chartData as ChartData | undefined,
-                embedUrl:
-                  typeof b.embedUrl === 'string' ? b.embedUrl : undefined,
-                embedType:
-                  typeof b.embedType === 'string'
-                    ? (b.embedType as GeneratedBlock['embedType'])
-                    : undefined,
-              };
-            })
+                const b = block as Record<string, unknown>;
+                return {
+                  type: typeof b.type === 'string' ? b.type : 'paragraph',
+                  content: typeof b.content === 'string' ? b.content : '',
+                  chartData: b.chartData as ChartData | undefined,
+                  embedUrl:
+                    typeof b.embedUrl === 'string' ? b.embedUrl : undefined,
+                  embedType:
+                    typeof b.embedType === 'string'
+                      ? (b.embedType as GeneratedBlock['embedType'])
+                      : undefined,
+                };
+              })
             : [],
         };
       },
@@ -1173,21 +1176,21 @@ Generate the complete ${type} with all metadata.`;
       sections,
       metadata: metadata
         ? {
-          estimatedDuration:
-            typeof metadata.estimatedDuration === 'number'
-              ? metadata.estimatedDuration
-              : sections.length * 2,
-          keywords: Array.isArray(metadata.keywords)
-            ? (metadata.keywords as string[])
-            : [],
-          summary:
-            typeof metadata.summary === 'string' ? metadata.summary : '',
-        }
+            estimatedDuration:
+              typeof metadata.estimatedDuration === 'number'
+                ? metadata.estimatedDuration
+                : sections.length * 2,
+            keywords: Array.isArray(metadata.keywords)
+              ? (metadata.keywords as string[])
+              : [],
+            summary:
+              typeof metadata.summary === 'string' ? metadata.summary : '',
+          }
         : {
-          estimatedDuration: sections.length * 2,
-          keywords: [],
-          summary: '',
-        },
+            estimatedDuration: sections.length * 2,
+            keywords: [],
+            summary: '',
+          },
     };
   }
 

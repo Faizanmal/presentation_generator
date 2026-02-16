@@ -12,16 +12,14 @@ import {
     Image as ImageIcon,
     Check,
     Sparkles,
-    X,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import type { Block, BlockContent } from '@/types';
+import type { Block } from '@/types';
 
 interface MagicLayoutButtonProps {
     projectId: string;
@@ -218,7 +216,7 @@ export function MagicLayoutButton({
                         <div className="p-2 space-y-1">
                             {suggestedLayouts.map((layout, index) => (
                                 <button
-                                    key={index}
+                                    key={layout.name || `ai-layout-${index}`}
                                     onClick={() => {
                                         onApplyLayout?.(layout);
                                         setAppliedLayout(`ai-${index}`);

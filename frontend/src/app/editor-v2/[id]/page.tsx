@@ -21,7 +21,6 @@ import {
     Loader2,
 } from "lucide-react"; // Fallback icons
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -31,7 +30,7 @@ import {
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useEditorStore } from "@/stores/editor-store";
-import type { Project, Theme, Slide, Block } from "@/types";
+import type { Project, Theme, Slide, Block, Comment } from "@/types";
 import SlidePanel from "@/components/editor/SlidePanel";
 import SlideCanvas from "@/components/editor/SlideCanvas";
 import BlockToolbar from "@/components/editor/BlockToolbar";
@@ -89,10 +88,10 @@ export default function EditorPageV2() {
     const [showAnalyticsDialog, setShowAnalyticsDialog] = useState(false);
     const [showBrandKitDialog, setShowBrandKitDialog] = useState(false);
     const [isCommentsPanelOpen, setIsCommentsPanelOpen] = useState(false);
-    const [comments, setComments] = useState<import('@/types').Comment[]>([]);
+    const [comments, setComments] = useState<Comment[]>([]);
 
     // Mock collaborators for demo
-    const [collaborators] = useState([
+    const [collaborators] = useState(() => [
         {
             id: 'collab-1',
             name: 'Sarah Chen',
@@ -295,7 +294,7 @@ export default function EditorPageV2() {
 
     // Comment handlers
     const handleAddComment = (content: string, slideId?: string, blockId?: string, parentId?: string) => {
-        const newComment: import('@/types').Comment = {
+        const newComment: Comment = {
             id: `comment-${Date.now()}`,
             projectId,
             userId: user?.id || 'current-user',
@@ -339,12 +338,12 @@ export default function EditorPageV2() {
     };
 
     // AI Refine handler
-    const handleRefineComplete = (result: unknown) => {
+    const handleRefineComplete = (_result: unknown) => {
         queryClient.invalidateQueries({ queryKey: ["project", projectId] });
     };
 
     // AI Suggestion handler
-    const handleApplySuggestion = (action: string, data?: Record<string, unknown>) => {
+    const handleApplySuggestion = (action: string, _data?: Record<string, unknown>) => {
         toast.success(`Applying: ${action}`);
         // Future: apply the action to the slide
     };
@@ -622,7 +621,7 @@ export default function EditorPageV2() {
                                     currentThemeId={project?.themeId || undefined}
                                     onThemeChange={(themeId) => {
                                         const theme = themes?.find(t => t.id === themeId);
-                                        if (theme) handleThemeChange(theme);
+                                        if (theme) { handleThemeChange(theme); }
                                     }}
                                     onExportPdf={() => handleExport("pdf")}
                                 />

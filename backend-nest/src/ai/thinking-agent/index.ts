@@ -10,3 +10,6 @@ export * from './critic-agent.service';
 export * from './thinking-agent-orchestrator.service';
 export * from './thinking-agent.controller';
 export * from './thinking-agent.module';
+export * from './thinking-generation.processor';
+export * from './thinking-jobs.types';
+export * from './thinking-response.mapper';

@@ -30,30 +30,30 @@ interface SlideCanvasProps {
   theme?: Theme;
 }
 
+// Slash command block type mapping
+const COMMAND_TO_BLOCK: Record<string, { type: BlockType; content: BlockContent }> = {
+  heading1: { type: "HEADING", content: { text: "Heading" } },
+  heading2: { type: "SUBHEADING", content: { text: "Subheading" } },
+  paragraph: { type: "PARAGRAPH", content: { text: "Start typing..." } },
+  bulletList: { type: "BULLET_LIST", content: { items: ["Item 1", "Item 2", "Item 3"] } },
+  numberedList: { type: "NUMBERED_LIST", content: { items: ["Item 1", "Item 2", "Item 3"] } },
+  quote: { type: "QUOTE", content: { text: "Quote text...", author: "" } },
+  code: { type: "CODE", content: { code: "// Your code here", language: "javascript" } },
+  image: { type: "IMAGE", content: { url: "", alt: "" } },
+  video: { type: "EMBED", content: { url: "" } },
+  chart: { type: "EMBED", content: { url: "" } },
+  table: { type: "TABLE", content: { rows: [["Header 1", "Header 2", "Header 3"], ["Cell 1", "Cell 2", "Cell 3"]] } },
+  divider: { type: "DIVIDER", content: {} },
+  columns: { type: "PARAGRAPH", content: { text: "Column layout" } },
+  link: { type: "PARAGRAPH", content: { text: "Link text" } },
+  aiGenerate: { type: "PARAGRAPH", content: { text: "AI Generated content..." } },
+};
+
 export default function SlideCanvas({ projectId, slide, theme }: SlideCanvasProps) {
 
   const { updateBlock, deleteBlock, reorderBlocks } = useEditorStore();
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
-
-  // Slash command block type mapping
-  const COMMAND_TO_BLOCK: Record<string, { type: BlockType; content: BlockContent }> = {
-    heading1: { type: "HEADING", content: { text: "Heading" } },
-    heading2: { type: "SUBHEADING", content: { text: "Subheading" } },
-    paragraph: { type: "PARAGRAPH", content: { text: "Start typing..." } },
-    bulletList: { type: "BULLET_LIST", content: { items: ["Item 1", "Item 2", "Item 3"] } },
-    numberedList: { type: "NUMBERED_LIST", content: { items: ["Item 1", "Item 2", "Item 3"] } },
-    quote: { type: "QUOTE", content: { text: "Quote text...", author: "" } },
-    code: { type: "CODE", content: { code: "// Your code here", language: "javascript" } },
-    image: { type: "IMAGE", content: { url: "", alt: "" } },
-    video: { type: "EMBED", content: { url: "" } },
-    chart: { type: "EMBED", content: { url: "" } },
-    table: { type: "TABLE", content: { rows: [["Header 1", "Header 2", "Header 3"], ["Cell 1", "Cell 2", "Cell 3"]] } },
-    divider: { type: "DIVIDER", content: {} },
-    columns: { type: "PARAGRAPH", content: { text: "Column layout" } },
-    link: { type: "PARAGRAPH", content: { text: "Link text" } },
-    aiGenerate: { type: "PARAGRAPH", content: { text: "AI Generated content..." } },
-  };
 
   // Add block from slash command
   const addBlockMutation = useMutation({
@@ -75,7 +75,7 @@ export default function SlideCanvas({ projectId, slide, theme }: SlideCanvasProp
       const order = slide.blocks?.length || 0;
       addBlockMutation.mutate({ blockType: blockDef.type, content: blockDef.content, order });
     }
-  }, [slide.blocks?.length, slide.id, addBlockMutation]);
+  }, [slide.blocks?.length, addBlockMutation]);
 
   // Slash commands integration
   const {

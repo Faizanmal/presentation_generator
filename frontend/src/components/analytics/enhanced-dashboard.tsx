@@ -428,8 +428,8 @@ function PredictiveAnalyticsPanel({ data }: PredictiveAnalyticsPanelProps) {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {data.insights.map((insight, idx) => (
-                <div key={`insight-${idx}-${insight.substring(0, 10)}`} className="flex items-start gap-2 text-sm">
+              {data.insights.map((insight) => (
+                <div key={`insight-${insight.substring(0, 20).replace(/\s+/g, '')}`} className="flex items-start gap-2 text-sm">
                   <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5" />
                   <span>{insight}</span>
                 </div>
@@ -535,8 +535,8 @@ function AudienceSegmentsPanel({ data }: AudienceSegmentsPanelProps) {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {data.insights.map((insight, idx) => (
-                <div key={`audience-insight-${idx}-${insight.substring(0, 10)}`} className="flex items-start gap-2 text-sm p-3 bg-muted rounded-lg">
+              {data.insights.map((insight) => (
+                <div key={`audience-insight-${insight.substring(0, 20).replace(/\s+/g, '')}`} className="flex items-start gap-2 text-sm p-3 bg-muted rounded-lg">
                   <span>{insight}</span>
                 </div>
               ))}
@@ -614,8 +614,8 @@ function ContentOptimizationPanel({ suggestions }: ContentOptimizationPanelProps
             </div>
 
             <div className="grid gap-3">
-              {groupedByPriority[priority].map((suggestion, idx) => (
-                <Card key={`suggestion-${suggestion.slideNumber}-${idx}`} className={priorityColors[priority]}>
+              {groupedByPriority[priority].map((suggestion) => (
+                <Card key={`suggestion-${suggestion.slideNumber}-${suggestion.type}-${suggestion.issue.substring(0, 10).replace(/\s+/g, '')}`} className={priorityColors[priority]}>
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <div>

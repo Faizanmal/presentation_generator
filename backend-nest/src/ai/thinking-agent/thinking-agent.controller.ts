@@ -10,16 +10,30 @@ import {
   Query,
   Get,
   Param,
+  ForbiddenException,
+  NotFoundException,
 } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Job, Queue } from 'bullmq';
 import { Observable, from, map, catchError, of } from 'rxjs';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import { UsersService } from '../../users/users.service';
 import { ThinkingAgentOrchestratorService } from './thinking-agent-orchestrator.service';
 import { ThinkingProjectService } from './thinking-project.service';
 import {
   EnhancedGenerationParams,
   EnhancedGenerationResult,
 } from './thinking-agent.types';
+import { ThrottleAIGeneration } from '../../common/decorators/throttle.decorator';
+import {
+  ThinkingGenerationJobData,
+  ThinkingQueuedResponse,
+} from './thinking-jobs.types';
+import {
+  ThinkingApiGenerationResult,
+  transformThinkingGenerationResult,
+} from './thinking-response.mapper';
 
 /**
  * DTO for thinking generation request
@@ -71,6 +85,9 @@ export class ThinkingAgentController {
   constructor(
     private readonly orchestrator: ThinkingAgentOrchestratorService,
     private readonly projectService: ThinkingProjectService,
+    private readonly usersService: UsersService,
+    @InjectQueue('thinking-generation')
+    private readonly thinkingGenerationQueue: Queue,
   ) {}
 
   /**
@@ -83,11 +100,17 @@ export class ThinkingAgentController {
    * 4. Refinement: Iterative improvement until quality target is met
    */
   @Post('generate')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ThrottleAIGeneration()
   async generateWithThinking(
     @CurrentUser() user: { id: string },
     @Body() body: ThinkingGenerationDto,
-  ): Promise<any> { // Using any for now, will type properly
+  ): Promise<ThinkingQueuedResponse> {
+    const canGenerate = await this.usersService.canGenerateAI(user.id);
+    if (!canGenerate) {
+      throw new ForbiddenException('AI generation limit reached');
+    }
+
     const params: EnhancedGenerationParams = {
       topic: body.topic,
       tone: body.tone || 'professional',
@@ -106,25 +129,30 @@ export class ThinkingAgentController {
       brandGuidelines: body.brandGuidelines,
     };
 
-    const result = await this.orchestrator.generateWithThinking(params);
-
-    // Transform to frontend expected format
-    const transformedResult = {
-      presentation: this.transformPresentation(result.presentation),
-      qualityReport: this.transformQualityReport(result.qualityReport),
-      thinkingSteps: result.thinkingProcess.steps,
-      thinkingProcess: {
-        steps: result.thinkingProcess.steps,
-      },
-      metadata: {
-        totalIterations: result.thinkingProcess.iterations,
-        totalTokensUsed: result.metadata.totalTokensUsed,
-        generationTimeMs: result.metadata.totalTimeMs,
-        qualityImprovement: result.qualityReport.overallScore / 10 - 7, // Rough estimate
-      },
+    const aiGenerationCost = Math.max(1, Math.min(body.length || 8, 20));
+    const jobData: ThinkingGenerationJobData = {
+      userId: user.id,
+      action: 'generate',
+      params,
+      aiGenerationCost,
     };
 
-    return transformedResult;
+    const job = await this.thinkingGenerationQueue.add(
+      'thinking-generate',
+      jobData,
+      {
+        attempts: 2,
+        backoff: { type: 'exponential', delay: 3000 },
+        removeOnComplete: { age: 3600, count: 500 },
+        removeOnFail: { age: 86400, count: 1000 },
+      },
+    );
+
+    return {
+      status: 'queued',
+      jobId: String(job.id),
+      message: 'Thinking generation started in background',
+    };
   }
 
   /**
@@ -133,10 +161,16 @@ export class ThinkingAgentController {
    */
   @Post('generate/quick')
   @HttpCode(HttpStatus.OK)
+  @ThrottleAIGeneration()
   async generateQuick(
     @CurrentUser() user: { id: string },
     @Body() body: ThinkingGenerationDto,
-  ): Promise<any> {
+  ): Promise<ThinkingApiGenerationResult> {
+    const canGenerate = await this.usersService.canGenerateAI(user.id);
+    if (!canGenerate) {
+      throw new ForbiddenException('AI generation limit reached');
+    }
+
     const params: EnhancedGenerationParams = {
       topic: body.topic,
       tone: body.tone || 'professional',
@@ -153,24 +187,12 @@ export class ThinkingAgentController {
     };
 
     const result = await this.orchestrator.generateQuick(params);
+    await this.usersService.incrementAIGenerations(
+      user.id,
+      Math.max(1, Math.min(body.length || 6, 6)),
+    );
 
-    // Transform to frontend expected format
-    const transformedResult = {
-      presentation: this.transformPresentation(result.presentation),
-      qualityReport: this.transformQualityReport(result.qualityReport),
-      thinkingSteps: result.thinkingProcess.steps,
-      thinkingProcess: {
-        steps: result.thinkingProcess.steps,
-      },
-      metadata: {
-        totalIterations: result.thinkingProcess.iterations,
-        totalTokensUsed: result.metadata.totalTokensUsed,
-        generationTimeMs: result.metadata.totalTimeMs,
-        qualityImprovement: 0, // Quick mode doesn't improve
-      },
-    };
-
-    return transformedResult;
+    return transformThinkingGenerationResult(result);
   }
 
   /**
@@ -339,19 +361,23 @@ export class ThinkingAgentController {
    * This is a convenience endpoint that combines generation + project creation
    */
   @Post('generate-and-create')
-  @HttpCode(HttpStatus.CREATED)
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ThrottleAIGeneration()
   async generateAndCreateProject(
     @CurrentUser() user: { id: string },
     @Body() body: ThinkingGenerationDto & CreateProjectDto,
-  ): Promise<{
-    projectId: string;
-    slideCount: number;
-    blockCount: number;
-    qualityScore: number;
-    generationTimeMs: number;
-    tokensUsed: number;
-  }> {
-    const startTime = Date.now();
+  ): Promise<ThinkingQueuedResponse> {
+    const canGenerate = await this.usersService.canGenerateAI(user.id);
+    if (!canGenerate) {
+      throw new ForbiddenException('AI generation limit reached');
+    }
+
+    const canCreate = await this.usersService.canCreateProject(user.id);
+    if (!canCreate) {
+      throw new ForbiddenException(
+        'Project limit reached. Upgrade to create more projects.',
+      );
+    }
 
     // Generate with thinking
     const params: EnhancedGenerationParams = {
@@ -372,28 +398,59 @@ export class ThinkingAgentController {
       brandGuidelines: body.brandGuidelines,
     };
 
-    const result = await this.orchestrator.generateWithThinking(params);
-    const generationTimeMs = Date.now() - startTime;
+    const aiGenerationCost = Math.max(1, Math.min(body.length || 8, 20));
+    const jobData: ThinkingGenerationJobData = {
+      userId: user.id,
+      action: 'generate-and-create',
+      params,
+      aiGenerationCost,
+      createProjectOptions: {
+        title: body.title,
+        description: body.description,
+        themeId: body.themeId,
+      },
+    };
 
-    // Create project from result
-    const projectResult =
-      await this.projectService.createProjectFromThinkingResult(
-        user.id,
-        result.presentation,
-        {
-          title: body.title || result.presentation.title,
-          description: body.description || result.presentation.metadata.summary,
-          themeId: body.themeId,
-        },
-      );
+    const job = await this.thinkingGenerationQueue.add(
+      'thinking-generate-and-create',
+      jobData,
+      {
+        attempts: 2,
+        backoff: { type: 'exponential', delay: 3000 },
+        removeOnComplete: { age: 3600, count: 500 },
+        removeOnFail: { age: 86400, count: 1000 },
+      },
+    );
 
     return {
-      projectId: projectResult.projectId,
-      slideCount: projectResult.slideCount,
-      blockCount: projectResult.blockCount,
-      qualityScore: result.qualityReport.overallScore,
-      generationTimeMs,
-      tokensUsed: result.metadata.totalTokensUsed,
+      status: 'queued',
+      jobId: String(job.id),
+      message: 'Thinking generation + project creation started in background',
+    };
+  }
+
+  @Get('jobs/:jobId')
+  @HttpCode(HttpStatus.OK)
+  async getThinkingJobStatus(
+    @CurrentUser() user: { id: string },
+    @Param('jobId') jobId: string,
+  ) {
+    const job = await this.thinkingGenerationQueue.getJob(jobId);
+    if (!job) {
+      throw new NotFoundException('Job not found');
+    }
+
+    const jobData = job.data as ThinkingGenerationJobData;
+    if (jobData.userId !== user.id) {
+      throw new ForbiddenException('You cannot access this job');
+    }
+
+    const state = await job.getState();
+    return {
+      id: String(job.id),
+      state,
+      result: state === 'completed' ? this.normalizeJobResult(job) : null,
+      failedReason: job.failedReason,
     };
   }
 
@@ -411,12 +468,20 @@ export class ThinkingAgentController {
       title?: string;
       description?: string;
       themeId?: string;
+      generateImages?: boolean;
     },
   ): Promise<{
     projectId: string;
     slideCount: number;
     blockCount: number;
   }> {
+    const canCreate = await this.usersService.canCreateProject(user.id);
+    if (!canCreate) {
+      throw new ForbiddenException(
+        'Project limit reached. Upgrade to create more projects.',
+      );
+    }
+
     return this.projectService.createProjectFromThinkingResult(
       user.id,
       body.presentation,
@@ -424,96 +489,24 @@ export class ThinkingAgentController {
         title: body.title,
         description: body.description,
         themeId: body.themeId,
+        generateImages: body.generateImages,
       },
     );
   }
 
-  private transformPresentation(presentation: any): any {
-    return {
-      title: presentation.title,
-      subtitle: presentation.subtitle,
-      sections: presentation.sections.map((section: any) => ({
-        id: section.id,
-        heading: section.heading,
-        subheading: section.subheading,
-        blocks: section.blocks.map((block: any) => ({
-          id: block.id,
-          type: block.type,
-          content: block.content,
-          formatting: block.formatting,
-          chartData: block.chartData,
-        })),
-        layout: section.layout,
-        suggestedImage: section.suggestedImage,
-        speakerNotes: section.speakerNotes,
-        transition: section.transition,
-        duration: section.duration,
-      })),
-      metadata: {
-        estimatedDuration: presentation.metadata?.estimatedDuration || 10,
-        keywords: presentation.metadata?.keywords || [],
-        summary: presentation.metadata?.summary || '',
-        difficulty: presentation.metadata?.difficulty || 'intermediate',
-        category: presentation.metadata?.category || 'presentation',
-      },
+  private normalizeJobResult(job: Job) {
+    const returnValue = job.returnvalue as {
+      kind?: string;
+      result?: unknown;
     };
-  }
 
-  private transformQualityReport(qualityReport: any): any {
-    const breakdown = qualityReport.breakdown;
-    const categoryScores = [
-      {
-        criterion: 'Content Quality',
-        score: breakdown.contentQuality / 10,
-        maxScore: 10,
-        feedback: `Content quality score: ${breakdown.contentQuality}/100`,
-      },
-      {
-        criterion: 'Structure Quality',
-        score: breakdown.structureQuality / 10,
-        maxScore: 10,
-        feedback: `Structure quality score: ${breakdown.structureQuality}/100`,
-      },
-      {
-        criterion: 'Engagement Potential',
-        score: breakdown.engagementPotential / 10,
-        maxScore: 10,
-        feedback: `Engagement potential score: ${breakdown.engagementPotential}/100`,
-      },
-      {
-        criterion: 'Visual Richness',
-        score: breakdown.visualRichness / 10,
-        maxScore: 10,
-        feedback: `Visual richness score: ${breakdown.visualRichness}/100`,
-      },
-      {
-        criterion: 'Audience Alignment',
-        score: breakdown.audienceAlignment / 10,
-        maxScore: 10,
-        feedback: `Audience alignment score: ${breakdown.audienceAlignment}/100`,
-      },
-      {
-        criterion: 'Originality',
-        score: breakdown.originality / 10,
-        maxScore: 10,
-        feedback: `Originality score: ${breakdown.originality}/100`,
-      },
-    ];
+    if (
+      returnValue?.kind &&
+      Object.prototype.hasOwnProperty.call(returnValue, 'result')
+    ) {
+      return returnValue.result;
+    }
 
-    const improvements = qualityReport.suggestions.map((suggestion: string, index: number) => ({
-      area: `Area ${index + 1}`,
-      currentState: 'Current implementation',
-      suggestedChange: suggestion,
-      priority: 'medium' as const,
-      affectedSections: [],
-    }));
-
-    return {
-      overallScore: qualityReport.overallScore / 10, // Convert from 1-100 to 1-10 scale
-      categoryScores,
-      improvements,
-      passedQualityThreshold: qualityReport.passedThreshold,
-      summary: `Overall quality score: ${qualityReport.overallScore}/100`,
-    };
+    return returnValue;
   }
 }

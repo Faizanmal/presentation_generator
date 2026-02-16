@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import BlockRenderer from '@/components/editor/BlockRenderer';
 import type { Block, BlockType } from '@/types';
 
@@ -24,7 +24,7 @@ jest.mock('@dnd-kit/utilities', () => ({
 
 jest.mock('next/image', () => ({
     __esModule: true,
-    default: (props: any) => <img {...props} alt={props.alt} />,
+    default: (props: React.ImgHTMLAttributes<HTMLImageElement>) => <img {...props} alt={props.alt || ''} />,
 }));
 
 jest.mock('lucide-react', () => ({
@@ -34,10 +34,10 @@ jest.mock('lucide-react', () => ({
 }));
 
 jest.mock('@/components/ui/dropdown-menu', () => ({
-    DropdownMenu: ({ children }: any) => <div>{children}</div>,
-    DropdownMenuTrigger: ({ children }: any) => <div data-testid="dropdown-trigger">{children}</div>,
-    DropdownMenuContent: ({ children }: any) => <div data-testid="dropdown-content">{children}</div>,
-    DropdownMenuItem: ({ children, onClick }: any) => (
+    DropdownMenu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => <div data-testid="dropdown-trigger">{children}</div>,
+    DropdownMenuContent: ({ children }: { children: React.ReactNode }) => <div data-testid="dropdown-content">{children}</div>,
+    DropdownMenuItem: ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => (
         <div data-testid="dropdown-item" onClick={onClick}>
             {children}
         </div>
@@ -45,7 +45,7 @@ jest.mock('@/components/ui/dropdown-menu', () => ({
 }));
 
 jest.mock('@/components/ui/button', () => ({
-    Button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
+    Button: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...props}>{children}</button>,
 }));
 
 jest.mock('@/components/editor/chart-block', () => ({

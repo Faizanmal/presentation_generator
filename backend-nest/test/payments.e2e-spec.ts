@@ -186,7 +186,8 @@ describe('Payments (e2e)', () => {
             id: 'sub_test_123',
             customer: 'cus_test_123',
             status: 'active',
-            current_period_end: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
+            current_period_end:
+              Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
             metadata: {
               userId: testUserId,
               plan: 'PRO',
@@ -279,7 +280,9 @@ describe('Payments (e2e)', () => {
 
       expect(response.body).toHaveProperty('message');
       expect(response.body.message).toContain('cancel');
-      expect(mockStripe.subscriptions.cancel).toHaveBeenCalledWith('sub_test_123');
+      expect(mockStripe.subscriptions.cancel).toHaveBeenCalledWith(
+        'sub_test_123',
+      );
     });
 
     it('should reject request without authentication', async () => {

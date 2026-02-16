@@ -221,7 +221,7 @@ export function FeatureTour({
                         <div className="flex items-center gap-1">
                             {steps.map((step, index) => (
                                 <div
-                                    key={`tour-dot-${index}-${step.title.substring(0, 10)}`}
+                                    key={`tour-dot-${step.title.replace(/\s+/g, '-')}`}
                                     className={`h-2 w-2 rounded-full transition-colors ${index === currentStep
                                         ? "bg-blue-500"
                                         : "bg-slate-300 dark:bg-slate-600"

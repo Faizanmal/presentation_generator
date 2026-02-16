@@ -8,7 +8,6 @@ export function initializeNewRelic(): void {
     try {
       // `require` is used intentionally here because New Relic must be loaded
       // synchronously before the application starts. eslint rule waived for this line.
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       require('newrelic');
       console.log('✓ New Relic monitoring initialized');
     } catch (error) {
@@ -31,7 +30,6 @@ export function createNewRelicMiddleware() {
   ) => {
     if (process.env.NEW_RELIC_ENABLED === 'true') {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const newrelic = require('newrelic');
         const transactionName = `${req.method} ${req.path}`;
 
@@ -69,10 +67,8 @@ export function TrackNewRelic(segmentName: string) {
 
     descriptor.value = async function (...args: unknown[]) {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const newrelic = require('newrelic');
         // `newrelic.startWebTransaction` typing is not strict here — treat as unknown and forward.
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         return await newrelic.startWebTransaction(segmentName, async () => {
           return await originalMethod.apply(this, args as any[]);
         });

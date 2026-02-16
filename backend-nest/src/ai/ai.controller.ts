@@ -19,11 +19,16 @@ import { AutoLayoutService } from './auto-layout.service';
 import { AIChatService, SlideContext } from './ai-chat.service';
 import { URLImportService } from './url-import.service';
 import { RealTimeDataService } from './realtime-data.service';
+import { ImageRecognitionService } from './image-recognition.service';
 import {
   ThrottleAIGeneration,
   ThrottleImageGeneration,
   ThrottleModerate,
 } from '../common/decorators/throttle.decorator';
+import {
+  AdvancedRateLimitGuard,
+  RateLimit,
+} from '../common/rate-limit/advanced-rate-limit.guard';
 
 class EnhanceContentDto {
   content: string;
@@ -69,6 +74,7 @@ export class AIController {
     private readonly aiChatService: AIChatService,
     private readonly urlImportService: URLImportService,
     private readonly realTimeDataService: RealTimeDataService,
+    private readonly imageRecognitionService: ImageRecognitionService,
   ) {}
 
   /**
@@ -1125,5 +1131,31 @@ Format as a numbered list with clear structure.`;
       statistics,
       message: 'Topic statistics retrieved',
     };
+  }
+  // ============================================
+  // IMAGE RECOGNITION ENDPOINTS
+  // ============================================
+
+  /**
+   * Analyze image for presentation suitability and context
+   */
+  @Post('analyze-image')
+  @HttpCode(HttpStatus.OK)
+  async analyzeImage(
+    @CurrentUser() user: { id: string },
+    @Body() body: { imageUrl: string },
+  ) {
+    const canGenerate = await this.usersService.canGenerateAI(user.id);
+    if (!canGenerate) {
+      throw new ForbiddenException('AI generation usage limit reached');
+    }
+
+    const analysis = await this.imageRecognitionService.analyzeImage(
+      body.imageUrl,
+    );
+
+    // Analysis cost
+    await this.usersService.incrementAIGenerations(user.id, 2);
+    return { analysis };
   }
 }

@@ -1,6 +1,7 @@
 'use client';
 
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import type { ErrorInfo, ReactNode } from 'react';
+import React, { Component } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
@@ -44,8 +45,8 @@ export class ErrorBoundary extends Component<Props, State> {
     });
 
     // Log to external error tracking service (Sentry)
-    if (typeof window !== 'undefined' && (window as any).Sentry) {
-      (window as any).Sentry.captureException(error, {
+    if (typeof window !== 'undefined' && window.Sentry) {
+      window.Sentry.captureException(error, {
         contexts: {
           react: {
             componentStack: errorInfo.componentStack,

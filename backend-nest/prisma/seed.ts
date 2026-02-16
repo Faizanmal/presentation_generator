@@ -1,7 +1,20 @@
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
 import * as bcrypt from 'bcryptjs';
 
-const prisma = new PrismaClient();
+// Create Prisma client with the same configuration as PrismaService
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  throw new Error('DATABASE_URL environment variable is required');
+}
+const pool = new Pool({ connectionString });
+const adapter = new PrismaPg(pool);
+
+const prisma = new PrismaClient({
+  adapter,
+  log: ['error'],
+});
 
 async function main() {
   console.log('🌱 Starting database seeding...');
@@ -12,7 +25,8 @@ async function main() {
 
   // Seed Users
   console.log('📝 Seeding users...');
-  const hashedPassword = await bcrypt.hash('Password123!', 10);
+  const defaultPassword = process.env.SEED_DEFAULT_PASSWORD || 'Password123!';
+  const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 
   const adminUser = await prisma.user.upsert({
     where: { email: 'admin@presentation.com' },
@@ -70,71 +84,21 @@ async function main() {
     data: {
       title: 'Q4 Business Review',
       description: 'Quarterly business review presentation for stakeholders',
-      userId: adminUser.id,
-      visibility: 'PRIVATE',
+      ownerId: adminUser.id,
+      isPublic: false,
       slides: {
         create: [
           {
             title: 'Q4 Performance Overview',
-            content: JSON.stringify({
-              blocks: [
-                {
-                  id: '1',
-                  type: 'heading',
-                  content: 'Q4 2025 Business Review',
-                  level: 1,
-                },
-                {
-                  id: '2',
-                  type: 'paragraph',
-                  content: 'Annual performance summary and 2026 outlook',
-                },
-              ],
-            }),
             order: 0,
+
           },
           {
             title: 'Key Metrics',
-            content: JSON.stringify({
-              blocks: [
-                {
-                  id: '1',
-                  type: 'heading',
-                  content: 'Key Performance Indicators',
-                  level: 2,
-                },
-                {
-                  id: '2',
-                  type: 'list',
-                  items: [
-                    'Revenue Growth: 45%',
-                    'Customer Acquisition: 10,000+',
-                    'User Engagement: 85%',
-                    'Customer Satisfaction: 4.8/5',
-                  ],
-                },
-              ],
-            }),
             order: 1,
           },
           {
             title: 'Strategic Priorities',
-            content: JSON.stringify({
-              blocks: [
-                {
-                  id: '1',
-                  type: 'heading',
-                  content: '2026 Strategic Focus',
-                  level: 2,
-                },
-                {
-                  id: '2',
-                  type: 'paragraph',
-                  content:
-                    'Focus on enterprise expansion, AI capabilities, and global market penetration',
-                },
-              ],
-            }),
             order: 2,
           },
         ],
@@ -146,48 +110,16 @@ async function main() {
     data: {
       title: 'Product Launch Deck',
       description: 'New product launch presentation for investors',
-      userId: proUser.id,
-      visibility: 'PUBLIC',
+      ownerId: proUser.id,
+      isPublic: true,
       slides: {
         create: [
           {
             title: 'Revolutionary AI Platform',
-            content: JSON.stringify({
-              blocks: [
-                {
-                  id: '1',
-                  type: 'heading',
-                  content: 'Introducing Our AI-Powered Platform',
-                  level: 1,
-                },
-                {
-                  id: '2',
-                  type: 'paragraph',
-                  content:
-                    'Transform how teams create and collaborate on presentations',
-                },
-              ],
-            }),
             order: 0,
           },
           {
             title: 'Market Opportunity',
-            content: JSON.stringify({
-              blocks: [
-                {
-                  id: '1',
-                  type: 'heading',
-                  content: '$10B Market Opportunity',
-                  level: 2,
-                },
-                {
-                  id: '2',
-                  type: 'paragraph',
-                  content:
-                    'The presentation software market continues to grow at 15% annually',
-                },
-              ],
-            }),
             order: 1,
           },
         ],
@@ -199,27 +131,12 @@ async function main() {
     data: {
       title: 'Team Training Materials',
       description: 'Onboarding and training presentation for new team members',
-      userId: freeUser.id,
-      visibility: 'PRIVATE',
+      ownerId: freeUser.id,
+      isPublic: false,
       slides: {
         create: [
           {
             title: 'Welcome to the Team',
-            content: JSON.stringify({
-              blocks: [
-                {
-                  id: '1',
-                  type: 'heading',
-                  content: 'Welcome Aboard!',
-                  level: 1,
-                },
-                {
-                  id: '2',
-                  type: 'paragraph',
-                  content: "We're excited to have you join our team",
-                },
-              ],
-            }),
             order: 0,
           },
         ],
@@ -233,14 +150,14 @@ async function main() {
   console.log('🏷️  Seeding tags...');
   const tags = await prisma.tag.createMany({
     data: [
-      { name: 'Business', color: '#3B82F6' },
-      { name: 'Marketing', color: '#10B981' },
-      { name: 'Sales', color: '#F59E0B' },
-      { name: 'Product', color: '#8B5CF6' },
-      { name: 'Design', color: '#EC4899' },
-      { name: 'Engineering', color: '#6366F1' },
-      { name: 'HR', color: '#14B8A6' },
-      { name: 'Finance', color: '#EF4444' },
+      { userId: adminUser.id, name: 'Business', color: '#3B82F6' },
+      { userId: adminUser.id, name: 'Marketing', color: '#10B981' },
+      { userId: adminUser.id, name: 'Sales', color: '#F59E0B' },
+      { userId: adminUser.id, name: 'Product', color: '#8B5CF6' },
+      { userId: adminUser.id, name: 'Design', color: '#EC4899' },
+      { userId: adminUser.id, name: 'Engineering', color: '#6366F1' },
+      { userId: adminUser.id, name: 'HR', color: '#14B8A6' },
+      { userId: adminUser.id, name: 'Finance', color: '#EF4444' },
     ],
     skipDuplicates: true,
   });
@@ -252,6 +169,7 @@ async function main() {
   const org = await prisma.organization.create({
     data: {
       name: 'Acme Corporation',
+      slug: 'acme-corporation',
       domain: 'acme.com',
       plan: 'ENTERPRISE',
       members: {
@@ -277,21 +195,21 @@ async function main() {
     data: [
       {
         projectId: project1.id,
+        sessionId: 'session-1',
         viewedAt: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
-        duration: 300, // 5 minutes
-        completionRate: 80,
+        totalDuration: 300, // 5 minutes
       },
       {
         projectId: project1.id,
+        sessionId: 'session-2',
         viewedAt: new Date(Date.now() - 1000 * 60 * 60 * 12), // 12 hours ago
-        duration: 450,
-        completionRate: 100,
+        totalDuration: 450,
       },
       {
         projectId: project2.id,
+        sessionId: 'session-3',
         viewedAt: new Date(Date.now() - 1000 * 60 * 60 * 6), // 6 hours ago
-        duration: 240,
-        completionRate: 60,
+        totalDuration: 240,
       },
     ],
   });
@@ -311,7 +229,14 @@ async function main() {
         background: '#FFFFFF',
         text: '#1F2937',
       },
-      typographyTokens: {
+      colors: {
+        primary: '#3B82F6',
+        secondary: '#8B5CF6',
+        accent: '#10B981',
+        background: '#FFFFFF',
+        text: '#1F2937',
+      },
+      typography: {
         fontFamily: 'Inter, sans-serif',
         fontSize: {
           small: '14px',
@@ -320,14 +245,13 @@ async function main() {
           xlarge: '32px',
         },
       },
-      spacingTokens: {
+      spacing: {
         xs: '4px',
         sm: '8px',
         md: '16px',
         lg: '24px',
         xl: '32px',
       },
-      isPublic: true,
     },
   });
 
@@ -335,9 +259,9 @@ async function main() {
 
   console.log('\n🎉 Database seeding completed successfully!\n');
   console.log('Test accounts:');
-  console.log('  Admin: admin@presentation.com / Password123!');
-  console.log('  Pro:   pro@presentation.com / Password123!');
-  console.log('  Free:  user@presentation.com / Password123!');
+  console.log('  Admin: admin@presentation.com / (use SEED_DEFAULT_PASSWORD env var)');
+  console.log('  Pro:   pro@presentation.com / (use SEED_DEFAULT_PASSWORD env var)');
+  console.log('  Free:  user@presentation.com / (use SEED_DEFAULT_PASSWORD env var)');
 }
 
 main()

@@ -1,15 +1,16 @@
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import compression from 'compression';
-import * as cookieParser from 'cookie-parser';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { LoggerService } from './common/logger/logger.service';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { CacheInterceptor } from './common/interceptors/cache.interceptor';
+import { CacheService } from './common/cache/cache.service';
 import { SanitizationMiddleware } from './common/middleware/security.middleware';
 import { CsrfMiddleware } from './common/middleware/csrf.middleware';
 import {
@@ -119,6 +120,7 @@ async function bootstrap() {
       'Cache-Control',
       'Pragma',
       'Expires',
+      'x-csrf-token',
     ],
     exposedHeaders: ['Content-Disposition', 'X-Request-ID'],
     maxAge: 86400, // 24 hours
@@ -152,8 +154,8 @@ async function bootstrap() {
   app.useGlobalInterceptors(new LoggingInterceptor(logger));
 
   // Cache interceptor (requires CacheService and Reflector)
-  const reflector = app.get('Reflector');
-  const cacheService = app.get('CacheService');
+  const reflector = app.get(Reflector);
+  const cacheService = app.get(CacheService);
   if (cacheService && reflector) {
     app.useGlobalInterceptors(new CacheInterceptor(cacheService, reflector));
     logger.log('🗄️  Response caching enabled');
@@ -169,13 +171,22 @@ async function bootstrap() {
   });
 
   // ========================================
+  // START SERVER
+  // ========================================
+
+  const port = configService.get<number>('PORT') || 3001;
+  const environment = configService.get<string>('NODE_ENV') || 'development';
+
+  // ========================================
   // SWAGGER/OPENAPI DOCUMENTATION
   // ========================================
 
   if (environment !== 'production') {
     const config = new DocumentBuilder()
       .setTitle('Presentation Generator API')
-      .setDescription('AI-powered presentation creation platform with real-time collaboration, analytics, and enterprise features')
+      .setDescription(
+        'AI-powered presentation creation platform with real-time collaboration, analytics, and enterprise features',
+      )
       .setVersion('2.0')
       .addBearerAuth(
         {
@@ -212,35 +223,10 @@ async function bootstrap() {
       customSiteTitle: 'Presentation Generator API Documentation',
     });
 
-    logger.log(`📚 Swagger documentation available at http://localhost:${port}/api/docs`);
+    logger.log(
+      `📚 Swagger documentation available at http://localhost:${port}/api/docs`,
+    );
   }
-
-  // ========================================
-  // GRACEFUL SHUTDOWN
-  // ========================================
-
-  app.enableShutdownHooks();
-
-  process.on('SIGTERM', () => {
-    logger.log('SIGTERM signal received: closing HTTP server');
-    app.close().catch((error) => {
-      logger.error('Error during app close', error);
-    });
-  });
-
-  process.on('SIGINT', () => {
-    logger.log('SIGINT signal received: closing HTTP server');
-    app.close().catch((error) => {
-      logger.error('Error during app close', error);
-    });
-  });
-
-  // ========================================
-  // START SERVER
-  // ========================================
-
-  const port = configService.get<number>('PORT') || 3001;
-  const environment = configService.get<string>('NODE_ENV') || 'development';
 
   await app.listen(port);
 

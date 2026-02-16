@@ -407,8 +407,8 @@ export function DataImporter({ onSuccess, trigger }: DataImportProps) {
                                         <div>
                                             <h4 className="font-semibold mb-2">Insights</h4>
                                             <div className="space-y-2">
-                                                {parsedData.analysis.insights.map((insight, idx) => (
-                                                    <Alert key={`insight-${insight.type}-${idx}`}>
+                                                {parsedData.analysis.insights.map((insight) => (
+                                                    <Alert key={`insight-${insight.type}-${insight.description.substring(0, 15).replace(/\s+/g, '')}`}>
                                                         <AlertCircle className="h-4 w-4" />
                                                         <AlertDescription>
                                                             {insight.description}
@@ -429,9 +429,9 @@ export function DataImporter({ onSuccess, trigger }: DataImportProps) {
                                             <div className="space-y-2">
                                                 {parsedData.analysis.recommendedCharts
                                                     .slice(0, 3)
-                                                    .map((chart, idx) => (
+                                                    .map((chart) => (
                                                         <div
-                                                            key={`chart-${chart.type}-${chart.columns.join("-")}-${idx}`}
+                                                            key={`chart-${chart.type}-${chart.columns.join("-").replace(/\s+/g, '')}`}
                                                             className="p-3 border rounded-lg bg-accent/30"
                                                         >
                                                             <div className="flex items-center justify-between mb-1">

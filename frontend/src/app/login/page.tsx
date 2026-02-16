@@ -7,15 +7,15 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { 
-  Sparkles, 
-  Loader2, 
-  Mail, 
-  Lock, 
-  Eye, 
-  EyeOff, 
-  ArrowRight, 
-  CheckCircle2, 
+import {
+  Sparkles,
+  Loader2,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  ArrowRight,
+  CheckCircle2,
   Phone,
   Clock,
   RefreshCw,
@@ -28,12 +28,12 @@ import { Label } from "@/components/ui/label";
 import { useAuthStore } from "@/stores/auth-store";
 import { api } from "@/lib/api";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
@@ -71,7 +71,7 @@ function OtpInput({
   error?: string;
 }) {
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-  
+
   useEffect(() => {
     // Auto-focus first input on mount
     if (inputRefs.current[0]) {
@@ -87,8 +87,8 @@ function OtpInput({
   }, [value, onComplete]);
 
   const handleChange = (index: number, digit: string) => {
-    if (!/^\d*$/.test(digit)) {return;}
-    
+    if (!/^\d*$/.test(digit)) { return; }
+
     const newValue = value.split('');
     newValue[index] = digit.slice(-1);
     const result = newValue.join('').slice(0, 6);
@@ -110,7 +110,7 @@ function OtpInput({
     e.preventDefault();
     const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
     onChange(pastedData);
-    
+
     // Focus appropriate input after paste
     const focusIndex = Math.min(pastedData.length, 5);
     inputRefs.current[focusIndex]?.focus();
@@ -162,15 +162,15 @@ function CountdownTimer({
   const [timeLeft, setTimeLeft] = useState<number>(0);
 
   useEffect(() => {
-    if (!expiresAt) {return;}
+    if (!expiresAt) { return; }
 
     const updateTimer = () => {
       const now = new Date().getTime();
       const expiry = expiresAt.getTime();
       const diff = Math.max(0, Math.floor((expiry - now) / 1000));
-      
+
       setTimeLeft(diff);
-      
+
       if (diff === 0) {
         onExpired();
       }
@@ -182,7 +182,7 @@ function CountdownTimer({
     return () => clearInterval(interval);
   }, [expiresAt, onExpired]);
 
-  if (!expiresAt || timeLeft === 0) {return null;}
+  if (!expiresAt || timeLeft === 0) { return null; }
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
@@ -238,8 +238,15 @@ function EmailSentAnimation({ channel }: { channel: "email" | "sms" }) {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, loginWithOtp } = useAuthStore();
-  
+  const { isAuthenticated, isLoading: isAuthLoading, login, loginWithOtp } = useAuthStore();
+
+  // Redirect to dashboard if already authenticated
+  useEffect(() => {
+    if (!isAuthLoading && isAuthenticated) {
+      router.push('/dashboard');
+    }
+  }, [isAuthenticated, isAuthLoading, router]);
+
   // Loading & UI states
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -248,7 +255,7 @@ export default function LoginPage() {
   const [otpIdentifier, setOtpIdentifier] = useState("");
   const [otpChannel, setOtpChannel] = useState<"email" | "sms">("email");
   const [rememberDevice, setRememberDevice] = useState(false);
-  
+
   // OTP states
   const [otpValue, setOtpValue] = useState("");
   const [otpExpiresAt, setOtpExpiresAt] = useState<Date | null>(null);
@@ -258,8 +265,8 @@ export default function LoginPage() {
 
   // Resend cooldown timer
   useEffect(() => {
-    if (resendCooldown <= 0) {return;}
-    
+    if (resendCooldown <= 0) { return; }
+
     const interval = setInterval(() => {
       setResendCooldown((prev) => Math.max(0, prev - 1));
     }, 1000);
@@ -313,31 +320,31 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       const response = await api.requestOtpLoginMultiChannel(
-        data.identifier, 
+        data.identifier,
         otpChannel,
         rememberDevice
       );
-      
+
       if (response.success) {
         setOtpIdentifier(data.identifier);
         setShowSentAnimation(true);
-        
+
         // Show animation for 2 seconds, then show OTP input
         setTimeout(() => {
           setShowSentAnimation(false);
           setOtpSent(true);
         }, 2000);
-        
+
         // Set expiry timer
         if (response.expiresInSeconds) {
           setOtpExpiresAt(new Date(Date.now() + response.expiresInSeconds * 1000));
         }
-        
+
         // Set resend cooldown
         setResendCooldown(response.resendAfterSeconds || 60);
         setOtpExpired(false);
         setOtpValue("");
-        
+
         toast.success(response.message || "Verification code sent!");
       } else {
         // Check if it's a cooldown response
@@ -360,8 +367,8 @@ export default function LoginPage() {
   };
 
   const handleOtpComplete = useCallback(async () => {
-    if (otpValue.length !== 6 || isLoading) {return;}
-    
+    if (otpValue.length !== 6 || isLoading) { return; }
+
     setIsLoading(true);
     try {
       await loginWithOtp(otpIdentifier, otpValue, rememberDevice);
@@ -376,11 +383,11 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [otpValue, otpIdentifier, rememberDevice, isLoading, loginWithOtp, router, setOtpVerifyError]);
+  }, [otpValue, otpIdentifier, rememberDevice, isLoading, router, setOtpVerifyError, loginWithOtp]);
 
   const handleResendOtp = async () => {
-    if (resendCooldown > 0 || isResending) {return;}
-    
+    if (resendCooldown > 0 || isResending) { return; }
+
     setIsResending(true);
     try {
       const response = await api.requestOtpLoginMultiChannel(
@@ -388,12 +395,12 @@ export default function LoginPage() {
         otpChannel,
         rememberDevice
       );
-      
+
       if (response.success) {
         toast.success("New verification code sent!");
         setOtpValue("");
         setOtpExpired(false);
-        
+
         if (response.expiresInSeconds) {
           setOtpExpiresAt(new Date(Date.now() + response.expiresInSeconds * 1000));
         }
@@ -547,8 +554,8 @@ export default function LoginPage() {
                     {/* Channel Selection */}
                     <div>
                       <Label>Receive code via</Label>
-                      <Select 
-                        value={otpChannel} 
+                      <Select
+                        value={otpChannel}
                         onValueChange={(v) => setOtpChannel(v as "email" | "sms")}
                       >
                         <SelectTrigger className="mt-1.5">
@@ -653,9 +660,9 @@ export default function LoginPage() {
 
                     {/* Timer */}
                     {!otpExpired && (
-                      <CountdownTimer 
-                        expiresAt={otpExpiresAt} 
-                        onExpired={handleOtpExpired} 
+                      <CountdownTimer
+                        expiresAt={otpExpiresAt}
+                        onExpired={handleOtpExpired}
                       />
                     )}
 
@@ -676,9 +683,9 @@ export default function LoginPage() {
                         error={errorsOtpVerify.otp?.message}
                       />
 
-                      <Button 
-                        type="submit" 
-                        className="w-full mt-4" 
+                      <Button
+                        type="submit"
+                        className="w-full mt-4"
                         disabled={isLoading || otpValue.length !== 6 || otpExpired}
                       >
                         {isLoading ? (
@@ -717,8 +724,8 @@ export default function LoginPage() {
                           Resend {resendCooldown > 0 && `(${resendCooldown}s)`}
                         </button>
                         <span className="text-slate-300 dark:text-slate-600">|</span>
-                        <Link 
-                          href="/support" 
+                        <Link
+                          href="/support"
                           className="flex items-center gap-1 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                         >
                           <HelpCircle className="h-4 w-4" />

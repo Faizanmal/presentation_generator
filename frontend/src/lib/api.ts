@@ -51,6 +51,8 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 class ApiClient {
   private client: AxiosInstance;
   private token: string | null = null;
+  private csrfToken: string | null = null;
+  private csrfPromise: Promise<string> | null = null;
 
   constructor() {
     this.client = axios.create({
@@ -58,13 +60,35 @@ class ApiClient {
       headers: {
         'Content-Type': 'application/json',
       },
+      withCredentials: true,
     });
 
     // Request interceptor to add auth token
-    this.client.interceptors.request.use((config) => {
+    // Request interceptor to add auth token
+    this.client.interceptors.request.use(async (config) => {
+      // Add Auth token
       if (this.token) {
         config.headers.Authorization = `Bearer ${this.token}`;
       }
+
+      // Add CSRF token for mutation requests
+      if (
+        config.method &&
+        ['post', 'put', 'patch', 'delete'].includes(config.method.toLowerCase()) &&
+        !config.url?.includes('/auth/login')
+      ) {
+        if (!this.csrfToken) {
+          await this.fetchCsrfToken().catch(err => console.error('[ApiClient] CSRF fetch failed', err));
+        }
+
+        if (this.csrfToken) {
+          // console.log('[ApiClient] Attaching CSRF token');
+          config.headers['x-csrf-token'] = this.csrfToken;
+        } else {
+          console.warn('[ApiClient] Failed to obtain CSRF token - request may fail');
+        }
+      }
+
       return config;
     });
 
@@ -106,8 +130,50 @@ class ApiClient {
     }
   }
 
+
   getToken(): string | null {
     return this.token;
+  }
+
+  // ============================================
+  // CSRF
+  // ============================================
+
+  async fetchCsrfToken(): Promise<string> {
+    if (this.csrfToken) { return this.csrfToken; }
+    if (this.csrfPromise) { return this.csrfPromise; }
+
+    this.csrfPromise = (async () => {
+      try {
+        // Add timestamp to prevent 304 Not Modified responses
+        const timestamp = new Date().getTime();
+        const response = await this.client.get<{ token: string }>(`/csrf/token?t=${timestamp}`);
+
+        if (response.data) {
+          // Handle case where token might be nested or direct property
+          // Based on controller, it is { token: "..." }
+          this.csrfToken = response.data.token || (response.data as { csrfToken?: string }).csrfToken || null;
+
+          if (!this.csrfToken) {
+            console.error('[ApiClient] CSRF response data structure mismatch', response.data);
+            throw new Error('CSRF token not found in response');
+          }
+
+          return this.csrfToken;
+        } else {
+          console.error('[ApiClient] CSRF response missing body', response);
+          throw new Error('CSRF response missing body');
+        }
+      } catch (error) {
+        console.error('[ApiClient] Failed to fetch CSRF token', error);
+        this.csrfToken = null;
+        throw error;
+      } finally {
+        this.csrfPromise = null;
+      }
+    })();
+
+    return this.csrfPromise;
   }
 
   // ============================================
@@ -503,8 +569,12 @@ class ApiClient {
     };
     rawData?: string; // Support for unstructured raw data inputs
   }): Promise<ThinkingGenerationResult> {
-    const { data } = await this.client.post<ThinkingGenerationResult>('/ai/thinking/generate', params);
-    return data;
+    const { data } = await this.client.post<{
+      status: string;
+      jobId: string;
+      message?: string;
+    }>('/ai/thinking/generate', params);
+    return this.waitForThinkingJob<ThinkingGenerationResult>(data.jobId);
   }
 
   /**
@@ -607,11 +677,11 @@ class ApiClient {
    */
   async generateAndCreateProject(params: {
     topic: string;
-    tone?: 'professional' | 'casual' | 'academic' | 'creative';
+    tone?: string;
     audience?: string;
     length?: number;
-    type?: 'presentation' | 'document' | 'pitch-deck' | 'report';
-    qualityLevel?: 'standard' | 'high' | 'premium';
+    type?: string;
+    qualityLevel?: string;
     title?: string;
     description?: string;
     themeId?: string;
@@ -621,14 +691,35 @@ class ApiClient {
     blockCount: number;
     qualityScore: number;
     generationTimeMs: number;
+    tokensUsed?: number;
   }> {
     const { data } = await this.client.post<{
+      status: string;
+      jobId: string;
+      message?: string;
+    }>('/ai/thinking/generate-and-create', params);
+    return this.waitForThinkingJob<{
       projectId: string;
       slideCount: number;
       blockCount: number;
       qualityScore: number;
       generationTimeMs: number;
-    }>('/ai/thinking/generate-and-create', params);
+      tokensUsed?: number;
+    }>(data.jobId);
+  }
+
+  async getThinkingJobStatus(jobId: string): Promise<{
+    id: string;
+    state: string;
+    result: unknown;
+    failedReason?: string;
+  }> {
+    const { data } = await this.client.get<{
+      id: string;
+      state: string;
+      result: unknown;
+      failedReason?: string;
+    }>(`/ai/thinking/jobs/${jobId}`);
     return data;
   }
 
@@ -640,6 +731,7 @@ class ApiClient {
     title?: string;
     description?: string;
     themeId?: string;
+    generateImages?: boolean;
   }): Promise<{
     projectId: string;
     slideCount: number;
@@ -651,6 +743,30 @@ class ApiClient {
       blockCount: number;
     }>('/ai/thinking/create-project', params);
     return data;
+  }
+
+  private async waitForThinkingJob<T>(
+    jobId: string,
+    timeoutMs = 20 * 60 * 1000,
+    pollIntervalMs = 1500,
+  ): Promise<T> {
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < timeoutMs) {
+      const status = await this.getThinkingJobStatus(jobId);
+
+      if (status.state === 'completed') {
+        return status.result as T;
+      }
+
+      if (status.state === 'failed') {
+        throw new Error(status.failedReason || 'Thinking generation failed');
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+    }
+
+    throw new Error('Thinking generation timed out');
   }
 
   // ============================================
@@ -2379,7 +2495,7 @@ class ApiClient {
     update: (id: string, input: Partial<Project>) => this.updateProject(id, input),
     delete: (id: string) => this.deleteProject(id),
     duplicate: (id: string) => this.duplicateProject(id),
-    generateAndCreate: (input: unknown) => this.generateAndCreateProject(input as any),
+    generateAndCreate: (input: unknown) => this.generateAndCreateProject(input as GenerateProjectInput),
   };
 
   readonly slides = {

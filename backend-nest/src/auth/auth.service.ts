@@ -442,15 +442,80 @@ export class AuthService {
     return this.generateAuthResponse(user);
   }
 
-  // ─── Validate JWT ──────────────────────────────────────────
-  async validateJwtPayload(payload: JwtPayload) {
-    const user = await this.usersService.findById(payload.sub);
+  // ─── Validate User (for passport strategy) ───────────────
+  async validateUser(email: string, password: string) {
+    const user = await this.usersService.findByEmail(email);
 
-    if (!user) {
-      throw new UnauthorizedException('User not found');
+    if (!user || !user.password) {
+      return null;
     }
 
-    return user;
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    if (!isPasswordValid) {
+      return null;
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+    };
+  }
+
+  // ─── Validate JWT Payload ──────────────────────────────────
+  async validateJwtPayload(payload: JwtPayload) {
+    const user = await this.usersService.findById(payload.sub);
+    if (!user) {
+      return null;
+    }
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+    };
+  }
+
+  // ─── Change Password ───────────────────────────────────────
+  async changePassword(
+    userId: string,
+    oldPassword: string,
+    newPassword: string,
+  ): Promise<{ success: boolean; message: string }> {
+    const user = await this.usersService.findById(userId);
+
+    if (!user || !user.password) {
+      throw new BadRequestException('User not found or no password set');
+    }
+
+    const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password);
+
+    if (!isOldPasswordValid) {
+      throw new BadRequestException('Current password is incorrect');
+    }
+
+    const hashedNewPassword = await bcrypt.hash(newPassword, 12);
+    await this.usersService.update(user.id, {
+      password: hashedNewPassword,
+    });
+
+    this.logger.log(`Password changed for user: ${user.email}`);
+
+    return {
+      success: true,
+      message: 'Password changed successfully',
+    };
+  }
+
+  // ─── Verify Token ──────────────────────────────────────────
+  async verifyToken(token: string) {
+    try {
+      const payload = this.jwtService.verify(token);
+      const user = await this.validateJwtPayload(payload);
+      return user;
+    } catch (error) {
+      throw new UnauthorizedException('Invalid token');
+    }
   }
 
   // ─── JWT Generation ────────────────────────────────────────

@@ -368,6 +368,7 @@ export class ThinkingAgentOrchestratorService {
         totalTimeMs,
         modelUsed: 'gpt-4o / llama-3.3-70b-versatile',
         fallbackUsed,
+        generateImages: params.generateImages,
       };
 
       this.logger.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -499,6 +500,7 @@ export class ThinkingAgentOrchestratorService {
         totalTimeMs,
         modelUsed: 'gpt-4o / llama-3.3-70b-versatile',
         fallbackUsed: false,
+        generateImages: params.generateImages,
       },
     };
   }

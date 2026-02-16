@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/consistent-type-imports */
 import type { NextConfig } from 'next';
+import type { Configuration } from 'webpack';
 
 const nextConfig: NextConfig = {
   // Output configuration for Docker
@@ -111,7 +111,7 @@ const nextConfig: NextConfig = {
   },
 
   // Webpack configuration
-  webpack: (config: import('webpack').Configuration, { dev, isServer }: { dev: boolean; isServer: boolean }) => {
+  webpack: (config: Configuration, { dev, isServer }: { dev: boolean; isServer: boolean }) => {
     // Production optimizations
     if (!dev && !isServer) {
       config.optimization = {

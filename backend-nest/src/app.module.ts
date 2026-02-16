@@ -42,17 +42,22 @@ import { NarrationExportModule } from './narration-export/narration-export.modul
 import { ContentGovernanceModule } from './content-governance/content-governance.module';
 import { TeamAnalyticsModule } from './team-analytics/team-analytics.module';
 import { ContentLibraryModule } from './library/content-library.module';
+import { ImageAcquisitionModule } from './image-acquisition/image-acquisition.module';
+import { ImageRecognitionModule } from './image-recognition/image-recognition.module';
 
 // Common modules for production
 import { CacheModule } from './common/cache/cache.module';
 import { SecurityModule } from './common/security/security.module';
 import { MonitoringModule } from './common/monitoring/monitoring.module';
 import { CsrfModule } from './common/csrf/csrf.module';
+import { AdvancedRateLimitModule } from './common/rate-limit/advanced-rate-limit.module';
 
 // Services for seeding
 import { ThemesService } from './themes/themes.service';
 import { BullModule } from '@nestjs/bullmq';
 import { RedisModule } from './common/redis/redis.module';
+import { PerformanceInterceptor } from './common/monitoring/performance.interceptor';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 
 @Module({
   imports: [
@@ -141,18 +146,26 @@ import { RedisModule } from './common/redis/redis.module';
     ContentGovernanceModule,
     TeamAnalyticsModule,
     ContentLibraryModule,
+    ImageAcquisitionModule,
+    ImageRecognitionModule,
 
     // Production modules
     CacheModule,
     SecurityModule,
     MonitoringModule,
     CsrfModule,
+    AdvancedRateLimitModule,
   ],
   providers: [
     // Global rate limiting
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    // Global performance monitoring
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: PerformanceInterceptor,
     },
   ],
 })

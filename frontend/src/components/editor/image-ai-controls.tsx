@@ -40,7 +40,6 @@ export function ImageAIControls({
     onDelete,
 }: ImageAIControlsProps) {
     const [isHovered, setIsHovered] = useState(false);
-    const [isRegenerating, setIsRegenerating] = useState(false);
 
     const regenerateImageMutation = useMutation({
         mutationFn: async () => {
@@ -84,9 +83,7 @@ export function ImageAIControls({
     });
 
     const handleRegenerate = () => {
-        setIsRegenerating(true);
         regenerateImageMutation.mutate();
-        setTimeout(() => setIsRegenerating(false), 2000);
     };
 
     return (

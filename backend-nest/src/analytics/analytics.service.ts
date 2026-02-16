@@ -590,20 +590,26 @@ export class AnalyticsService {
     averageDuration: number;
     completionRate: number;
     dropOffSlide: number | null;
-    topSlides: Array<{ slideIndex: number; averageDuration: number; viewCount: number }>;
+    topSlides: Array<{
+      slideIndex: number;
+      averageDuration: number;
+      viewCount: number;
+    }>;
     totalSlides: number;
   }): Promise<string[]> {
     try {
       // Use the AIService generateAnalyticsInsights method for structured insights
-      const structuredInsights = await this.aiService.generateAnalyticsInsights({
-        totalViews: data.totalViews,
-        uniqueViews: data.uniqueViews,
-        averageDuration: data.averageDuration,
-        completionRate: data.completionRate,
-        dropOffSlide: data.dropOffSlide,
-        topSlides: data.topSlides,
-        totalSlides: data.totalSlides,
-      });
+      const structuredInsights = await this.aiService.generateAnalyticsInsights(
+        {
+          totalViews: data.totalViews,
+          uniqueViews: data.uniqueViews,
+          averageDuration: data.averageDuration,
+          completionRate: data.completionRate,
+          dropOffSlide: data.dropOffSlide,
+          topSlides: data.topSlides,
+          totalSlides: data.totalSlides,
+        },
+      );
 
       // Convert structured insights to strings for backward compatibility
       return structuredInsights.map(
@@ -614,14 +620,14 @@ export class AnalyticsService {
       return this.generateFallbackInsights(data);
     }
   }
-  
+
   /**
    * Get structured AI insights with full detail
    */
   async getStructuredInsights(projectId: string) {
     const summary = await this.getAnalyticsSummary(projectId);
     const slidePerformance = await this.getSlidePerformance(projectId);
-    
+
     return this.aiService.generateAnalyticsInsights({
       totalViews: summary.totalViews,
       uniqueViews: summary.uniqueViews,
@@ -1083,7 +1089,10 @@ Provide 5-8 specific, actionable recommendations based on the data patterns.`;
     for (let i = 1; i <= forecastDays; i++) {
       const futureDate = new Date(lastDate);
       futureDate.setDate(futureDate.getDate() + i);
-      const predictedViews = Math.max(0, Math.round(slope * (n + i) + intercept));
+      const predictedViews = Math.max(
+        0,
+        Math.round(slope * (n + i) + intercept),
+      );
 
       forecast.push({
         date: futureDate.toISOString().split('T')[0],
@@ -1093,7 +1102,8 @@ Provide 5-8 specific, actionable recommendations based on the data patterns.`;
 
     // Calculate trend direction and confidence
     const avgViews = sumY / n;
-    const trend = slope > 0.5 ? 'growing' : slope < -0.5 ? 'declining' : 'stable';
+    const trend =
+      slope > 0.5 ? 'growing' : slope < -0.5 ? 'declining' : 'stable';
     const projectedGrowth = ((slope * forecastDays) / avgViews) * 100;
 
     return {
@@ -1105,10 +1115,7 @@ Provide 5-8 specific, actionable recommendations based on the data patterns.`;
     };
   }
 
-  private generatePredictiveInsights(
-    trend: string,
-    growth: number,
-  ): string[] {
+  private generatePredictiveInsights(trend: string, growth: number): string[] {
     const insights: string[] = [];
 
     if (trend === 'growing') {
@@ -1122,14 +1129,10 @@ Provide 5-8 specific, actionable recommendations based on the data patterns.`;
       insights.push(
         `📉 Views are declining by approximately ${Math.abs(growth).toFixed(1)}%`,
       );
-      insights.push(
-        '💡 Consider refreshing content or increasing promotion',
-      );
+      insights.push('💡 Consider refreshing content or increasing promotion');
     } else {
       insights.push('📊 Viewership is stable');
-      insights.push(
-        '💡 Try new distribution channels to increase reach',
-      );
+      insights.push('💡 Try new distribution channels to increase reach');
     }
 
     return insights;
@@ -1314,7 +1317,10 @@ OVERALL METRICS:
 - Average Duration: ${summary.averageDuration}s
 
 CONTENT STRUCTURE:
-${project.slides.slice(0, 10).map((slide, idx) => `Slide ${idx + 1}: ${slide.blocks.length} blocks`).join('\n')}
+${project.slides
+  .slice(0, 10)
+  .map((slide, idx) => `Slide ${idx + 1}: ${slide.blocks.length} blocks`)
+  .join('\n')}
 
 Provide 5-8 specific, actionable optimization suggestions in JSON format:
 {
@@ -1377,8 +1383,7 @@ Provide 5-8 specific, actionable optimization suggestions in JSON format:
         slideNumber: slide.slideNumber,
         type: 'content',
         issue: `Very short view time (${slide.avgDuration}s)`,
-        suggestion:
-          'Add more engaging content or interactive elements',
+        suggestion: 'Add more engaging content or interactive elements',
         priority: 'medium',
         expectedImpact: 'Could increase engagement time by 50%',
       });

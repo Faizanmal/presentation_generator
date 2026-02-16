@@ -864,6 +864,7 @@ export interface ThinkingGenerationResult {
     totalTokensUsed: number;
     generationTimeMs: number;
     qualityImprovement: number;
+    generateImages?: boolean;
   };
 }
 

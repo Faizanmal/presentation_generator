@@ -29,7 +29,7 @@ export default function AIThinkingPage() {
     }, []);
 
     const handleCreateProject = useCallback(async () => {
-        if (!result) {return;}
+        if (!result) { return; }
 
         setIsCreatingProject(true);
         try {
@@ -38,6 +38,7 @@ export default function AIThinkingPage() {
                 presentation: result.presentation,
                 title: result.presentation.title,
                 description: result.presentation.metadata.summary,
+                generateImages: result.metadata.generateImages,
             });
 
             // Navigate to editor with the generated content
@@ -124,6 +125,7 @@ export default function AIThinkingPage() {
                         <ThinkingModeGenerator
                             onComplete={handleComplete}
                             onError={handleError}
+                            onOpenInEditor={handleCreateProject}
                         />
                     </div>
 

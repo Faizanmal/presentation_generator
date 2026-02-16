@@ -8,37 +8,48 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: backend
-  minReplicas: 3
-  maxReplicas: 10
+  minReplicas: 5
+  maxReplicas: 50
   metrics:
   - type: Resource
     resource:
       name: cpu
       target:
         type: Utilization
-        averageUtilization: 70
+        averageUtilization: 65
   - type: Resource
     resource:
       name: memory
       target:
         type: Utilization
-        averageUtilization: 80
+        averageUtilization: 75
+  - type: Pods
+    pods:
+      metric:
+        name: active_connections
+      target:
+        type: AverageValue
+        averageValue: "1000"
   behavior:
     scaleDown:
       stabilizationWindowSeconds: 300
       policies:
       - type: Percent
-        value: 50
+        value: 25
         periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Min
     scaleUp:
       stabilizationWindowSeconds: 0
       policies:
       - type: Percent
         value: 100
-        periodSeconds: 30
+        periodSeconds: 15
       - type: Pods
-        value: 2
-        periodSeconds: 30
+        value: 4
+        periodSeconds: 15
       selectPolicy: Max
 ---
 apiVersion: autoscaling/v2

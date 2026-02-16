@@ -25,7 +25,7 @@ export class ProjectsService {
     private readonly usersService: UsersService,
     private readonly aiService: AIService,
     @InjectQueue('generation') private readonly generationQueue: Queue,
-  ) { }
+  ) {}
 
   /**
    * Create a new empty project

@@ -19,6 +19,9 @@ model User {
   phone         String?   @unique // For SMS OTP
   name          String?
   password      String? // null for OAuth users
+  role          String?   @default("USER") // ADMIN, USER
+  subscriptionTier String? @default("FREE") // FREE, PRO, ENTERPRISE
+  subscriptionStatus String? @default("ACTIVE") // ACTIVE, INACTIVE, CANCELLED
   emailVerified DateTime?
   phoneVerified DateTime?
   image         String?
@@ -37,6 +40,8 @@ model User {
   templateReviews     TemplateReview[]
   emailPreferences    EmailPreferences?
   otpLogs             OtpLog[]
+  uploads             Upload[]
+  imagePatterns       PresentationImagePattern?
 
   @@index([createdAt])
   @@index([subscriptionTier])
@@ -183,12 +188,13 @@ model Project {
   tags    Tag[]
   collaborationSessions CollaborationSession[]
   projectVersions ProjectVersion[]
+  uploads Upload[]
+  imageUsages ImageUsage[]
 
   @@index([ownerId])
   @@index([ownerId, createdAt])
   @@index([shareToken])
   @@index([status])
-  @@index([visibility])
   @@index([themeId])
   @@index([createdAt])
   @@map("projects")
@@ -197,6 +203,8 @@ model Project {
 model Slide {
   id        String @id @default(cuid())
   projectId String
+  title     String?
+  content   Json? // Slide content as JSON
   order     Int
   layout    String @default("default") // layout template name
   createdById String?
@@ -207,11 +215,30 @@ model Slide {
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   blocks  Block[]
+  uploads Upload[]
+  imageUsages ImageUsage[]
 
   @@index([projectId])
   @@index([projectId, order])
   @@index([createdAt])
   @@map("slides")
+}
+
+model Tag {
+  id     String @id @default(cuid())
+  userId String
+  name   String
+  color  String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projects Project[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("tags")
 }
 
 enum BlockType {
@@ -243,6 +270,7 @@ model Block {
   content   Json // Flexible content storage
   order     Int
   createdById String?
+  version   Int       @default(1) // Optimistic locking version
 
   // Styling overrides
   style Json? // Custom styling for this block
@@ -256,6 +284,7 @@ model Block {
 
   @@index([projectId])
   @@index([slideId])
+  @@index([projectId, version])
   @@map("blocks")
 }
 
@@ -367,6 +396,132 @@ model Asset {
   @@index([createdAt])
   @@index([mimeType])
   @@map("assets")
+}
+
+// Enhanced upload tracking with image recognition support
+model Upload {
+  id            String   @id @default(cuid())
+  userId        String
+  projectId     String?
+  slideId       String?
+  source        String   // 'ai', 'unsplash', 'pexels', 'pixabay', 'url', 'local'
+  sourceId      String?  // Original ID from stock photo provider
+  url           String
+  localPath     String?
+  thumbnailUrl  String?
+  filename      String
+  mimeType      String
+  size          Int      @default(0)
+  width         Int?
+  height        Int?
+  description   String?  @db.Text
+  tags          String[] @default([])
+  author        String?
+  authorUrl     String?
+  license       String?
+  metadata      Json     @default("{}")
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project       Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  slide         Slide?   @relation(fields: [slideId], references: [id], onDelete: SetNull)
+  
+  embedding     ImageEmbedding?
+  usages        ImageUsage[]
+  similarityAsSource ImageSimilarityCache[] @relation("SourceUpload")
+  similarityAsTarget ImageSimilarityCache[] @relation("TargetUpload")
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([slideId])
+  @@index([source])
+  @@index([sourceId])
+  @@index([createdAt])
+  @@index([tags])
+  @@map("uploads")
+}
+
+// Image embeddings for ML-powered similarity matching
+model ImageEmbedding {
+  id             String   @id @default(cuid())
+  uploadId       String   @unique
+  embedding      Float[]  // Vector embedding
+  embeddingModel String   @default("openai-clip")
+  dimension      Int      @default(512)
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  upload         Upload   @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+
+  @@index([uploadId])
+  @@map("image_embeddings")
+}
+
+// Track image usage in presentations
+model ImageUsage {
+  id         String    @id @default(cuid())
+  uploadId   String
+  projectId  String
+  slideId    String?
+  blockId    String?
+  position   Int?
+  usageType  String    @default("content") // 'content', 'background', 'thumbnail'
+  addedAt    DateTime  @default(now())
+  removedAt  DateTime?
+
+  upload     Upload    @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  slide      Slide?    @relation(fields: [slideId], references: [id], onDelete: SetNull)
+
+  @@index([uploadId])
+  @@index([projectId])
+  @@index([slideId])
+  @@index([blockId])
+  @@index([addedAt])
+  @@index([uploadId, projectId, removedAt])
+  @@map("image_usage")
+}
+
+// Cache similarity scores for performance
+model ImageSimilarityCache {
+  id              String   @id @default(cuid())
+  sourceUploadId  String
+  targetUploadId  String
+  similarityScore Float    // Cosine similarity (0-1)
+  calculatedAt    DateTime @default(now())
+
+  sourceUpload    Upload   @relation("SourceUpload", fields: [sourceUploadId], references: [id], onDelete: Cascade)
+  targetUpload    Upload   @relation("TargetUpload", fields: [targetUploadId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceUploadId, targetUploadId])
+  @@index([sourceUploadId])
+  @@index([targetUploadId])
+  @@index([similarityScore])
+  @@map("image_similarity_cache")
+}
+
+// ML-based user image preferences and patterns
+model PresentationImagePattern {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  presentationType    String?  // 'business', 'creative', 'educational'
+  industryTags        String[] @default([])
+  preferredSources    String[] @default([])
+  avgImagesPerSlide   Float?
+  commonImageTags     String[] @default([])
+  colorPreferences    Json     @default("{}")
+  stylePreferences    Json     @default("{}")
+  lastUpdated         DateTime @default(now()) @updatedAt
+
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([industryTags])
+  @@map("presentation_image_patterns")
 }
 
 // ============================================
@@ -497,6 +652,7 @@ model PresentationView {
   projectId String
   viewerId  String? // Anonymous if null
   sessionId String // Unique session identifier
+  viewedAt  DateTime? // When the view was recorded
   ipAddress String?
   userAgent String?
   referrer  String?
@@ -678,6 +834,7 @@ model Organization {
   id     String  @id @default(cuid())
   name   String
   slug   String  @unique
+  plan   String? @default("FREE") // FREE, PRO, ENTERPRISE
   logo   String?
   domain String? @unique // For SSO domain verification
 
@@ -842,26 +999,6 @@ enum SyncStatus {
   PROCESSING
   COMPLETED
   FAILED
-}
-
-// ============================================
-// TAGS
-// ============================================
-
-model Tag {
-  id        String   @id @default(cuid())
-  name      String
-  color     String
-  userId    String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  projects Project[]
-
-  @@unique([userId, name])
-  @@index([userId])
-  @@map("tags")
 }
 
 // ============================================
@@ -1092,6 +1229,7 @@ model DesignSystem {
   userId         String?
   name           String
   isDefault      Boolean  @default(false)
+  colorTokens    Json? // Color tokens
   colors         Json // Color tokens
   typography     Json // Typography tokens
   spacing        Json // Spacing tokens
