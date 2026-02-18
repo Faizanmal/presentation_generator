@@ -132,39 +132,8 @@ export class BlocksService {
       }
     }
 
-    // Optimistic locking: Check version if provided
-    if (
-      updateBlockDto.version !== undefined &&
-      block.version !== updateBlockDto.version
-    ) {
-      // Version conflict detected - fetch latest and merge if possible
-      this.logger.warn(
-        `Version conflict for block ${blockId}: expected ${updateBlockDto.version}, got ${block.version}`,
-      );
-
-      // Simple conflict resolution: last write wins with version increment
-      // In production, you might want more sophisticated merging
-      const updated = await this.prisma.block.update({
-        where: { id: blockId },
-        data: {
-          content: updateBlockDto.content as import('@prisma/client').Prisma.InputJsonValue,
-          order: updateBlockDto.order,
-          style: updateBlockDto.style as import('@prisma/client').Prisma.InputJsonValue,
-          blockType: updateBlockDto.blockType,
-          version: { increment: 1 },
-        },
-      });
-
-      // Update project timestamp
-      await this.prisma.project.update({
-        where: { id: block.projectId },
-        data: { updatedAt: new Date() },
-      });
-
-      return { ...updated, conflictResolved: true };
-    }
-
-    // Normal update with version increment
+    // Optimistic locking removed — Prisma `Block` model does not include a `version` field.
+    // Perform a straight update and return the updated block.
     const updated = await this.prisma.block.update({
       where: { id: blockId },
       data: {
@@ -172,7 +141,6 @@ export class BlocksService {
         order: updateBlockDto.order,
         style: updateBlockDto.style as import('@prisma/client').Prisma.InputJsonValue,
         blockType: updateBlockDto.blockType,
-        version: { increment: 1 },
       },
     });
 

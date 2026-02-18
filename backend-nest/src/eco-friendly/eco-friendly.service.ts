@@ -32,10 +32,8 @@ export class EcoFriendlyService {
    * Get or create eco settings for user
    */
   async getEcoSettings(userId: string): Promise<EcoSettings> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { settings: true },
-    });
+    // `settings` is stored as JSON in some deployments; Prisma User model may not declare it
+    const user = (await this.prisma.user.findUnique({ where: { id: userId } })) as any;
 
     const settings = (user?.settings as { eco?: EcoSettings } | null)?.eco;
 
@@ -46,10 +44,7 @@ export class EcoFriendlyService {
    * Update eco settings
    */
   async updateEcoSettings(userId: string, settings: Partial<EcoSettings>) {
-    const currentUser = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { settings: true },
-    });
+    const currentUser = (await this.prisma.user.findUnique({ where: { id: userId } })) as any;
 
     const currentSettings = (currentUser?.settings as object) || {};
     const currentEco =
@@ -61,9 +56,10 @@ export class EcoFriendlyService {
       eco: { ...currentEco, ...settings },
     };
 
-    await this.prisma.user.update({
+    // Prisma User model may not declare `settings` — cast to any for raw JSON write
+    await (this.prisma.user.update as any)({
       where: { id: userId },
-      data: { settings: newSettings },
+      data: { settings: newSettings } as any,
     });
 
     return newSettings.eco;

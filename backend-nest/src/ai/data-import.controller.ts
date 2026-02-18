@@ -74,7 +74,7 @@ export class DataImportController {
     // Parse file based on type
     let parsedData: ParsedDataResult;
     if (source === DataImportSourceEnum.EXCEL) {
-      parsedData = this.dataImportService.parseExcel(
+      parsedData = await this.dataImportService.parseExcel(
         file.buffer,
         file.originalname,
         importDto.sheetName,
@@ -124,7 +124,7 @@ export class DataImportController {
 
     let parsedData: ParsedDataResult;
     if (isExcel) {
-      parsedData = this.dataImportService.parseExcel(
+      parsedData = await this.dataImportService.parseExcel(
         file.buffer,
         file.originalname,
         importDto.sheetName,
@@ -171,12 +171,12 @@ export class DataImportController {
    */
   @Post('preview-sheets')
   @UseInterceptors(FileInterceptor('file'))
-  previewExcelSheets(@UploadedFile() file: Express.Multer.File) {
+  async previewExcelSheets(@UploadedFile() file: Express.Multer.File) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
 
-    const sheets = this.dataImportService.getExcelSheets(file.buffer);
+    const sheets = await this.dataImportService.getExcelSheets(file.buffer);
 
     return {
       success: true,
@@ -207,7 +207,7 @@ export class DataImportController {
 
     let parsedData: ParsedDataResult;
     if (isExcel) {
-      parsedData = this.dataImportService.parseExcel(
+      parsedData = await this.dataImportService.parseExcel(
         file.buffer,
         file.originalname,
         sheetName,

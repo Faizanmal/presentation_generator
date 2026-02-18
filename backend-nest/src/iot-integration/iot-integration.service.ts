@@ -56,16 +56,19 @@ export class IoTIntegrationService {
     },
   ) {
     const deviceToken = `iot_${crypto.randomBytes(24).toString('hex')}`;
+    const capabilitiesList = Object.entries(device.capabilities || {})
+      .filter(([, v]) => Boolean(v))
+      .map(([k]) => k);
 
     return this.prisma.ioTDevice.create({
       data: {
         userId,
+        deviceId: `device_${crypto.randomBytes(16).toString('hex')}`,
         name: device.name,
         deviceType: device.type,
-        capabilities: device.capabilities as object,
-        manufacturer: device.manufacturer,
-        model: device.model,
-        deviceToken,
+        capabilities: capabilitiesList as any,
+        metadata: { manufacturer: device.manufacturer, model: device.model },
+        authToken: deviceToken,
         status: 'registered',
       },
     });
@@ -79,18 +82,18 @@ export class IoTIntegrationService {
     device?: object;
   }> {
     const device = await this.prisma.ioTDevice.findFirst({
-      where: { deviceToken, status: { not: 'revoked' } },
+      where: { authToken: deviceToken, status: { not: 'revoked' } },
     });
 
     if (!device) {
       return { authenticated: false };
     }
 
-    // Update last connected
+    // Update last ping
     await this.prisma.ioTDevice.update({
       where: { id: device.id },
       data: {
-        lastConnectedAt: new Date(),
+        lastPing: new Date(),
         status: 'connected',
       },
     });
@@ -181,7 +184,7 @@ export class IoTIntegrationService {
       data: {
         deviceId,
         command: command.action,
-        payload: command.payload as object,
+        parameters: command.payload as any,
         status: 'pending',
       },
     });

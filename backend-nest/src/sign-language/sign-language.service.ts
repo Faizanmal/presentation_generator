@@ -197,8 +197,13 @@ export class SignLanguageService {
       include: { blocks: true },
     });
 
-    if (!slide) {
-      throw new NotFoundException('Slide not found');
+    // Get sign language config for this project
+    const config = await this.prisma.signLanguageConfig.findUnique({
+      where: { projectId: slide.projectId },
+    });
+
+    if (!config) {
+      throw new NotFoundException('Sign language not configured for this project');
     }
 
     // Extract all text content
@@ -221,11 +226,12 @@ export class SignLanguageService {
     // Store translation
     const stored = await this.prisma.signLanguageTranslation.create({
       data: {
+        configId: config.id,
         slideId,
+        blockId,
+        sourceText: fullText,
         language,
-        originalText: fullText,
-        glossSequence: translation.signs.map((s) => s.gloss),
-        timing: translation.signs.map((s) => s.duration),
+        signSequence: translation.signs as any,
         status: 'generated',
       },
     });

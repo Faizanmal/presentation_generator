@@ -101,7 +101,7 @@ export class HolographicService {
 
       if (!preview) return;
 
-      const config = preview.config as HolographicConfig;
+      const config = preview.config as unknown as HolographicConfig;
 
       // Generate quilts based on display type
       let quilts: LookingGlassQuilt[] | object[] = [];
@@ -274,7 +274,7 @@ export class HolographicService {
    */
   async generateViewerHTML(previewId: string, userId: string): Promise<string> {
     const preview = await this.getPreview(previewId, userId);
-    const config = preview.config as HolographicConfig;
+    const config = preview.config as unknown as HolographicConfig;
 
     return `<!DOCTYPE html>
 <html>

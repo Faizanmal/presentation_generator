@@ -183,7 +183,7 @@ export class SubscriptionLimitsService {
       where: {
         userId,
         action: { in: ['AI_GENERATION', 'THINKING_GENERATION'] },
-        timestamp: { gte: startOfMonth },
+        createdAt: { gte: startOfMonth },
       },
     });
 
@@ -192,7 +192,7 @@ export class SubscriptionLimitsService {
       where: {
         userId,
         action: 'IMAGE_GENERATION',
-        timestamp: { gte: startOfMonth },
+        createdAt: { gte: startOfMonth },
       },
     });
 
@@ -201,7 +201,7 @@ export class SubscriptionLimitsService {
       where: {
         userId,
         action: 'EXPORT',
-        timestamp: { gte: startOfMonth },
+        createdAt: { gte: startOfMonth },
       },
     });
 
@@ -344,8 +344,8 @@ export class SubscriptionLimitsService {
       data: {
         userId,
         action,
-        metadata: metadata || {},
-      },
+        metadata: (metadata || {}) as any,
+      } as any,
     });
   }
 }

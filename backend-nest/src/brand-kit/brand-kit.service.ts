@@ -5,6 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 
 export interface BrandKitDto {
   name: string;
@@ -85,33 +86,33 @@ export class BrandKitService {
         accentColor: data.accentColor,
         backgroundColor: data.backgroundColor,
         textColor: data.textColor,
-        colorPalette: data.colorPalette,
+        colorPalette: data.colorPalette as unknown as import('@prisma/client').Prisma.InputJsonValue,
 
         // Typography
         headingFont: data.headingFont,
         bodyFont: data.bodyFont,
-        fontSizes: data.fontSizes,
+        fontSizes: data.fontSizes as unknown as Prisma.InputJsonValue,
 
         // Logo & Images
         logoUrl: data.logoUrl,
         logoLight: data.logoLight,
         logoDark: data.logoDark,
         favicon: data.favicon,
-        coverImages: data.coverImages,
+        coverImages: data.coverImages as unknown as Prisma.InputJsonValue,
 
         // Assets
-        icons: data.icons,
-        patterns: data.patterns,
+        icons: data.icons as unknown as Prisma.InputJsonValue,
+        patterns: data.patterns as unknown as Prisma.InputJsonValue,
         watermark: data.watermark,
         watermarkOpacity: data.watermarkOpacity,
 
         // Voice & Tone
         voiceDescription: data.voiceDescription,
-        toneKeywords: data.toneKeywords,
+        toneKeywords: data.toneKeywords as unknown as Prisma.InputJsonValue,
 
         // Guidelines
-        doList: data.doList,
-        dontList: data.dontList,
+        doList: data.doList as unknown as Prisma.InputJsonValue,
+        dontList: data.dontList as unknown as Prisma.InputJsonValue,
         styleGuideUrl: data.styleGuideUrl,
       },
     });
@@ -210,33 +211,33 @@ export class BrandKitService {
         accentColor: data.accentColor,
         backgroundColor: data.backgroundColor,
         textColor: data.textColor,
-        colorPalette: data.colorPalette,
+        colorPalette: data.colorPalette as unknown as import('@prisma/client').Prisma.InputJsonValue,
 
         // Typography
         headingFont: data.headingFont,
         bodyFont: data.bodyFont,
-        fontSizes: data.fontSizes,
+        fontSizes: data.fontSizes as unknown as Prisma.InputJsonValue,
 
         // Logo & Images
         logoUrl: data.logoUrl,
         logoLight: data.logoLight,
         logoDark: data.logoDark,
         favicon: data.favicon,
-        coverImages: data.coverImages,
+        coverImages: data.coverImages as unknown as Prisma.InputJsonValue,
 
         // Assets
-        icons: data.icons,
-        patterns: data.patterns,
+        icons: data.icons as unknown as Prisma.InputJsonValue,
+        patterns: data.patterns as unknown as Prisma.InputJsonValue,
         watermark: data.watermark,
         watermarkOpacity: data.watermarkOpacity,
 
         // Voice & Tone
         voiceDescription: data.voiceDescription,
-        toneKeywords: data.toneKeywords,
+        toneKeywords: data.toneKeywords as unknown as Prisma.InputJsonValue,
 
         // Guidelines
-        doList: data.doList,
-        dontList: data.dontList,
+        doList: data.doList as unknown as Prisma.InputJsonValue,
+        dontList: data.dontList as unknown as Prisma.InputJsonValue,
         styleGuideUrl: data.styleGuideUrl,
       },
     });
@@ -278,7 +279,7 @@ export class BrandKitService {
 
     return this.prisma.brandKit.create({
       data: {
-        ...data,
+        ...(data as any),
         name: newName || `${original.name} (Copy)`,
         isDefault: false,
         userId,

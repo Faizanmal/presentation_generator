@@ -330,7 +330,7 @@ export class CollaborationService {
     if (isOwner) return;
 
     const role = await this.getUserRole(projectId, userId);
-    if (!role || !allowedRoles.includes(role)) {
+    if (!role || !allowedRoles.includes(role as any)) {
       throw new ForbiddenException(
         'You do not have permission to perform this action',
       );
@@ -381,9 +381,10 @@ export class CollaborationService {
 
     const repliesByParent = new Map<string, Record<string, unknown>[]>();
     replies.forEach((r) => {
-      const list = repliesByParent.get(r.parentId) || [];
+      const parentId = r.parentId as string;
+      const list = repliesByParent.get(parentId) || [];
       list.push({ ...r, user: userMap.get(r.userId) });
-      repliesByParent.set(r.parentId, list);
+      repliesByParent.set(parentId, list);
     });
 
     return comments.map((c) => ({
@@ -495,7 +496,8 @@ export class CollaborationService {
     // The snapshot contains the full project state
     await this.prisma.project.update({
       where: { id: projectId },
-      data: versionData.snapshot,
+      // `snapshot` is JSON — cast to any so Prisma types are satisfied
+      data: versionData.snapshot as any,
     });
     return versionData.snapshot;
   }

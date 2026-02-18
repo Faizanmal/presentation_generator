@@ -46,7 +46,7 @@ export class ZipAdapter {
 
     // default compression level 6; JSZip used DEFLATE level 9 in callers
     const level = _options?.compressionOptions?.level ?? 6;
-    const u8 = zipSync(entries, { level });
+    const u8 = zipSync(entries, { level: level as any });
     return Promise.resolve(Buffer.from(u8));
   }
 }

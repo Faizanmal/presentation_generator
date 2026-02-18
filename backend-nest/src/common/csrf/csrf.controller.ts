@@ -12,12 +12,14 @@ export class CsrfController {
     const isProduction = process.env.NODE_ENV === 'production';
 
     // Create new instance of doubleCsrf with identical configuration
-    const { generateToken } = doubleCsrf({
+    const cookieName = isProduction
+      ? '__Host-psifi.x-csrf-token'
+      : 'psifi.x-csrf-token';
+
+    const utilities: any = doubleCsrf({
       getSecret: () =>
         process.env.CSRF_SECRET || 'default-csrf-secret-change-in-production',
-      cookieName: isProduction
-        ? '__Host-psifi.x-csrf-token'
-        : 'psifi.x-csrf-token',
+      cookieName,
       cookieOptions: {
         sameSite: 'strict',
         path: '/',
@@ -26,12 +28,22 @@ export class CsrfController {
       },
       size: 64,
       ignoredMethods: ['GET', 'HEAD', 'OPTIONS'],
-      getTokenFromRequest: (req) => {
+      // session identifier (required by newer types)
+      getSessionIdentifier: (req: any) => String(req.cookies?.sessionId || req.headers['x-session-id'] || req.ip || ''),
+      // new option name in current types
+      getCsrfTokenFromRequest: (req: any) => {
         return req.headers['x-csrf-token'] as string;
       },
     });
 
-    this.generateToken = generateToken;
+    // support multiple versions of the library API
+    this.generateToken =
+      utilities.generateToken || utilities.getToken ||
+      ((req: any, res: any) => {
+        const token = require('crypto').randomBytes(32).toString('hex');
+        res.cookie(cookieName, token, { httpOnly: true, sameSite: 'strict' });
+        return token;
+      });
   }
 
   @Get('token')

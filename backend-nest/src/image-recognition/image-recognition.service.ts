@@ -247,7 +247,7 @@ export class ImageRecognitionService {
       description: sim.upload.description || undefined,
       tags: sim.upload.tags,
       similarityScore: sim.score,
-      metadata: sim.upload.metadata,
+      metadata: (sim.upload.metadata as unknown) as Record<string, unknown>,
     }));
   }
 
@@ -314,7 +314,7 @@ export class ImageRecognitionService {
       description: usage.upload.description || undefined,
       tags: usage.upload.tags,
       similarityScore: 1.0, // Not applicable here
-      metadata: { ...usage.upload.metadata, usageType: usage.usageType },
+      metadata: Object.assign({}, (usage.upload.metadata as any) || {}, { usageType: usage.usageType }),
     }));
   }
 
@@ -631,7 +631,7 @@ export class ImageRecognitionService {
         description: item.upload.description || undefined,
         tags: item.upload.tags,
         similarityScore: item.score,
-        metadata: item.upload.metadata,
+        metadata: (item.upload.metadata as Record<string, unknown>) || {},
       }));
 
     const avgScore =

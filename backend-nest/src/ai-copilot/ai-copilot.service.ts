@@ -112,7 +112,7 @@ export class AICopilotService {
         role: 'assistant',
         content: response,
         tokens,
-        metadata: action ? { action } : undefined,
+        metadata: action ? ({ action } as any) : undefined,
       },
     });
 

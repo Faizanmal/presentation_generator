@@ -33,18 +33,9 @@ export class PresenterWellnessService {
     return this.prisma.wellnessSession.create({
       data: {
         userId,
-        presentationId,
-        startTime: new Date(),
-        metrics: {
-          speakingPaceWPM: 0,
-          pauseFrequency: 0,
-          avgPauseDuration: 0,
-          volumeVariation: 0,
-          fillerWordCount: 0,
-          stressIndicators: 0,
-        },
-        breaksTaken: 0,
-        wellnessScore: 100,
+        projectId: presentationId,
+        startedAt: new Date(),
+        summary: {},
       },
     });
   }
@@ -61,46 +52,89 @@ export class PresenterWellnessService {
       throw new NotFoundException('Wellness session not found');
     }
 
-    const currentMetrics = session.metrics as WellnessMetrics;
-    const updatedMetrics = { ...currentMetrics, ...metrics };
+    // Create individual metric records
+    const metricCreates = Object.entries(metrics).map(([key, value]) => ({
+      sessionId,
+      metricType: key,
+      value: value as number,
+      raw: { originalKey: key, value },
+    }));
 
-    // Calculate wellness score
-    const wellnessScore = this.calculateWellnessScore(updatedMetrics);
+    await this.prisma.wellnessMetric.createMany({
+      data: metricCreates,
+    });
+
+    // Update session summary with latest metrics
+    const latestMetrics = await this.prisma.wellnessMetric.findMany({
+      where: { sessionId },
+      orderBy: { timestamp: 'desc' },
+      take: 10,
+    });
+
+    const summary = this.calculateSummary(latestMetrics);
 
     return this.prisma.wellnessSession.update({
       where: { id: sessionId },
-      data: {
-        metrics: updatedMetrics as object,
-        wellnessScore,
-      },
+      data: { summary },
     });
   }
 
   /**
-   * Calculate wellness score based on metrics
+   * Calculate session summary from metrics
    */
-  private calculateWellnessScore(metrics: WellnessMetrics): number {
+  private calculateSummary(metrics: any[]): object {
+    if (metrics.length === 0) {
+      return {};
+    }
+
+    // Group metrics by type and get latest values
+    const latestByType = {};
+    metrics.forEach(metric => {
+      if (!latestByType[metric.metricType] || metric.timestamp > latestByType[metric.metricType].timestamp) {
+        latestByType[metric.metricType] = metric;
+      }
+    });
+
+    // Calculate averages
+    const averages = {};
+    const grouped = metrics.reduce((acc, metric) => {
+      if (!acc[metric.metricType]) acc[metric.metricType] = [];
+      acc[metric.metricType].push(metric.value);
+      return acc;
+    }, {});
+
+    Object.keys(grouped).forEach(type => {
+      averages[type] = grouped[type].reduce((sum, val) => sum + val, 0) / grouped[type].length;
+    });
+
+    // Calculate wellness score based on latest metrics
     let score = 100;
+    const latestValues = Object.values(latestByType);
 
-    // Speaking pace analysis (ideal: 120-150 WPM)
-    if (metrics.speakingPaceWPM < 100) {
-      score -= 10; // Too slow
-    } else if (metrics.speakingPaceWPM > 180) {
-      score -= 15; // Too fast, may indicate stress
-    }
+    latestValues.forEach((metric: any) => {
+      switch (metric.metricType) {
+        case 'speakingPaceWPM':
+          if (metric.value < 100) score -= 10;
+          else if (metric.value > 180) score -= 15;
+          break;
+        case 'fillerWordCount':
+          score -= Math.min(20, metric.value * 2);
+          break;
+        case 'stressIndicators':
+          score -= Math.min(15, metric.value * 3);
+          break;
+        case 'pauseFrequency':
+          if (metric.value >= 3 && metric.value <= 8) score += 5;
+          break;
+      }
+    });
 
-    // Filler word penalty
-    score -= Math.min(20, metrics.fillerWordCount * 2);
-
-    // Stress indicator penalty
-    score -= Math.min(15, metrics.stressIndicators * 3);
-
-    // Pause frequency bonus (good for engagement)
-    if (metrics.pauseFrequency >= 3 && metrics.pauseFrequency <= 8) {
-      score += 5;
-    }
-
-    return Math.max(0, Math.min(100, score));
+    return {
+      wellnessScore: Math.max(0, Math.min(100, score)),
+      averages,
+      latest: latestByType,
+      totalMetrics: metrics.length,
+    };
   }
 
   /**
@@ -109,6 +143,7 @@ export class PresenterWellnessService {
   async endSession(sessionId: string) {
     const session = await this.prisma.wellnessSession.findUnique({
       where: { id: sessionId },
+      include: { metrics: true },
     });
 
     if (!session) {
@@ -116,24 +151,26 @@ export class PresenterWellnessService {
     }
 
     const endTime = new Date();
-    const duration =
-      (endTime.getTime() - session.startTime.getTime()) / 1000 / 60; // minutes
+    const duration = Math.round((endTime.getTime() - session.startedAt.getTime()) / 1000 / 60); // minutes
 
-    const metrics = session.metrics as WellnessMetrics;
-    const recommendations = this.generateRecommendations(metrics, duration);
+    const recommendations = this.generateRecommendations(session.metrics, duration);
+
+    const summary = this.calculateSummary(session.metrics);
 
     const updated = await this.prisma.wellnessSession.update({
       where: { id: sessionId },
       data: {
-        endTime,
-        recommendations: recommendations as object[],
+        endedAt: endTime,
+        status: 'completed',
+        duration,
+        recommendations: recommendations as any,
+        summary,
       },
     });
 
     return {
       ...updated,
-      durationMinutes: Math.round(duration),
-      summary: this.generateSummary(metrics, duration, session.breaksTaken),
+      durationMinutes: duration,
       recommendations,
     };
   }
@@ -142,7 +179,7 @@ export class PresenterWellnessService {
    * Generate recommendations based on metrics
    */
   private generateRecommendations(
-    metrics: WellnessMetrics,
+    metrics: any[],
     durationMinutes: number,
   ): {
     category: string;
@@ -157,8 +194,19 @@ export class PresenterWellnessService {
       priority: 'high' | 'medium' | 'low';
     }[] = [];
 
+    // Get latest values for each metric type
+    const latestValues = {};
+    metrics.forEach(metric => {
+      latestValues[metric.metricType] = metric.value;
+    });
+
+    const speakingPaceWPM = latestValues['speakingPaceWPM'] || 0;
+    const fillerWordCount = latestValues['fillerWordCount'] || 0;
+    const stressIndicators = latestValues['stressIndicators'] || 0;
+    const pauseFrequency = latestValues['pauseFrequency'] || 0;
+
     // Speaking pace
-    if (metrics.speakingPaceWPM > 170) {
+    if (speakingPaceWPM > 170) {
       recommendations.push({
         category: 'pace',
         issue: 'Speaking too fast',
@@ -166,7 +214,7 @@ export class PresenterWellnessService {
           'Practice deliberate pauses and slow down to 130-150 WPM for better comprehension',
         priority: 'high',
       });
-    } else if (metrics.speakingPaceWPM < 100) {
+    } else if (speakingPaceWPM < 100) {
       recommendations.push({
         category: 'pace',
         issue: 'Speaking pace is slow',
@@ -176,7 +224,7 @@ export class PresenterWellnessService {
     }
 
     // Filler words
-    if (metrics.fillerWordCount > 10) {
+    if (fillerWordCount > 10) {
       recommendations.push({
         category: 'clarity',
         issue: 'Excessive filler words detected',
@@ -187,7 +235,7 @@ export class PresenterWellnessService {
     }
 
     // Stress indicators
-    if (metrics.stressIndicators > 3) {
+    if (stressIndicators > 3) {
       recommendations.push({
         category: 'stress',
         issue: 'High stress levels detected',
@@ -209,7 +257,7 @@ export class PresenterWellnessService {
     }
 
     // Pauses
-    if (metrics.pauseFrequency < 2) {
+    if (pauseFrequency < 2) {
       recommendations.push({
         category: 'engagement',
         issue: 'Few pauses detected',
@@ -220,53 +268,6 @@ export class PresenterWellnessService {
     }
 
     return recommendations;
-  }
-
-  /**
-   * Generate wellness summary
-   */
-  private generateSummary(
-    metrics: WellnessMetrics,
-    durationMinutes: number,
-    breaksTaken: number,
-  ): {
-    overallRating: 'excellent' | 'good' | 'fair' | 'needs-improvement';
-    highlights: string[];
-    areasForImprovement: string[];
-  } {
-    const score = this.calculateWellnessScore(metrics);
-
-    let overallRating: 'excellent' | 'good' | 'fair' | 'needs-improvement';
-    if (score >= 85) overallRating = 'excellent';
-    else if (score >= 70) overallRating = 'good';
-    else if (score >= 50) overallRating = 'fair';
-    else overallRating = 'needs-improvement';
-
-    const highlights: string[] = [];
-    const areasForImprovement: string[] = [];
-
-    // Analyze metrics
-    if (metrics.speakingPaceWPM >= 120 && metrics.speakingPaceWPM <= 150) {
-      highlights.push('Optimal speaking pace maintained');
-    } else {
-      areasForImprovement.push('Speaking pace could be adjusted');
-    }
-
-    if (metrics.fillerWordCount < 5) {
-      highlights.push('Minimal filler words used');
-    } else {
-      areasForImprovement.push('Reduce filler word usage');
-    }
-
-    if (breaksTaken > 0 && durationMinutes > 30) {
-      highlights.push('Took healthy breaks during presentation');
-    }
-
-    if (metrics.volumeVariation > 0.3) {
-      highlights.push('Good vocal variety and emphasis');
-    }
-
-    return { overallRating, highlights, areasForImprovement };
   }
 
   /**
@@ -455,13 +456,8 @@ export class PresenterWellnessService {
   async getWellnessHistory(userId: string, limit = 10) {
     return this.prisma.wellnessSession.findMany({
       where: { userId },
-      orderBy: { startTime: 'desc' },
+      orderBy: { startedAt: 'desc' },
       take: limit,
-      include: {
-        presentation: {
-          select: { title: true },
-        },
-      },
     });
   }
 
@@ -470,8 +466,8 @@ export class PresenterWellnessService {
    */
   async getWellnessTrends(userId: string) {
     const sessions = await this.prisma.wellnessSession.findMany({
-      where: { userId, endTime: { not: null } },
-      orderBy: { startTime: 'desc' },
+      where: { userId, endedAt: { not: null } },
+      orderBy: { startedAt: 'desc' },
       take: 20,
     });
 
@@ -483,9 +479,9 @@ export class PresenterWellnessService {
     }
 
     const recentAvg =
-      sessions.slice(0, 5).reduce((sum, s) => sum + s.wellnessScore, 0) / 5;
+      sessions.slice(0, 5).reduce((sum, s) => sum + ((s.summary as any)?.wellnessScore || 50), 0) / 5;
     const olderAvg =
-      sessions.slice(-5).reduce((sum, s) => sum + s.wellnessScore, 0) /
+      sessions.slice(-5).reduce((sum, s) => sum + ((s.summary as any)?.wellnessScore || 50), 0) /
       Math.min(5, sessions.length);
 
     const trend =
@@ -508,12 +504,12 @@ export class PresenterWellnessService {
    * Generate trend insights
    */
   private generateTrendInsights(
-    sessions: { metrics: object; wellnessScore: number }[],
+    sessions: any[],
   ): string[] {
     const insights: string[] = [];
 
     const avgScore =
-      sessions.reduce((sum, s) => sum + s.wellnessScore, 0) / sessions.length;
+      sessions.reduce((sum, s) => sum + ((s.summary as any)?.wellnessScore || 50), 0) / sessions.length;
 
     if (avgScore >= 80) {
       insights.push('Your overall wellness scores are excellent!');
@@ -527,8 +523,9 @@ export class PresenterWellnessService {
 
     // Analyze common patterns
     const fastPaceCount = sessions.filter((s) => {
-      const m = s.metrics as WellnessMetrics;
-      return m.speakingPaceWPM > 170;
+      const metrics = s.metrics || [];
+      const speakingPace = metrics.find((m: any) => m.metricType === 'speakingPaceWPM');
+      return speakingPace && speakingPace.value > 170;
     }).length;
 
     if (fastPaceCount > sessions.length / 2) {

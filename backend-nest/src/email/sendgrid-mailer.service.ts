@@ -67,10 +67,15 @@ export class SendgridMailerService {
       }
     }
 
+    const content: Array<{ type: string; value: string }> = [];
+    if (finalHtml) content.push({ type: 'text/html', value: finalHtml });
+    if (finalText) content.push({ type: 'text/plain', value: finalText });
+
     const msg: sendgrid.MailDataRequired = {
       to,
       from: { email: this.fromAddress, name: this.fromName },
       subject,
+      content: content.length > 0 ? (content as any) : [{ type: 'text/plain', value: '' }],
       html: finalHtml || undefined,
       text: finalText || undefined,
     };

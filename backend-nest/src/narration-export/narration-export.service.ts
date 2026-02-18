@@ -639,7 +639,10 @@ Return only the speaker notes, ready to be read aloud.
       }
 
       const slides = project.slides;
-      const narrationSlides = job.narrationProject.slides;
+      const narrationSlides = (job.narrationProject.slides || []).map((s: any) => ({
+        duration: s.duration == null ? undefined : s.duration,
+        audioUrl: s.audioUrl || undefined,
+      }));
 
       // Create temp directory for video processing
       const tempDir = path.join(os.tmpdir(), `video_export_${jobId}`);
@@ -988,7 +991,7 @@ Return only the speaker notes, ready to be read aloud.
       include: {
         slides: {
           orderBy: { order: 'asc' },
-          select: { id: true },
+          select: { id: true, content: true },
         },
       },
     });
@@ -998,7 +1001,7 @@ Return only the speaker notes, ready to be read aloud.
     const perSlide = project.slides.map((slide) => ({
       slideId: slide.id,
       estimatedSeconds: this.estimateSlideDuration(
-        (slide.speakerNotes as string) || '',
+        ((slide.content as any)?.speakerNotes as string) || '',
       ),
     }));
 

@@ -62,6 +62,8 @@ export class LearningPathsService {
     const learningPath = await this.prisma.learningPath.create({
       data: {
         userId: creatorId,
+        // Associate path with first project for traceability
+        projectId: data.projectIds[0],
         title: data.title,
         description: data.description,
         category: data.category,
@@ -79,12 +81,11 @@ export class LearningPathsService {
         data: {
           pathId: learningPath.id,
           title: project.title,
-          description: project.description,
+          content: project.description || `Learn from presentation: ${project.title}`,
           order: i + 1,
           type: 'presentation',
-          // store project reference in the free-form content JSON
-          content: JSON.stringify({ projectId: project.id }),
-          estimatedMinutes: 30,
+          // store project reference in the free-form resources JSON
+          resources: { projectId: project.id, estimatedTime: 30 },
         },
       });
     }
@@ -154,6 +155,8 @@ Format as JSON array:
       const learningPath = await this.prisma.learningPath.create({
         data: {
           userId: creatorId,
+          // Not tied to a specific project for AI-generated paths
+          projectId: 'ai-generated',
           title: `Learn ${topic}`,
           description: `A comprehensive ${difficulty}-level course on ${topic}`,
           category: 'AI Generated',
@@ -169,11 +172,10 @@ Format as JSON array:
           data: {
             pathId: learningPath.id,
             title: modules[i].title,
-            description: modules[i].description,
+            content: modules[i].description || modules[i].title,
             order: i + 1,
             type: 'generated',
-            content: JSON.stringify({ concepts: modules[i].concepts }),
-            estimatedMinutes: 25,
+            resources: { concepts: modules[i].concepts, estimatedTime: 25 },
           },
         });
       }
@@ -408,7 +410,7 @@ Format as JSON array:
     }
 
     // module.content is stored as a JSON string (or plain text). Parse if possible.
-    let contentObj: { quizzes?: any[] } = {};
+    let contentObj: { quizzes?: any[]; text?: string } = {};
     if (typeof module.content === 'string' && module.content.trim()) {
       try {
         contentObj = JSON.parse(module.content as string);

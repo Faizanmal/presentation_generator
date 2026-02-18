@@ -9,7 +9,7 @@ export class CsrfMiddleware implements NestMiddleware {
   constructor() {
     const isProduction = process.env.NODE_ENV === 'production';
 
-    const { generateToken, doubleCsrfProtection } = doubleCsrf({
+    const utilities: any = doubleCsrf({
       getSecret: () =>
         process.env.CSRF_SECRET || 'default-csrf-secret-change-in-production',
       cookieName: isProduction
@@ -23,12 +23,11 @@ export class CsrfMiddleware implements NestMiddleware {
       },
       size: 64,
       ignoredMethods: ['GET', 'HEAD', 'OPTIONS'],
-      getTokenFromRequest: (req) => {
-        return req.headers['x-csrf-token'] as string;
-      },
+      getSessionIdentifier: (req: any) => String(req.cookies?.sessionId || req.headers['x-session-id'] || req.ip || ''),
+      getCsrfTokenFromRequest: (req: any) => req.headers['x-csrf-token'] as string,
     });
 
-    this.csrfProtection = doubleCsrfProtection;
+    this.csrfProtection = utilities.doubleCsrfProtection || utilities.protect;
   }
 
   use(req: Request, res: Response, next: NextFunction) {

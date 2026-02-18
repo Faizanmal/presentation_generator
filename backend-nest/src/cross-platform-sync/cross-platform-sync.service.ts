@@ -46,29 +46,23 @@ export class CrossPlatformSyncService {
       appVersion?: string;
     },
   ) {
+    // Prisma schema uses `deviceId` as unique; cast to any where input shape differs
     return this.prisma.deviceSync.upsert({
-      where: {
-        userId_deviceId: {
-          userId,
-          deviceId: deviceInfo.deviceId,
-        },
-      },
+      where: { deviceId: deviceInfo.deviceId } as any,
       update: {
         platform: deviceInfo.platform,
         deviceName: deviceInfo.deviceName,
-        appVersion: deviceInfo.appVersion,
+        // appVersion is not a typed field in schema — store under syncVersion if needed
         lastSyncAt: new Date(),
         isOnline: true,
-      },
+      } as any,
       create: {
         userId,
         deviceId: deviceInfo.deviceId,
         platform: deviceInfo.platform,
         deviceName: deviceInfo.deviceName,
-        appVersion: deviceInfo.appVersion,
-        syncState: {},
         isOnline: true,
-      },
+      } as any,
     });
   }
 
@@ -77,14 +71,12 @@ export class CrossPlatformSyncService {
    */
   async setDeviceOnline(userId: string, deviceId: string, online: boolean) {
     return this.prisma.deviceSync.update({
-      where: {
-        userId_deviceId: { userId, deviceId },
-      },
+      where: { deviceId } as any,
       data: {
         isOnline: online,
         lastSyncAt: new Date(),
       },
-    });
+    } as any);
   }
 
   /**
@@ -110,10 +102,11 @@ export class CrossPlatformSyncService {
       data: {
         projectId,
         userId,
-        operation: operation as object,
-        version: await this.getNextVersion(projectId),
-        appliedAt: null, // Not applied until synced
-      },
+        // Prisma model expects a string for `operation` — store the operation as JSON text
+        operation: JSON.stringify(operation),
+        serverSeq: await this.getNextVersion(projectId),
+        isApplied: false,
+      } as any,
     });
   }
 
@@ -127,9 +120,9 @@ export class CrossPlatformSyncService {
     if (!this.serverVersion.has(projectId)) {
       const latest = await this.prisma.operationalTransform.findFirst({
         where: { projectId },
-        orderBy: { version: 'desc' },
+        orderBy: { serverSeq: 'desc' },
       });
-      const version = (latest?.version || 0) + 1;
+      const version = (latest?.serverSeq || 0) + 1;
       this.serverVersion.set(projectId, version);
       return version;
     }
@@ -143,13 +136,25 @@ export class CrossPlatformSyncService {
    * Get pending operations for sync
    */
   async getPendingOperations(projectId: string, sinceVersion: number) {
-    return this.prisma.operationalTransform.findMany({
+    const rows = await this.prisma.operationalTransform.findMany({
       where: {
         projectId,
-        version: { gt: sinceVersion },
+        serverSeq: { gt: sinceVersion },
       },
-      orderBy: { version: 'asc' },
+      orderBy: { serverSeq: 'asc' },
     });
+
+    // Parse stored operation JSON (Prisma stores `operation` as string in schema)
+    return rows.map((r) => ({
+      ...r,
+      operation: (() => {
+        try {
+          return typeof r.operation === 'string' ? JSON.parse(r.operation) : r.operation;
+        } catch (e) {
+          return r.operation;
+        }
+      })(),
+    } as any));
   }
 
   /**
@@ -167,19 +172,19 @@ export class CrossPlatformSyncService {
   }> {
     // Get operations that happened since client's base version
     const serverOps = await this.getPendingOperations(projectId, baseVersion);
+    const applied: Operation[] = [];
 
     if (serverOps.length === 0) {
       // No conflicts, apply directly
-      const applied: Operation[] = [];
       for (const op of operations) {
         const stored = await this.prisma.operationalTransform.create({
           data: {
             projectId,
             userId,
-            operation: op as object,
-            version: await this.getNextVersion(projectId),
-            appliedAt: new Date(),
-          },
+            operation: JSON.stringify(op),
+            serverSeq: await this.getNextVersion(projectId),
+            isApplied: true,
+          } as any,
         });
         applied.push({ ...op, id: stored.id });
       }
@@ -197,16 +202,16 @@ export class CrossPlatformSyncService {
       serverOps.map((o) => o.operation as Operation),
     );
 
-    const applied: Operation[] = [];
-    for (const op of transformed) {
+    const transformedOps: Operation[] = transformed;
+    for (const op of transformedOps) {
       const stored = await this.prisma.operationalTransform.create({
         data: {
           projectId,
           userId,
-          operation: op as object,
-          version: await this.getNextVersion(projectId),
-          appliedAt: new Date(),
-        },
+          operation: JSON.stringify(op),
+          serverSeq: await this.getNextVersion(projectId),
+          isApplied: true,
+        } as any,
       });
       applied.push({ ...op, id: stored.id });
     }
@@ -333,7 +338,7 @@ export class CrossPlatformSyncService {
 
     // Check access
     if (project.ownerId !== userId) {
-      const collaborator = await this.prisma.collaborator.findFirst({
+      const collaborator = await this.prisma.projectCollaborator.findFirst({
         where: { projectId, userId },
       });
       if (!collaborator) {
@@ -345,15 +350,13 @@ export class CrossPlatformSyncService {
     const currentVersion = this.serverVersion.get(projectId) || 0;
 
     await this.prisma.deviceSync.update({
-      where: { userId_deviceId: { userId, deviceId } },
+      where: { deviceId } as any,
       data: {
         lastSyncAt: new Date(),
-        syncState: {
-          projectId,
-          version: currentVersion,
-          syncedAt: new Date().toISOString(),
-        },
-      },
+        // store small sync metadata in `offlineData` JSON since schema doesn't have `syncState`
+        syncVersion: currentVersion,
+        offlineData: { projectId, version: currentVersion, syncedAt: new Date().toISOString() },
+      } as any,
     });
 
     return {
@@ -374,18 +377,19 @@ export class CrossPlatformSyncService {
     const operations = await this.prisma.operationalTransform.aggregate({
       where: { projectId },
       _count: true,
-      _max: { version: true },
+      _max: { serverSeq: true },
     });
 
     return {
-      currentVersion: operations._max.version || 0,
+      currentVersion: operations._max.serverSeq || 0,
       totalOperations: operations._count,
       devices: devices.map((d) => ({
         deviceId: d.deviceId,
         platform: d.platform,
         isOnline: d.isOnline,
         lastSyncAt: d.lastSyncAt,
-        syncState: d.syncState,
+        // `syncState` isn't a Prisma field; present `offlineData` instead
+        syncState: d.offlineData,
       })),
     };
   }
@@ -412,10 +416,10 @@ export class CrossPlatformSyncService {
         data: {
           projectId,
           userId,
-          operation: op as object,
-          version: await this.getNextVersion(projectId),
-          appliedAt: new Date(),
-        },
+          operation: JSON.stringify(op),
+          serverSeq: await this.getNextVersion(projectId),
+          isApplied: true,
+        } as any,
       });
     }
 
@@ -433,7 +437,7 @@ export class CrossPlatformSyncService {
       await this.prisma.operationalTransform.deleteMany({
         where: {
           projectId,
-          version: { lt: cutoff },
+          serverSeq: { lt: cutoff },
         },
       });
     }

@@ -160,13 +160,14 @@ export class ImageAcquisitionProcessor extends WorkerHost {
     return this.prisma.upload.create({
       data: {
         filename: image.localPath.split('/').pop() || 'unknown',
-        originalName: `${image.source}-${image.id}`,
-        mimetype: 'image/jpeg',
+        source: image.source,
+        mimeType: 'image/jpeg',
         size: 0, // Will be updated by file size check
         url: image.localPath,
         userId,
         projectId,
         metadata: {
+          originalName: `${image.source}-${image.id}`,
           source: image.source,
           sourceUrl: image.url,
           width: image.width,
@@ -199,12 +200,12 @@ export class ImageAcquisitionProcessor extends WorkerHost {
     // Create an image block
     await this.prisma.block.create({
       data: {
-        type: 'image',
+        blockType: 'IMAGE',
         content: {
           uploadId,
           alt: 'Acquired image',
         },
-        styles: {
+        style: {
           position: 'relative',
           width: '100%',
           height: 'auto',
@@ -212,7 +213,7 @@ export class ImageAcquisitionProcessor extends WorkerHost {
         order: slide.blocks.length,
         slideId,
         projectId: slide.projectId,
-      },
+      } as any,
     });
   }
 
@@ -241,9 +242,8 @@ export class ImageAcquisitionProcessor extends WorkerHost {
         order: project.slides.length,
         projectId,
         layout: 'image-focus',
-        transition: 'fade',
       },
-    });
+    } as any);
 
     // Add image block to slide
     await this.addImageToSlide(uploadId, slide.id);
