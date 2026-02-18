@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
 
-interface AccessibilityProfile {
+export interface AccessibilityProfile {
   reduceAnimations: boolean;
   simplifyText: boolean;
   highContrast: boolean;
@@ -18,7 +18,7 @@ interface AccessibilityProfile {
   progressIndicator: boolean;
 }
 
-interface SimplificationResult {
+export interface SimplificationResult {
   original: string;
   simplified: string;
   readingLevel: {
@@ -104,7 +104,9 @@ export class CognitiveAccessibilityService {
   /**
    * Merge with defaults
    */
-  private mergeWithDefaults(partial: Partial<AccessibilityProfile>): AccessibilityProfile {
+  private mergeWithDefaults(
+    partial: Partial<AccessibilityProfile>,
+  ): AccessibilityProfile {
     return { ...this.getDefaultProfile(), ...partial };
   }
 
@@ -130,7 +132,11 @@ export class CognitiveAccessibilityService {
   /**
    * Get available presets
    */
-  getPresets(): Array<{ name: string; description: string; settings: AccessibilityProfile }> {
+  getPresets(): Array<{
+    name: string;
+    description: string;
+    settings: AccessibilityProfile;
+  }> {
     return [
       {
         name: 'dyslexia-friendly',
@@ -184,7 +190,7 @@ export class CognitiveAccessibilityService {
    */
   async applyPreset(userId: string, presetName: string) {
     const presets = this.getPresets();
-    const preset = presets.find(p => p.name === presetName);
+    const preset = presets.find((p) => p.name === presetName);
 
     if (!preset) {
       throw new NotFoundException('Preset not found');
@@ -196,7 +202,10 @@ export class CognitiveAccessibilityService {
   /**
    * Simplify text content
    */
-  async simplifyText(text: string, targetLevel: 'basic' | 'intermediate' = 'intermediate'): Promise<SimplificationResult> {
+  async simplifyText(
+    text: string,
+    targetLevel: 'basic' | 'intermediate' = 'intermediate',
+  ): Promise<SimplificationResult> {
     const originalLevel = this.calculateReadingLevel(text);
 
     try {
@@ -212,7 +221,7 @@ Original text:
 "${text}"
 
 Provide only the simplified text, nothing else.`,
-        { maxTokens: Math.max(200, text.length) }
+        { maxTokens: Math.max(200, text.length) },
       );
 
       const simplifiedLevel = this.calculateReadingLevel(simplified);
@@ -245,9 +254,12 @@ Provide only the simplified text, nothing else.`,
    * Calculate approximate reading level (Flesch-Kincaid grade)
    */
   private calculateReadingLevel(text: string): number {
-    const sentences = text.split(/[.!?]+/).filter(s => s.trim());
-    const words = text.split(/\s+/).filter(w => w.trim());
-    const syllables = words.reduce((sum, word) => sum + this.countSyllables(word), 0);
+    const sentences = text.split(/[.!?]+/).filter((s) => s.trim());
+    const words = text.split(/\s+/).filter((w) => w.trim());
+    const syllables = words.reduce(
+      (sum, word) => sum + this.countSyllables(word),
+      0,
+    );
 
     if (sentences.length === 0 || words.length === 0) return 0;
 
@@ -255,7 +267,8 @@ Provide only the simplified text, nothing else.`,
     const avgSyllablesPerWord = syllables / words.length;
 
     // Flesch-Kincaid Grade Level formula
-    const grade = 0.39 * avgWordsPerSentence + 11.8 * avgSyllablesPerWord - 15.59;
+    const grade =
+      0.39 * avgWordsPerSentence + 11.8 * avgSyllablesPerWord - 15.59;
 
     return Math.max(1, Math.min(18, Math.round(grade)));
   }
@@ -311,8 +324,12 @@ Provide only the simplified text, nothing else.`,
       changes.push(`Reduced from ${origWords} to ${simpWords} words`);
     }
 
-    const origSentences = original.split(/[.!?]+/).filter(s => s.trim()).length;
-    const simpSentences = simplified.split(/[.!?]+/).filter(s => s.trim()).length;
+    const origSentences = original
+      .split(/[.!?]+/)
+      .filter((s) => s.trim()).length;
+    const simpSentences = simplified
+      .split(/[.!?]+/)
+      .filter((s) => s.trim()).length;
 
     if (simpSentences !== origSentences) {
       changes.push(`Sentence structure adjusted`);
@@ -324,10 +341,13 @@ Provide only the simplified text, nothing else.`,
   /**
    * Process slide for cognitive accessibility
    */
-  async processSlide(slideId: string, options: {
-    simplifyText?: boolean;
-    chunk?: boolean;
-  }) {
+  async processSlide(
+    slideId: string,
+    options: {
+      simplifyText?: boolean;
+      chunk?: boolean;
+    },
+  ) {
     const slide = await this.prisma.slide.findUnique({
       where: { id: slideId },
       include: { blocks: true },
@@ -340,13 +360,15 @@ Provide only the simplified text, nothing else.`,
     const processed: Array<{ blockId: string; changes: string[] }> = [];
 
     for (const block of slide.blocks) {
-      const content = block.content as { text?: string } || {};
+      const content = (block.content as { text?: string }) || {};
       const changes: string[] = [];
 
       if (content.text && options.simplifyText) {
         const simplified = await this.simplifyText(content.text);
         // In production, would update the block
-        changes.push(`Simplified from grade ${simplified.readingLevel.original} to ${simplified.readingLevel.simplified}`);
+        changes.push(
+          `Simplified from grade ${simplified.readingLevel.original} to ${simplified.readingLevel.simplified}`,
+        );
       }
 
       if (options.chunk && content.text && content.text.length > 200) {

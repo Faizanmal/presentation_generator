@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -116,25 +117,11 @@ export function DataImporter({ onSuccess, trigger }: DataImportProps) {
             const formData = new FormData();
             formData.append("file", file);
 
-            const response = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/ai/data-import/preview-sheets`,
-                {
-                    method: "POST",
-                    headers: {
-                        Authorization: `Bearer ${localStorage.getItem("token")}`,
-                    },
-                    body: formData,
-                }
-            );
-
-            if (!response.ok) {
-                throw new Error("Failed to fetch Excel sheets");
-            }
-
-            const data = await response.json();
-            setSheets(data.data.sheets);
-            if (data.data.sheets.length > 0) {
-                setSelectedSheet(data.data.sheets[0]);
+            const result = await api.dataImport.previewSheets(formData);
+            const data = result.data;
+            setSheets(data.sheets);
+            if (data.sheets.length > 0) {
+                setSelectedSheet(data.sheets[0]);
             }
         } catch (err) {
             setError(
@@ -157,27 +144,8 @@ export function DataImporter({ onSuccess, trigger }: DataImportProps) {
             const formData = new FormData();
             formData.append("file", targetFile);
 
-            const url = new URL(
-                `${process.env.NEXT_PUBLIC_API_URL}/ai/data-import/analyze`
-            );
-            if (sheetName) { url.searchParams.append("sheetName", sheetName); }
-            if (!autoDetectHeaders) { url.searchParams.append("autoDetectHeaders", "false"); }
-
-            const response = await fetch(url.toString(), {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${localStorage.getItem("token")}`,
-                },
-                body: formData,
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || "Failed to analyze file");
-            }
-
-            const data = await response.json();
-            setParsedData(data.data);
+            const result = await api.dataImport.analyze(formData, sheetName);
+            setParsedData(result.data as ParsedData);
             setProgress(100);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to analyze file");
@@ -219,33 +187,16 @@ export function DataImporter({ onSuccess, trigger }: DataImportProps) {
                 setProgress((prev) => Math.min(prev + 10, 90));
             }, 500);
 
-            const response = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/ai/data-import/generate-presentation`,
-                {
-                    method: "POST",
-                    headers: {
-                        Authorization: `Bearer ${localStorage.getItem("token")}`,
-                    },
-                    body: formData,
-                }
-            );
+            const result = await api.dataImport.generatePresentation(formData);
 
             clearInterval(progressInterval);
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(
-                    errorData.message || "Failed to generate presentation"
-                );
-            }
-
-            const data = await response.json();
             setProgress(100);
 
             // Success!
             setTimeout(() => {
-                if (onSuccess && data.data.project) {
-                    onSuccess(data.data.project.id);
+                const project = result.data?.project as { id?: string } | undefined;
+                if (onSuccess && project?.id) {
+                    onSuccess(project.id);
                 }
                 setOpen(false);
                 resetState();

@@ -44,7 +44,6 @@ import { QuickActionsToolbar } from "@/components/editor/quick-actions-toolbar";
 import { SlideTemplatesDialog } from "@/components/editor/slide-templates";
 import { useRecentProjects } from "@/components/ui/favorites-recent";
 import { AIChatAssistant, AIChatTrigger } from "@/components/editor/ai-chat-assistant";
-import { URLImporter } from "@/components/editor/url-importer";
 import { ViewerAnalyticsWidget } from "@/components/editor/viewer-analytics-widget";
 import { BrandKitManager } from "@/components/editor/brand-kit-manager";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -85,7 +84,6 @@ export default function EditorPageV2() {
     const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
     const [showTemplatesDialog, setShowTemplatesDialog] = useState(false);
     const [isAIChatOpen, setIsAIChatOpen] = useState(false);
-    const [showURLImportDialog, setShowURLImportDialog] = useState(false);
     const [showAnalyticsDialog, setShowAnalyticsDialog] = useState(false);
     const [showBrandKitDialog, setShowBrandKitDialog] = useState(false);
     const [isCommentsPanelOpen, setIsCommentsPanelOpen] = useState(false);
@@ -467,10 +465,6 @@ export default function EditorPageV2() {
                             </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setShowURLImportDialog(true)}>
-                                <span className="material-symbols-outlined text-[18px] mr-2">link</span>
-                                Import from URL
-                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setShowAnalyticsDialog(true)}>
                                 <span className="material-symbols-outlined text-[18px] mr-2">bar_chart</span>
                                 Analytics
@@ -555,7 +549,7 @@ export default function EditorPageV2() {
                 )}
 
                 {/* Central Canvas */}
-                <main 
+                <main
                     className="flex-1 bg-slate-100 dark:bg-slate-900 relative flex flex-col items-center justify-center p-8 overflow-hidden"
                     onMouseMove={(e) => {
                         // Send cursor position to collaborators
@@ -777,20 +771,6 @@ export default function EditorPageV2() {
                     )}
                 </>
             )}
-
-            {/* URL Importer Dialog */}
-            <Dialog open={showURLImportDialog} onOpenChange={setShowURLImportDialog}>
-                <DialogContent className="max-w-3xl">
-                    <URLImporter
-                        onImport={(result) => {
-                            toast.success(`Imported ${result.slides.length} slides from URL`);
-                            // Refetch project to show new slides
-                            queryClient.invalidateQueries({ queryKey: ["project", projectId] });
-                        }}
-                        onClose={() => setShowURLImportDialog(false)}
-                    />
-                </DialogContent>
-            </Dialog>
 
             {/* Analytics Dialog */}
             <Dialog open={showAnalyticsDialog} onOpenChange={setShowAnalyticsDialog}>

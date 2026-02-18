@@ -5,8 +5,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import JSZip from 'jszip';
-import { PDFDocument, StandardFonts, rgb, PageSizes } from 'pdf-lib';
+import { ZipAdapter } from './zip-adapter';
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import PptxGenJS from 'pptxgenjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
@@ -209,7 +209,7 @@ export class ExportService {
     }
 
     const exportData = project as unknown as ExportProject;
-    const result = this.exportToPdf(exportData);
+    const result = await this.exportToPdf(exportData);
     return Buffer.from(result.data as string, 'utf-8');
   }
 
@@ -477,17 +477,17 @@ export class ExportService {
     const pdfDoc = await PDFDocument.create();
     const theme = project.theme || this.getDefaultTheme();
     const themeColors = (theme.colors || {}) as Record<string, string>;
-    
+
     // Embed fonts
     const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    
+
     // Process each slide
     for (const slide of project.slides || []) {
       // Create a 16:9 aspect ratio page (landscape)
       const page = pdfDoc.addPage([1280, 720]);
       const { width, height } = page.getSize();
-      
+
       // Draw background
       const bgColor = this.hexToRgb(themeColors.background || '#ffffff');
       page.drawRectangle({
@@ -497,14 +497,14 @@ export class ExportService {
         height,
         color: rgb(bgColor.r / 255, bgColor.g / 255, bgColor.b / 255),
       });
-      
+
       // Draw blocks
       let yOffset = height - 60; // Start from top with margin
-      
+
       for (const block of slide.blocks || []) {
         const content = this.getBlockTextContent(block);
         const textColor = this.hexToRgb(themeColors.text || '#000000');
-        
+
         switch (block.blockType) {
           case 'heading':
           case 'HEADING':
@@ -513,12 +513,16 @@ export class ExportService {
               y: yOffset,
               size: 36,
               font: helveticaBold,
-              color: rgb(textColor.r / 255, textColor.g / 255, textColor.b / 255),
+              color: rgb(
+                textColor.r / 255,
+                textColor.g / 255,
+                textColor.b / 255,
+              ),
               maxWidth: width - 120,
             });
             yOffset -= 60;
             break;
-            
+
           case 'subheading':
           case 'SUBHEADING':
             page.drawText(content, {
@@ -526,16 +530,20 @@ export class ExportService {
               y: yOffset,
               size: 24,
               font: helveticaBold,
-              color: rgb(textColor.r / 255, textColor.g / 255, textColor.b / 255),
+              color: rgb(
+                textColor.r / 255,
+                textColor.g / 255,
+                textColor.b / 255,
+              ),
               maxWidth: width - 120,
             });
             yOffset -= 45;
             break;
-            
+
           case 'paragraph':
           case 'PARAGRAPH':
           case 'text':
-          case 'TEXT':
+          case 'TEXT': {
             // Word wrap for paragraphs
             const lines = this.wrapText(content, 100);
             for (const line of lines) {
@@ -545,17 +553,22 @@ export class ExportService {
                 y: yOffset,
                 size: 16,
                 font: helveticaFont,
-                color: rgb(textColor.r / 255, textColor.g / 255, textColor.b / 255),
+                color: rgb(
+                  textColor.r / 255,
+                  textColor.g / 255,
+                  textColor.b / 255,
+                ),
               });
               yOffset -= 24;
             }
             yOffset -= 10;
             break;
-            
+          }
+
           case 'bullet_list':
           case 'BULLET_LIST':
           case 'list':
-          case 'LIST':
+          case 'LIST': {
             const items = this.getListItems(block);
             for (const item of items) {
               if (yOffset < 60) break;
@@ -564,14 +577,19 @@ export class ExportService {
                 y: yOffset,
                 size: 16,
                 font: helveticaFont,
-                color: rgb(textColor.r / 255, textColor.g / 255, textColor.b / 255),
+                color: rgb(
+                  textColor.r / 255,
+                  textColor.g / 255,
+                  textColor.b / 255,
+                ),
                 maxWidth: width - 140,
               });
               yOffset -= 28;
             }
             yOffset -= 10;
             break;
-            
+          }
+
           default:
             if (content) {
               page.drawText(content, {
@@ -579,14 +597,18 @@ export class ExportService {
                 y: yOffset,
                 size: 16,
                 font: helveticaFont,
-                color: rgb(textColor.r / 255, textColor.g / 255, textColor.b / 255),
+                color: rgb(
+                  textColor.r / 255,
+                  textColor.g / 255,
+                  textColor.b / 255,
+                ),
                 maxWidth: width - 120,
               });
               yOffset -= 30;
             }
         }
       }
-      
+
       // Add slide number
       page.drawText(`${(slide.order || 0) + 1}`, {
         x: width - 60,
@@ -596,17 +618,17 @@ export class ExportService {
         color: rgb(0.5, 0.5, 0.5),
       });
     }
-    
+
     // Generate PDF bytes
     const pdfBytes = await pdfDoc.save();
-    
+
     return {
       filename: `${this.sanitizeFilename(project.title)}.pdf`,
       mimeType: 'application/pdf',
       data: Buffer.from(pdfBytes),
     };
   }
-  
+
   /**
    * Helper to convert hex color to RGB
    */
@@ -621,7 +643,7 @@ export class ExportService {
     }
     return { r: 0, g: 0, b: 0 };
   }
-  
+
   /**
    * Helper to wrap text for PDF
    */
@@ -629,7 +651,7 @@ export class ExportService {
     const words = text.split(' ');
     const lines: string[] = [];
     let currentLine = '';
-    
+
     for (const word of words) {
       if ((currentLine + ' ' + word).trim().length <= maxCharsPerLine) {
         currentLine = (currentLine + ' ' + word).trim();
@@ -639,18 +661,20 @@ export class ExportService {
       }
     }
     if (currentLine) lines.push(currentLine);
-    
+
     return lines;
   }
-  
+
   /**
    * Helper to get list items from block
    */
   private getListItems(block: ExportBlock): string[] {
     const content = block.content as Record<string, unknown>;
     if (Array.isArray(content?.items)) {
-      return content.items.map((item: unknown) => 
-        typeof item === 'string' ? item : (item as Record<string, unknown>)?.text as string || ''
+      return content.items.map((item: unknown) =>
+        typeof item === 'string'
+          ? item
+          : ((item as Record<string, unknown>)?.text as string) || '',
       );
     }
     if (typeof content?.text === 'string') {
@@ -658,7 +682,7 @@ export class ExportService {
     }
     return [];
   }
-  
+
   /**
    * Helper to get text content from block
    */
@@ -677,35 +701,37 @@ export class ExportService {
   private async exportToPptx(project: ExportProject): Promise<ExportResult> {
     const theme = project.theme || this.getDefaultTheme();
     const themeColors = (theme.colors || {}) as Record<string, string>;
-    
+
     // Create new presentation
     const pptx = new PptxGenJS();
-    
+
     // Set presentation properties
     pptx.author = 'Presentation Designer';
     pptx.title = project.title || 'Untitled Presentation';
     pptx.subject = project.description || '';
     pptx.company = 'Presentation Designer';
-    
+
     // Set layout to 16:9
     pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
     pptx.layout = 'WIDE';
-    
+
     // Process each slide
     for (const slide of project.slides || []) {
       const pptxSlide = pptx.addSlide();
-      
+
       // Set background color
       if (themeColors.background) {
-        pptxSlide.background = { color: themeColors.background.replace('#', '') };
+        pptxSlide.background = {
+          color: themeColors.background.replace('#', ''),
+        };
       }
-      
+
       let yPosition = 0.5; // Start position in inches
-      
+
       for (const block of slide.blocks || []) {
         const content = this.getBlockTextContent(block);
         const textColor = (themeColors.text || '#000000').replace('#', '');
-        
+
         switch (block.blockType) {
           case 'heading':
           case 'HEADING':
@@ -721,7 +747,7 @@ export class ExportService {
             });
             yPosition += 1;
             break;
-            
+
           case 'subheading':
           case 'SUBHEADING':
             pptxSlide.addText(content, {
@@ -736,7 +762,7 @@ export class ExportService {
             });
             yPosition += 0.8;
             break;
-            
+
           case 'paragraph':
           case 'PARAGRAPH':
           case 'text':
@@ -753,13 +779,13 @@ export class ExportService {
             });
             yPosition += 1.2;
             break;
-            
+
           case 'bullet_list':
           case 'BULLET_LIST':
           case 'list':
-          case 'LIST':
+          case 'LIST': {
             const items = this.getListItems(block);
-            const textProps = items.map(item => ({
+            const textProps = items.map((item) => ({
               text: item,
               options: { bullet: true, color: textColor, fontSize: 16 },
             }));
@@ -773,9 +799,10 @@ export class ExportService {
             });
             yPosition += items.length * 0.4 + 0.3;
             break;
-            
+          }
+
           case 'image':
-          case 'IMAGE':
+          case 'IMAGE': {
             const imageContent = block.content as Record<string, unknown>;
             const imageUrl = imageContent?.url || imageContent?.src;
             if (typeof imageUrl === 'string' && imageUrl.startsWith('http')) {
@@ -793,7 +820,8 @@ export class ExportService {
               }
             }
             break;
-            
+          }
+
           default:
             if (content) {
               pptxSlide.addText(content, {
@@ -809,7 +837,7 @@ export class ExportService {
             }
         }
       }
-      
+
       // Add slide number
       pptxSlide.addText(String((slide.order || 0) + 1), {
         x: 12.5,
@@ -821,13 +849,16 @@ export class ExportService {
         align: 'right',
       });
     }
-    
+
     // Generate PPTX buffer
-    const pptxBuffer = await pptx.write({ outputType: 'nodebuffer' }) as Buffer;
-    
+    const pptxBuffer = (await pptx.write({
+      outputType: 'nodebuffer',
+    })) as Buffer;
+
     return {
       filename: `${this.sanitizeFilename(project.title)}.pptx`,
-      mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      mimeType:
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
       data: pptxBuffer,
     };
   }
@@ -1003,7 +1034,7 @@ export class ExportService {
     // Create PPTX structure - Office Open XML format
     // PPTX is a ZIP file containing XML files
 
-    const zip = new JSZip() as unknown as IJSZip;
+    const zip = new ZipAdapter() as unknown as IJSZip;
 
     // [Content_Types].xml
     zip.file(

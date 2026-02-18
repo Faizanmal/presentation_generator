@@ -75,7 +75,9 @@ export class BlockchainService {
    */
   async createCollection(userId: string, config: CollectionConfig) {
     // Validate chain
-    if (!this.supportedChains[config.chainId as keyof typeof this.supportedChains]) {
+    if (
+      !this.supportedChains[config.chainId as keyof typeof this.supportedChains]
+    ) {
       throw new BadRequestException('Unsupported blockchain network');
     }
 
@@ -85,7 +87,9 @@ export class BlockchainService {
     });
 
     if (existing) {
-      throw new BadRequestException('Collection with this symbol already exists');
+      throw new BadRequestException(
+        'Collection with this symbol already exists',
+      );
     }
 
     return this.prisma.nFTCollection.create({
@@ -100,7 +104,10 @@ export class BlockchainService {
         status: 'draft',
         metadata: {
           createdAt: new Date().toISOString(),
-          supportedMarketplaces: this.supportedChains[config.chainId as keyof typeof this.supportedChains].marketplaces,
+          supportedMarketplaces:
+            this.supportedChains[
+              config.chainId as keyof typeof this.supportedChains
+            ].marketplaces,
         },
       },
     });
@@ -173,7 +180,10 @@ export class BlockchainService {
     // Check collection limits
     if (config.collectionId) {
       const collection = await this.getCollection(config.collectionId, userId);
-      if (collection.maxSupply && collection.mintedCount >= collection.maxSupply) {
+      if (
+        collection.maxSupply &&
+        collection.mintedCount >= collection.maxSupply
+      ) {
         throw new BadRequestException('Collection max supply reached');
       }
     }
@@ -238,7 +248,10 @@ export class BlockchainService {
       // Simulated minting
       const tokenId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const transactionHash = `0x${crypto.randomBytes(32).toString('hex')}`;
-      const ipfsHash = `Qm${crypto.randomBytes(22).toString('base64').replace(/[^a-zA-Z0-9]/g, '')}`;
+      const ipfsHash = `Qm${crypto
+        .randomBytes(22)
+        .toString('base64')
+        .replace(/[^a-zA-Z0-9]/g, '')}`;
 
       await this.prisma.nFTMint.update({
         where: { id: mintId },
@@ -339,7 +352,11 @@ export class BlockchainService {
   /**
    * Get NFT pricing suggestion
    */
-  getSuggestedPricing(slideCount: number, hasCustomDesign: boolean, isPremium: boolean): number {
+  getSuggestedPricing(
+    slideCount: number,
+    hasCustomDesign: boolean,
+    isPremium: boolean,
+  ): number {
     let basePrice = 0.01; // ETH
 
     // Adjust for slide count
@@ -496,7 +513,9 @@ export class BlockchainService {
     const collection = await this.getCollection(id, userId);
 
     if (collection.mintedCount > 0) {
-      throw new BadRequestException('Cannot delete collection with minted NFTs');
+      throw new BadRequestException(
+        'Cannot delete collection with minted NFTs',
+      );
     }
 
     return this.prisma.nFTCollection.delete({ where: { id } });

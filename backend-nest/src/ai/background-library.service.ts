@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface GeneratedBackground {
@@ -13,7 +14,11 @@ export interface GeneratedBackground {
 
 @Injectable()
 export class BackgroundLibraryService {
-  constructor(private prisma: PrismaService) {}
+  private readonly db: PrismaClient;
+
+  constructor(private prisma: PrismaService) {
+    this.db = this.prisma as unknown as PrismaClient;
+  }
 
   /**
    * Save generated background to user's library
@@ -27,7 +32,7 @@ export class BackgroundLibraryService {
   ): Promise<GeneratedBackground> {
     // In a real implementation, you'd save this to a dedicated table
     // For now, we'll use the Asset table
-    const asset = await this.prisma.asset.create({
+    const asset = await this.db.asset.create({
       data: {
         userId,
         url,
@@ -52,7 +57,7 @@ export class BackgroundLibraryService {
    * Get user's background library
    */
   async getUserBackgrounds(userId: string): Promise<GeneratedBackground[]> {
-    const assets = await this.prisma.asset.findMany({
+    const assets = await this.db.asset.findMany({
       where: {
         userId,
         mimeType: 'image/png',
@@ -76,7 +81,7 @@ export class BackgroundLibraryService {
    * Delete background from library
    */
   async deleteBackground(userId: string, backgroundId: string): Promise<void> {
-    await this.prisma.asset.deleteMany({
+    await this.db.asset.deleteMany({
       where: {
         id: backgroundId,
         userId, // Ensure user owns this asset

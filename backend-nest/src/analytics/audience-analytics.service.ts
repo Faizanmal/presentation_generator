@@ -9,7 +9,7 @@ export interface ViewEvent {
   timestamp: Date;
   eventType: 'view' | 'slide_change' | 'interaction' | 'exit';
   duration?: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface AudienceInsights {
@@ -319,9 +319,10 @@ export class AudienceAnalyticsService {
         startTime: event.timestamp,
         userId: event.userId,
         userAgent:
-          ((event.metadata as Record<string, any>)?.userAgent as string) ||
+          ((event.metadata as Record<string, unknown>)?.userAgent as string) ||
           'Unknown',
-        location: (event.metadata as Record<string, any>)?.location as string,
+        location: (event.metadata as Record<string, unknown>)
+          ?.location as string,
         slidesViewed: [],
         totalDuration: 0,
         completed: false,
@@ -343,7 +344,7 @@ export class AudienceAnalyticsService {
     if (event.eventType === 'exit') {
       currentSession.endTime = event.timestamp;
       currentSession.completed =
-        ((event.metadata as Record<string, any>)?.completed as boolean) ||
+        ((event.metadata as Record<string, unknown>)?.completed as boolean) ||
         false;
     }
   }
@@ -402,7 +403,9 @@ export class AudienceAnalyticsService {
       return {
         slideId: slide.id,
         slideNumber: index + 1,
-        title: (slide as { title?: string }).title || `Slide ${index + 1}`,
+        title:
+          (slide as unknown as { title?: string }).title ||
+          `Slide ${index + 1}`,
         views,
         averageTimeSpent: avgTimeSpent,
         dropOffRate,

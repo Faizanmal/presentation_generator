@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Prisma } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { EnhancedPresentation, EnhancedSection } from './thinking-agent.types';
 import { AIService } from '../ai.service';
 
@@ -12,16 +12,28 @@ interface CreateProjectFromThinkingResult {
   blockCount: number;
 }
 
+type DraftBlock = {
+  type: string;
+  content: Record<string, unknown>;
+  style: Record<string, unknown>;
+  isGeneratedImage?: boolean;
+  generationPrompt?: string;
+  generationStyle?: 'vivid' | 'natural';
+};
+
 @Injectable()
 export class ThinkingProjectService {
   private readonly logger = new Logger(ThinkingProjectService.name);
+  private readonly db: PrismaClient;
 
   constructor(
     private prisma: PrismaService,
     @Inject(forwardRef(() => AIService))
     private aiService: AIService,
     @InjectQueue('image-generation') private imageQueue: Queue,
-  ) {}
+  ) {
+    this.db = this.prisma as unknown as PrismaClient;
+  }
 
   /**
    * Create a project from the thinking agent's generated presentation
@@ -41,11 +53,11 @@ export class ThinkingProjectService {
     const imageGenerationJobs: Array<{
       blockId: string;
       prompt: string;
-      style: string;
+      style: 'vivid' | 'natural';
     }> = [];
 
     // Create the project with slides and blocks in a transaction
-    const result = await this.prisma.$transaction(async (tx) => {
+    const result = await this.db.$transaction(async (tx) => {
       // 1. Create the project
       const project = await tx.project.create({
         data: {
@@ -87,7 +99,7 @@ export class ThinkingProjectService {
           if (blocks.length > 1 && blocks[1].type === 'subheading')
             insertIndex++;
 
-          blocks.splice(insertIndex, 0, {
+          const generatedImageBlock: DraftBlock = {
             type: 'image',
             content: {
               url: '', // Placeholder
@@ -95,11 +107,12 @@ export class ThinkingProjectService {
               status: 'generating',
             },
             style: { width: '100%', borderRadius: '8px' },
-            // @ts-expect-error - Adding temporary property for job creation
             isGeneratedImage: true,
             generationPrompt: section.suggestedImage.prompt,
-            generationStyle: section.suggestedImage.style || 'vivid',
-          });
+            generationStyle:
+              section.suggestedImage.style === 'natural' ? 'natural' : 'vivid',
+          };
+          blocks.splice(insertIndex, 0, generatedImageBlock);
         }
 
         for (let blockIndex = 0; blockIndex < blocks.length; blockIndex++) {
@@ -117,11 +130,11 @@ export class ThinkingProjectService {
           totalBlockCount++;
 
           // Collect job info if this was our placeholder
-          if ((block as any).isGeneratedImage) {
+          if (block.isGeneratedImage) {
             imageGenerationJobs.push({
               blockId: createdBlock.id,
-              prompt: (block as any).generationPrompt,
-              style: (block as any).generationStyle,
+              prompt: block.generationPrompt || '',
+              style: block.generationStyle || 'vivid',
             });
           }
         }
@@ -165,16 +178,8 @@ export class ThinkingProjectService {
   private convertSectionToBlocks(
     section: EnhancedSection,
     slideIndex: number,
-  ): Array<{
-    type: string;
-    content: Record<string, unknown>;
-    style: Record<string, unknown>;
-  }> {
-    const blocks: Array<{
-      type: string;
-      content: Record<string, unknown>;
-      style: Record<string, unknown>;
-    }> = [];
+  ): DraftBlock[] {
+    const blocks: DraftBlock[] = [];
 
     // Add heading block
     blocks.push({
@@ -458,8 +463,8 @@ export class ThinkingProjectService {
   /**
    * Get project with full details including slides and blocks
    */
-  async getProjectWithDetails(projectId: string) {
-    return this.prisma.project.findUnique({
+  getProjectWithDetails(projectId: string) {
+    return this.db.project.findUnique({
       where: { id: projectId },
       include: {
         slides: {

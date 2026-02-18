@@ -66,20 +66,14 @@ export class BrandKitController {
   @Get(':id')
   @ApiOperation({ summary: 'Get a specific brand kit' })
   @ApiResponse({ status: 200, description: 'Brand kit details' })
-  async findOne(
-    @Param('id') id: string,
-    @CurrentUser() user: { sub: string },
-  ) {
+  async findOne(@Param('id') id: string, @CurrentUser() user: { sub: string }) {
     return this.brandKitService.findOne(id, user.sub);
   }
 
   @Get(':id/theme')
   @ApiOperation({ summary: 'Get brand kit as theme-compatible object' })
   @ApiResponse({ status: 200, description: 'Theme object' })
-  async toTheme(
-    @Param('id') id: string,
-    @CurrentUser() user: { sub: string },
-  ) {
+  async toTheme(@Param('id') id: string, @CurrentUser() user: { sub: string }) {
     return this.brandKitService.toTheme(id, user.sub);
   }
 
@@ -119,10 +113,7 @@ export class BrandKitController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a brand kit' })
   @ApiResponse({ status: 204, description: 'Brand kit deleted' })
-  async delete(
-    @Param('id') id: string,
-    @CurrentUser() user: { sub: string },
-  ) {
+  async delete(@Param('id') id: string, @CurrentUser() user: { sub: string }) {
     await this.brandKitService.delete(id, user.sub);
   }
 }

@@ -8,14 +8,14 @@ export class SendgridMailerService {
   private readonly logger = new Logger(SendgridMailerService.name);
   private fromAddress: string;
   private fromName: string;
-  private readonly sg: any;
+  private readonly sg: typeof sendgrid;
 
   constructor(
     private readonly config: ConfigService,
     private readonly templateCache: EmailTemplateCacheService,
   ) {
-    // Accept either CJS or ESM-shaped import
-    this.sg = (sendgrid as any)?.default ?? sendgrid;
+    // Use the typed SendGrid client directly
+    this.sg = sendgrid;
 
     const apiKey = this.config.get<string>('SENDGRID_API_KEY');
     if (!apiKey) {
@@ -67,13 +67,13 @@ export class SendgridMailerService {
       }
     }
 
-    const msg: any = {
+    const msg: sendgrid.MailDataRequired = {
       to,
       from: { email: this.fromAddress, name: this.fromName },
       subject,
       html: finalHtml || undefined,
       text: finalText || undefined,
-    } as any;
+    };
 
     try {
       // use guarded runtime client

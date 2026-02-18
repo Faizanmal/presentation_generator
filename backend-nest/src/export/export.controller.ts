@@ -3,11 +3,8 @@ import type { Response } from 'express';
 import { ExportService } from './export.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import {
-  ThrottleExportPDF,
-  ThrottleExportHTML,
-  ThrottleRelaxed,
-} from '../common/decorators/throttle.decorator';
+import { ThrottleExportPDF } from '../common/decorators/throttle.decorator';
+import { Feature } from '../common/decorators/feature.decorator';
 
 @Controller('export')
 @UseGuards(JwtAuthGuard)
@@ -28,6 +25,7 @@ export class ExportController {
    */
   @Get(':projectId')
   @ThrottleExportPDF() // Default to PDF rate limit (can be overridden per format)
+  @Feature('highResExport')
   async exportProject(
     @CurrentUser() user: { id: string },
     @Param('projectId') projectId: string,

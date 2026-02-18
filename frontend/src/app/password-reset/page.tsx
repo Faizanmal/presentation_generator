@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/stores/auth-store";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -35,6 +36,15 @@ type ResetPasswordForm = z.infer<typeof resetPasswordSchema>;
 
 export default function PasswordResetPage() {
     const router = useRouter();
+    const { isAuthenticated, isLoading: authLoading } = useAuthStore();
+
+    // If already authenticated, go to dashboard
+    useEffect(() => {
+        if (!authLoading && isAuthenticated) {
+            router.push('/dashboard');
+        }
+    }, [authLoading, isAuthenticated, router]);
+
     const [step, setStep] = useState<1 | 2>(1);
     const [isLoading, setIsLoading] = useState(false);
     const [email, setEmail] = useState("");

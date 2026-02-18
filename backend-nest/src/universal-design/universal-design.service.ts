@@ -4,7 +4,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
 
 interface DesignIssue {
-  type: 'color' | 'contrast' | 'typography' | 'layout' | 'cultural' | 'accessibility' | 'language';
+  type:
+    | 'color'
+    | 'contrast'
+    | 'typography'
+    | 'layout'
+    | 'cultural'
+    | 'accessibility'
+    | 'language';
   severity: 'error' | 'warning' | 'info';
   element: string;
   description: string;
@@ -12,7 +19,7 @@ interface DesignIssue {
   wcagCriteria?: string;
 }
 
-interface DesignReport {
+export interface DesignReport {
   score: number;
   issues: DesignIssue[];
   passedChecks: string[];
@@ -31,32 +38,35 @@ export class UniversalDesignService {
   private readonly logger = new Logger(UniversalDesignService.name);
 
   // Color meanings across cultures
-  private readonly colorCulturalMeanings: Record<string, Record<string, string>> = {
+  private readonly colorCulturalMeanings: Record<
+    string,
+    Record<string, string>
+  > = {
     red: {
-      'Western': 'danger, passion, excitement',
-      'China': 'luck, prosperity, happiness',
-      'India': 'purity, fertility',
+      Western: 'danger, passion, excitement',
+      China: 'luck, prosperity, happiness',
+      India: 'purity, fertility',
       'South Africa': 'mourning',
       'Middle East': 'danger, caution',
     },
     white: {
-      'Western': 'purity, peace, cleanliness',
-      'China': 'death, mourning',
-      'Japan': 'death, mourning',
-      'India': 'unhappiness',
+      Western: 'purity, peace, cleanliness',
+      China: 'death, mourning',
+      Japan: 'death, mourning',
+      India: 'unhappiness',
       'Middle East': 'purity, mourning',
     },
     green: {
-      'Western': 'nature, growth, money',
-      'China': 'infidelity',
+      Western: 'nature, growth, money',
+      China: 'infidelity',
       'Middle East': 'Islam, strength',
-      'Japan': 'eternal life',
+      Japan: 'eternal life',
     },
     yellow: {
-      'Western': 'happiness, caution',
-      'China': 'royalty, honor',
-      'Japan': 'courage',
-      'Egypt': 'mourning',
+      Western: 'happiness, caution',
+      China: 'royalty, honor',
+      Japan: 'courage',
+      Egypt: 'mourning',
     },
   };
 
@@ -69,11 +79,14 @@ export class UniversalDesignService {
   /**
    * Run full design check on a project
    */
-  async checkProject(projectId: string, options?: {
-    targetRegions?: string[];
-    checkAccessibility?: boolean;
-    checkCultural?: boolean;
-  }): Promise<DesignReport> {
+  async checkProject(
+    projectId: string,
+    options?: {
+      targetRegions?: string[];
+      checkAccessibility?: boolean;
+      checkCultural?: boolean;
+    },
+  ): Promise<DesignReport> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       include: {
@@ -114,10 +127,10 @@ export class UniversalDesignService {
     issues.push(...layoutIssues);
 
     // Track passed checks
-    if (!issues.some(i => i.type === 'contrast')) {
+    if (!issues.some((i) => i.type === 'contrast')) {
       passedChecks.push('Color contrast meets WCAG standards');
     }
-    if (!issues.some(i => i.type === 'typography')) {
+    if (!issues.some((i) => i.type === 'typography')) {
       passedChecks.push('Typography is accessible');
     }
     if (!layoutIssues.length) {
@@ -150,14 +163,22 @@ export class UniversalDesignService {
    * Check accessibility compliance
    */
   private async checkAccessibility(project: {
-    slides: Array<{ blocks: Array<{ blockType: string; content: unknown; styles?: unknown }> }>;
+    slides: Array<{
+      blocks: Array<{ blockType: string; content: unknown; styles?: unknown }>;
+    }>;
   }): Promise<DesignIssue[]> {
     const issues: DesignIssue[] = [];
 
     for (const slide of project.slides) {
       for (const block of slide.blocks) {
-        const content = block.content as { text?: string; alt?: string } || {};
-        const styles = block.styles as { fontSize?: number; color?: string; backgroundColor?: string } || {};
+        const content =
+          (block.content as { text?: string; alt?: string }) || {};
+        const styles =
+          (block.styles as {
+            fontSize?: number;
+            color?: string;
+            backgroundColor?: string;
+          }) || {};
 
         // Check for alt text on images
         if (block.blockType === 'image' && !content.alt) {
@@ -185,7 +206,10 @@ export class UniversalDesignService {
 
         // Check color contrast (simplified)
         if (styles.color && styles.backgroundColor) {
-          const contrast = this.calculateContrast(styles.color, styles.backgroundColor);
+          const contrast = this.calculateContrast(
+            styles.color,
+            styles.backgroundColor,
+          );
           if (contrast < 4.5) {
             issues.push({
               type: 'contrast',
@@ -216,14 +240,17 @@ export class UniversalDesignService {
    * Check cultural sensitivity
    */
   private async checkCulturalSensitivity(
-    project: { slides: Array<{ blocks: Array<{ content: unknown; styles?: unknown }> }> },
+    project: {
+      slides: Array<{ blocks: Array<{ content: unknown; styles?: unknown }> }>;
+    },
     regions: string[],
   ): Promise<CulturalIssue[]> {
     const issues: CulturalIssue[] = [];
 
     for (const slide of project.slides) {
       for (const block of slide.blocks) {
-        const styles = block.styles as { color?: string; backgroundColor?: string } || {};
+        const styles =
+          (block.styles as { color?: string; backgroundColor?: string }) || {};
 
         // Check color meanings
         for (const colorProp of ['color', 'backgroundColor'] as const) {
@@ -233,7 +260,10 @@ export class UniversalDesignService {
             if (colorName && this.colorCulturalMeanings[colorName]) {
               for (const region of regions) {
                 const meaning = this.colorCulturalMeanings[colorName][region];
-                if (meaning && (meaning.includes('death') || meaning.includes('mourning'))) {
+                if (
+                  meaning &&
+                  (meaning.includes('death') || meaning.includes('mourning'))
+                ) {
                   issues.push({
                     type: 'color-meaning',
                     region,
@@ -282,7 +312,7 @@ export class UniversalDesignService {
 
     for (const slide of project.slides) {
       for (const block of slide.blocks) {
-        const styles = block.styles as { fontFamily?: string } || {};
+        const styles = (block.styles as { fontFamily?: string }) || {};
         if (styles.fontFamily) {
           fontFamilies.add(styles.fontFamily);
         }
@@ -313,7 +343,7 @@ export class UniversalDesignService {
 
     for (let i = 0; i < project.slides.length; i++) {
       const slide = project.slides[i];
-      
+
       // Check for overcrowded slides
       if (slide.blocks.length > 8) {
         issues.push({
@@ -328,7 +358,7 @@ export class UniversalDesignService {
       // Check for text density
       let textLength = 0;
       for (const block of slide.blocks) {
-        const content = block.content as { text?: string } || {};
+        const content = (block.content as { text?: string }) || {};
         if (content.text) {
           textLength += content.text.length;
         }
@@ -351,14 +381,23 @@ export class UniversalDesignService {
   /**
    * Calculate overall score
    */
-  private calculateScore(issues: DesignIssue[], culturalIssues: CulturalIssue[]): number {
+  private calculateScore(
+    issues: DesignIssue[],
+    culturalIssues: CulturalIssue[],
+  ): number {
     let score = 100;
 
     for (const issue of issues) {
       switch (issue.severity) {
-        case 'error': score -= 10; break;
-        case 'warning': score -= 5; break;
-        case 'info': score -= 1; break;
+        case 'error':
+          score -= 10;
+          break;
+        case 'warning':
+          score -= 5;
+          break;
+        case 'info':
+          score -= 1;
+          break;
       }
     }
 
@@ -372,14 +411,18 @@ export class UniversalDesignService {
    */
   getCulturalGuide(region: string) {
     const guides: Record<string, object> = {
-      'Western': {
+      Western: {
         colors: { green: 'positive', red: 'danger/passion', white: 'purity' },
         symbols: { thumbsUp: 'positive', ok: 'positive' },
         textDirection: 'ltr',
         tips: ['Use direct communication', 'Time-sensitive audiences'],
       },
-      'China': {
-        colors: { red: 'luck/prosperity', white: 'mourning', yellow: 'royalty' },
+      China: {
+        colors: {
+          red: 'luck/prosperity',
+          white: 'mourning',
+          yellow: 'royalty',
+        },
         symbols: { number4: 'avoid (death)', number8: 'lucky' },
         textDirection: 'ltr',
         tips: ['Emphasize group harmony', 'Respect hierarchy'],
@@ -390,7 +433,7 @@ export class UniversalDesignService {
         textDirection: 'rtl',
         tips: ['Consider RTL layout', 'Modest imagery'],
       },
-      'Japan': {
+      Japan: {
         colors: { white: 'mourning', red: 'good luck' },
         symbols: { silence: 'respect' },
         textDirection: 'ltr',

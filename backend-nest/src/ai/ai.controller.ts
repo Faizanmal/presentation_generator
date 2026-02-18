@@ -23,12 +23,7 @@ import { ImageRecognitionService } from './image-recognition.service';
 import {
   ThrottleAIGeneration,
   ThrottleImageGeneration,
-  ThrottleModerate,
 } from '../common/decorators/throttle.decorator';
-import {
-  AdvancedRateLimitGuard,
-  RateLimit,
-} from '../common/rate-limit/advanced-rate-limit.guard';
 
 class EnhanceContentDto {
   content: string;

@@ -331,17 +331,31 @@ export class ProjectsService {
   }
 
   /**
-   * Get all projects for a user
+   * Get all projects for a user with optional search and filtering
    */
-  async findAll(userId: string, page = 1, limit = 20) {
+  async findAll(
+    userId: string,
+    page = 1,
+    limit = 20,
+    options?: { search?: string; archived?: boolean },
+  ) {
     const skip = (page - 1) * limit;
+    const { search, archived = false } = options || {};
+
+    const where: Prisma.ProjectWhereInput = {
+      ownerId: userId,
+      deletedAt: archived ? { not: null } : null,
+      ...(search && {
+        OR: [
+          { title: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+        ],
+      }),
+    };
 
     const [projects, total] = await Promise.all([
       this.prisma.project.findMany({
-        where: {
-          ownerId: userId,
-          deletedAt: null, // Soft delete filter
-        },
+        where,
         include: {
           theme: true,
           _count: {
@@ -355,9 +369,7 @@ export class ProjectsService {
         skip,
         take: limit,
       }),
-      this.prisma.project.count({
-        where: { ownerId: userId },
-      }),
+      this.prisma.project.count({ where }),
     ]);
 
     return {
@@ -367,6 +379,8 @@ export class ProjectsService {
         page,
         limit,
         totalPages: Math.ceil(total / limit),
+        hasNextPage: page * limit < total,
+        hasPrevPage: page > 1,
       },
     };
   }
@@ -489,6 +503,86 @@ export class ProjectsService {
         theme: true,
       },
     });
+  }
+
+  /**
+   * Archive a project (soft-delete with archived flag)
+   */
+  async archive(id: string, userId: string) {
+    const project = await this.findOne(id, userId);
+
+    if (project.ownerId !== userId) {
+      throw new ForbiddenException('You cannot archive this project');
+    }
+
+    await this.prisma.project.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+
+    this.logger.log(`Project archived: ${id} by user ${userId}`);
+    return { success: true, message: 'Project archived successfully' };
+  }
+
+  /**
+   * Restore an archived project
+   */
+  async restore(id: string, userId: string) {
+    const project = await this.prisma.project.findUnique({
+      where: { id },
+    });
+
+    if (!project) throw new NotFoundException('Project not found');
+    if (project.ownerId !== userId)
+      throw new ForbiddenException('You cannot restore this project');
+
+    // Check project limits before restoring
+    const canCreate = await this.usersService.canCreateProject(userId);
+    if (!canCreate) {
+      throw new ForbiddenException(
+        'Project limit reached. Upgrade to restore projects.',
+      );
+    }
+
+    await this.prisma.project.update({
+      where: { id },
+      data: { deletedAt: null },
+    });
+
+    this.logger.log(`Project restored: ${id} by user ${userId}`);
+    return { success: true, message: 'Project restored successfully' };
+  }
+
+  /**
+   * Get project statistics (slide count, block types breakdown, last edited)
+   */
+  async getStats(id: string, userId: string) {
+    await this.findOne(id, userId); // ensure access
+
+    const [slideCount, blockCounts] = await Promise.all([
+      this.prisma.slide.count({ where: { projectId: id } }),
+      this.prisma.block.groupBy({
+        by: ['blockType'],
+        where: { projectId: id },
+        _count: { blockType: true },
+      }),
+    ]);
+
+    const blockBreakdown = blockCounts.reduce(
+      (acc, row) => ({ ...acc, [row.blockType]: row._count.blockType }),
+      {} as Record<string, number>,
+    );
+
+    const totalBlocks = Object.values(blockBreakdown).reduce(
+      (s: number, n: number) => s + n,
+      0,
+    );
+
+    return {
+      slideCount,
+      totalBlocks,
+      blockBreakdown,
+    };
   }
 
   /**

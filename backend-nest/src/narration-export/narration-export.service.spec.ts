@@ -47,18 +47,25 @@ describe('NarrationExportService', () => {
     project: {
       findFirst: jest.fn(),
     },
-    narrationExport: {
+    narrationProject: {
       create: jest.fn(),
       findUnique: jest.fn(),
       findMany: jest.fn(),
       update: jest.fn(),
     },
+    videoExportJob: {
+      create: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+    },
+    narrationSlide: { create: jest.fn() },
+    speakerNote: { upsert: jest.fn(), findUnique: jest.fn() },
   };
 
   const mockConfigService = {
     get: jest.fn((key: string) => {
       const config: Record<string, string> = {
-        AWS_S3_BUCKET: 'test-bucket',
+        AWS_S3_BUCKET: '', // keep empty to avoid S3 uploads in tests
         AWS_S3_REGION: 'us-east-1',
         AWS_ACCESS_KEY_ID: 'test-key',
         AWS_SECRET_ACCESS_KEY: 'test-secret',
@@ -68,8 +75,10 @@ describe('NarrationExportService', () => {
   };
 
   const mockAIService = {
-    generateNarration: jest.fn().mockResolvedValue('This is the narration for slide 1'),
-    textToSpeech: jest.fn().mockResolvedValue(Buffer.from('audio data')),
+    chatCompletion: jest.fn().mockResolvedValue({
+      choices: [{ message: { content: 'Generated speaker notes' } }],
+    }),
+    generateSpeech: jest.fn().mockResolvedValue(Buffer.from('audio data')),
   };
 
   beforeEach(async () => {
@@ -101,124 +110,124 @@ describe('NarrationExportService', () => {
     expect(service).toBeDefined();
   });
 
-  describe('generateNarrationScript', () => {
-    it('should generate narration script for project', async () => {
+  describe('generateSpeakerNotes', () => {
+    it('should generate speaker notes for project', async () => {
       mockPrismaService.project.findFirst.mockResolvedValue(mockProject);
-      mockAIService.generateNarration.mockResolvedValue('Generated narration text');
+      mockAIService.chatCompletion.mockResolvedValueOnce({
+        choices: [{ message: { content: 'Generated speaker notes' } }],
+      });
 
-      const result = await service.generateNarrationScript('project-1', 'user-1');
+      const result = await service.generateSpeakerNotes('project-1', 'user-1');
 
       expect(result).toBeDefined();
-      expect(result.slides).toHaveLength(2);
-      expect(mockAIService.generateNarration).toHaveBeenCalled();
+      expect(result.length).toBeGreaterThan(0);
+      expect(mockAIService.chatCompletion).toHaveBeenCalled();
     });
 
     it('should throw NotFoundException if project not found', async () => {
       mockPrismaService.project.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.generateNarrationScript('nonexistent', 'user-1'),
+        service.generateSpeakerNotes('nonexistent', 'user-1'),
       ).rejects.toThrow(NotFoundException);
     });
   });
 
-  describe('generateAudio', () => {
-    it('should generate audio from text', async () => {
-      mockAIService.textToSpeech.mockResolvedValue(Buffer.from('audio data'));
-
-      const result = await service.generateAudio('Hello world', {
-        voice: 'alloy',
-        speed: 1.0,
-      });
-
-      expect(result).toBeDefined();
-      expect(result).toBeInstanceOf(Buffer);
-    });
-
-    it('should use default voice settings', async () => {
-      await service.generateAudio('Test text');
-
-      expect(mockAIService.textToSpeech).toHaveBeenCalledWith(
-        'Test text',
-        expect.objectContaining({
-          voice: 'alloy',
-        }),
+  describe('generateSlideAudio', () => {
+    it('should generate audio for a slide', async () => {
+      mockAIService.generateSpeech.mockResolvedValueOnce(
+        Buffer.from('audio data'),
       );
-    });
-  });
 
-  describe('exportWithNarration', () => {
-    it('should create a narration export job', async () => {
-      mockPrismaService.project.findFirst.mockResolvedValue(mockProject);
-      mockPrismaService.narrationExport.create.mockResolvedValue({
-        id: 'export-1',
-        projectId: 'project-1',
-        status: 'PENDING',
-        format: 'AUDIO',
-      });
-
-      const result = await service.exportWithNarration('project-1', 'user-1', {
-        format: 'audio',
-        voice: 'alloy',
-        speed: 1.0,
-      });
+      const result = await service.generateSlideAudio(
+        'slide-1',
+        'Hello world',
+        'alloy',
+        1.0,
+      );
 
       expect(result).toBeDefined();
-      expect(result.id).toBe('export-1');
-      expect(mockPrismaService.narrationExport.create).toHaveBeenCalled();
-    });
-  });
-
-  describe('getExportStatus', () => {
-    it('should return export status', async () => {
-      const mockExport = {
-        id: 'export-1',
-        projectId: 'project-1',
-        status: 'COMPLETED',
-        outputUrl: 'https://s3.amazonaws.com/test-bucket/exports/export-1.mp3',
-      };
-
-      mockPrismaService.narrationExport.findUnique.mockResolvedValue(mockExport);
-
-      const result = await service.getExportStatus('export-1', 'user-1');
-
-      expect(result).toBeDefined();
-      expect(result.status).toBe('COMPLETED');
+      expect(result).toHaveProperty('audioUrl');
+      expect(typeof result.duration).toBe('number');
     });
 
-    it('should throw NotFoundException if export not found', async () => {
-      mockPrismaService.narrationExport.findUnique.mockResolvedValue(null);
+    it('should throw when AI service fails', async () => {
+      mockAIService.generateSpeech.mockRejectedValueOnce(
+        new Error('TTS failed'),
+      );
 
       await expect(
-        service.getExportStatus('nonexistent', 'user-1'),
-      ).rejects.toThrow(NotFoundException);
+        service.generateSlideAudio('slide-1', 'Test text', 'alloy', 1.0),
+      ).rejects.toThrow();
     });
   });
 
-  describe('getAvailableVoices', () => {
-    it('should return list of available voices', async () => {
-      const voices = await service.getAvailableVoices();
+  describe('exportVideo', () => {
+    it('should create a video export job', async () => {
+      mockPrismaService.project.findFirst.mockResolvedValue(mockProject);
+      mockPrismaService.videoExportJob.create.mockResolvedValue({
+        id: 'job-1',
+        projectId: 'project-1',
+        format: 'mp4',
+        resolution: '1080p',
+        includeNarration: true,
+        slideDuration: 5,
+        status: 'PENDING',
+        progress: 0,
+        createdAt: new Date(),
+      });
+
+      const result = await service.exportVideo('project-1', 'user-1', {
+        format: 'mp4',
+        resolution: '1080p',
+        includeNarration: true,
+      });
+
+      expect(result).toBeDefined();
+      expect(result.id).toBe('job-1');
+      expect(mockPrismaService.videoExportJob.create).toHaveBeenCalled();
+    });
+  });
+
+  describe('getNarrationProject', () => {
+    it('should return narration project status', async () => {
+      const mockProjectRecord = {
+        id: 'narr-1',
+        projectId: 'project-1',
+        voice: 'alloy',
+        speed: 1.0,
+        slides: [],
+        totalDuration: 10,
+        status: 'completed',
+        createdAt: new Date(),
+      } as any;
+
+      mockPrismaService.narrationProject.findUnique.mockResolvedValue(
+        mockProjectRecord,
+      );
+
+      const result = await service.getNarrationProject('narr-1');
+
+      expect(result).toBeDefined();
+      expect(result?.status).toBe('completed');
+    });
+
+    it('should return null if project not found', async () => {
+      mockPrismaService.narrationProject.findUnique.mockResolvedValue(null);
+
+      const result = await service.getNarrationProject('nonexistent');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('getVoiceOptions', () => {
+    it('should return list of available voices', () => {
+      const voices = service.getVoiceOptions();
 
       expect(voices).toBeInstanceOf(Array);
       expect(voices.length).toBeGreaterThan(0);
       expect(voices[0]).toHaveProperty('id');
       expect(voices[0]).toHaveProperty('name');
-    });
-  });
-
-  describe('estimateDuration', () => {
-    it('should estimate audio duration from text length', () => {
-      // Assuming average speaking rate of ~150 words per minute
-      const text = 'This is a test sentence with ten words in it.';
-      const duration = (service as any).estimateDuration(text);
-
-      expect(duration).toBeGreaterThan(0);
-      expect(duration).toBeLessThan(60); // Should be less than a minute for this text
-    });
-
-    it('should return 0 for empty text', () => {
-      const duration = (service as any).estimateDuration('');
-      expect(duration).toBe(0);
     });
   });
 });

@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 
-interface EcoSettings {
+export interface EcoSettings {
   lowPowerMode: boolean;
   reducedAnimations: boolean;
   compressImages: boolean;
@@ -12,7 +12,7 @@ interface EcoSettings {
   cacheStrategy: 'aggressive' | 'moderate' | 'minimal';
 }
 
-interface EnergyEstimate {
+export interface EnergyEstimate {
   baselineWh: number;
   optimizedWh: number;
   savingsWh: number;
@@ -52,7 +52,9 @@ export class EcoFriendlyService {
     });
 
     const currentSettings = (currentUser?.settings as object) || {};
-    const currentEco = (currentSettings as { eco?: EcoSettings }).eco || this.getDefaultSettings();
+    const currentEco =
+      (currentSettings as { eco?: EcoSettings }).eco ||
+      this.getDefaultSettings();
 
     const newSettings = {
       ...currentSettings,
@@ -70,7 +72,9 @@ export class EcoFriendlyService {
   /**
    * Apply eco presets
    */
-  applyPreset(preset: 'maximum-savings' | 'balanced' | 'quality-first'): EcoSettings {
+  applyPreset(
+    preset: 'maximum-savings' | 'balanced' | 'quality-first',
+  ): EcoSettings {
     const presets: Record<string, EcoSettings> = {
       'maximum-savings': {
         lowPowerMode: true,
@@ -107,12 +111,15 @@ export class EcoFriendlyService {
   /**
    * Optimize presentation for eco-friendly delivery
    */
-  async optimizePresentation(presentationId: string, options: {
-    compressImages?: boolean;
-    removeUnusedAssets?: boolean;
-    optimizeAnimations?: boolean;
-    generateOfflineBundle?: boolean;
-  }) {
+  async optimizePresentation(
+    presentationId: string,
+    options: {
+      compressImages?: boolean;
+      removeUnusedAssets?: boolean;
+      optimizeAnimations?: boolean;
+      generateOfflineBundle?: boolean;
+    },
+  ) {
     const presentation = await this.prisma.project.findUnique({
       where: { id: presentationId },
       include: { slides: true },
@@ -123,21 +130,25 @@ export class EcoFriendlyService {
     }
 
     const optimizations: string[] = [];
-    let originalSize = this.estimateSize(presentation);
+    const originalSize = this.estimateSize(presentation);
     let optimizedSize = originalSize;
 
     // Image compression
     if (options.compressImages) {
       const imageReduction = originalSize * 0.3; // Estimate 30% reduction
       optimizedSize -= imageReduction;
-      optimizations.push(`Compressed images: saved ~${Math.round(imageReduction / 1024)}KB`);
+      optimizations.push(
+        `Compressed images: saved ~${Math.round(imageReduction / 1024)}KB`,
+      );
     }
 
     // Remove unused assets
     if (options.removeUnusedAssets) {
       const unusedReduction = originalSize * 0.1;
       optimizedSize -= unusedReduction;
-      optimizations.push(`Removed unused assets: saved ~${Math.round(unusedReduction / 1024)}KB`);
+      optimizations.push(
+        `Removed unused assets: saved ~${Math.round(unusedReduction / 1024)}KB`,
+      );
     }
 
     // Optimize animations
@@ -152,7 +163,8 @@ export class EcoFriendlyService {
       optimizations.push('Generated offline bundle for reduced network usage');
     }
 
-    const savingsPercent = ((originalSize - optimizedSize) / originalSize) * 100;
+    const savingsPercent =
+      ((originalSize - optimizedSize) / originalSize) * 100;
 
     return {
       presentationId,
@@ -169,7 +181,10 @@ export class EcoFriendlyService {
   /**
    * Calculate energy impact
    */
-  calculateEnergyImpact(originalBytes: number, optimizedBytes: number): EnergyEstimate {
+  calculateEnergyImpact(
+    originalBytes: number,
+    optimizedBytes: number,
+  ): EnergyEstimate {
     // Rough estimates based on data transfer energy consumption
     // ~0.06 kWh per GB of data transferred
     const energyPerByte = 0.00000006; // Wh per byte
@@ -181,7 +196,9 @@ export class EcoFriendlyService {
       baselineWh: Math.round(baselineWh * 1000) / 1000,
       optimizedWh: Math.round(optimizedWh * 1000) / 1000,
       savingsWh: Math.round((baselineWh - optimizedWh) * 1000) / 1000,
-      savingsPercent: Math.round(((baselineWh - optimizedWh) / baselineWh) * 100),
+      savingsPercent: Math.round(
+        ((baselineWh - optimizedWh) / baselineWh) * 100,
+      ),
     };
   }
 
@@ -261,13 +278,21 @@ export class EcoFriendlyService {
   /**
    * Track eco metrics
    */
-  async trackEcoMetrics(userId: string, metrics: {
+  trackEcoMetrics(
+    userId: string,
+    metrics: {
+      sessionDuration: number;
+      dataTransferred: number;
+      animationsReduced: boolean;
+      darkModeUsed: boolean;
+      offlineViewTime: number;
+    },
+  ): Promise<{
+    tracked: boolean;
     sessionDuration: number;
-    dataTransferred: number;
-    animationsReduced: boolean;
-    darkModeUsed: boolean;
-    offlineViewTime: number;
-  }) {
+    estimatedEnergySavedWh: number;
+    ecoScore: number;
+  }> {
     // Calculate estimated savings
     const baselineEnergy = metrics.dataTransferred * 0.00000006; // Wh
     let savings = 0;
@@ -275,15 +300,18 @@ export class EcoFriendlyService {
     if (metrics.animationsReduced) savings += baselineEnergy * 0.15;
     if (metrics.darkModeUsed) savings += baselineEnergy * 0.1;
     if (metrics.offlineViewTime > 0) {
-      savings += (metrics.offlineViewTime / metrics.sessionDuration) * baselineEnergy * 0.5;
+      savings +=
+        (metrics.offlineViewTime / metrics.sessionDuration) *
+        baselineEnergy *
+        0.5;
     }
 
-    return {
+    return Promise.resolve({
       tracked: true,
       sessionDuration: metrics.sessionDuration,
       estimatedEnergySavedWh: Math.round(savings * 1000) / 1000,
       ecoScore: this.calculateEcoScore(metrics),
-    };
+    });
   }
 
   /**
@@ -339,7 +367,7 @@ export class EcoFriendlyService {
       },
       {
         category: 'streaming',
-        tip: 'Use lower quality video when HD isn\'t necessary',
+        tip: "Use lower quality video when HD isn't necessary",
         impact: 'Can reduce energy use by 50-70%',
       },
     ];

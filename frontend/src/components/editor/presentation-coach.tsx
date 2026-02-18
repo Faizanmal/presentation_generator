@@ -103,7 +103,7 @@ export function PresentationCoach({
 
   const analyzeMutation = useMutation({
     mutationFn: () =>
-      api.post('/ai/coach/analyze', {
+      api.coach.analyze({
         title,
         slides: slides.map((s) => ({
           content: s.content,

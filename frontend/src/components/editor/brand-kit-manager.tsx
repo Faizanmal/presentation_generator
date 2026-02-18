@@ -144,21 +144,16 @@ export function BrandKitManager({ onApplyBrandKit }: BrandKitManagerProps) {
     // Fetch brand kits
     const { data: brandKits = [], refetch } = useQuery<BrandKit[]>({
         queryKey: ['brand-kits'],
-        queryFn: async () => {
-            const response = await api.get<BrandKit[]>('/brand-kits');
-            return response.data;
-        },
+        queryFn: () => api.brandKit.list() as Promise<BrandKit[]>,
     });
 
     // Save brand kit mutation
     const saveMutation = useMutation<BrandKit, Error, Partial<BrandKit>>({
         mutationFn: async (kit: Partial<BrandKit>) => {
             if (kit.id) {
-                const response = await api.patch<BrandKit>(`/brand-kits/${kit.id}`, kit);
-                return response.data;
+                return await api.brandKit.update(kit.id, kit) as BrandKit;
             }
-            const response = await api.post<BrandKit>('/brand-kits', kit);
-            return response.data;
+            return await api.brandKit.create(kit as Parameters<typeof api.createBrandKit>[0]) as BrandKit;
         },
         onSuccess: () => {
             refetch();
@@ -168,9 +163,7 @@ export function BrandKitManager({ onApplyBrandKit }: BrandKitManagerProps) {
 
     // Delete brand kit mutation
     const deleteMutation = useMutation({
-        mutationFn: async (kitId: string) => {
-            await api.delete(`/brand-kits/${kitId}`);
-        },
+        mutationFn: (kitId: string) => api.brandKit.delete(kitId),
         onSuccess: () => refetch(),
     });
 

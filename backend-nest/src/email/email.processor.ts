@@ -399,24 +399,35 @@ export class EmailProcessor extends WorkerHost {
     try {
       // Use Handlebars to render the template with context
       const Handlebars = await import('handlebars');
-      const { readFileSync } = await import('fs');
+      const { promises: fsPromises } = await import('fs');
       const { join } = await import('path');
 
       const templatePath = join(__dirname, 'templates', `${template}.hbs`);
-      const templateContent = readFileSync(templatePath, 'utf-8');
+      const templateContent = await fsPromises.readFile(templatePath, 'utf-8');
       const compiled = Handlebars.compile(templateContent);
       return compiled(context);
     } catch (error) {
-      this.logger.warn(
-        `Failed to render template '${template}': ${error.message}`,
-      );
+      const message =
+        error instanceof Error ? error.message : 'Unknown render error';
+      this.logger.warn(`Failed to render template '${template}': ${message}`);
+
+      const ctx = context;
+      const title =
+        (typeof ctx.title === 'string' && ctx.title) ||
+        (typeof ctx.subject === 'string' && ctx.subject) ||
+        'Notification';
+      const body =
+        (typeof ctx.message === 'string' && ctx.message) ||
+        (typeof ctx.otp === 'string' && ctx.otp) ||
+        '';
+
       // Fallback: create a simple HTML email
       return `
-                <div style="font-family: Arial, sans-serif; padding: 20px;">
-                    <h2>${String((context as any).title ?? (context as any).subject ?? 'Notification')}</h2>
-                    <p>${String((context as any).message ?? (context as any).otp ?? '')}</p>
-                </div>
-            `;
+        <div style="font-family: Arial, sans-serif; padding: 20px;">
+          <h2>${title}</h2>
+          <p>${body}</p>
+        </div>
+      `;
     }
   }
 
@@ -465,6 +476,7 @@ export class EmailProcessor extends WorkerHost {
   }
 
   // ─── Worker Events ─────────────────────────────────────────
+  /* eslint-disable @typescript-eslint/unbound-method */
   @OnWorkerEvent('completed')
   onCompleted(job: Job) {
     this.logger.debug(`Job ${job.id} (${job.name}) completed successfully`);
@@ -492,4 +504,5 @@ export class EmailProcessor extends WorkerHost {
   onStalled(jobId: string) {
     this.logger.warn(`Job ${jobId} has stalled`);
   }
+  /* eslint-enable @typescript-eslint/unbound-method */
 }

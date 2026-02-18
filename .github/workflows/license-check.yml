@@ -1,0 +1,40 @@
+name: License check
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  license-scan:
+    name: Scan dependency licenses
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install backend dependencies
+        working-directory: backend-nest
+        run: npm ci --prefer-offline --no-audit --progress=false
+
+      - name: Generate license data (JSON)
+        working-directory: backend-nest
+        run: npx --yes license-checker --production --json > license-checker.json
+
+      - name: Fail on disallowed licenses
+        working-directory: backend-nest
+        run: |
+          node -e "const fs=require('fs');const data=JSON.parse(fs.readFileSync('license-checker.json','utf8'));const bad=[];for(const [k,v] of Object.entries(data)){const L=(v.licenses||'').toLowerCase();if(/\b(gpl|agpl|lgpl|unlicensed|unlicense)\b/.test(L))bad.push(`${k} -> ${v.licenses}`);}if(bad.length){console.error('Disallowed licenses found:\n'+bad.join('\n'));process.exit(1);}console.log('No disallowed licenses found');"
+
+      - name: Upload license report
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-report
+          path: backend-nest/license-checker.json

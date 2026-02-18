@@ -539,7 +539,7 @@ export class IntegrationsService {
       throw new BadRequestException('Zoom not connected');
     }
     this.assertIntegration(integrationRaw);
-    const integration = integrationRaw as LocalIntegration;
+    const integration = integrationRaw;
 
     const accessToken = await this.ensureValidToken(integration);
 
@@ -642,7 +642,7 @@ export class IntegrationsService {
       throw new BadRequestException('Slack not connected');
     }
     this.assertIntegration(integrationRaw);
-    const integration = integrationRaw as LocalIntegration;
+    const integration = integrationRaw;
 
     const response = await axios.get(
       'https://slack.com/api/conversations.list',
@@ -709,7 +709,7 @@ export class IntegrationsService {
       throw new BadRequestException('Figma not connected');
     }
     this.assertIntegration(integrationRaw);
-    const integration = integrationRaw as LocalIntegration;
+    const integration = integrationRaw;
 
     const response = await axios.get(
       `https://api.figma.com/v1/files/${fileKey}`,

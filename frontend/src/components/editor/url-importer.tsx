@@ -15,6 +15,7 @@ import {
     Layout,
     Image as ImageIcon,
     RefreshCw,
+    ShieldCheck,
 } from "lucide-react";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -83,6 +84,8 @@ const STYLE_OPTIONS = [
 
 const SLIDE_COUNT_OPTIONS = [4, 6, 8, 10, 12, 15];
 
+const ALLOWED_DOMAINS_TIP = "Allowed: wikipedia.org, creativecommons.org, gov/edu sites, unsplash.com";
+
 export function URLImporter({ onImport, onClose }: URLImporterProps) {
     const [activeTab, setActiveTab] = useState<'url' | 'youtube' | 'document'>('url');
     const [url, setUrl] = useState('');
@@ -91,23 +94,34 @@ export function URLImporter({ onImport, onClose }: URLImporterProps) {
     const [includeImages] = useState(true);
     const [importResult, setImportResult] = useState<ImportResult | null>(null);
     const [showPreview, setShowPreview] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     // Import mutation
     const importMutation = useMutation({
         mutationFn: async () => {
+            setError(null);
             const endpoint = activeTab === 'youtube' ? '/ai/import-youtube' : '/ai/import-url';
-            const response = await api.post(endpoint, {
-                url,
-                targetSlides: slideCount,
-                style,
-                includeImages,
-            });
-            return response.data as ImportResult;
+            try {
+                const response = await api.post(endpoint, {
+                    url,
+                    targetSlides: slideCount,
+                    style,
+                    includeImages,
+                });
+                return response.data as ImportResult;
+            } catch (err: any) {
+                const msg = err.response?.data?.message || err.message || 'Import failed';
+                console.error("Import error:", msg); // Log explicitly
+                throw new Error(msg);
+            }
         },
         onSuccess: (data) => {
             setImportResult(data);
             setShowPreview(true);
         },
+        onError: (err) => {
+            setError(err.message);
+        }
     });
 
     const handleImport = () => {
@@ -143,7 +157,7 @@ export function URLImporter({ onImport, onClose }: URLImporterProps) {
                 </div>
                 <h2 className="mt-4 text-2xl font-bold">Import from URL</h2>
                 <p className="mt-1 text-muted-foreground">
-                    Transform any webpage, video, or document into a presentation
+                    Transform permissible web content into a presentation
                 </p>
             </div>
 
@@ -167,10 +181,15 @@ export function URLImporter({ onImport, onClose }: URLImporterProps) {
                                 id="url-input"
                                 value={url}
                                 onChange={(e) => setUrl(e.target.value)}
-                                placeholder="https://example.com/article"
+                                placeholder="https://wikipedia.org/wiki/..."
                                 className="pl-10"
                             />
                         </div>
+                        <div className="flex items-start gap-2 text-xs text-muted-foreground mt-1">
+                            <ShieldCheck className="h-4 w-4 text-green-600 mt-0.5" />
+                            <p>{ALLOWED_DOMAINS_TIP}</p>
+                        </div>
+
                         {url && !isValidUrl(url) && (
                             <p className="text-xs text-destructive">Please enter a valid URL</p>
                         )}
@@ -225,6 +244,14 @@ export function URLImporter({ onImport, onClose }: URLImporterProps) {
                 </TabsContent>
             </Tabs>
 
+            {/* Error Message */}
+            {error && (
+                <div className="p-3 bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-md flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    {error}
+                </div>
+            )}
+
             {/* Import Options */}
             <Card>
                 <CardHeader className="pb-3">
@@ -276,6 +303,10 @@ export function URLImporter({ onImport, onClose }: URLImporterProps) {
                                 </Label>
                             ))}
                         </RadioGroup>
+                    </div>
+
+                    <div className="text-xs text-muted-foreground pt-2 border-t">
+                        By importing content, you confirm that you have the rights to use the content/media from the source URL.
                     </div>
                 </CardContent>
             </Card>

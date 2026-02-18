@@ -21,18 +21,116 @@ export interface ChartDataPoint {
   value: number;
 }
 
+interface GoogleSearchItem {
+  title?: string;
+  snippet?: string;
+  link?: string;
+  displayLink?: string;
+}
+
+interface GoogleSearchResponse {
+  items?: GoogleSearchItem[];
+  searchInformation?: unknown;
+}
+
+interface BingSearchItem {
+  name?: string;
+  snippet?: string;
+  url?: string;
+  displayUrl?: string;
+}
+
+interface BingSearchResponse {
+  webPages?: {
+    value?: BingSearchItem[];
+  };
+}
+
+// Tavily Search Interfaces
+interface TavilySearchItem {
+  title: string;
+  content: string;
+  url: string;
+}
+
+interface TavilySearchResponse {
+  results?: TavilySearchItem[];
+  answer?: string;
+}
+
 @Injectable()
 export class RealTimeDataService {
   private readonly logger = new Logger(RealTimeDataService.name);
   private readonly googleApiKey: string;
   private readonly googleSearchEngineId: string;
   private readonly bingApiKey: string;
+  private readonly tavilyApiKey: string;
 
   constructor(private readonly configService: ConfigService) {
     this.googleApiKey = this.configService.get<string>('GOOGLE_API_KEY') || '';
     this.googleSearchEngineId =
       this.configService.get<string>('GOOGLE_SEARCH_ENGINE_ID') || '';
     this.bingApiKey = this.configService.get<string>('BING_API_KEY') || '';
+    this.tavilyApiKey = this.configService.get<string>('TAVILY_API_KEY') || '';
+  }
+
+  /**
+   * Search using Tavily API (Optimized for AI/LLM context)
+   */
+  async searchTavily(
+    query: string,
+    limit: number = 5,
+  ): Promise<RealTimeDataResult> {
+    if (!this.tavilyApiKey) {
+      this.logger.warn('Tavily API key not configured');
+      return this.getMockSearchResults(query, limit);
+    }
+
+    try {
+      const response = await axios.post(
+        'https://api.tavily.com/search',
+        {
+          query,
+          search_depth: 'basic',
+          max_results: limit,
+          include_answer: true,
+          include_raw_content: false,
+        },
+        {
+          headers: {
+            'api-key': this.tavilyApiKey,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+
+      const data = response.data as TavilySearchResponse;
+      const results: SearchResult[] =
+        data.results?.map((item) => ({
+          title: item.title || '',
+          snippet: item.content || item.title || '',
+          link: item.url || '',
+          displayLink: new URL(item.url).hostname,
+        })) || [];
+
+      // Include the direct answer if available as a "featured" result or statistics
+      let statistics: unknown = undefined;
+      if (data.answer) {
+        statistics = { answer: data.answer };
+      }
+
+      return {
+        query,
+        results,
+        statistics,
+        timestamp: new Date(),
+      };
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Tavily search failed: ${errorMessage}`);
+      return this.getMockSearchResults(query, limit);
+    }
   }
 
   /**
@@ -44,11 +142,11 @@ export class RealTimeDataService {
   ): Promise<RealTimeDataResult> {
     if (!this.googleApiKey || !this.googleSearchEngineId) {
       this.logger.warn('Google API credentials not configured');
-      return this.getMockSearchResults(query, limit);
+      return this.getMockSearchResults(query, limit); // Fallback to mock if config missing
     }
 
     try {
-      const response = await axios.get(
+      const response = await axios.get<GoogleSearchResponse>(
         'https://www.googleapis.com/customsearch/v1',
         {
           params: {
@@ -60,13 +158,16 @@ export class RealTimeDataService {
         },
       );
 
-      const results: SearchResult[] =
-        response.data.items?.map((item: Record<string, unknown>) => ({
-          title: item.title,
-          snippet: item.snippet,
-          link: item.link,
-          displayLink: item.displayLink,
-        })) || [];
+      const items = response.data.items || [];
+      // If google returns valid but empty items, it's a valid result, not an error.
+      // But for our fallback logic, empty results might trigger next provider.
+
+      const results: SearchResult[] = items.map((item) => ({
+        title: item.title || '',
+        snippet: item.snippet || '',
+        link: item.link || '',
+        displayLink: item.displayLink,
+      }));
 
       return {
         query,
@@ -78,7 +179,11 @@ export class RealTimeDataService {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Google search failed: ${errorMessage}`);
-      return this.getMockSearchResults(query, limit);
+      // Don't return mock here, throw or return empty so the main search loop can try next provider
+      // But returning mock here was the previous behavior.
+      // Let's modify the main search method to handle fallbacks properly instead of relying on this returning mock.
+      // For now, to keep signature, we return empty results if failed, to let caller decide.
+      return { query, results: [], timestamp: new Date() };
     }
   }
 
@@ -91,11 +196,11 @@ export class RealTimeDataService {
   ): Promise<RealTimeDataResult> {
     if (!this.bingApiKey) {
       this.logger.warn('Bing API key not configured');
-      return this.getMockSearchResults(query, limit);
+      return { query, results: [], timestamp: new Date() };
     }
 
     try {
-      const response = await axios.get(
+      const response = await axios.get<BingSearchResponse>(
         'https://api.bing.microsoft.com/v7.0/search',
         {
           params: {
@@ -109,10 +214,10 @@ export class RealTimeDataService {
       );
 
       const results: SearchResult[] =
-        response.data.webPages?.value?.map((item: Record<string, unknown>) => ({
-          title: item.name,
-          snippet: item.snippet,
-          link: item.url,
+        response.data.webPages?.value?.map((item) => ({
+          title: item.name || '',
+          snippet: item.snippet || '',
+          link: item.url || '',
           displayLink: item.displayUrl,
         })) || [];
 
@@ -125,28 +230,38 @@ export class RealTimeDataService {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Bing search failed: ${errorMessage}`);
-      return this.getMockSearchResults(query, limit);
+      return { query, results: [], timestamp: new Date() };
     }
   }
 
   /**
-   * Smart search that tries Google first, falls back to Bing
+   * Smart search with fallback: Tavily -> Google -> Bing -> Mock
    */
   async search(query: string, limit: number = 5): Promise<RealTimeDataResult> {
-    // Try Google first
+    let result: RealTimeDataResult | null = null;
+
+    // 1. Try Tavily (Best for AI context)
+    if (this.tavilyApiKey) {
+      result = await this.searchTavily(query, limit);
+      if (result.results.length > 0) return result;
+    }
+
+    // 2. Try Google
     if (this.googleApiKey && this.googleSearchEngineId) {
-      const result = await this.searchGoogle(query, limit);
-      if (result.results.length > 0) {
-        return result;
-      }
+      result = await this.searchGoogle(query, limit);
+      if (result.results.length > 0) return result;
     }
 
-    // Fallback to Bing
+    // 3. Try Bing
     if (this.bingApiKey) {
-      return await this.searchBing(query, limit);
+      result = await this.searchBing(query, limit);
+      if (result.results.length > 0) return result;
     }
 
-    // If all else fails, return mock data
+    // 4. Fallback to Mock Data
+    this.logger.warn(
+      `All search providers failed or returned no results for: "${query}". Using fallback.`,
+    );
     return this.getMockSearchResults(query, limit);
   }
 
@@ -172,7 +287,7 @@ export class RealTimeDataService {
       ];
 
       for (const pattern of patterns) {
-        let match;
+        let match: RegExpExecArray | null = null;
         while ((match = pattern.exec(result.snippet)) !== null) {
           const label = match[1].trim();
           const value = parseFloat(match[2]);

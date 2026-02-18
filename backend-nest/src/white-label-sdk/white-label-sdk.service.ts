@@ -1,4 +1,9 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import * as crypto from 'crypto';
@@ -36,13 +41,16 @@ export class WhiteLabelSdkService {
   /**
    * Create SDK configuration for organization
    */
-  async createSdkConfiguration(organizationId: string, config: {
-    name: string;
-    branding: BrandingConfig;
-    features: FeatureConfig;
-    allowedDomains: string[];
-    plan?: PlanType;
-  }) {
+  async createSdkConfiguration(
+    organizationId: string,
+    config: {
+      name: string;
+      branding: BrandingConfig;
+      features: FeatureConfig;
+      allowedDomains: string[];
+      plan?: PlanType;
+    },
+  ) {
     // Generate SDK key
     const sdkKey = `sdk_${crypto.randomBytes(24).toString('hex')}`;
 
@@ -102,7 +110,9 @@ export class WhiteLabelSdkService {
         ...(updates.name && { name: updates.name }),
         ...(updates.branding && { branding: updates.branding as object }),
         ...(updates.features && { features: updates.features as object }),
-        ...(updates.allowedDomains && { allowedDomains: updates.allowedDomains }),
+        ...(updates.allowedDomains && {
+          allowedDomains: updates.allowedDomains,
+        }),
       },
     });
   }
@@ -110,11 +120,14 @@ export class WhiteLabelSdkService {
   /**
    * Create SDK instance for a client
    */
-  async createInstance(sdkConfigId: string, clientInfo: {
-    domain: string;
-    clientName: string;
-    customBranding?: Partial<BrandingConfig>;
-  }) {
+  async createInstance(
+    sdkConfigId: string,
+    clientInfo: {
+      domain: string;
+      clientName: string;
+      customBranding?: Partial<BrandingConfig>;
+    },
+  ) {
     const config = await this.prisma.sDKConfiguration.findUnique({
       where: { id: sdkConfigId },
     });
@@ -124,7 +137,10 @@ export class WhiteLabelSdkService {
     }
 
     // Check domain is allowed
-    if (!config.allowedDomains.includes(clientInfo.domain) && !config.allowedDomains.includes('*')) {
+    if (
+      !config.allowedDomains.includes(clientInfo.domain) &&
+      !config.allowedDomains.includes('*')
+    ) {
       throw new BadRequestException('Domain not allowed');
     }
 
@@ -145,12 +161,18 @@ export class WhiteLabelSdkService {
   /**
    * Get embed code for SDK
    */
-  getEmbedCode(sdkKey: string, options?: {
-    containerId?: string;
-    theme?: 'light' | 'dark';
-    locale?: string;
-  }) {
-    const baseUrl = this.configService.get('SDK_CDN_URL', 'https://sdk.example.com');
+  getEmbedCode(
+    sdkKey: string,
+    options?: {
+      containerId?: string;
+      theme?: 'light' | 'dark';
+      locale?: string;
+    },
+  ) {
+    const baseUrl = this.configService.get(
+      'SDK_CDN_URL',
+      'https://sdk.example.com',
+    );
     const containerId = options?.containerId || 'presentation-editor';
 
     return {
@@ -219,10 +241,13 @@ export default MyPresentationEditor;
   /**
    * Track SDK usage
    */
-  async trackUsage(instanceKey: string, event: {
-    type: string;
-    metadata?: object;
-  }) {
+  async trackUsage(
+    instanceKey: string,
+    event: {
+      type: string;
+      metadata?: object;
+    },
+  ) {
     const instance = await this.prisma.sDKInstance.findFirst({
       where: { instanceKey },
     });
@@ -249,13 +274,15 @@ export default MyPresentationEditor;
     });
 
     const totalUsage = instances.reduce((sum, i) => sum + i.usageCount, 0);
-    const activeInstances = instances.filter(i => i.status === 'active').length;
+    const activeInstances = instances.filter(
+      (i) => i.status === 'active',
+    ).length;
 
     return {
       totalInstances: instances.length,
       activeInstances,
       totalUsage,
-      instancesByDomain: instances.map(i => ({
+      instancesByDomain: instances.map((i) => ({
         domain: i.domain,
         clientName: i.clientName,
         usage: i.usageCount,
@@ -301,7 +328,8 @@ export default MyPresentationEditor;
    */
   getDocumentation() {
     return {
-      overview: 'The Presentation SDK allows you to embed our presentation editor into your application.',
+      overview:
+        'The Presentation SDK allows you to embed our presentation editor into your application.',
       quickStart: {
         steps: [
           '1. Create an SDK configuration in your dashboard',
@@ -312,9 +340,18 @@ export default MyPresentationEditor;
       },
       methods: [
         { name: 'init(config)', description: 'Initialize the SDK' },
-        { name: 'createPresentation()', description: 'Create a new presentation' },
-        { name: 'loadPresentation(id)', description: 'Load an existing presentation' },
-        { name: 'exportPresentation(format)', description: 'Export to PDF, PPTX, etc.' },
+        {
+          name: 'createPresentation()',
+          description: 'Create a new presentation',
+        },
+        {
+          name: 'loadPresentation(id)',
+          description: 'Load an existing presentation',
+        },
+        {
+          name: 'exportPresentation(format)',
+          description: 'Export to PDF, PPTX, etc.',
+        },
         { name: 'destroy()', description: 'Clean up SDK instance' },
       ],
       events: [

@@ -6,7 +6,7 @@ import {
   ExecutionContext,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
 
 export type SubscriptionTier = 'FREE' | 'PRO' | 'ENTERPRISE';
 
@@ -33,74 +33,75 @@ export interface SubscriptionLimits {
   };
 }
 
-export const SUBSCRIPTION_LIMITS: Record<SubscriptionTier, SubscriptionLimits> = {
-  FREE: {
-    maxProjects: 5,
-    maxSlidesPerProject: 15,
-    maxBlocksPerSlide: 20,
-    maxCollaboratorsPerProject: 2,
-    maxStorageMB: 100,
-    aiGenerationsPerMonth: 10,
-    imageGenerationsPerMonth: 5,
-    exportsPerMonth: 10,
-    maxFileSizeMB: 5,
-    features: {
-      customBranding: false,
-      analytics: false,
-      advancedExport: false,
-      videoExport: false,
-      prioritySupport: false,
-      sso: false,
-      auditLogs: false,
-      whiteLabeling: false,
-      apiAccess: false,
+export const SUBSCRIPTION_LIMITS: Record<SubscriptionTier, SubscriptionLimits> =
+  {
+    FREE: {
+      maxProjects: 5,
+      maxSlidesPerProject: 15,
+      maxBlocksPerSlide: 20,
+      maxCollaboratorsPerProject: 2,
+      maxStorageMB: 100,
+      aiGenerationsPerMonth: 10,
+      imageGenerationsPerMonth: 5,
+      exportsPerMonth: 10,
+      maxFileSizeMB: 5,
+      features: {
+        customBranding: false,
+        analytics: false,
+        advancedExport: false,
+        videoExport: false,
+        prioritySupport: false,
+        sso: false,
+        auditLogs: false,
+        whiteLabeling: false,
+        apiAccess: false,
+      },
     },
-  },
-  PRO: {
-    maxProjects: 50,
-    maxSlidesPerProject: 100,
-    maxBlocksPerSlide: 50,
-    maxCollaboratorsPerProject: 10,
-    maxStorageMB: 5000,
-    aiGenerationsPerMonth: 200,
-    imageGenerationsPerMonth: 100,
-    exportsPerMonth: 100,
-    maxFileSizeMB: 50,
-    features: {
-      customBranding: true,
-      analytics: true,
-      advancedExport: true,
-      videoExport: true,
-      prioritySupport: true,
-      sso: false,
-      auditLogs: false,
-      whiteLabeling: false,
-      apiAccess: true,
+    PRO: {
+      maxProjects: 50,
+      maxSlidesPerProject: 100,
+      maxBlocksPerSlide: 50,
+      maxCollaboratorsPerProject: 10,
+      maxStorageMB: 5000,
+      aiGenerationsPerMonth: 200,
+      imageGenerationsPerMonth: 100,
+      exportsPerMonth: 100,
+      maxFileSizeMB: 50,
+      features: {
+        customBranding: true,
+        analytics: true,
+        advancedExport: true,
+        videoExport: true,
+        prioritySupport: true,
+        sso: false,
+        auditLogs: false,
+        whiteLabeling: false,
+        apiAccess: true,
+      },
     },
-  },
-  ENTERPRISE: {
-    maxProjects: -1, // unlimited
-    maxSlidesPerProject: -1,
-    maxBlocksPerSlide: -1,
-    maxCollaboratorsPerProject: -1,
-    maxStorageMB: -1,
-    aiGenerationsPerMonth: -1,
-    imageGenerationsPerMonth: -1,
-    exportsPerMonth: -1,
-    maxFileSizeMB: 200,
-    features: {
-      customBranding: true,
-      analytics: true,
-      advancedExport: true,
-      videoExport: true,
-      prioritySupport: true,
-      sso: true,
-      auditLogs: true,
-      whiteLabeling: true,
-      apiAccess: true,
+    ENTERPRISE: {
+      maxProjects: -1, // unlimited
+      maxSlidesPerProject: -1,
+      maxBlocksPerSlide: -1,
+      maxCollaboratorsPerProject: -1,
+      maxStorageMB: -1,
+      aiGenerationsPerMonth: -1,
+      imageGenerationsPerMonth: -1,
+      exportsPerMonth: -1,
+      maxFileSizeMB: 200,
+      features: {
+        customBranding: true,
+        analytics: true,
+        advancedExport: true,
+        videoExport: true,
+        prioritySupport: true,
+        sso: true,
+        auditLogs: true,
+        whiteLabeling: true,
+        apiAccess: true,
+      },
     },
-  },
-};
+  };
 
 export const QUOTA_KEY = 'subscription_quota';
 
@@ -108,7 +109,11 @@ export const QUOTA_KEY = 'subscription_quota';
  * Decorator to specify which quota to check
  */
 export const RequireQuota = (quotaType: keyof UsageQuotas) => {
-  return (target: object, key?: string | symbol, descriptor?: PropertyDescriptor) => {
+  return (
+    target: object,
+    key?: string | symbol,
+    descriptor?: PropertyDescriptor,
+  ) => {
     if (descriptor) {
       Reflect.defineMetadata(QUOTA_KEY, quotaType, descriptor.value);
       return descriptor;
@@ -222,7 +227,12 @@ export class SubscriptionLimitsService {
   async canPerformAction(
     userId: string,
     action: keyof UsageQuotas,
-  ): Promise<{ allowed: boolean; reason?: string; current: number; limit: number }> {
+  ): Promise<{
+    allowed: boolean;
+    reason?: string;
+    current: number;
+    limit: number;
+  }> {
     const tier = await this.getUserTier(userId);
     const limits = this.getLimits(tier);
     const usage = await this.getCurrentUsage(userId);
@@ -292,7 +302,10 @@ export class SubscriptionLimitsService {
   /**
    * Check if user can add more collaborators
    */
-  async canAddCollaborator(userId: string, projectId: string): Promise<boolean> {
+  async canAddCollaborator(
+    userId: string,
+    projectId: string,
+  ): Promise<boolean> {
     const tier = await this.getUserTier(userId);
     const limits = this.getLimits(tier);
 
@@ -310,7 +323,10 @@ export class SubscriptionLimitsService {
   /**
    * Check if a feature is available for the user
    */
-  async hasFeature(userId: string, feature: keyof SubscriptionLimits['features']): Promise<boolean> {
+  async hasFeature(
+    userId: string,
+    feature: keyof SubscriptionLimits['features'],
+  ): Promise<boolean> {
     const tier = await this.getUserTier(userId);
     const limits = this.getLimits(tier);
     return limits.features[feature];
@@ -319,7 +335,11 @@ export class SubscriptionLimitsService {
   /**
    * Log usage for tracking
    */
-  async logUsage(userId: string, action: string, metadata?: Record<string, unknown>): Promise<void> {
+  async logUsage(
+    userId: string,
+    action: string,
+    metadata?: Record<string, unknown>,
+  ): Promise<void> {
     await this.prisma.activityLog.create({
       data: {
         userId,
@@ -341,7 +361,10 @@ export class SubscriptionQuotaGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const quotaType = this.reflector.get<keyof UsageQuotas>(QUOTA_KEY, context.getHandler());
+    const quotaType = this.reflector.get<keyof UsageQuotas>(
+      QUOTA_KEY,
+      context.getHandler(),
+    );
 
     if (!quotaType) {
       return true;
@@ -354,7 +377,10 @@ export class SubscriptionQuotaGuard implements CanActivate {
       throw new ForbiddenException('Authentication required');
     }
 
-    const result = await this.subscriptionLimitsService.canPerformAction(user.id, quotaType);
+    const result = await this.subscriptionLimitsService.canPerformAction(
+      user.id,
+      quotaType,
+    );
 
     if (!result.allowed) {
       throw new ForbiddenException(result.reason);

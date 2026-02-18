@@ -16,9 +16,11 @@ export class PublicApiGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
-    
+
     // Get API key from header
-    const apiKey = request.headers['x-api-key'] || request.headers['authorization']?.replace('Bearer ', '');
+    const apiKey =
+      request.headers['x-api-key'] ||
+      request.headers['authorization']?.replace('Bearer ', '');
 
     if (!apiKey) {
       throw new UnauthorizedException('API key required');
@@ -44,10 +46,18 @@ export class PublicApiGuard implements CanActivate {
     response.setHeader('X-RateLimit-Reset', rateLimit.resetAt);
 
     // Check required scope
-    const requiredScope = this.reflector.get<string>('apiScope', context.getHandler());
-    
-    if (requiredScope && !this.apiService.hasScope(validation.scopes!, requiredScope)) {
-      throw new UnauthorizedException(`Missing required scope: ${requiredScope}`);
+    const requiredScope = this.reflector.get<string>(
+      'apiScope',
+      context.getHandler(),
+    );
+
+    if (
+      requiredScope &&
+      !this.apiService.hasScope(validation.scopes!, requiredScope)
+    ) {
+      throw new UnauthorizedException(
+        `Missing required scope: ${requiredScope}`,
+      );
     }
 
     // Attach user info to request
@@ -60,13 +70,15 @@ export class PublicApiGuard implements CanActivate {
     // Log usage (async, don't wait)
     const startTime = Date.now();
     response.on('finish', () => {
-      this.apiService.logUsage(
-        validation.keyId!,
-        request.path,
-        request.method,
-        response.statusCode,
-        Date.now() - startTime,
-      ).catch(() => {});
+      this.apiService
+        .logUsage(
+          validation.keyId!,
+          request.path,
+          request.method,
+          response.statusCode,
+          Date.now() - startTime,
+        )
+        .catch(() => {});
     });
 
     return true;

@@ -2,7 +2,6 @@ import {
   Controller,
   Get,
   Post,
-  Patch,
   Delete,
   Body,
   Param,
@@ -11,7 +10,7 @@ import {
   Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ABTestingService } from './ab-testing.service';
 
 class CreateTestDto {
@@ -50,7 +49,7 @@ class GenerateVariationsDto {
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class ABTestingController {
-  constructor(private readonly abTestingService: ABTestingService) {}
+  constructor(private readonly abTestingService: ABTestingService) { }
 
   @Post()
   @ApiOperation({ summary: 'Create a new A/B test' })
@@ -131,10 +130,7 @@ export class ABTestingController {
 
   @Post(':id/result')
   @ApiOperation({ summary: 'Record a test result' })
-  async recordResult(
-    @Param('id') id: string,
-    @Body() dto: RecordResultDto,
-  ) {
+  async recordResult(@Param('id') id: string, @Body() dto: RecordResultDto) {
     return this.abTestingService.recordResult(id, dto);
   }
 

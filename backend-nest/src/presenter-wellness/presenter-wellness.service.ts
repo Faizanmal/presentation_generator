@@ -11,7 +11,7 @@ interface WellnessMetrics {
   stressIndicators: number;
 }
 
-interface BreakReminder {
+export interface BreakReminder {
   type: 'hydration' | 'stretch' | 'eye-rest' | 'breathing' | 'posture';
   message: string;
   intervalMinutes: number;
@@ -116,7 +116,8 @@ export class PresenterWellnessService {
     }
 
     const endTime = new Date();
-    const duration = (endTime.getTime() - session.startTime.getTime()) / 1000 / 60; // minutes
+    const duration =
+      (endTime.getTime() - session.startTime.getTime()) / 1000 / 60; // minutes
 
     const metrics = session.metrics as WellnessMetrics;
     const recommendations = this.generateRecommendations(metrics, duration);
@@ -140,7 +141,10 @@ export class PresenterWellnessService {
   /**
    * Generate recommendations based on metrics
    */
-  private generateRecommendations(metrics: WellnessMetrics, durationMinutes: number): {
+  private generateRecommendations(
+    metrics: WellnessMetrics,
+    durationMinutes: number,
+  ): {
     category: string;
     issue: string;
     suggestion: string;
@@ -158,7 +162,8 @@ export class PresenterWellnessService {
       recommendations.push({
         category: 'pace',
         issue: 'Speaking too fast',
-        suggestion: 'Practice deliberate pauses and slow down to 130-150 WPM for better comprehension',
+        suggestion:
+          'Practice deliberate pauses and slow down to 130-150 WPM for better comprehension',
         priority: 'high',
       });
     } else if (metrics.speakingPaceWPM < 100) {
@@ -175,7 +180,8 @@ export class PresenterWellnessService {
       recommendations.push({
         category: 'clarity',
         issue: 'Excessive filler words detected',
-        suggestion: 'Practice pausing instead of using filler words like "um", "uh", "like"',
+        suggestion:
+          'Practice pausing instead of using filler words like "um", "uh", "like"',
         priority: 'high',
       });
     }
@@ -185,7 +191,8 @@ export class PresenterWellnessService {
       recommendations.push({
         category: 'stress',
         issue: 'High stress levels detected',
-        suggestion: 'Try deep breathing exercises before presenting. Consider reducing caffeine.',
+        suggestion:
+          'Try deep breathing exercises before presenting. Consider reducing caffeine.',
         priority: 'high',
       });
     }
@@ -195,7 +202,8 @@ export class PresenterWellnessService {
       recommendations.push({
         category: 'endurance',
         issue: 'Long presentation duration',
-        suggestion: 'Consider breaking into smaller segments with Q&A or activity breaks',
+        suggestion:
+          'Consider breaking into smaller segments with Q&A or activity breaks',
         priority: 'medium',
       });
     }
@@ -205,7 +213,8 @@ export class PresenterWellnessService {
       recommendations.push({
         category: 'engagement',
         issue: 'Few pauses detected',
-        suggestion: 'Add strategic pauses for emphasis and to let key points sink in',
+        suggestion:
+          'Add strategic pauses for emphasis and to let key points sink in',
         priority: 'medium',
       });
     }
@@ -216,13 +225,17 @@ export class PresenterWellnessService {
   /**
    * Generate wellness summary
    */
-  private generateSummary(metrics: WellnessMetrics, durationMinutes: number, breaksTaken: number): {
+  private generateSummary(
+    metrics: WellnessMetrics,
+    durationMinutes: number,
+    breaksTaken: number,
+  ): {
     overallRating: 'excellent' | 'good' | 'fair' | 'needs-improvement';
     highlights: string[];
     areasForImprovement: string[];
   } {
     const score = this.calculateWellnessScore(metrics);
-    
+
     let overallRating: 'excellent' | 'good' | 'fair' | 'needs-improvement';
     if (score >= 85) overallRating = 'excellent';
     else if (score >= 70) overallRating = 'good';
@@ -283,12 +296,14 @@ export class PresenterWellnessService {
     return [
       {
         type: 'hydration',
-        message: 'Time for a sip of water! Staying hydrated helps maintain vocal clarity.',
+        message:
+          'Time for a sip of water! Staying hydrated helps maintain vocal clarity.',
         intervalMinutes: 20,
       },
       {
         type: 'stretch',
-        message: 'Quick stretch break! Roll your shoulders and stretch your neck.',
+        message:
+          'Quick stretch break! Roll your shoulders and stretch your neck.',
         intervalMinutes: 30,
       },
       {
@@ -321,20 +336,24 @@ export class PresenterWellnessService {
     rating: 'too-slow' | 'slow' | 'optimal' | 'fast' | 'too-fast';
     suggestion: string;
   } {
-    const wpm = Math.round((audioMetrics.wordCount / audioMetrics.durationSeconds) * 60);
+    const wpm = Math.round(
+      (audioMetrics.wordCount / audioMetrics.durationSeconds) * 60,
+    );
 
     let rating: 'too-slow' | 'slow' | 'optimal' | 'fast' | 'too-fast';
     let suggestion: string;
 
     if (wpm < 100) {
       rating = 'too-slow';
-      suggestion = 'Your pace is quite slow. Consider increasing to 120-150 WPM for better engagement.';
+      suggestion =
+        'Your pace is quite slow. Consider increasing to 120-150 WPM for better engagement.';
     } else if (wpm < 120) {
       rating = 'slow';
       suggestion = 'Slightly below optimal pace. You can speed up a bit.';
     } else if (wpm <= 150) {
       rating = 'optimal';
-      suggestion = 'Great pace! Maintain this for optimal audience comprehension.';
+      suggestion =
+        'Great pace! Maintain this for optimal audience comprehension.';
     } else if (wpm <= 180) {
       rating = 'fast';
       suggestion = 'A bit fast. Consider slowing down for better clarity.';
@@ -398,7 +417,9 @@ export class PresenterWellnessService {
   /**
    * Get coping strategies based on stress level
    */
-  private getCopingStrategies(stressLevel: 'low' | 'moderate' | 'high'): string[] {
+  private getCopingStrategies(
+    stressLevel: 'low' | 'moderate' | 'high',
+  ): string[] {
     const baseStrategies = [
       'Take a deep breath before starting each major section',
       'Maintain good posture to support breathing',
@@ -455,13 +476,24 @@ export class PresenterWellnessService {
     });
 
     if (sessions.length < 2) {
-      return { trend: 'insufficient-data', message: 'Need more sessions for trend analysis' };
+      return {
+        trend: 'insufficient-data',
+        message: 'Need more sessions for trend analysis',
+      };
     }
 
-    const recentAvg = sessions.slice(0, 5).reduce((sum, s) => sum + s.wellnessScore, 0) / 5;
-    const olderAvg = sessions.slice(-5).reduce((sum, s) => sum + s.wellnessScore, 0) / Math.min(5, sessions.length);
+    const recentAvg =
+      sessions.slice(0, 5).reduce((sum, s) => sum + s.wellnessScore, 0) / 5;
+    const olderAvg =
+      sessions.slice(-5).reduce((sum, s) => sum + s.wellnessScore, 0) /
+      Math.min(5, sessions.length);
 
-    const trend = recentAvg > olderAvg + 5 ? 'improving' : recentAvg < olderAvg - 5 ? 'declining' : 'stable';
+    const trend =
+      recentAvg > olderAvg + 5
+        ? 'improving'
+        : recentAvg < olderAvg - 5
+          ? 'declining'
+          : 'stable';
 
     return {
       trend,
@@ -475,21 +507,26 @@ export class PresenterWellnessService {
   /**
    * Generate trend insights
    */
-  private generateTrendInsights(sessions: { metrics: object; wellnessScore: number }[]): string[] {
+  private generateTrendInsights(
+    sessions: { metrics: object; wellnessScore: number }[],
+  ): string[] {
     const insights: string[] = [];
 
-    const avgScore = sessions.reduce((sum, s) => sum + s.wellnessScore, 0) / sessions.length;
+    const avgScore =
+      sessions.reduce((sum, s) => sum + s.wellnessScore, 0) / sessions.length;
 
     if (avgScore >= 80) {
       insights.push('Your overall wellness scores are excellent!');
     } else if (avgScore >= 60) {
       insights.push('Your wellness scores are good with room for improvement.');
     } else {
-      insights.push('Consider focusing on stress reduction and pacing techniques.');
+      insights.push(
+        'Consider focusing on stress reduction and pacing techniques.',
+      );
     }
 
     // Analyze common patterns
-    const fastPaceCount = sessions.filter(s => {
+    const fastPaceCount = sessions.filter((s) => {
       const m = s.metrics as WellnessMetrics;
       return m.speakingPaceWPM > 170;
     }).length;

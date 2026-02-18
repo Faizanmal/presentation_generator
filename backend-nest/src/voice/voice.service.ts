@@ -133,15 +133,18 @@ export class VoiceService {
         os.tmpdir(),
         `whisper-${Date.now()}-${file.originalname}`,
       );
-      fs.writeFileSync(tempPath, file.buffer);
+      await fs.promises.writeFile(tempPath, file.buffer);
 
-      const transcription = await this.aiService.transcribeAudio(
-        fs.createReadStream(tempPath),
-        'en', // Auto-detect if not specified
-      );
-
-      // Clean up temp file
-      fs.unlinkSync(tempPath);
+      let transcription;
+      try {
+        transcription = await this.aiService.transcribeAudio(
+          fs.createReadStream(tempPath),
+          'en',
+        );
+      } finally {
+        // Clean up temp file (best-effort)
+        await fs.promises.unlink(tempPath).catch(() => {});
+      }
 
       const transcriptionResult = transcription as {
         text: string;

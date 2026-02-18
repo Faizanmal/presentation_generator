@@ -8,7 +8,7 @@ import {
   Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SentimentAnalysisService } from './sentiment-analysis.service';
 
 class StartSessionDto {
@@ -29,7 +29,11 @@ export class SentimentAnalysisController {
     @Request() req: { user: { id: string } },
     @Body() dto: StartSessionDto,
   ) {
-    return this.sentimentService.startSession(req.user.id, dto.projectId, dto.slideId);
+    return this.sentimentService.startSession(
+      req.user.id,
+      dto.projectId,
+      dto.slideId,
+    );
   }
 
   @Get('sessions/:id')

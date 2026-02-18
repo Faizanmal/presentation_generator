@@ -11,24 +11,70 @@ import {
   Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { StoryboardingService } from './storyboarding.service';
+import {
+  IsString,
+  IsOptional,
+  IsIn,
+  IsNumber,
+  IsArray,
+  ArrayNotEmpty,
+  IsNotEmpty,
+  IsInt,
+} from 'class-validator';
 
 class GenerateStoryboardDto {
+  @IsString()
+  @IsNotEmpty()
   topic: string;
+
+  @IsOptional()
+  @IsString()
   projectId?: string;
-  audienceType: string; // executive, technical, educational, marketing, creative
-  presentationType: string; // summary, deep_dive, pitch, tutorial
+
+  @IsOptional()
+  @IsString()
+  audienceType?: string; // executive, technical, educational, marketing, creative
+
+  @IsOptional()
+  @IsString()
+  presentationType?: string; // summary, deep_dive, pitch, tutorial
+
+  @IsOptional()
+  @IsInt()
   duration?: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
   keyPoints?: string[];
+
+  @IsOptional()
+  @IsString()
   tone?: string;
 }
 
 class UpdateSectionDto {
+  @IsOptional()
+  @IsString()
   title?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
   keyPoints?: string[];
+
+  @IsOptional()
+  @IsString()
   speakerNotes?: string;
+
+  @IsOptional()
+  @IsString()
   suggestedLayout?: string;
+
+  @IsOptional()
+  @IsInt()
   duration?: number;
 }
 
@@ -45,7 +91,11 @@ export class StoryboardingController {
     @Request() req: { user: { id: string } },
     @Body() dto: GenerateStoryboardDto,
   ) {
-    return this.storyboardingService.generateStoryboard(req.user.id, dto);
+    return this.storyboardingService.generateStoryboard(req.user.id, {
+      ...dto,
+      audienceType: dto.audienceType || 'general',
+      presentationType: dto.presentationType || 'presentation',
+    });
   }
 
   @Get()

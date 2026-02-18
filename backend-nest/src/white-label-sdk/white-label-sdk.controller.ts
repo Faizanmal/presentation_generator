@@ -11,7 +11,7 @@ import {
   Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { WhiteLabelSdkService } from './white-label-sdk.service';
 
 class CreateConfigDto {
@@ -61,7 +61,9 @@ export class WhiteLabelSdkController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'List SDK configurations' })
-  async listConfigurations(@Request() req: { user: { organizationId: string } }) {
+  async listConfigurations(
+    @Request() req: { user: { organizationId: string } },
+  ) {
     return this.sdkService.listConfigurations(req.user.organizationId);
   }
 
@@ -85,7 +87,11 @@ export class WhiteLabelSdkController {
     @Param('id') id: string,
     @Body() dto: Partial<CreateConfigDto>,
   ) {
-    return this.sdkService.updateConfiguration(id, req.user.organizationId, dto);
+    return this.sdkService.updateConfiguration(
+      id,
+      req.user.organizationId,
+      dto,
+    );
   }
 
   @Delete('configurations/:id')

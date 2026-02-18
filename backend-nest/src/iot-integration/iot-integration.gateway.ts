@@ -24,7 +24,9 @@ interface IoTSocket extends Socket {
     credentials: true,
   },
 })
-export class IoTIntegrationGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class IoTIntegrationGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server: Server;
 
@@ -38,7 +40,7 @@ export class IoTIntegrationGateway implements OnGatewayConnection, OnGatewayDisc
 
   async handleDisconnect(client: IoTSocket) {
     this.logger.log(`IoT device disconnected: ${client.id}`);
-    
+
     if (client.deviceId) {
       await this.iotService.handleDeviceEvent(client.deviceId, {
         type: 'disconnected',
@@ -135,7 +137,9 @@ export class IoTIntegrationGateway implements OnGatewayConnection, OnGatewayDisc
   @SubscribeMessage('ping')
   async handlePing(@ConnectedSocket() client: IoTSocket) {
     if (client.deviceId) {
-      await this.iotService.handleDeviceEvent(client.deviceId, { type: 'ping' });
+      await this.iotService.handleDeviceEvent(client.deviceId, {
+        type: 'ping',
+      });
     }
     client.emit('pong', { timestamp: Date.now() });
   }

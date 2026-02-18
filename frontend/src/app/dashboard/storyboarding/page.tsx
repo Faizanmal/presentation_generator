@@ -114,15 +114,15 @@ export default function StoryboardingPage() {
           {isLoading ? (
             <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>
           ) : storyboards?.length ? (
-            storyboards.map((sb: { id: string; title: string; narrativeArc: string; status: string; sections: { id: string; title: string; order: number; duration: number }[] }) => (
+            storyboards.map((sb: any) => (
               <Card key={sb.id}>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h3 className="font-semibold text-lg">{sb.title}</h3>
+                      <h3 className="font-semibold text-lg">{typeof sb.title === 'string' ? sb.title : 'Untitled Storyboard'}</h3>
                       <div className="flex gap-2 mt-1">
-                        <Badge variant="outline">{sb.narrativeArc}</Badge>
-                        <Badge variant={sb.status === 'completed' ? 'default' : 'secondary'}>{sb.status}</Badge>
+                        <Badge variant="outline">{typeof sb.narrativeArc === 'string' ? sb.narrativeArc : 'Custom'}</Badge>
+                        <Badge variant={sb.status === 'completed' ? 'default' : 'secondary'}>{typeof sb.status === 'string' ? sb.status : 'Draft'}</Badge>
                       </div>
                     </div>
                     <Button
@@ -134,17 +134,32 @@ export default function StoryboardingPage() {
                       <ArrowRight className="w-4 h-4 mr-2" /> Apply to Slides
                     </Button>
                   </div>
-                  {sb.sections?.length > 0 && (
+                  {/* Ensure sections is an array before mapping */}
+                  {Array.isArray(sb.sections) && sb.sections.length > 0 ? (
                     <div className="space-y-2">
-                      {sb.sections.map((section) => (
-                        <div key={section.id} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                      {sb.sections.map((section: any, idx: number) => (
+                        <div key={section.id || idx} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
                           <GripVertical className="w-4 h-4 text-muted-foreground" />
-                          <span className="font-medium text-sm">{section.order + 1}.</span>
-                          <span className="text-sm flex-1">{section.title}</span>
+                          <span className="font-medium text-sm">{(section.order || idx) + 1}.</span>
+                          <span className="text-sm flex-1">{typeof section.title === 'string' ? section.title : 'Untitled Section'}</span>
                           <span className="text-xs text-muted-foreground">{section.duration}min</span>
                         </div>
                       ))}
                     </div>
+                  ) : (
+                    // Fallback if sections is wrapped or structure is different
+                    Array.isArray(sb.content?.sections) && (
+                      <div className="space-y-2">
+                        {sb.content.sections.map((section: any, idx: number) => (
+                          <div key={idx} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                            <GripVertical className="w-4 h-4 text-muted-foreground" />
+                            <span className="font-medium text-sm">{idx + 1}.</span>
+                            <span className="text-sm flex-1">{section.title}</span>
+                            <span className="text-xs text-muted-foreground">{section.duration}min</span>
+                          </div>
+                        ))}
+                      </div>
+                    )
                   )}
                 </CardContent>
               </Card>

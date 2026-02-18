@@ -10,7 +10,7 @@ import {
   Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { LearningPathsService } from './learning-paths.service';
 
 class CreatePathDto {
@@ -79,7 +79,11 @@ export class LearningPathsController {
     @Request() req: { user: { id: string } },
     @Body() dto: GeneratePathDto,
   ) {
-    return this.learningService.generateLearningPath(req.user.id, dto.topic, dto);
+    return this.learningService.generateLearningPath(
+      req.user.id,
+      dto.topic,
+      dto,
+    );
   }
 
   @Get('dashboard')

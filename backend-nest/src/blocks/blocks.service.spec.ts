@@ -4,18 +4,18 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AdvancedCacheService } from '../common/cache/advanced-cache.service';
 import { CollaborationService } from '../collaboration/collaboration.service';
 import { ForbiddenException } from '@nestjs/common';
+import { BlockType } from '@prisma/client';
 
 describe('BlocksService (permissions)', () => {
   let service: BlocksService;
 
-  const mockPrisma: any = {
-    project: { findUnique: jest.fn() },
-    block: { create: jest.fn(), update: jest.fn() },
+  const mockPrisma = {
     project: { update: jest.fn(), findUnique: jest.fn() },
+    block: { create: jest.fn(), update: jest.fn() },
   };
 
-  const mockCache: any = {};
-  const mockCollab: any = { getUserRole: jest.fn() };
+  const mockCache = {};
+  const mockCollab = { getUserRole: jest.fn() };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -32,14 +32,17 @@ describe('BlocksService (permissions)', () => {
   });
 
   it('allows an EDITOR to create a block', async () => {
-    mockPrisma.project.findUnique.mockResolvedValue({ id: 'proj-1', ownerId: 'owner' });
+    mockPrisma.project.findUnique.mockResolvedValue({
+      id: 'proj-1',
+      ownerId: 'owner',
+    });
     mockCollab.getUserRole.mockResolvedValue('EDITOR');
     mockPrisma.block.create.mockResolvedValue({ id: 'block-1' });
     mockPrisma.project.update.mockResolvedValue({});
 
     const result = await service.create('editor-1', {
       projectId: 'proj-1',
-      blockType: 'PARAGRAPH' as any,
+      blockType: 'PARAGRAPH' as BlockType,
       content: { text: 'hi' },
       order: 1,
     });
@@ -49,13 +52,16 @@ describe('BlocksService (permissions)', () => {
   });
 
   it('forbids non-EDITOR from creating a block', async () => {
-    mockPrisma.project.findUnique.mockResolvedValue({ id: 'proj-1', ownerId: 'owner' });
+    mockPrisma.project.findUnique.mockResolvedValue({
+      id: 'proj-1',
+      ownerId: 'owner',
+    });
     mockCollab.getUserRole.mockResolvedValue('VIEWER');
 
     await expect(
       service.create('viewer-1', {
         projectId: 'proj-1',
-        blockType: 'PARAGRAPH' as any,
+        blockType: 'PARAGRAPH' as BlockType,
         content: { text: 'nope' },
         order: 1,
       }),

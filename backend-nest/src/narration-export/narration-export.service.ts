@@ -6,6 +6,8 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { v4 as uuidv4 } from 'uuid';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -108,13 +110,15 @@ export class NarrationExportService {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly aiService: AIService,
+    @InjectQueue('narration') private readonly narrationQueue: Queue,
   ) {
     // Initialize S3 client
     this.s3Client = new S3Client({
       region: this.configService.get<string>('AWS_S3_REGION') || 'us-east-1',
       credentials: {
         accessKeyId: this.configService.get<string>('AWS_ACCESS_KEY_ID') || '',
-        secretAccessKey: this.configService.get<string>('AWS_SECRET_ACCESS_KEY') || '',
+        secretAccessKey:
+          this.configService.get<string>('AWS_SECRET_ACCESS_KEY') || '',
       },
     });
     this.bucketName = this.configService.get<string>('AWS_S3_BUCKET') || '';
@@ -283,12 +287,16 @@ Return only the speaker notes, ready to be read aloud.
       },
     });
 
-    // Process asynchronously
-    void this.processNarration(
-      narrationProject.id,
-      slidesToProcess,
-      options.voice,
-      speed,
+    // Enqueue narration job (processed by worker)
+    await this.narrationQueue.add(
+      'generate-narration',
+      {
+        narrationProjectId: narrationProject.id,
+        slides: slidesToProcess,
+        voice: options.voice,
+        speed,
+      },
+      { attempts: 3, removeOnComplete: true },
     );
 
     return {
@@ -326,9 +334,9 @@ Return only the speaker notes, ready to be read aloud.
       // Upload to S3
       const filename = `narration_${slideId}_${uuidv4()}.mp3`;
       const key = `narrations/${filename}`;
-      
+
       let audioUrl: string;
-      
+
       if (this.bucketName) {
         // Upload to S3
         await this.s3Client.send(
@@ -515,7 +523,7 @@ Return only the speaker notes, ready to be read aloud.
   }
 
   // Private methods
-  private async processNarration(
+  async processNarration(
     narrationProjectId: string,
     slides: { id: string; blocks?: { content: unknown }[] }[],
     voice: VoiceId,
@@ -604,15 +612,6 @@ Return only the speaker notes, ready to be read aloud.
         include: {
           narrationProject: {
             include: {
-              project: {
-                include: {
-                  slides: {
-                    include: { blocks: true },
-                    orderBy: { order: 'asc' },
-                  },
-                  theme: true,
-                },
-              },
               slides: true,
             },
           },
@@ -623,10 +622,25 @@ Return only the speaker notes, ready to be read aloud.
         throw new Error('Job or narration project not found');
       }
 
-      const project = job.narrationProject.project;
+      // Fetch the project separately
+      const project = await this.prisma.project.findUnique({
+        where: { id: job.narrationProject.projectId },
+        include: {
+          slides: {
+            include: { blocks: true },
+            orderBy: { order: 'asc' },
+          },
+          theme: true,
+        },
+      });
+
+      if (!project) {
+        throw new Error('Project not found');
+      }
+
       const slides = project.slides;
       const narrationSlides = job.narrationProject.slides;
-      
+
       // Create temp directory for video processing
       const tempDir = path.join(os.tmpdir(), `video_export_${jobId}`);
       if (!fs.existsSync(tempDir)) {
@@ -639,7 +653,7 @@ Return only the speaker notes, ready to be read aloud.
         '1080p': { width: 1920, height: 1080 },
         '4k': { width: 3840, height: 2160 },
       };
-      const res = resolutions[job.resolution] || resolutions['1080p'];
+      const res = resolutions[job.resolution || '1080p'] || resolutions['1080p'];
 
       // Check if FFmpeg is available
       let ffmpegAvailable = false;
@@ -647,12 +661,14 @@ Return only the speaker notes, ready to be read aloud.
         await this.execAsync('which ffmpeg');
         ffmpegAvailable = true;
       } catch {
-        this.logger.warn('FFmpeg not available, using fallback video generation');
+        this.logger.warn(
+          'FFmpeg not available, using fallback video generation',
+        );
       }
 
       const totalSlides = slides.length;
       const slideDuration = job.slideDuration || 5;
-      
+
       // Generate slide images (simplified - in production use HTML to image)
       const slideImages: string[] = [];
       for (let i = 0; i < totalSlides; i++) {
@@ -663,38 +679,38 @@ Return only the speaker notes, ready to be read aloud.
             progress: Math.round(((i + 1) / totalSlides) * 30),
           },
         });
-        
+
         // Create a simple slide image placeholder
         // In production, use puppeteer to screenshot actual rendered slides
         slideImages.push(`slide_${i}.png`);
       }
 
       let outputUrl: string;
-      
+
       if (ffmpegAvailable && job.includeNarration) {
         // Generate video with FFmpeg
         try {
           // Create concat file for FFmpeg
           const concatFile = path.join(tempDir, 'concat.txt');
           let concatContent = '';
-          
+
           for (let i = 0; i < totalSlides; i++) {
             const duration = narrationSlides[i]?.duration || slideDuration;
             concatContent += `file 'slide_${i}.png'\nduration ${duration}\n`;
           }
           fs.writeFileSync(concatFile, concatContent);
-          
+
           // Generate video
           const outputFile = path.join(tempDir, `output.${job.format}`);
           const ffmpegCmd = `ffmpeg -f concat -safe 0 -i ${concatFile} -vf "scale=${res.width}:${res.height}" -c:v libx264 -pix_fmt yuv420p ${outputFile}`;
-          
+
           await this.execAsync(ffmpegCmd);
-          
+
           // Upload to S3
           if (this.bucketName && fs.existsSync(outputFile)) {
             const videoBuffer = fs.readFileSync(outputFile);
             const key = `exports/video_${project.id}_${Date.now()}.${job.format}`;
-            
+
             await this.s3Client.send(
               new PutObjectCommand({
                 Bucket: this.bucketName,
@@ -704,7 +720,7 @@ Return only the speaker notes, ready to be read aloud.
                 ACL: 'public-read',
               }),
             );
-            
+
             outputUrl = `https://${this.bucketName}.s3.amazonaws.com/${key}`;
           } else {
             outputUrl = `/exports/video_${project.id}_${Date.now()}.${job.format}`;
@@ -716,9 +732,13 @@ Return only the speaker notes, ready to be read aloud.
       } else {
         // Fallback: Create a slideshow-style export using HTML
         // This generates a downloadable HTML presentation with autoplay
-        const htmlContent = this.generateVideoFallbackHtml(project, narrationSlides, slideDuration);
+        const htmlContent = this.generateVideoFallbackHtml(
+          project,
+          narrationSlides,
+          slideDuration,
+        );
         const filename = `video_${project.id}_${Date.now()}.html`;
-        
+
         if (this.bucketName) {
           const key = `exports/${filename}`;
           await this.s3Client.send(
@@ -798,16 +818,22 @@ Return only the speaker notes, ready to be read aloud.
    * Generate an HTML-based video fallback with auto-advancing slides
    */
   private generateVideoFallbackHtml(
-    project: { title: string; slides: Array<{ blocks?: Array<{ blockType: string; content: unknown }> }> },
+    project: {
+      title: string;
+      slides: Array<{
+        blocks?: Array<{ blockType: string; content: unknown }>;
+      }>;
+    },
     narrationSlides: Array<{ duration?: number; audioUrl?: string }>,
     defaultDuration: number,
   ): string {
-    const slidesHtml = project.slides.map((slide, index) => {
-      const content = this.extractSlideContent(slide);
-      const duration = narrationSlides[index]?.duration || defaultDuration;
-      const audioUrl = narrationSlides[index]?.audioUrl;
-      
-      return `
+    const slidesHtml = project.slides
+      .map((slide, index) => {
+        const content = this.extractSlideContent(slide);
+        const duration = narrationSlides[index]?.duration || defaultDuration;
+        const audioUrl = narrationSlides[index]?.audioUrl;
+
+        return `
         <div class="slide" data-duration="${duration * 1000}" ${audioUrl ? `data-audio="${audioUrl}"` : ''}>
           <div class="slide-content">
             <div class="slide-number">${index + 1} / ${project.slides.length}</div>
@@ -815,7 +841,8 @@ Return only the speaker notes, ready to be read aloud.
           </div>
         </div>
       `;
-    }).join('');
+      })
+      .join('');
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -932,5 +959,107 @@ Return only the speaker notes, ready to be read aloud.
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+  }
+
+  /**
+   * Estimate narration duration for a text snippet (based on average reading speed)
+   * Average speaking rate: ~150 words/minute
+   */
+  estimateSlideDuration(speakerNotes: string): number {
+    const wordCount = speakerNotes.trim().split(/\s+/).filter(Boolean).length;
+    const WORDS_PER_SECOND = 150 / 60; // 2.5 words/sec
+    const rawSeconds = wordCount / WORDS_PER_SECOND;
+    // Add 1 second buffer per slide, minimum 3 seconds
+    return Math.max(3, Math.round(rawSeconds + 1));
+  }
+
+  /**
+   * Get estimated total duration for a project's narration
+   */
+  async estimateProjectDuration(
+    projectId: string,
+    userId: string,
+  ): Promise<{
+    totalSeconds: number;
+    perSlide: Array<{ slideId: string; estimatedSeconds: number }>;
+  }> {
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, ownerId: userId },
+      include: {
+        slides: {
+          orderBy: { order: 'asc' },
+          select: { id: true },
+        },
+      },
+    });
+
+    if (!project) throw new Error('Project not found');
+
+    const perSlide = project.slides.map((slide) => ({
+      slideId: slide.id,
+      estimatedSeconds: this.estimateSlideDuration(
+        (slide.speakerNotes as string) || '',
+      ),
+    }));
+
+    const totalSeconds = perSlide.reduce(
+      (sum, s) => sum + s.estimatedSeconds,
+      0,
+    );
+    return { totalSeconds, perSlide };
+  }
+
+  /**
+   * Generate a short voice preview (first sentence of the first slide's notes)
+   */
+  async generateVoicePreview(
+    text: string,
+    voice: VoiceId = 'alloy',
+    speed: number = 1.0,
+  ): Promise<{ audioBase64: string; durationEstimate: number }> {
+    const openaiKey = this.configService.get<string>('OPENAI_API_KEY');
+    if (!openaiKey) throw new Error('OpenAI API key not configured for TTS');
+
+    const { default: OpenAI } = await import('openai');
+    const client = new OpenAI({ apiKey: openaiKey });
+
+    // Take at most the first 200 characters for the preview
+    const previewText = text.slice(0, 200).trim();
+    if (!previewText) throw new Error('No text provided for preview');
+
+    const response = await client.audio.speech.create({
+      model: 'tts-1',
+      voice,
+      input: previewText,
+      speed,
+    });
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const audioBase64 = buffer.toString('base64');
+    const durationEstimate = this.estimateSlideDuration(previewText);
+
+    return { audioBase64, durationEstimate };
+  }
+
+  /**
+   * Get available voice options with preview samples
+   */
+  getVoiceOptionsWithSamples(): Array<VoiceOption & { sampleText: string }> {
+    const sampleTexts: Record<VoiceId, string> = {
+      alloy:
+        "Welcome to this presentation. Let's explore the key insights together.",
+      echo: "Good morning everyone. Today we'll be covering some exciting new developments.",
+      fable:
+        'Once upon a time, in the world of data, a story emerged from the numbers.',
+      onyx: 'Ladies and gentlemen, the findings before you represent months of rigorous research.',
+      nova: "Hey there! Ready to dive into something really cool today? Let's get started!",
+      shimmer:
+        'Thank you for joining us today. We have an informative session ahead.',
+    };
+
+    return this.voiceOptions.map((v) => ({
+      ...v,
+      sampleText: sampleTexts[v.id],
+    }));
   }
 }

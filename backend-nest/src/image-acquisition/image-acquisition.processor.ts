@@ -39,7 +39,7 @@ export class ImageAcquisitionProcessor extends WorkerHost {
 
   async process(
     job: Job<AcquireImageJobData | BulkAcquireJobData>,
-  ): Promise<any> {
+  ): Promise<unknown> {
     this.logger.log(`Processing job ${job.id} of type ${job.name}`);
 
     switch (job.name) {
@@ -115,7 +115,7 @@ export class ImageAcquisitionProcessor extends WorkerHost {
       await job.updateProgress(60);
 
       // Save all images to database
-      const savedImages = [];
+      const savedImages: { id: string }[] = [];
       for (let i = 0; i < images.length; i++) {
         const savedImage = await this.saveImageToDatabase(
           images[i],

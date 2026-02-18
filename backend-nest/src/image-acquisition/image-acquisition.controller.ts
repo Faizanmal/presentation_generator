@@ -12,7 +12,18 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import {
-  ImageAcquisitionService,
+  IsString,
+  IsOptional,
+  IsIn,
+  IsUrl,
+  IsBoolean,
+  IsInt,
+  Min,
+  Max,
+  IsNotEmpty,
+} from 'class-validator';
+import { ImageAcquisitionService } from './image-acquisition.service';
+import type {
   ImageSource,
   ImageAcquisitionOptions,
 } from './image-acquisition.service';
@@ -24,29 +35,80 @@ import {
 } from './image-acquisition.processor';
 
 class AcquireImageDto {
+  @IsIn(['ai', 'unsplash', 'pexels', 'pixabay', 'url'])
   source: ImageSource;
+
+  @IsOptional()
+  @IsString()
   query?: string;
+
+  @IsOptional()
+  @IsString()
   prompt?: string;
+
+  @IsOptional()
+  @IsUrl()
   url?: string;
+
+  @IsOptional()
+  @IsIn(['landscape', 'portrait', 'square'])
   orientation?: 'landscape' | 'portrait' | 'square';
+
+  @IsOptional()
+  @IsString()
   color?: string;
+
+  @IsString()
+  @IsNotEmpty()
   projectId: string;
+
+  @IsOptional()
+  @IsString()
   slideId?: string;
+
+  @IsOptional()
+  @IsBoolean()
   autoAdd?: boolean;
 }
 
 class BulkAcquireDto {
+  @IsString()
+  @IsNotEmpty()
   topic: string;
+
+  @IsInt()
+  @Min(1)
+  @Max(20)
   count: number;
+
+  @IsString()
+  @IsNotEmpty()
   projectId: string;
+
+  @IsOptional()
+  @IsBoolean()
   autoCreateSlides?: boolean;
 }
 
 class SmartAcquireDto {
+  @IsString()
+  @IsNotEmpty()
   query: string;
+
+  @IsString()
+  @IsNotEmpty()
   projectId: string;
+
+  @IsOptional()
+  @IsString()
   slideId?: string;
+
+  @IsOptional()
+  @IsIn(['landscape', 'portrait', 'square'])
   orientation?: 'landscape' | 'portrait' | 'square';
+
+  @IsOptional()
+  @IsBoolean()
   autoAdd?: boolean;
 }
 
@@ -58,7 +120,7 @@ export class ImageAcquisitionController {
   constructor(
     private readonly imageAcquisitionService: ImageAcquisitionService,
     @InjectQueue('image-acquisition') private readonly imageQueue: Queue,
-  ) {}
+  ) { }
 
   /**
    * Acquire single image (synchronous)
@@ -239,7 +301,7 @@ export class ImageAcquisitionController {
    * Get available sources and their configuration status
    */
   @Get('sources')
-  async getSources() {
+  getSources() {
     return {
       success: true,
       sources: [

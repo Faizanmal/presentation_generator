@@ -25,25 +25,12 @@ import {
     DropdownMenuTrigger,
 } from "./dropdown-menu";
 
-interface Project {
-    id: string;
-    title: string;
-    description?: string;
-    thumbnail?: string;
-    updatedAt: Date | string;
-    createdAt: Date | string;
-    slideCount?: number;
+import type { Project as BaseProject, Collaborator } from "@/types";
+
+interface Project extends BaseProject {
+    collaborators?: Collaborator[];
     viewCount?: number;
-    isPublic?: boolean;
-    collaborators?: Array<{
-        id: string;
-        name: string;
-        avatar?: string;
-    }>;
-    _count?: {
-        slides: number;
-        blocks: number;
-    };
+    description: string | null;
 }
 
 interface ProjectCardProps {

@@ -59,14 +59,12 @@ export class CollaborationController {
       req.user.id,
     );
     if (!isOwner) {
-      throw new ForbiddenException('Only project owner can remove collaborators');
+      throw new ForbiddenException(
+        'Only project owner can remove collaborators',
+      );
     }
 
-    return this.collaborationService.removeCollaborator(
-      projectId,
-      userId,
-      req.user.id,
-    );
+    return this.collaborationService.removeCollaborator(projectId, userId);
   }
 
   @Patch(':projectId/collaborators/:collaboratorId')
@@ -81,13 +79,14 @@ export class CollaborationController {
       req.user.id,
     );
     if (!isOwner) {
-      throw new ForbiddenException('Only project owner can update collaborator roles');
+      throw new ForbiddenException(
+        'Only project owner can update collaborator roles',
+      );
     }
 
     return this.collaborationService.updateCollaboratorRole(
       collaboratorId,
       body.role,
-      req.user.id,
     );
   }
 

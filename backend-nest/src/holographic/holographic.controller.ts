@@ -10,9 +10,9 @@ import {
   Request,
   Res,
 } from '@nestjs/common';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { HolographicService } from './holographic.service';
 
 class CreatePreviewDto {
@@ -70,7 +70,10 @@ export class HolographicController {
     @Param('id') id: string,
     @Res() res: Response,
   ) {
-    const html = await this.holographicService.generateViewerHTML(id, req.user.id);
+    const html = await this.holographicService.generateViewerHTML(
+      id,
+      req.user.id,
+    );
     res.type('text/html').send(html);
   }
 

@@ -1,4 +1,10 @@
-import { Injectable, Logger, BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import * as crypto from 'crypto';
@@ -8,7 +14,7 @@ interface RateLimitConfig {
   requestsPerDay: number;
 }
 
-interface UsageStats {
+export interface UsageStats {
   today: number;
   thisMonth: number;
   total: number;
@@ -18,7 +24,10 @@ interface UsageStats {
 @Injectable()
 export class PublicApiService {
   private readonly logger = new Logger(PublicApiService.name);
-  private rateLimitCache = new Map<string, { count: number; resetAt: number }>();
+  private rateLimitCache = new Map<
+    string,
+    { count: number; resetAt: number }
+  >();
 
   constructor(
     private readonly configService: ConfigService,
@@ -28,12 +37,15 @@ export class PublicApiService {
   /**
    * Generate API key for user/organization
    */
-  async generateApiKey(userId: string, options: {
-    name: string;
-    scopes?: string[];
-    rateLimits?: RateLimitConfig;
-    expiresAt?: Date;
-  }) {
+  async generateApiKey(
+    userId: string,
+    options: {
+      name: string;
+      scopes?: string[];
+      rateLimits?: RateLimitConfig;
+      expiresAt?: Date;
+    },
+  ) {
     // Generate secure API key
     const keyPrefix = 'pk_';
     const keyValue = crypto.randomBytes(32).toString('hex');
@@ -44,6 +56,7 @@ export class PublicApiService {
       data: {
         userId,
         name: options.name,
+        key: fullKey,
         keyHash: hashedKey,
         keyPrefix: fullKey.substring(0, 8),
         scopes: options.scopes || ['read:projects', 'read:slides'],
@@ -122,7 +135,9 @@ export class PublicApiService {
   /**
    * Check rate limit
    */
-  async checkRateLimit(keyId: string): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
+  async checkRateLimit(
+    keyId: string,
+  ): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
     const apiKey = await this.prisma.aPIKey.findUnique({
       where: { id: keyId },
     });
@@ -131,7 +146,9 @@ export class PublicApiService {
       throw new NotFoundException('API key not found');
     }
 
-    const limits = apiKey.rateLimits as RateLimitConfig || { requestsPerMinute: 60 };
+    const limits = (apiKey.rateLimits as unknown as RateLimitConfig) || {
+      requestsPerMinute: 60,
+    };
     const now = Date.now();
     const cacheKey = `rate_${keyId}`;
 
@@ -162,14 +179,20 @@ export class PublicApiService {
   /**
    * Log API usage
    */
-  async logUsage(keyId: string, endpoint: string, method: string, statusCode: number, responseTime: number) {
+  async logUsage(
+    keyId: string,
+    endpoint: string,
+    method: string,
+    statusCode: number,
+    responseTime: number,
+  ) {
     return this.prisma.aPIUsageLog.create({
       data: {
-        keyId,
+        apiKeyId: keyId,
         endpoint,
         method,
         statusCode,
-        responseTime,
+        latency: responseTime,
       },
     });
   }
@@ -184,24 +207,24 @@ export class PublicApiService {
 
     const [today, thisMonth, total, endpoints] = await Promise.all([
       this.prisma.aPIUsageLog.count({
-        where: { keyId, timestamp: { gte: todayStart } },
+        where: { apiKeyId: keyId, createdAt: { gte: todayStart } },
       }),
       this.prisma.aPIUsageLog.count({
-        where: { keyId, timestamp: { gte: monthStart } },
+        where: { apiKeyId: keyId, createdAt: { gte: monthStart } },
       }),
       this.prisma.aPIUsageLog.count({
-        where: { keyId },
+        where: { apiKeyId: keyId },
       }),
       this.prisma.aPIUsageLog.groupBy({
         by: ['endpoint'],
-        where: { keyId },
+        where: { apiKeyId: keyId },
         _count: true,
       }),
     ]);
 
     const endpointStats: Record<string, number> = {};
-    endpoints.forEach(e => {
-      endpointStats[e.endpoint] = e._count;
+    endpoints.forEach((e) => {
+      endpointStats[e.endpoint] = e._count as number;
     });
 
     return {

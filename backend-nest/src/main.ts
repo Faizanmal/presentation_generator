@@ -13,10 +13,8 @@ import { CacheInterceptor } from './common/interceptors/cache.interceptor';
 import { CacheService } from './common/cache/cache.service';
 import { SanitizationMiddleware } from './common/middleware/security.middleware';
 import { CsrfMiddleware } from './common/middleware/csrf.middleware';
-import {
-  initializeNewRelic,
-  createNewRelicMiddleware,
-} from './newrelic.initialization';
+import { initializeNewRelic, createNewRelicMiddleware } from './newrelic.initialization';
+import { RedisIoAdapter } from './common/adapters/redis-io.adapter';
 
 async function bootstrap() {
   // ========================================
@@ -39,6 +37,17 @@ async function bootstrap() {
   // ========================================
   if (configService.get<boolean>('NEW_RELIC_ENABLED', false)) {
     app.use(createNewRelicMiddleware());
+  }
+
+  // ========================================
+  // REDIS ADAPTER (Enable for horizontal scaling)
+  // ========================================
+  const redisHost = configService.get('REDIS_HOST');
+  if (redisHost) {
+    const redisIoAdapter = new RedisIoAdapter(app, configService);
+    await redisIoAdapter.connectToRedis();
+    app.useWebSocketAdapter(redisIoAdapter);
+    logger.log('🚀 Redis Adapter initialized for Socket.IO');
   }
 
   // ========================================

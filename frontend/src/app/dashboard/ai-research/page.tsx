@@ -102,7 +102,7 @@ export default function AIResearchPage() {
             </div>
           ) : researches?.length ? (
             <div className="grid gap-4">
-              {researches.map((research: { id: string; topic: string; status: string; keyFindings: string[]; sources: { id: string }[]; createdAt: string }) => (
+              {researches.map((research: { id: string; topic: string; status: string; summary?: string; keywords?: string[]; sources: { id: string }[]; createdAt: string }) => (
                 <Card key={research.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-6">
                     <div className="flex items-start justify-between">
@@ -113,16 +113,17 @@ export default function AIResearchPage() {
                             {research.status}
                           </Badge>
                         </div>
-                        {research.keyFindings?.length > 0 && (
-                          <ul className="text-sm text-muted-foreground space-y-1">
-                            {research.keyFindings.slice(0, 3).map((finding: string, i: number) => (
-                              <li key={i} className="flex items-start gap-2">
-                                <CheckCircle2 className="w-3 h-3 mt-1 text-green-500 shrink-0" />
-                                {finding}
-                              </li>
+
+                        {research.summary ? (
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-3">{research.summary}</p>
+                        ) : research.keywords?.length ? (
+                          <div className="flex gap-2 flex-wrap mt-1">
+                            {research.keywords.slice(0, 5).map((kw: string) => (
+                              <Badge key={kw} variant="outline" className="text-xs">{kw}</Badge>
                             ))}
-                          </ul>
-                        )}
+                          </div>
+                        ) : null}
+
                         <div className="flex gap-4 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1">
                             <BookOpen className="w-3 h-3" /> {research.sources?.length || 0} sources
@@ -130,7 +131,31 @@ export default function AIResearchPage() {
                           <span>{new Date(research.createdAt).toLocaleDateString()}</span>
                         </div>
                       </div>
-                      <div className="flex gap-2 ml-4">
+                      {/* Generated Content Preview */}
+                      {research.content && (
+                        <div className="mt-4 p-4 bg-muted/30 rounded-md border border-border/50">
+                          <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                            <FileText className="w-4 h-4" /> Generated Content
+                          </h4>
+                          {/* Check if content is a string or object */}
+                          {typeof research.content === 'string' ? (
+                            <p className="text-sm text-muted-foreground whitespace-pre-wrap">{research.content}</p>
+                          ) : Array.isArray(research.content?.blocks) ? (
+                            <div className="space-y-2">
+                              {research.content.blocks.map((block: any, i: number) => (
+                                <div key={i} className="text-sm border-l-2 border-primary/20 pl-3">
+                                  <p className="font-medium text-foreground">{block.type}</p>
+                                  <p className="text-muted-foreground line-clamp-2">{typeof block.content === 'string' ? block.content : JSON.stringify(block.content)}</p>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-muted-foreground italic">Content available in presentation format.</p>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
                         <Button
                           size="sm"
                           variant="outline"

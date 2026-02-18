@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { v4 as uuidv4 } from 'uuid';
 import { AIService } from '../ai.service';
+import { RealTimeDataService } from '../realtime-data.service';
 import {
   PresentationPlan,
   EnhancedPresentation,
@@ -26,6 +27,7 @@ export class GeneratorAgentService {
   constructor(
     private readonly configService: ConfigService,
     private readonly aiService: AIService,
+    private readonly realTimeDataService: RealTimeDataService,
   ) {}
 
   /**
@@ -78,6 +80,32 @@ export class GeneratorAgentService {
         `✍️ Generating section ${i + 1}/${totalSections}: ${sectionType}...`,
       );
 
+      // Check if this section needs real-time data
+      let sectionSpecificData = '';
+      if (
+        this.doesSectionNeedData(
+          sectionType,
+          plan.keyMessages[i % plan.keyMessages.length],
+        )
+      ) {
+        const query = `${topic} ${plan.keyMessages[i % plan.keyMessages.length]} statistics data`;
+        this.logger.log(
+          `🔍 Fetching real-time data for section ${i + 1}: "${query}"`,
+        );
+        const searchResult = await this.fetchRealTimeData(query);
+        if (searchResult) {
+          sectionSpecificData = searchResult;
+          thinkingSteps.push({
+            stepNumber: 2 + i, // Approximate step numbering
+            phase: 'generation',
+            thought: `Fetched real-time data for section ${i + 1} (${sectionType})`,
+            action: 'Data Fetching',
+            observation: `Found relevant statistics from search engines`,
+            timestamp: new Date(),
+          });
+        }
+      }
+
       const sectionResult = await this.generateSection(plan, topic, {
         index: i,
         total: totalSections,
@@ -86,7 +114,9 @@ export class GeneratorAgentService {
         tone: options.tone || 'professional',
         style: options.style || 'professional',
         keyMessage: plan.keyMessages[i % plan.keyMessages.length],
-        rawData: options.rawData,
+        rawData: options.rawData
+          ? options.rawData + '\n\n' + sectionSpecificData
+          : sectionSpecificData,
       });
 
       sections.push(sectionResult.section);
@@ -131,6 +161,64 @@ export class GeneratorAgentService {
       thinkingSteps,
       tokensUsed: totalTokens,
     };
+  }
+
+  /**
+   * Helper to check if a section needs data
+   */
+  private doesSectionNeedData(
+    sectionType: string,
+    keyMessage: string,
+  ): boolean {
+    const dataTypes = [
+      'evidence-data',
+      'hook-statistic',
+      'market-analysis',
+      'financials',
+    ];
+    const dataKeywords = [
+      'growth',
+      'increase',
+      'decrease',
+      'percent',
+      '%',
+      'statistics',
+      'trends',
+      'data',
+      'market size',
+      'revenue',
+    ];
+
+    if (dataTypes.includes(sectionType)) return true;
+    if (dataKeywords.some((kw) => keyMessage.toLowerCase().includes(kw)))
+      return true;
+
+    return false;
+  }
+
+  /**
+   * Helper to fetch and format real-time data
+   */
+  private async fetchRealTimeData(query: string): Promise<string | null> {
+    try {
+      const result = await this.realTimeDataService.search(query, 5);
+      if (!result || result.results.length === 0) return null;
+
+      let formattedData =
+        'REAL-TIME MARKET DATA (Use this for charts/stats):\n';
+      result.results.forEach((r) => {
+        formattedData += `- ${r.title}: ${r.snippet}\n`;
+      });
+
+      if (result.statistics) {
+        formattedData += `Statistics Info: ${JSON.stringify(result.statistics)}\n`;
+      }
+
+      return formattedData;
+    } catch (e) {
+      this.logger.warn(`Failed to fetch data for ${query}: ${e.message}`);
+      return null;
+    }
   }
 
   /**
@@ -239,19 +327,19 @@ STYLE: ${context.style}
 AUDIENCE: ${plan.targetAudience.type} (${plan.targetAudience.knowledgeLevel} level)
 NARRATIVE ARC: ${plan.contentStrategy.narrativeArc}
 SUGGESTED LAYOUT: ${layoutForType}
-${context.rawData ? `RAW DATA REFERENCE: "${context.rawData.substring(0, 3000)}..."` : ''}
+${context.rawData ? `REAL-TIME DATA & CONTEXT: "${context.rawData.substring(0, 5000)}..."` : ''}
 
 CRITICAL INSTRUCTIONS:
-1. **Charts:** If this slide discusses data, trends, or comparisons, YOU MUST generate a "chart" block with realistic "chartData".
-2. **Visuals:** Use relevant emojis 🌟 in headings or key points to add visual appeal.
-3. **Card Style:** For key paragraphs or concepts, use "paragraph" blocks with 'variant': 'card' in formatting.
-4. **Colors:** Use 'color' in formatting to distinguish headings (e.g., 'primary'), paragraphs ('default'), and lists.
-5. **Detail:** Provide comprehensive, detailed content. Avoid brief summaries. Aim for 50-75 words per paragraph.
+1. **Charts:** If this slide discusses data, trends, or comparisons (especially if Real-Time Data is provided above), YOU MUST generate a "chart" block with realistic "chartData" based on the provided data.
+2. **Visuals:** Use relevant emojis 🌟 in headings or key points.
+3. **Card Style:** For key paragraphs, use "paragraph" blocks with 'variant': 'card'.
+4. **Data Accuracy:** EXTRACT NUMBERS from the Real-Time Data provided above. Do not hallucinate numbers if data is available.
+5. **Detail:** Provide comprehensive content (50-75 words/paragraph).
 
 Think step by step:
-1. What is the main point? Does it need a chart?
-2. How can I make the text visually distinct?
-3. What card-style layouts can I use?
+1. Does the Real-Time Data contain stats/numbers relevant to this slide?
+2. If yes, create a chart (bar, line, pie) visualizing them.
+3. Structure the content to highlight these insights.
 
 Return JSON:
 {
@@ -260,22 +348,22 @@ Return JSON:
   "blocks": [
     {
       "type": "chart",
-      "content": "Description of the chart",
+      "content": "Description of the chart (e.g., 'Market growth 2023-2025')",
       "chartData": {
         "type": "bar|line|pie|doughnut",
-        "labels": ["Q1", "Q2", "Q3", "Q4"],
-        "datasets": [{ "label": "Sales", "data": [10, 25, 40, 30], "backgroundColor": "#3b82f6" }]
+        "labels": ["Item 1", "Item 2"],
+        "datasets": [{ "label": "Metric", "data": [10, 20], "backgroundColor": "#3b82f6" }]
       }
     },
     {
       "type": "paragraph",
-      "content": "Detailed explanation...",
+      "content": "Analysis of the data...",
       "formatting": { "variant": "card", "color": "text-primary", "bold": true }
     }
   ],
   "layout": "${layoutForType}",
   "suggestedImage": {
-    "prompt": "Highly detailed, photorealistic image of...",
+    "prompt": "Highly detailed image of...",
     "style": "photography",
     "placement": "right"
   },

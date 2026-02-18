@@ -1,7 +1,10 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { useAuthStore } from "@/stores/auth-store";
 import {
   Sparkles,
   Zap,
@@ -31,6 +34,16 @@ import {
 } from "@/components/ui/animations";
 
 export default function Home() {
+  const router = useRouter();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
+
+  // Redirect authenticated users straight to the dashboard
+  useEffect(() => {
+    if (!isAuthLoading && isAuthenticated) {
+      router.push('/dashboard');
+    }
+  }, [isAuthenticated, isAuthLoading, router]);
+
   return (
     <div className="min-h-screen bg-slate-950 text-white overflow-hidden">
       {/* Animated background */}

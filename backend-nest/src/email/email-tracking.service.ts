@@ -127,8 +127,9 @@ export class EmailTrackingService {
   }
 
   // ─── Get Email Stats ───────────────────────────────────────
-  async getStats(date?: string): Promise<EmailStats> {
-    const targetDate = date || new Date().toISOString().split('T')[0];
+  async getStats(_date?: string): Promise<EmailStats> {
+    // Mark parameter as intentionally unused (kept for future filtering support)
+    void _date;
     const globalKey = `${this.STATS_PREFIX}:global`;
 
     // Get daily stats

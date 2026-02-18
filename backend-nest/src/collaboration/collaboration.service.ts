@@ -1,6 +1,13 @@
-import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  ForbiddenException,
+  Inject,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { Redis } from 'ioredis';
 
 interface CreateSessionDto {
   projectId: string;
@@ -37,7 +44,10 @@ interface BlockChangeDto {
 export class CollaborationService {
   private readonly logger = new Logger(CollaborationService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject('REDIS_CLIENT') private readonly redis: Redis,
+  ) { }
 
   // ============================================
   // SESSION MANAGEMENT
@@ -66,6 +76,9 @@ export class CollaborationService {
   }
 
   async removeSession(projectId: string, userId: string, socketId: string) {
+    // Clean up cursor from Redis
+    await this.redis.hdel(`project:${projectId}:cursors`, socketId);
+
     return this.prisma.collaborationSession.updateMany({
       where: {
         projectId,
@@ -93,10 +106,26 @@ export class CollaborationService {
 
     const userMap = new Map(users.map((u) => [u.id, u]));
 
-    return sessions.map((session) => ({
-      ...session,
-      user: userMap.get(session.userId),
-    }));
+    // Fetch live cursor positions from Redis
+    const cursors = await this.redis.hgetall(`project:${projectId}:cursors`);
+
+    return sessions.map((session) => {
+      let cursorData = {};
+      if (cursors && cursors[session.socketId]) {
+        try {
+          cursorData = JSON.parse(cursors[session.socketId]);
+        } catch (_e) {
+          // Ignore parse errors
+        }
+      }
+
+      return {
+        ...session,
+        // Overlay Redis cursor data on top of session data
+        ...cursorData,
+        user: userMap.get(session.userId),
+      };
+    });
   }
 
   async updateCursorPosition(
@@ -104,15 +133,25 @@ export class CollaborationService {
     x: number,
     y: number,
     slideIndex: number,
+    projectId: string, // Added projectId parameter
   ) {
-    return this.prisma.collaborationSession.updateMany({
-      where: { socketId, isActive: true },
-      data: {
-        cursorX: x,
-        cursorY: y,
-        cursorSlide: slideIndex,
-      },
+    // Store cursor position in Redis (Hash: project:{id}:cursors Field: {socketId})
+    // We store it as a JSON string to keep x, y, slideIndex together
+    const cursorData = JSON.stringify({
+      cursorX: x,
+      cursorY: y,
+      cursorSlide: slideIndex,
+      updatedAt: Date.now(),
     });
+
+    // Use HSET for O(1) access/update
+    await this.redis.hset(`project:${projectId}:cursors`, socketId, cursorData);
+
+    // Set expiry for the whole hash (optional, e.g. 24h cleanup)
+    // We don't want to expire it too quickly as long as project is active
+    await this.redis.expire(`project:${projectId}:cursors`, 86400);
+
+    return true;
   }
 
   // ============================================
@@ -291,8 +330,10 @@ export class CollaborationService {
     if (isOwner) return;
 
     const role = await this.getUserRole(projectId, userId);
-    if (!role || !allowedRoles.includes(role as any)) {
-      throw new ForbiddenException('You do not have permission to perform this action');
+    if (!role || !allowedRoles.includes(role)) {
+      throw new ForbiddenException(
+        'You do not have permission to perform this action',
+      );
     }
   }
 
@@ -338,11 +379,11 @@ export class CollaborationService {
       orderBy: { createdAt: 'asc' },
     });
 
-    const repliesByParent = new Map<string, any[]>();
+    const repliesByParent = new Map<string, Record<string, unknown>[]>();
     replies.forEach((r) => {
-      const list = repliesByParent.get(r.parentId!) || [];
+      const list = repliesByParent.get(r.parentId) || [];
       list.push({ ...r, user: userMap.get(r.userId) });
-      repliesByParent.set(r.parentId!, list);
+      repliesByParent.set(r.parentId, list);
     });
 
     return comments.map((c) => ({
@@ -454,7 +495,7 @@ export class CollaborationService {
     // The snapshot contains the full project state
     await this.prisma.project.update({
       where: { id: projectId },
-      data: versionData.snapshot as any,
+      data: versionData.snapshot,
     });
     return versionData.snapshot;
   }

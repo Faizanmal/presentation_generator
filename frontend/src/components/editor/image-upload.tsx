@@ -7,15 +7,15 @@ import type {
 } from "lucide-react";
 import {
     Upload,
-    Image as ImageIcon,
+    ImageIcon as ImageIcon,
     X,
     Loader2,
     CheckCircle,
     AlertCircle,
-    Link as LinkIcon,
+    // Link as LinkIcon, // Removing Link icon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+// import { Input } from "@/components/ui/input"; // Removing Input
 import { Progress } from "@/components/ui/progress";
 import {
     Dialog,
@@ -24,11 +24,12 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+// Removing Tabs imports as they are no longer needed
+// import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import Image from "next/image";
+// import Image from "next/image"; // Removing Image component
 
 interface ImageUploadProps {
     onUpload: (url: string, metadata?: ImageMetadata) => void;
@@ -290,35 +291,7 @@ export function ImageInsertDialog({
     onInsert,
     projectId,
 }: ImageInsertDialogProps) {
-    const [urlInput, setUrlInput] = useState("");
-    const [isLoadingUrl, setIsLoadingUrl] = useState(false);
-
-    const handleUrlInsert = async () => {
-        if (!urlInput.trim()) {
-            toast.error("Please enter an image URL");
-            return;
-        }
-
-        setIsLoadingUrl(true);
-        try {
-            // Validate URL is an image
-            const response = await fetch(urlInput, { method: "HEAD" });
-            const contentType = response.headers.get("content-type");
-
-            if (!contentType?.startsWith("image/")) {
-                toast.error("URL does not point to a valid image");
-                return;
-            }
-
-            onInsert(urlInput);
-            setUrlInput("");
-            onOpenChange(false);
-        } catch {
-            toast.error("Failed to load image from URL");
-        } finally {
-            setIsLoadingUrl(false);
-        }
-    };
+    // Removed URL input state and handlers
 
     const handleUpload = (url: string, metadata?: ImageMetadata) => {
         onInsert(url, metadata);
@@ -334,69 +307,18 @@ export function ImageInsertDialog({
                         Insert Image
                     </DialogTitle>
                     <DialogDescription>
-                        Upload an image or paste a URL
+                        Upload an image from your device
                     </DialogDescription>
                 </DialogHeader>
 
-                <Tabs defaultValue="upload" className="mt-4">
-                    <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="upload" className="gap-2">
-                            <Upload className="h-4 w-4" />
-                            Upload
-                        </TabsTrigger>
-                        <TabsTrigger value="url" className="gap-2">
-                            <LinkIcon className="h-4 w-4" />
-                            From URL
-                        </TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent value="upload" className="mt-4">
-                        <ImageUploadZone
-                            projectId={projectId}
-                            onUpload={handleUpload}
-                            accept="image/*"
-                            maxSize={10}
-                        />
-                    </TabsContent>
-
-                    <TabsContent value="url" className="mt-4 space-y-4">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Image URL</label>
-                            <div className="flex gap-2">
-                                <Input
-                                    placeholder="https://example.com/image.jpg"
-                                    value={urlInput}
-                                    onChange={(e) => setUrlInput(e.target.value)}
-                                    onKeyDown={(e) => e.key === "Enter" && handleUrlInsert()}
-                                />
-                                <Button onClick={handleUrlInsert} disabled={isLoadingUrl}>
-                                    {isLoadingUrl ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                        "Insert"
-                                    )}
-                                </Button>
-                            </div>
-                            <p className="text-xs text-slate-500">
-                                Paste the URL of any image on the web
-                            </p>
-                        </div>
-
-                        {/* URL Preview */}
-                        {urlInput && (
-                            <div className="aspect-video bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden flex items-center justify-center">
-                                <Image
-                                    src={urlInput}
-                                    alt="Preview"
-                                    className="max-w-full max-h-full object-contain"
-                                    onError={(e) => {
-                                        (e.target as HTMLImageElement).style.display = "none";
-                                    }}
-                                />
-                            </div>
-                        )}
-                    </TabsContent>
-                </Tabs>
+                <div className="mt-4">
+                    <ImageUploadZone
+                        projectId={projectId}
+                        onUpload={handleUpload}
+                        accept="image/*"
+                        maxSize={10}
+                    />
+                </div>
             </DialogContent>
         </Dialog>
     );

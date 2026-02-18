@@ -13,15 +13,15 @@ interface CreateBlockDto {
   projectId: string;
   slideId?: string;
   blockType: BlockType;
-  content: Record<string, any>;
+  content: Record<string, unknown>;
   order: number;
-  style?: Record<string, any>;
+  style?: Record<string, unknown>;
 }
 
 interface UpdateBlockDto {
-  content?: Record<string, any>;
+  content?: Record<string, unknown>;
   order?: number;
-  style?: Record<string, any>;
+  style?: Record<string, unknown>;
   blockType?: BlockType;
   version?: number; // For optimistic locking
 }
@@ -38,7 +38,7 @@ export class BlocksService {
     private readonly prisma: PrismaService,
     private readonly cacheService: AdvancedCacheService,
     private readonly collaborationService: CollaborationService,
-  ) {}
+  ) { }
 
   /**
    * Create a new block
@@ -54,7 +54,10 @@ export class BlocksService {
     }
 
     if (project.ownerId !== userId) {
-      const role = await this.collaborationService.getUserRole(createBlockDto.projectId, userId);
+      const role = await this.collaborationService.getUserRole(
+        createBlockDto.projectId,
+        userId,
+      );
       if (role !== 'EDITOR') {
         throw new ForbiddenException('You cannot edit this project');
       }
@@ -65,9 +68,9 @@ export class BlocksService {
         projectId: createBlockDto.projectId,
         slideId: createBlockDto.slideId,
         blockType: createBlockDto.blockType,
-        content: createBlockDto.content,
+        content: createBlockDto.content as import('@prisma/client').Prisma.InputJsonValue,
         order: createBlockDto.order,
-        style: createBlockDto.style || {},
+        style: (createBlockDto.style || {}) as import('@prisma/client').Prisma.InputJsonValue,
       },
     });
 
@@ -85,9 +88,9 @@ export class BlocksService {
   /**
    * Get all blocks for a slide
    */
-  async findBySlide(slideId: string) {
+  async findBySlide(slideId: string, filterType?: BlockType) {
     return this.prisma.block.findMany({
-      where: { slideId },
+      where: { slideId, ...(filterType && { blockType: filterType }) },
       orderBy: { order: 'asc' },
     });
   }
@@ -120,7 +123,10 @@ export class BlocksService {
     }
 
     if (block.project.ownerId !== userId) {
-      const role = await this.collaborationService.getUserRole(block.projectId, userId);
+      const role = await this.collaborationService.getUserRole(
+        block.projectId,
+        userId,
+      );
       if (role !== 'EDITOR') {
         throw new ForbiddenException('You cannot edit this block');
       }
@@ -141,9 +147,9 @@ export class BlocksService {
       const updated = await this.prisma.block.update({
         where: { id: blockId },
         data: {
-          content: updateBlockDto.content,
+          content: updateBlockDto.content as import('@prisma/client').Prisma.InputJsonValue,
           order: updateBlockDto.order,
-          style: updateBlockDto.style,
+          style: updateBlockDto.style as import('@prisma/client').Prisma.InputJsonValue,
           blockType: updateBlockDto.blockType,
           version: { increment: 1 },
         },
@@ -162,9 +168,9 @@ export class BlocksService {
     const updated = await this.prisma.block.update({
       where: { id: blockId },
       data: {
-        content: updateBlockDto.content,
+        content: updateBlockDto.content as import('@prisma/client').Prisma.InputJsonValue,
         order: updateBlockDto.order,
-        style: updateBlockDto.style,
+        style: updateBlockDto.style as import('@prisma/client').Prisma.InputJsonValue,
         blockType: updateBlockDto.blockType,
         version: { increment: 1 },
       },
@@ -193,7 +199,10 @@ export class BlocksService {
     }
 
     if (block.project.ownerId !== userId) {
-      const role = await this.collaborationService.getUserRole(block.projectId, userId);
+      const role = await this.collaborationService.getUserRole(
+        block.projectId,
+        userId,
+      );
       if (role !== 'EDITOR') {
         throw new ForbiddenException('You cannot delete this block');
       }
@@ -226,6 +235,101 @@ export class BlocksService {
   }
 
   /**
+   * Duplicate a block (copy within same slide)
+   */
+  async duplicate(userId: string, blockId: string): Promise<object> {
+    const block = await this.prisma.block.findUnique({
+      where: { id: blockId },
+      include: { project: true },
+    });
+
+    if (!block) throw new NotFoundException('Block not found');
+
+    if (block.project.ownerId !== userId) {
+      const role = await this.collaborationService.getUserRole(
+        block.projectId,
+        userId,
+      );
+      if (role !== 'EDITOR')
+        throw new ForbiddenException('You cannot edit this project');
+    }
+
+    // Shift blocks after target order
+    await this.prisma.block.updateMany({
+      where: { slideId: block.slideId, order: { gt: block.order } },
+      data: { order: { increment: 1 } },
+    });
+
+    const newBlock = await this.prisma.block.create({
+      data: {
+        projectId: block.projectId,
+        slideId: block.slideId,
+        blockType: block.blockType,
+        content:
+          block.content as import('@prisma/client').Prisma.InputJsonValue,
+        style: block.style as import('@prisma/client').Prisma.InputJsonValue,
+        order: block.order + 1,
+      },
+    });
+
+    await this.prisma.project.update({
+      where: { id: block.projectId },
+      data: { updatedAt: new Date() },
+    });
+
+    this.logger.log(`Block duplicated: ${blockId} -> ${newBlock.id}`);
+    return newBlock;
+  }
+
+  /**
+   * Bulk create multiple blocks (for paste/import operations)
+   */
+  async bulkCreate(
+    userId: string,
+    projectId: string,
+    blocks: Array<CreateBlockDto>,
+  ) {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+    });
+    if (!project) throw new NotFoundException('Project not found');
+
+    if (project.ownerId !== userId) {
+      const role = await this.collaborationService.getUserRole(
+        projectId,
+        userId,
+      );
+      if (role !== 'EDITOR')
+        throw new ForbiddenException('You cannot edit this project');
+    }
+
+    const created = await this.prisma.$transaction(
+      blocks.map((b) =>
+        this.prisma.block.create({
+          data: {
+            projectId,
+            slideId: b.slideId,
+            blockType: b.blockType,
+            content: b.content as import('@prisma/client').Prisma.InputJsonValue,
+            order: b.order,
+            style: (b.style || {}) as import('@prisma/client').Prisma.InputJsonValue,
+          },
+        }),
+      ),
+    );
+
+    await this.prisma.project.update({
+      where: { id: projectId },
+      data: { updatedAt: new Date() },
+    });
+
+    this.logger.log(
+      `Bulk created ${created.length} blocks for project ${projectId}`,
+    );
+    return created;
+  }
+
+  /**
    * Reorder blocks within a slide
    */
   async reorder(
@@ -243,7 +347,10 @@ export class BlocksService {
     }
 
     if (project.ownerId !== userId) {
-      const role = await this.collaborationService.getUserRole(projectId, userId);
+      const role = await this.collaborationService.getUserRole(
+        projectId,
+        userId,
+      );
       if (role !== 'EDITOR') {
         throw new ForbiddenException('You cannot edit this project');
       }
@@ -276,8 +383,8 @@ export class BlocksService {
     projectId: string,
     blocks: Array<{
       id: string;
-      content?: Record<string, any>;
-      style?: Record<string, any>;
+      content?: Record<string, unknown>;
+      style?: Record<string, unknown>;
     }>,
   ) {
     // Verify project ownership / collaborator role
@@ -290,7 +397,10 @@ export class BlocksService {
     }
 
     if (project.ownerId !== userId) {
-      const role = await this.collaborationService.getUserRole(projectId, userId);
+      const role = await this.collaborationService.getUserRole(
+        projectId,
+        userId,
+      );
       if (role !== 'EDITOR') {
         throw new ForbiddenException('You cannot edit this project');
       }
@@ -302,8 +412,8 @@ export class BlocksService {
         this.prisma.block.update({
           where: { id: block.id },
           data: {
-            content: block.content,
-            style: block.style,
+            content: block.content as import('@prisma/client').Prisma.InputJsonValue,
+            style: block.style as import('@prisma/client').Prisma.InputJsonValue,
           },
         }),
       ),

@@ -393,7 +393,13 @@ export class ImageRecognitionService {
     });
 
     // Calculate most used images
-    const imageCounts = new Map<string, { upload: any; count: number }>();
+    const imageCounts = new Map<
+      string,
+      {
+        upload: (typeof uploads)[number];
+        count: number;
+      }
+    >();
     uploads.forEach((upload) => {
       imageCounts.set(upload.id, { upload, count: upload.usages.length });
     });
@@ -577,7 +583,11 @@ export class ImageRecognitionService {
       score: 0.5, // Base score
     }));
 
-    if (projectContext.description && candidateImages.length > 0) {
+    if (
+      this.openai &&
+      projectContext.description &&
+      candidateImages.length > 0
+    ) {
       // Generate embedding for description
       const descEmbedding = await this.openai.embeddings.create({
         model: 'text-embedding-3-small',
@@ -597,11 +607,13 @@ export class ImageRecognitionService {
         .sort((a, b) => b.score - a.score);
     } else {
       // Fallback: prioritize images from preferred sources
+      const preferredSources = Array.isArray(patterns?.preferredSources)
+        ? patterns.preferredSources
+        : [];
+
       scoredImages.sort((a, b) => {
-        const sourceA =
-          patterns?.preferredSources.indexOf(a.upload.source) ?? -1;
-        const sourceB =
-          patterns?.preferredSources.indexOf(b.upload.source) ?? -1;
+        const sourceA = preferredSources.indexOf(a.upload.source);
+        const sourceB = preferredSources.indexOf(b.upload.source);
         if (sourceA >= 0 && sourceB >= 0) return sourceA - sourceB;
         if (sourceA >= 0) return -1;
         if (sourceB >= 0) return 1;
@@ -646,19 +658,26 @@ export class ImageRecognitionService {
    * Build human-readable explanation for recommendations
    */
   private buildReasoningExplanation(
-    context: any,
-    patterns: any,
+    context: {
+      tone?: string;
+      audience?: string;
+    },
+    patterns: {
+      commonImageTags?: string[];
+      preferredSources?: string[];
+      industryTags?: string[];
+    } | null,
     searchTags: string[],
   ): string {
     const reasons: string[] = [];
 
-    if (patterns?.commonImageTags.length > 0) {
+    if (patterns?.commonImageTags && patterns.commonImageTags.length > 0) {
       reasons.push(
         `Based on your frequently used tags: ${patterns.commonImageTags.slice(0, 3).join(', ')}`,
       );
     }
 
-    if (patterns?.preferredSources.length > 0) {
+    if (patterns?.preferredSources && patterns.preferredSources.length > 0) {
       reasons.push(
         `Prioritizing ${patterns.preferredSources[0]} images from your preferred sources`,
       );
@@ -670,6 +689,12 @@ export class ImageRecognitionService {
 
     if (context.audience) {
       reasons.push(`Suitable for audience: ${context.audience}`);
+    }
+
+    if (searchTags.length > 0) {
+      reasons.push(
+        `Using tags: ${searchTags.slice(0, 5).join(', ')} to match relevant imagery`,
+      );
     }
 
     return reasons.length > 0

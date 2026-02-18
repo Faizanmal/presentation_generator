@@ -8,7 +8,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UniversalDesignService } from './universal-design.service';
 
 class CheckProjectDto {
@@ -66,7 +66,7 @@ export class UniversalDesignController {
   @ApiOperation({ summary: 'Get all cultural guides' })
   getAllCulturalGuides() {
     const regions = ['Western', 'China', 'Middle East', 'Japan'];
-    return regions.map(region => ({
+    return regions.map((region) => ({
       region,
       guide: this.designService.getCulturalGuide(region),
     }));

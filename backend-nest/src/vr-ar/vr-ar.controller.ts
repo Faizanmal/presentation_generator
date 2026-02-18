@@ -10,9 +10,9 @@ import {
   Request,
   Res,
 } from '@nestjs/common';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { VRARService } from './vr-ar.service';
 
 class CreateVRExportDto {
@@ -89,10 +89,7 @@ export class VRARController {
 
   @Get('exports/:id/webxr')
   @ApiOperation({ summary: 'Get WebXR HTML for VR export (public)' })
-  async getWebXRExport(
-    @Param('id') id: string,
-    @Res() res: Response,
-  ) {
+  async getWebXRExport(@Param('id') id: string, @Res() res: Response) {
     // Note: In production, you'd verify access via share token or auth
     const vrExport = await this.vrArService.getVRExport(id, '');
     // Generate and return HTML

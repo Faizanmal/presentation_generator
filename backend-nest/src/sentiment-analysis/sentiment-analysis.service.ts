@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
 
-interface SentimentMetrics {
+export interface SentimentMetrics {
   positive: number;
   neutral: number;
   negative: number;
@@ -22,10 +22,13 @@ interface AudienceSignal {
 @Injectable()
 export class SentimentAnalysisService {
   private readonly logger = new Logger(SentimentAnalysisService.name);
-  private activeSessions = new Map<string, {
-    signals: AudienceSignal[];
-    lastSnapshot: Date;
-  }>();
+  private activeSessions = new Map<
+    string,
+    {
+      signals: AudienceSignal[];
+      lastSnapshot: Date;
+    }
+  >();
 
   constructor(
     private readonly configService: ConfigService,
@@ -39,17 +42,11 @@ export class SentimentAnalysisService {
   async startSession(hostId: string, projectId: string, slideId?: string) {
     const session = await this.prisma.sentimentSession.create({
       data: {
-        hostId,
+        presenterId: hostId,
         projectId,
         slideId,
         status: 'active',
         startedAt: new Date(),
-        settings: {
-          trackReactions: true,
-          trackExpressions: true,
-          snapshotInterval: 30, // seconds
-          alertThreshold: 0.3, // negative sentiment threshold
-        },
       },
     });
 
@@ -66,7 +63,7 @@ export class SentimentAnalysisService {
    */
   async recordSignal(sessionId: string, signal: AudienceSignal) {
     const sessionData = this.activeSessions.get(sessionId);
-    
+
     if (!sessionData) {
       const session = await this.prisma.sentimentSession.findUnique({
         where: { id: sessionId },
@@ -84,8 +81,8 @@ export class SentimentAnalysisService {
       // Check if we should create a snapshot
       const settings = await this.getSessionSettings(sessionId);
       const timeSinceSnapshot = Date.now() - sessionData.lastSnapshot.getTime();
-      
-      if (timeSinceSnapshot >= (settings.snapshotInterval * 1000)) {
+
+      if (timeSinceSnapshot >= settings.snapshotInterval * 1000) {
         await this.createSnapshot(sessionId);
       }
     }
@@ -94,7 +91,11 @@ export class SentimentAnalysisService {
   /**
    * Record reaction (emoji, thumbs up/down)
    */
-  async recordReaction(sessionId: string, reaction: string, participantId?: string) {
+  async recordReaction(
+    sessionId: string,
+    reaction: string,
+    participantId?: string,
+  ) {
     return this.recordSignal(sessionId, {
       type: 'reaction',
       value: reaction,
@@ -106,7 +107,11 @@ export class SentimentAnalysisService {
   /**
    * Record engagement metric (attention, participation)
    */
-  async recordEngagement(sessionId: string, engagement: number, participantId?: string) {
+  async recordEngagement(
+    sessionId: string,
+    engagement: number,
+    participantId?: string,
+  ) {
     return this.recordSignal(sessionId, {
       type: 'engagement',
       value: Math.max(0, Math.min(1, engagement)),
@@ -132,7 +137,7 @@ export class SentimentAnalysisService {
   ) {
     // Determine dominant expression
     const expressions = Object.entries(expressionData);
-    const dominant = expressions.reduce((a, b) => a[1] > b[1] ? a : b);
+    const dominant = expressions.reduce((a, b) => (a[1] > b[1] ? a : b));
 
     return this.recordSignal(sessionId, {
       type: 'expression',
@@ -147,7 +152,7 @@ export class SentimentAnalysisService {
    */
   async createSnapshot(sessionId: string): Promise<SentimentMetrics> {
     const sessionData = this.activeSessions.get(sessionId);
-    
+
     if (!sessionData || sessionData.signals.length === 0) {
       return this.getDefaultMetrics();
     }
@@ -160,11 +165,16 @@ export class SentimentAnalysisService {
     });
 
     // Store snapshot
+    const dominantSentiment = metrics.positive > metrics.negative ? 'positive' : metrics.negative > metrics.neutral ? 'negative' : 'neutral';
+    const confidence = Math.max(metrics.positive, metrics.negative, metrics.neutral);
+
     await this.prisma.sentimentSnapshot.create({
       data: {
         sessionId,
+        slideIndex: 0, // Default, can be updated based on current slide
         slideId: session?.slideId,
-        metrics: metrics as object,
+        sentiment: dominantSentiment,
+        confidence,
         participantCount: this.getUniqueParticipants(sessionData.signals),
         timestamp: new Date(),
       },
@@ -202,21 +212,30 @@ export class SentimentAnalysisService {
     let confusionCount = 0;
     let excitementCount = 0;
 
-    const positiveReactions = ['👍', '❤️', '😊', '🎉', '👏', 'like', 'love', 'great'];
+    const positiveReactions = [
+      '👍',
+      '❤️',
+      '😊',
+      '🎉',
+      '👏',
+      'like',
+      'love',
+      'great',
+    ];
     const negativeReactions = ['👎', '😕', '😴', 'confused', 'bored'];
     const excitedReactions = ['🎉', '🔥', '💯', 'wow', 'amazing'];
 
     for (const signal of signals) {
       if (signal.type === 'reaction') {
         const reaction = String(signal.value).toLowerCase();
-        
-        if (positiveReactions.some(r => reaction.includes(r))) {
+
+        if (positiveReactions.some((r) => reaction.includes(r))) {
           positiveCount++;
-        } else if (negativeReactions.some(r => reaction.includes(r))) {
+        } else if (negativeReactions.some((r) => reaction.includes(r))) {
           negativeCount++;
         }
-        
-        if (excitedReactions.some(r => reaction.includes(r))) {
+
+        if (excitedReactions.some((r) => reaction.includes(r))) {
           excitementCount++;
         }
       } else if (signal.type === 'engagement') {
@@ -236,11 +255,12 @@ export class SentimentAnalysisService {
     }
 
     const total = Math.max(positiveCount + negativeCount + 1, signals.length);
-    
+
     metrics.positive = positiveCount / total;
     metrics.negative = negativeCount / total;
     metrics.neutral = 1 - metrics.positive - metrics.negative;
-    metrics.engagement = engagementCount > 0 ? engagementSum / engagementCount : 0.5;
+    metrics.engagement =
+      engagementCount > 0 ? engagementSum / engagementCount : 0.5;
     metrics.confusion = confusionCount / signals.length;
     metrics.excitement = excitementCount / signals.length;
 
@@ -252,7 +272,7 @@ export class SentimentAnalysisService {
    */
   private getUniqueParticipants(signals: AudienceSignal[]): number {
     const participants = new Set(
-      signals.filter(s => s.participantId).map(s => s.participantId)
+      signals.filter((s) => s.participantId).map((s) => s.participantId),
     );
     return participants.size || 1;
   }
@@ -262,7 +282,7 @@ export class SentimentAnalysisService {
    */
   private async checkAlerts(sessionId: string, metrics: SentimentMetrics) {
     const settings = await this.getSessionSettings(sessionId);
-    
+
     const alerts: string[] = [];
 
     if (metrics.negative > settings.alertThreshold) {
@@ -293,12 +313,13 @@ export class SentimentAnalysisService {
       where: { id: sessionId },
     });
 
-    const settings = session?.settings as {
-      trackReactions?: boolean;
-      trackExpressions?: boolean;
-      snapshotInterval?: number;
-      alertThreshold?: number;
-    } || {};
+    const settings =
+      (session?.settings as {
+        trackReactions?: boolean;
+        trackExpressions?: boolean;
+        snapshotInterval?: number;
+        alertThreshold?: number;
+      }) || {};
 
     return {
       trackReactions: settings.trackReactions ?? true,
@@ -327,7 +348,7 @@ export class SentimentAnalysisService {
    */
   async getCurrentSentiment(sessionId: string): Promise<SentimentMetrics> {
     const sessionData = this.activeSessions.get(sessionId);
-    
+
     if (!sessionData || sessionData.signals.length === 0) {
       // Get last snapshot
       const lastSnapshot = await this.prisma.sentimentSnapshot.findFirst({
@@ -335,7 +356,9 @@ export class SentimentAnalysisService {
         orderBy: { timestamp: 'desc' },
       });
 
-      return (lastSnapshot?.metrics as SentimentMetrics) || this.getDefaultMetrics();
+      return (
+        (lastSnapshot?.metrics as unknown as SentimentMetrics) || this.getDefaultMetrics()
+      );
     }
 
     return this.calculateMetrics(sessionData.signals);
@@ -350,10 +373,10 @@ export class SentimentAnalysisService {
       orderBy: { timestamp: 'asc' },
     });
 
-    return snapshots.map(s => ({
+    return snapshots.map((s) => ({
       timestamp: s.timestamp,
       slideId: s.slideId,
-      metrics: s.metrics as SentimentMetrics,
+      metrics: s.metrics as unknown as SentimentMetrics,
       participants: s.participantCount,
     }));
   }
@@ -392,8 +415,8 @@ export class SentimentAnalysisService {
       excitement: 0,
     };
 
-    snapshots.forEach(s => {
-      const m = s.metrics as SentimentMetrics;
+    snapshots.forEach((s) => {
+      const m = s.metrics as unknown as SentimentMetrics;
       avgMetrics.positive += m.positive;
       avgMetrics.neutral += m.neutral;
       avgMetrics.negative += m.negative;
@@ -403,19 +426,23 @@ export class SentimentAnalysisService {
     });
 
     const count = snapshots.length;
-    Object.keys(avgMetrics).forEach(key => {
+    Object.keys(avgMetrics).forEach((key) => {
       avgMetrics[key as keyof SentimentMetrics] /= count;
     });
 
     // Find peak moments
     const peakPositive = snapshots.reduce((max, s) => {
-      const m = s.metrics as SentimentMetrics;
-      return m.positive > (max?.metrics as SentimentMetrics)?.positive ? s : max;
+      const m = s.metrics as unknown as SentimentMetrics;
+      return m.positive > (max?.metrics as unknown as SentimentMetrics)?.positive
+        ? s
+        : max;
     }, snapshots[0]);
 
     const peakNegative = snapshots.reduce((max, s) => {
-      const m = s.metrics as SentimentMetrics;
-      return m.negative > (max?.metrics as SentimentMetrics)?.negative ? s : max;
+      const m = s.metrics as unknown as SentimentMetrics;
+      return m.negative > (max?.metrics as unknown as SentimentMetrics)?.negative
+        ? s
+        : max;
     }, snapshots[0]);
 
     return {
@@ -423,9 +450,18 @@ export class SentimentAnalysisService {
       summary: avgMetrics,
       snapshotCount: count,
       peaks: {
-        mostPositive: { timestamp: peakPositive.timestamp, slideId: peakPositive.slideId },
-        mostEngaged: { timestamp: peakPositive.timestamp, slideId: peakPositive.slideId },
-        leastEngaged: { timestamp: peakNegative.timestamp, slideId: peakNegative.slideId },
+        mostPositive: {
+          timestamp: peakPositive.timestamp,
+          slideId: peakPositive.slideId,
+        },
+        mostEngaged: {
+          timestamp: peakPositive.timestamp,
+          slideId: peakPositive.slideId,
+        },
+        leastEngaged: {
+          timestamp: peakNegative.timestamp,
+          slideId: peakNegative.slideId,
+        },
       },
     };
   }
@@ -438,7 +474,7 @@ export class SentimentAnalysisService {
       where: { id: sessionId },
     });
 
-    if (!session || session.hostId !== hostId) {
+    if (!session || session.presenterId !== hostId) {
       throw new NotFoundException('Session not found or unauthorized');
     }
 
@@ -477,16 +513,19 @@ Average Metrics:
 - Confusion: ${Math.round(summary.summary.confusion * 100)}%
 
 Timeline has ${timeline.length} data points.
-Peak positive at ${summary.peaks.mostPositive.timestamp}
-Lowest engagement at ${summary.peaks.leastEngaged.timestamp}
+Peak positive at ${summary.peaks?.mostPositive?.timestamp || 'N/A'}
+Lowest engagement at ${summary.peaks?.leastEngaged?.timestamp || 'N/A'}
 
 Provide 3-5 specific insights and recommendations.`,
-        { maxTokens: 300 }
+        { maxTokens: 300 },
       );
 
       return { summary: summary.summary, insights };
     } catch {
-      return { summary: summary.summary, insights: 'Unable to generate AI insights' };
+      return {
+        summary: summary.summary,
+        insights: 'Unable to generate AI insights',
+      };
     }
   }
 }

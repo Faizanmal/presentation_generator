@@ -6,13 +6,7 @@ import { ScalablePrismaService } from './scalable-prisma.service';
 @Global()
 @Module({
   imports: [ConfigModule],
-  providers: [
-    ClusterRedisService,
-    ScalablePrismaService,
-  ],
-  exports: [
-    ClusterRedisService,
-    ScalablePrismaService,
-  ],
+  providers: [ClusterRedisService, ScalablePrismaService],
+  exports: [ClusterRedisService, ScalablePrismaService],
 })
 export class ClusterModule {}

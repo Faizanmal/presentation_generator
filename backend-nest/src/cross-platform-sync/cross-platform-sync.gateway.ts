@@ -25,7 +25,9 @@ interface SyncSocket extends Socket {
     credentials: true,
   },
 })
-export class CrossPlatformSyncGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class CrossPlatformSyncGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server: Server;
 
@@ -39,9 +41,13 @@ export class CrossPlatformSyncGateway implements OnGatewayConnection, OnGatewayD
 
   async handleDisconnect(client: SyncSocket) {
     this.logger.log(`Sync client disconnected: ${client.id}`);
-    
+
     if (client.userId && client.deviceId) {
-      await this.syncService.setDeviceOnline(client.userId, client.deviceId, false);
+      await this.syncService.setDeviceOnline(
+        client.userId,
+        client.deviceId,
+        false,
+      );
     }
 
     if (client.projectId) {
@@ -54,7 +60,8 @@ export class CrossPlatformSyncGateway implements OnGatewayConnection, OnGatewayD
   @SubscribeMessage('register')
   async handleRegister(
     @ConnectedSocket() client: SyncSocket,
-    @MessageBody() data: {
+    @MessageBody()
+    data: {
       userId: string;
       deviceId: string;
       platform: string;
@@ -102,14 +109,17 @@ export class CrossPlatformSyncGateway implements OnGatewayConnection, OnGatewayD
       client.join(`sync:${data.projectId}`);
 
       // If client is behind, send pending operations
-      if (data.currentVersion !== undefined && data.currentVersion < sync.version) {
+      if (
+        data.currentVersion !== undefined &&
+        data.currentVersion < sync.version
+      ) {
         const pending = await this.syncService.getPendingOperations(
           data.projectId,
           data.currentVersion,
         );
 
         client.emit('syncUpdate', {
-          operations: pending.map(o => o.operation),
+          operations: pending.map((o) => o.operation),
           serverVersion: sync.version,
         });
       } else {
@@ -125,8 +135,9 @@ export class CrossPlatformSyncGateway implements OnGatewayConnection, OnGatewayD
         platform: data.projectId,
       });
     } catch (error) {
-      client.emit('error', { 
-        message: error instanceof Error ? error.message : 'Failed to join project',
+      client.emit('error', {
+        message:
+          error instanceof Error ? error.message : 'Failed to join project',
       });
     }
   }
@@ -134,7 +145,8 @@ export class CrossPlatformSyncGateway implements OnGatewayConnection, OnGatewayD
   @SubscribeMessage('operations')
   async handleOperations(
     @ConnectedSocket() client: SyncSocket,
-    @MessageBody() data: {
+    @MessageBody()
+    data: {
       operations: Array<{
         type: 'insert' | 'delete' | 'retain' | 'update';
         position?: number;
@@ -151,7 +163,7 @@ export class CrossPlatformSyncGateway implements OnGatewayConnection, OnGatewayD
     }
 
     try {
-      const opsWithMeta = data.operations.map(op => ({
+      const opsWithMeta = data.operations.map((op) => ({
         ...op,
         id: `${client.deviceId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         timestamp: Date.now(),
@@ -210,10 +222,11 @@ export class CrossPlatformSyncGateway implements OnGatewayConnection, OnGatewayD
       );
 
       client.emit('syncUpdate', {
-        operations: pending.map(o => o.operation),
-        serverVersion: pending.length > 0 
-          ? pending[pending.length - 1].version 
-          : data.sinceVersion,
+        operations: pending.map((o) => o.operation),
+        serverVersion:
+          pending.length > 0
+            ? pending[pending.length - 1].version
+            : data.sinceVersion,
       });
     } catch (error) {
       client.emit('error', { message: 'Failed to get sync updates' });
@@ -223,7 +236,8 @@ export class CrossPlatformSyncGateway implements OnGatewayConnection, OnGatewayD
   @SubscribeMessage('resolveConflict')
   async handleResolveConflict(
     @ConnectedSocket() client: SyncSocket,
-    @MessageBody() data: {
+    @MessageBody()
+    data: {
       strategy: 'last-write-wins' | 'merge' | 'manual';
       resolvedContent?: unknown;
     },
@@ -254,7 +268,8 @@ export class CrossPlatformSyncGateway implements OnGatewayConnection, OnGatewayD
   @SubscribeMessage('presence')
   handlePresence(
     @ConnectedSocket() client: SyncSocket,
-    @MessageBody() data: { cursor?: { x: number; y: number }; selection?: unknown },
+    @MessageBody()
+    data: { cursor?: { x: number; y: number }; selection?: unknown },
   ) {
     if (!client.projectId || !client.deviceId) return;
 

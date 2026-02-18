@@ -73,9 +73,9 @@ export class ImageRecognitionService {
           ) || [];
 
       const safeSearch = {
-        adult: result.safeSearchAnnotation?.adult || 'UNKNOWN',
-        violence: result.safeSearchAnnotation?.violence || 'UNKNOWN',
-        racy: result.safeSearchAnnotation?.racy || 'UNKNOWN',
+        adult: String(result.safeSearchAnnotation?.adult || 'UNKNOWN'),
+        violence: String(result.safeSearchAnnotation?.violence || 'UNKNOWN'),
+        racy: String(result.safeSearchAnnotation?.racy || 'UNKNOWN'),
       };
 
       // 3. Determine Scenery Type & Best Use Case (Heuristic + Labels)

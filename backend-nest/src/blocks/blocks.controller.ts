@@ -38,20 +38,20 @@ class CreateBlockDto {
   blockType: BlockType;
 
   @IsObject()
-  content: Record<string, any>;
+  content: Record<string, unknown>;
 
   @IsNumber()
   order: number;
 
   @IsObject()
   @IsOptional()
-  style?: Record<string, any>;
+  style?: Record<string, unknown>;
 }
 
 class UpdateBlockDto {
   @IsObject()
   @IsOptional()
-  content?: Record<string, any>;
+  content?: Record<string, unknown>;
 
   @IsNumber()
   @IsOptional()
@@ -59,7 +59,7 @@ class UpdateBlockDto {
 
   @IsObject()
   @IsOptional()
-  style?: Record<string, any>;
+  style?: Record<string, unknown>;
 
   @IsEnum(BlockType)
   @IsOptional()
@@ -87,11 +87,11 @@ class BatchUpdateBlockItem {
 
   @IsObject()
   @IsOptional()
-  content?: Record<string, any>;
+  content?: Record<string, unknown>;
 
   @IsObject()
   @IsOptional()
-  style?: Record<string, any>;
+  style?: Record<string, unknown>;
 }
 
 class BatchUpdateDto {
@@ -100,15 +100,15 @@ class BatchUpdateDto {
   @Type(() => BatchUpdateBlockItem)
   blocks: Array<{
     id: string;
-    content?: Record<string, any>;
-    style?: Record<string, any>;
+    content?: Record<string, unknown>;
+    style?: Record<string, unknown>;
   }>;
 }
 
 @Controller('blocks')
 @UseGuards(JwtAuthGuard)
 export class BlocksController {
-  constructor(private readonly blocksService: BlocksService) {}
+  constructor(private readonly blocksService: BlocksService) { }
 
   /**
    * Create a new block

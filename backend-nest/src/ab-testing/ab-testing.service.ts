@@ -1,7 +1,7 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
-interface VariantConfig {
+export interface VariantConfig {
   name: string;
   description?: string;
   themeConfig: Record<string, unknown>;
@@ -19,7 +19,7 @@ interface TestResult {
   dropOffSlide?: number;
 }
 
-interface StatisticalAnalysis {
+export interface StatisticalAnalysis {
   winner?: string;
   confidence: number;
   improvement: number;
@@ -39,7 +39,7 @@ interface StatisticalAnalysis {
 export class ABTestingService {
   private readonly logger = new Logger(ABTestingService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   /**
    * Create a new A/B test
@@ -56,14 +56,24 @@ export class ABTestingService {
       confidenceLevel?: number;
     },
   ) {
-    const { name, description, goalMetric = 'engagement', variants, sampleSize = 100, confidenceLevel = 0.95 } = data;
+    const {
+      name,
+      description,
+      goalMetric = 'engagement',
+      variants,
+      sampleSize = 100,
+      confidenceLevel = 0.95,
+    } = data;
 
     if (variants.length < 2) {
       throw new BadRequestException('A/B test requires at least 2 variants');
     }
 
     // Validate traffic allocation
-    const totalTraffic = variants.reduce((sum, v) => sum + (v.traffic || 50), 0);
+    const totalTraffic = variants.reduce(
+      (sum, v) => sum + (v.traffic || 50),
+      0,
+    );
     if (Math.abs(totalTraffic - 100) > 0.1) {
       throw new BadRequestException('Traffic allocation must sum to 100%');
     }
@@ -115,7 +125,9 @@ export class ABTestingService {
     const test = await this.getTest(testId, userId);
 
     if (test.status !== 'draft') {
-      throw new BadRequestException('Test can only be started from draft status');
+      throw new BadRequestException(
+        'Test can only be started from draft status',
+      );
     }
 
     return this.prisma.aBTest.update({
@@ -278,7 +290,10 @@ export class ABTestingService {
     });
 
     const conversions = results.filter((r) => r.completed).length;
-    const totalViewTime = results.reduce((sum, r) => sum + (r.viewTime || 0), 0);
+    const totalViewTime = results.reduce(
+      (sum, r) => sum + (r.viewTime || 0),
+      0,
+    );
     const engagedCount = results.filter((r) => r.engaged).length;
 
     await this.prisma.aBTestVariant.update({
@@ -286,15 +301,22 @@ export class ABTestingService {
       data: {
         conversions,
         avgViewTime: results.length > 0 ? totalViewTime / results.length : 0,
-        engagementScore: results.length > 0 ? (engagedCount / results.length) * 100 : 0,
-        bounceRate: results.length > 0 
-          ? (results.filter((r) => !r.engaged && (r.viewTime || 0) < 10).length / results.length) * 100 
-          : 0,
+        engagementScore:
+          results.length > 0 ? (engagedCount / results.length) * 100 : 0,
+        bounceRate:
+          results.length > 0
+            ? (results.filter((r) => !r.engaged && (r.viewTime || 0) < 10)
+              .length /
+              results.length) *
+            100
+            : 0,
       },
     });
 
     // Check if test should auto-complete
-    const currentSample = await this.prisma.aBTestResult.count({ where: { testId } });
+    const currentSample = await this.prisma.aBTestResult.count({
+      where: { testId },
+    });
     if (currentSample >= test.sampleSize) {
       this.logger.log(`Test ${testId} reached sample size, auto-completing`);
       // We don't auto-complete here to allow manual review, but could be configured
@@ -327,7 +349,10 @@ export class ABTestingService {
       const impressions = variant.impressions;
       const conversions = results.filter((r) => r.completed).length;
       const engaged = results.filter((r) => r.engaged).length;
-      const totalViewTime = results.reduce((sum, r) => sum + (r.viewTime || 0), 0);
+      const totalViewTime = results.reduce(
+        (sum, r) => sum + (r.viewTime || 0),
+        0,
+      );
 
       return {
         variantId: variant.id,
@@ -343,7 +368,7 @@ export class ABTestingService {
 
     // Find control variant
     const control = variantStats.find((v) => v.isControl) || variantStats[0];
-    
+
     // Find best performing variant
     const sortedByGoal = [...variantStats].sort((a, b) => {
       switch (test.goalMetric) {
@@ -371,20 +396,28 @@ export class ABTestingService {
     let improvement = 0;
     switch (test.goalMetric) {
       case 'completion':
-        improvement = control.conversionRate > 0 
-          ? ((best.conversionRate - control.conversionRate) / control.conversionRate) * 100 
-          : 0;
+        improvement =
+          control.conversionRate > 0
+            ? ((best.conversionRate - control.conversionRate) /
+              control.conversionRate) *
+            100
+            : 0;
         break;
       case 'view_time':
-        improvement = control.avgViewTime > 0 
-          ? ((best.avgViewTime - control.avgViewTime) / control.avgViewTime) * 100 
-          : 0;
+        improvement =
+          control.avgViewTime > 0
+            ? ((best.avgViewTime - control.avgViewTime) / control.avgViewTime) *
+            100
+            : 0;
         break;
       case 'engagement':
       default:
-        improvement = control.engagementScore > 0 
-          ? ((best.engagementScore - control.engagementScore) / control.engagementScore) * 100 
-          : 0;
+        improvement =
+          control.engagementScore > 0
+            ? ((best.engagementScore - control.engagementScore) /
+              control.engagementScore) *
+            100
+            : 0;
     }
 
     return {
@@ -416,10 +449,10 @@ export class ABTestingService {
 
     // Pooled proportion
     const p = (p1 * n1 + p2 * n2) / (n1 + n2);
-    
+
     // Standard error
     const se = Math.sqrt(p * (1 - p) * (1 / n1 + 1 / n2));
-    
+
     if (se === 0) {
       return { isSignificant: false, confidence: 0 };
     }
@@ -452,7 +485,9 @@ export class ABTestingService {
     z = Math.abs(z) / Math.sqrt(2);
 
     const t = 1.0 / (1.0 + p * z);
-    const y = 1.0 - ((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t * Math.exp(-z * z);
+    const y =
+      1.0 -
+      ((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t * Math.exp(-z * z);
 
     return 0.5 * (1.0 + sign * y);
   }
@@ -460,10 +495,10 @@ export class ABTestingService {
   /**
    * Generate theme variations for A/B testing
    */
-  async generateThemeVariations(
+  generateThemeVariations(
     baseTheme: Record<string, unknown>,
     count: number = 3,
-  ): Promise<VariantConfig[]> {
+  ): VariantConfig[] {
     const variations: VariantConfig[] = [
       {
         name: 'Control',
@@ -490,7 +525,7 @@ export class ABTestingService {
         themeConfig: {
           ...baseTheme,
           colors: {
-            ...(baseTheme.colors as object || {}),
+            ...((baseTheme.colors as object) || {}),
             ...colorScheme,
           },
         },
@@ -527,7 +562,7 @@ export class ABTestingService {
   /**
    * Get user's tests
    */
-  async getUserTests(userId: string, projectId?: string, limit: number = 10) {
+  getUserTests(userId: string, projectId?: string, limit: number = 10) {
     return this.prisma.aBTest.findMany({
       where: {
         userId,

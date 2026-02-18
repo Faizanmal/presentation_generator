@@ -15,6 +15,7 @@ import type { Response, Request as ExpressRequest } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { IntegrationsService } from './integrations.service';
 import { ConfigService } from '@nestjs/config';
+import { Feature } from '../common/decorators/feature.decorator';
 
 type IntegrationProvider =
   | 'ZOOM'
@@ -32,7 +33,7 @@ export class IntegrationsController {
   constructor(
     private readonly integrationsService: IntegrationsService,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   // ============================================
   // INTEGRATION MANAGEMENT
@@ -83,6 +84,7 @@ export class IntegrationsController {
   // ============================================
 
   @Get('zoom/callback')
+  @Feature('integrations')
   async zoomCallback(
     @Query('code') code: string,
     @Query('state') state: string,

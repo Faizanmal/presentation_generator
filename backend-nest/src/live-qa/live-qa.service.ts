@@ -1,9 +1,14 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
 
-interface ModerationResult {
+export interface ModerationResult {
   approved: boolean;
   spam: boolean;
   toxicity: number;
@@ -15,7 +20,7 @@ interface ModerationResult {
 @Injectable()
 export class LiveQAService {
   private readonly logger = new Logger(LiveQAService.name);
-  
+
   // Spam detection patterns
   private readonly spamPatterns = [
     /\b(buy now|click here|free money|visit my|subscribe to)\b/i,
@@ -25,9 +30,7 @@ export class LiveQAService {
   ];
 
   // Profanity patterns (simplified)
-  private readonly toxicPatterns = [
-    /\b(hate|stupid|idiot|terrible)\b/i,
-  ];
+  private readonly toxicPatterns = [/\b(hate|stupid|idiot|terrible)\b/i];
 
   constructor(
     private readonly configService: ConfigService,
@@ -38,12 +41,16 @@ export class LiveQAService {
   /**
    * Create a new Q&A session
    */
-  async createSession(hostId: string, projectId: string, options?: {
-    title?: string;
-    allowAnonymous?: boolean;
-    moderationLevel?: 'off' | 'basic' | 'strict';
-    maxQuestions?: number;
-  }) {
+  async createSession(
+    hostId: string,
+    projectId: string,
+    options?: {
+      title?: string;
+      allowAnonymous?: boolean;
+      moderationLevel?: 'off' | 'basic' | 'strict';
+      maxQuestions?: number;
+    },
+  ) {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
     });
@@ -54,18 +61,13 @@ export class LiveQAService {
 
     return this.prisma.liveQASession.create({
       data: {
-        hostId,
+        hostUserId: hostId,
         projectId,
         title: options?.title || `Q&A for ${project.title}`,
-        settings: {
-          allowAnonymous: options?.allowAnonymous ?? true,
-          moderationLevel: options?.moderationLevel || 'basic',
-          maxQuestions: options?.maxQuestions || 100,
-          votingEnabled: true,
-          autoCloseAfter: 3600, // 1 hour
-        },
-        status: 'active',
-        startedAt: new Date(),
+        moderationLevel: options?.moderationLevel || 'medium',
+        anonymousAllowed: options?.allowAnonymous ?? true,
+        maxQuestions: options?.maxQuestions || 100,
+        status: 'pending',
       },
     });
   }
@@ -85,10 +87,8 @@ export class LiveQAService {
       throw new BadRequestException('Session is not active');
     }
 
-    const settings = session.settings as { allowAnonymous?: boolean; moderationLevel?: string; maxQuestions?: number } || {};
-
     // Check anonymous permission
-    if (isAnonymous && !settings.allowAnonymous) {
+    if (isAnonymous && !session.anonymousAllowed) {
       throw new BadRequestException('Anonymous questions not allowed');
     }
 
@@ -97,12 +97,15 @@ export class LiveQAService {
       where: { sessionId },
     });
 
-    if (settings.maxQuestions && questionCount >= settings.maxQuestions) {
+    if (session.maxQuestions && questionCount >= session.maxQuestions) {
       throw new BadRequestException('Question limit reached');
     }
 
     // Run moderation
-    const moderation = await this.moderateQuestion(content, settings.moderationLevel || 'basic');
+    const moderation = await this.moderateQuestion(
+      content,
+      session.moderationLevel,
+    );
 
     if (!moderation.approved) {
       return { moderation };
@@ -112,7 +115,7 @@ export class LiveQAService {
     const question = await this.prisma.liveQuestion.create({
       data: {
         sessionId,
-        askerId: isAnonymous ? null : submitterId,
+        userId: isAnonymous ? null : submitterId,
         content,
         isAnonymous,
         status: moderation.spam ? 'flagged' : 'pending',
@@ -126,7 +129,10 @@ export class LiveQAService {
   /**
    * Moderate a question using rules and AI
    */
-  private async moderateQuestion(content: string, level: string): Promise<ModerationResult> {
+  private async moderateQuestion(
+    content: string,
+    level: string,
+  ): Promise<ModerationResult> {
     const result: ModerationResult = {
       approved: true,
       spam: false,
@@ -174,7 +180,7 @@ export class LiveQAService {
 Question: "${content}"
 
 Respond in JSON format: {"relevant": true/false, "appropriate": true/false, "type": "question"/"spam"}`,
-          { maxTokens: 100 }
+          { maxTokens: 100 },
         );
 
         try {
@@ -223,7 +229,7 @@ Respond in JSON format: {"relevant": true/false, "appropriate": true/false, "typ
       include: { session: true },
     });
 
-    if (!question || question.session.hostId !== hostId) {
+    if (!question || question.session.hostUserId !== hostId) {
       throw new BadRequestException('Question not found or unauthorized');
     }
 
@@ -246,7 +252,7 @@ Respond in JSON format: {"relevant": true/false, "appropriate": true/false, "typ
       include: { session: true },
     });
 
-    if (!question || question.session.hostId !== hostId) {
+    if (!question || question.session.hostUserId !== hostId) {
       throw new BadRequestException('Question not found or unauthorized');
     }
 
@@ -265,7 +271,7 @@ Respond in JSON format: {"relevant": true/false, "appropriate": true/false, "typ
       include: { session: true },
     });
 
-    if (!question || question.session.hostId !== hostId) {
+    if (!question || question.session.hostUserId !== hostId) {
       throw new BadRequestException('Question not found or unauthorized');
     }
 
@@ -291,16 +297,14 @@ Respond in JSON format: {"relevant": true/false, "appropriate": true/false, "typ
       where.status = options.status;
     }
 
-    const orderBy = options?.sortBy === 'popular' 
-      ? { upvotes: 'desc' as const }
-      : { createdAt: 'desc' as const };
+    const orderBy =
+      options?.sortBy === 'popular'
+        ? { upvotes: 'desc' as const }
+        : { createdAt: 'desc' as const };
 
     return this.prisma.liveQuestion.findMany({
       where,
-      orderBy: [
-        { isPinned: 'desc' },
-        orderBy,
-      ],
+      orderBy: [{ isPinned: 'desc' }, orderBy],
       take: options?.limit || 50,
     });
   }
@@ -310,7 +314,7 @@ Respond in JSON format: {"relevant": true/false, "appropriate": true/false, "typ
    */
   async summarizeQuestions(sessionId: string, hostId: string) {
     const session = await this.getSession(sessionId);
-    
+
     if (session.hostId !== hostId) {
       throw new BadRequestException('Unauthorized');
     }
@@ -324,7 +328,9 @@ Respond in JSON format: {"relevant": true/false, "appropriate": true/false, "typ
       return { summary: 'No questions submitted yet.', themes: [] };
     }
 
-    const questionList = questions.map((q, i) => `${i + 1}. ${q.content}`).join('\n');
+    const questionList = questions
+      .map((q, i) => `${i + 1}. ${q.content}`)
+      .join('\n');
 
     try {
       const analysis = await this.aiService.generateText(
@@ -338,7 +344,7 @@ Provide:
 3. Suggested order to answer (by importance/popularity)
 
 Format as JSON: {"summary": "...", "themes": ["theme1", "theme2", "theme3"], "suggestedOrder": [1, 5, 3]}`,
-        { maxTokens: 300 }
+        { maxTokens: 300 },
       );
 
       try {
@@ -348,7 +354,7 @@ Format as JSON: {"summary": "...", "themes": ["theme1", "theme2", "theme3"], "su
       }
     } catch (error) {
       this.logger.error('Failed to summarize questions', error);
-      return { 
+      return {
         summary: `${questions.length} questions received. Most popular topics need manual review.`,
         themes: [],
       };
@@ -361,7 +367,7 @@ Format as JSON: {"summary": "...", "themes": ["theme1", "theme2", "theme3"], "su
   async endSession(sessionId: string, hostId: string) {
     const session = await this.getSession(sessionId);
 
-    if (session.hostId !== hostId) {
+    if (session.hostUserId !== hostId) {
       throw new BadRequestException('Unauthorized');
     }
 
@@ -401,7 +407,7 @@ Format as JSON: {"summary": "...", "themes": ["theme1", "theme2", "theme3"], "su
       flagged: 0,
     };
 
-    questions.forEach(q => {
+    questions.forEach((q) => {
       stats[q.status] = q._count;
       stats.total += q._count;
     });

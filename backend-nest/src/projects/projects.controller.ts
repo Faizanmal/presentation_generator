@@ -18,10 +18,11 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { GenerateProjectDto } from './dto/generate-project.dto';
+import { Feature } from '../common/decorators/feature.decorator';
 
 @Controller('projects')
 export class ProjectsController {
-  constructor(private readonly projectsService: ProjectsService) {}
+  constructor(private readonly projectsService: ProjectsService) { }
 
   /**
    * Create a new empty project
@@ -41,6 +42,7 @@ export class ProjectsController {
    */
   @Post('generate')
   @UseGuards(JwtAuthGuard)
+  @Feature('aiGeneration')
   @HttpCode(HttpStatus.CREATED)
   async generate(
     @CurrentUser() user: { id: string },

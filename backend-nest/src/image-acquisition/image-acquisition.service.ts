@@ -34,14 +34,32 @@ export interface AcquiredImage {
   authorUrl?: string;
   license: string;
   downloadedAt: Date;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
+
+// Permissive Allowlist for Image Import
+const ALLOWED_IMAGE_DOMAINS = [
+  'unsplash.com',
+  'images.unsplash.com',
+  'pexels.com',
+  'images.pexels.com',
+  'pixabay.com',
+  'wikimedia.org',
+  'upload.wikimedia.org',
+  'publicdomainvectors.org',
+  'raw.githubusercontent.com',
+  'googleusercontent.com',
+  'picsum.photos',
+  'fastly.picsum.photos',
+];
 
 @Injectable()
 export class ImageAcquisitionService {
   private readonly logger = new Logger(ImageAcquisitionService.name);
   private readonly uploadDir: string;
-  private readonly openai: OpenAI;
+  private openai: OpenAI | null = null;
+  /** In-memory cache: query+source -> local file path (avoids re-downloading same image) */
+  private readonly imageCache = new Map<string, string>();
 
   constructor(private readonly configService: ConfigService) {
     this.uploadDir =
@@ -64,13 +82,49 @@ export class ImageAcquisitionService {
   }
 
   /**
-   * Acquire image from specified source
+   * Acquire image from specified source with retry-on-failure
    */
   async acquireImage(options: ImageAcquisitionOptions): Promise<AcquiredImage> {
     this.logger.log(
       `Acquiring image from ${options.source}: ${options.query || options.prompt || options.url}`,
     );
 
+    // Check cache for non-AI sources
+    if (options.source !== 'ai' && options.query) {
+      const cacheKey = `${options.source}:${options.query}:${options.orientation || 'any'}`;
+      const cachedPath = this.imageCache.get(cacheKey);
+      if (cachedPath) {
+        this.logger.debug(`Cache hit for ${cacheKey}`);
+        // Return a lightweight cached result
+        return {
+          id: this.generateId(),
+          source: options.source,
+          url: cachedPath,
+          localPath: cachedPath,
+          width: options.width || 1920,
+          height: options.height || 1080,
+          description: options.query,
+          license: 'Cached',
+          downloadedAt: new Date(),
+          metadata: { cached: true },
+        };
+      }
+    }
+
+    const result = await this.withRetry(() => this.dispatchAcquire(options), 3);
+
+    // Populate cache
+    if (options.source !== 'ai' && options.query && result.localPath) {
+      const cacheKey = `${options.source}:${options.query}:${options.orientation || 'any'}`;
+      this.imageCache.set(cacheKey, result.localPath);
+    }
+
+    return result;
+  }
+
+  private async dispatchAcquire(
+    options: ImageAcquisitionOptions,
+  ): Promise<AcquiredImage> {
     switch (options.source) {
       case 'ai':
         return this.generateAIImage(options);
@@ -83,25 +137,64 @@ export class ImageAcquisitionService {
       case 'url':
         return this.downloadFromUrl(options);
       default:
-        throw new Error(`Unsupported image source: ${options.source}`);
+        throw new Error(`Unsupported image source: ${(options as any).source}`);
     }
   }
 
   /**
-   * Acquire multiple images (batch)
+   * Retry helper with exponential backoff
+   */
+  private async withRetry<T>(
+    fn: () => Promise<T>,
+    maxAttempts = 3,
+  ): Promise<T> {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await fn();
+      } catch (err) {
+        lastError = err;
+        if (attempt < maxAttempts) {
+          const delayMs = 500 * Math.pow(2, attempt - 1);
+          this.logger.warn(
+            `Attempt ${attempt} failed, retrying in ${delayMs}ms... (${(err as Error).message})`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+      }
+    }
+    throw lastError;
+  }
+
+  /**
+   * Acquire multiple images (batch) - runs in parallel with concurrency limit
    */
   async acquireImages(
     options: ImageAcquisitionOptions,
   ): Promise<AcquiredImage[]> {
     const count = options.count || 1;
+    const CONCURRENCY = 3;
     const images: AcquiredImage[] = [];
 
-    for (let i = 0; i < count; i++) {
-      try {
-        const image = await this.acquireImage(options);
-        images.push(image);
-      } catch (error) {
-        this.logger.error(`Failed to acquire image ${i + 1}/${count}:`, error);
+    for (let i = 0; i < count; i += CONCURRENCY) {
+      const batch = Array.from(
+        { length: Math.min(CONCURRENCY, count - i) },
+        (_, j) =>
+          this.acquireImage({
+            ...options,
+            query: options.query ? `${options.query} ${i + j + 1}` : undefined,
+          }),
+      );
+      const results = await Promise.allSettled(batch);
+      for (const result of results) {
+        if (result.status === 'fulfilled') {
+          images.push(result.value);
+        } else {
+          this.logger.error(
+            'Parallel image acquisition failed:',
+            result.reason,
+          );
+        }
       }
     }
 
@@ -133,12 +226,16 @@ export class ImageAcquisitionService {
         response_format: 'url',
       });
 
+      if (!response.data || !response.data[0]) {
+        throw new Error('No image data returned from OpenAI');
+      }
+
       const imageUrl = response.data[0].url;
       if (!imageUrl) {
         throw new Error('No image URL returned from OpenAI');
       }
 
-      // Download the generated image
+      // Download the generated image (AI images are safe to download as we own them via API terms usually)
       const localPath = await this.downloadImage(imageUrl, 'ai');
 
       return {
@@ -156,12 +253,14 @@ export class ImageAcquisitionService {
         metadata: {
           prompt: options.prompt,
           model: 'dall-e-3',
-          revisedPrompt: response.data[0].revised_prompt,
+          revisedPrompt: response.data[0].revised_prompt || options.prompt,
         },
       };
     } catch (error) {
       this.logger.error('AI image generation failed:', error);
-      throw new Error(`Failed to generate AI image: ${error.message}`);
+      throw new Error(
+        `Failed to generate AI image: ${(error as Error).message}`,
+      );
     }
   }
 
@@ -177,7 +276,7 @@ export class ImageAcquisitionService {
     }
 
     try {
-      const params: any = {
+      const params: Record<string, string | number | undefined> = {
         query: options.query,
         orientation: options.orientation,
         per_page: 1,
@@ -226,7 +325,9 @@ export class ImageAcquisitionService {
       };
     } catch (error) {
       this.logger.error('Unsplash fetch failed:', error);
-      throw new Error(`Failed to fetch from Unsplash: ${error.message}`);
+      throw new Error(
+        `Failed to fetch from Unsplash: ${(error as Error).message}`,
+      );
     }
   }
 
@@ -242,7 +343,7 @@ export class ImageAcquisitionService {
     }
 
     try {
-      const params: any = {
+      const params: Record<string, string | number | undefined> = {
         query: options.query,
         per_page: 1,
         orientation: options.orientation,
@@ -280,7 +381,9 @@ export class ImageAcquisitionService {
       };
     } catch (error) {
       this.logger.error('Pexels fetch failed:', error);
-      throw new Error(`Failed to fetch from Pexels: ${error.message}`);
+      throw new Error(
+        `Failed to fetch from Pexels: ${(error as Error).message}`,
+      );
     }
   }
 
@@ -296,7 +399,7 @@ export class ImageAcquisitionService {
     }
 
     try {
-      const params: any = {
+      const params: Record<string, string | number | boolean | undefined> = {
         key: apiKey,
         q: options.query,
         image_type: 'photo',
@@ -340,7 +443,9 @@ export class ImageAcquisitionService {
       };
     } catch (error) {
       this.logger.error('Pixabay fetch failed:', error);
-      throw new Error(`Failed to fetch from Pixabay: ${error.message}`);
+      throw new Error(
+        `Failed to fetch from Pixabay: ${(error as Error).message}`,
+      );
     }
   }
 
@@ -352,6 +457,13 @@ export class ImageAcquisitionService {
   ): Promise<AcquiredImage> {
     if (!options.url) {
       throw new Error('URL is required for direct download');
+    }
+
+    // Validate Domain
+    if (!this.isDomainAllowed(options.url)) {
+      throw new Error(
+        'Domain not in allowlist. Please use only approved image sources (e.g., Unsplash, Pexels, Commons).',
+      );
     }
 
     try {
@@ -377,7 +489,21 @@ export class ImageAcquisitionService {
       };
     } catch (error) {
       this.logger.error('URL download failed:', error);
-      throw new Error(`Failed to download from URL: ${error.message}`);
+      throw new Error(
+        `Failed to download from URL: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  /**
+   * Check if domain is in allowlist
+   */
+  private isDomainAllowed(url: string): boolean {
+    try {
+      const hostname = new URL(url).hostname;
+      return ALLOWED_IMAGE_DOMAINS.some((domain) => hostname.endsWith(domain));
+    } catch {
+      return false;
     }
   }
 
@@ -391,6 +517,9 @@ export class ImageAcquisitionService {
         url,
         responseType: 'stream',
         timeout: 30000,
+        headers: {
+          'User-Agent': 'PresentationDesignerBot/1.0 (+http://your-domain.com)',
+        },
       });
 
       const ext = this.getExtensionFromUrl(url) || 'jpg';
@@ -425,9 +554,33 @@ export class ImageAcquisitionService {
         });
       } catch (error) {
         this.logger.warn(
-          `Failed to acquire from ${source}, trying next source...`,
+          `Failed to acquire from ${source}, trying next source... (${(error as Error).message})`,
         );
       }
+    }
+
+    // Fallback to Lorem Picsum if all else fails
+    try {
+      this.logger.warn(
+        `All primary sources failed for "${query}". Using fallback source (Picsum).`,
+      );
+      // Use a consistent seed based on query to get the same image for the same term
+      const seed = query.replace(/[^a-zA-Z0-9]/g, '');
+      const width = options?.orientation === 'portrait' ? 1080 : 1920;
+      const height = options?.orientation === 'portrait' ? 1920 : 1080;
+
+      return await this.acquireImage({
+        source: 'url',
+        url: `https://picsum.photos/seed/${seed}/${width}/${height}`,
+        width,
+        height,
+        query, // Pass query for metadata
+      });
+    } catch (fallbackError) {
+      this.logger.error(
+        `Fallback image acquisition failed for "${query}":`,
+        fallbackError,
+      );
     }
 
     throw new Error('Failed to acquire image from all sources');

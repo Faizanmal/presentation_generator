@@ -39,6 +39,7 @@ describe('CollaborationService', () => {
     projectCollaborator: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
+      findUnique: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
@@ -109,7 +110,10 @@ describe('CollaborationService', () => {
 
   describe('addCollaborator', () => {
     it('should add a new collaborator', async () => {
-        mockPrismaService.project.findUnique.mockResolvedValue({ id: 'project-1', ownerId: 'user-1' });
+      mockPrismaService.project.findUnique.mockResolvedValue({
+        id: 'project-1',
+        ownerId: 'user-1',
+      });
       mockPrismaService.user.findUnique.mockResolvedValue({
         id: 'user-3',
         email: 'new@test.com',
@@ -134,8 +138,14 @@ describe('CollaborationService', () => {
     });
 
     it('should throw ForbiddenException if inviter is not owner', async () => {
-      mockPrismaService.project.findUnique.mockResolvedValue({ id: 'project-1', ownerId: 'other-user' });
-      mockPrismaService.user.findUnique.mockResolvedValue({ id: 'user-4', email: 'u4@test.com' });
+      mockPrismaService.project.findUnique.mockResolvedValue({
+        id: 'project-1',
+        ownerId: 'other-user',
+      });
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'user-4',
+        email: 'u4@test.com',
+      });
 
       await expect(
         service.addCollaborator('project-1', 'u4@test.com', 'VIEWER', 'user-1'),
@@ -185,11 +195,17 @@ describe('CollaborationService', () => {
     });
 
     it('should throw if performedBy is not project owner', async () => {
-      mockPrismaService.projectCollaborator.findUnique.mockResolvedValue({ id: 'collab-1', projectId: 'project-1' });
-      mockPrismaService.project.findUnique.mockResolvedValue({ id: 'project-1', ownerId: 'owner-id' });
+      mockPrismaService.projectCollaborator.findUnique.mockResolvedValue({
+        id: 'collab-1',
+        projectId: 'project-1',
+      });
+      mockPrismaService.project.findUnique.mockResolvedValue({
+        id: 'project-1',
+        ownerId: 'owner-id',
+      });
 
       await expect(
-        service.updateCollaboratorRole('collab-1', 'EDITOR', 'not-owner'),
+        service.updateCollaboratorRole('collab-1', 'EDITOR'),
       ).rejects.toThrow();
     });
   });

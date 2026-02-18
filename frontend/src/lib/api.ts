@@ -2482,18 +2482,28 @@ class ApiClient {
   // AI RESEARCH API
   // ============================================
 
-  async startResearch(projectId: string, input: { topic: string; depth?: string; sources?: string[] }) {
-    const { data } = await this.client.post(`/ai-research/research/${projectId}`, input);
+  // Start research; if projectId is falsy, call the general `/ai-research/research` endpoint
+  async startResearch(projectId: string | undefined, input: { topic: string; depth?: string; sources?: string[] }) {
+    const url = projectId ? `/ai-research/research/${projectId}` : `/ai-research/research`;
+    const { data } = await this.client.post(url, input);
     return data;
   }
 
+  // Get research by id (legacy frontend path)
   async getResearch(id: string) {
     const { data } = await this.client.get(`/ai-research/research/${id}`);
     return data;
   }
 
+  // List research items for a project
   async listResearch(projectId: string) {
     const { data } = await this.client.get(`/ai-research/research/project/${projectId}`);
+    return data;
+  }
+
+  // Get user-level research history (no projectId)
+  async getResearchHistory() {
+    const { data } = await this.client.get(`/ai-research/history`);
     return data;
   }
 
@@ -2508,26 +2518,46 @@ class ApiClient {
   }
 
   // ============================================
-  // STORYBOARDING API
+  // STORYBOARDING API (aligned with backend)
   // ============================================
 
+  // Create / generate a storyboard using the backend AI endpoint.
+  // Maps frontend `title` -> backend `topic` and includes `projectId`.
   async createStoryboard(projectId: string, input: { title: string; narrativeArc?: string; audienceType?: string; slidesCount?: number }) {
-    const { data } = await this.client.post(`/storyboarding/storyboards/${projectId}`, input);
+    const payload = {
+      topic: input.title,
+      projectId,
+      audienceType: input.audienceType || 'general',
+      // presentationType left undefined so backend will default to 'summary'
+    } as const;
+
+    const { data } = await this.client.post(`/storyboarding/generate`, payload);
     return data;
   }
 
+  // Get a storyboard by id (backend route: GET /storyboarding/:id)
   async getStoryboard(id: string) {
-    const { data } = await this.client.get(`/storyboarding/storyboards/${id}`);
+    const { data } = await this.client.get(`/storyboarding/${id}`);
     return data;
   }
 
-  async listStoryboards(projectId: string) {
-    const { data } = await this.client.get(`/storyboarding/storyboards/project/${projectId}`);
+  // List storyboards for the current user and optionally filter by projectId on the client
+  async listStoryboards(projectId?: string) {
+    const { data } = await this.client.get(`/storyboarding`);
+    if (projectId) {
+      // server returns user's storyboards; filter client-side by projectId when requested
+      return (data as any[]).filter((s) => s.projectId === projectId);
+    }
     return data;
   }
 
-  async applyStoryboard(id: string) {
-    const { data } = await this.client.post(`/storyboarding/storyboards/${id}/apply`);
+  // Apply a storyboard to a project. Backend route: POST /storyboarding/:id/apply/:projectId
+  async applyStoryboard(id: string, projectId?: string) {
+    if (!projectId) {
+      throw new Error('projectId is required to apply a storyboard');
+    }
+
+    const { data } = await this.client.post(`/storyboarding/${id}/apply/${projectId}`);
     return data;
   }
 
@@ -3052,6 +3082,347 @@ class ApiClient {
     return data;
   }
 
+  // ============================================
+  // BRAND KIT ENDPOINTS
+  // ============================================
+
+  async createBrandKit(data: {
+    name: string;
+    colors?: { primary: string; secondary: string; accent: string; background?: string; text?: string };
+    typography?: { headingFont: string; bodyFont: string; monoFont?: string };
+    logos?: { primary?: string; secondary?: string; icon?: string };
+    guidelines?: string;
+  }, organizationId?: string): Promise<{ id: string; name: string }> {
+    const { data: result } = await this.client.post('/brand-kits', data, {
+      params: organizationId ? { organizationId } : undefined,
+    });
+    return result;
+  }
+
+  async getBrandKits(organizationId?: string): Promise<Array<{ id: string; name: string; isDefault: boolean }>> {
+    const { data } = await this.client.get('/brand-kits', {
+      params: organizationId ? { organizationId } : undefined,
+    });
+    return data;
+  }
+
+  async getDefaultBrandKit(organizationId?: string): Promise<{ id: string; name: string }> {
+    const { data } = await this.client.get('/brand-kits/default', {
+      params: organizationId ? { organizationId } : undefined,
+    });
+    return data;
+  }
+
+  async getBrandKit(id: string): Promise<{ id: string; name: string; colors: unknown; typography: unknown; logos: unknown }> {
+    const { data } = await this.client.get(`/brand-kits/${id}`);
+    return data;
+  }
+
+  async getBrandKitAsTheme(id: string): Promise<{ theme: unknown }> {
+    const { data } = await this.client.get(`/brand-kits/${id}/theme`);
+    return data;
+  }
+
+  async updateBrandKit(id: string, updates: Record<string, unknown>): Promise<{ id: string; name: string }> {
+    const { data } = await this.client.put(`/brand-kits/${id}`, updates);
+    return data;
+  }
+
+  async setDefaultBrandKit(id: string): Promise<{ success: boolean }> {
+    const { data } = await this.client.put(`/brand-kits/${id}/default`);
+    return data;
+  }
+
+  async duplicateBrandKit(id: string, name?: string): Promise<{ id: string; name: string }> {
+    const { data } = await this.client.post(`/brand-kits/${id}/duplicate`, { name });
+    return data;
+  }
+
+  async deleteBrandKit(id: string): Promise<void> {
+    await this.client.delete(`/brand-kits/${id}`);
+  }
+
+  // ============================================
+  // CONTENT LIBRARY ENDPOINTS
+  // ============================================
+
+  async saveToLibrary(item: {
+    name: string;
+    description?: string;
+    type: 'slide' | 'block';
+    content: unknown;
+    tags?: string[];
+    category?: string;
+  }): Promise<{ id: string; name: string }> {
+    const { data } = await this.client.post('/library/save', item);
+    return data;
+  }
+
+  async getLibrary(options?: {
+    type?: 'slide' | 'block';
+    category?: string;
+    search?: string;
+  }): Promise<{ items: Array<{ id: string; name: string; type: string; content: unknown; tags?: string[]; category?: string }> }> {
+    const { data } = await this.client.get('/library', { params: options });
+    return data;
+  }
+
+  async getLibraryTemplates(type?: 'slide' | 'block'): Promise<{ templates: Array<{ id: string; name: string; type: string; content: unknown }> }> {
+    const { data } = await this.client.get('/library/templates', { params: type ? { type } : undefined });
+    return data;
+  }
+
+  async deleteFromLibrary(itemId: string): Promise<{ success: boolean }> {
+    const { data } = await this.client.delete(`/library/${itemId}`);
+    return data;
+  }
+
+  // ============================================
+  // IMAGE ACQUISITION ENDPOINTS
+  // ============================================
+
+  async acquireImage(options: {
+    source: 'ai' | 'unsplash' | 'pexels' | 'pixabay' | 'url';
+    query?: string;
+    prompt?: string;
+    url?: string;
+    orientation?: 'landscape' | 'portrait' | 'square';
+    color?: string;
+    projectId: string;
+    slideId?: string;
+    autoAdd?: boolean;
+  }): Promise<{ success: boolean; image: { url: string; source: string; width: number; height: number; attribution?: string } }> {
+    const { data } = await this.client.post('/image-acquisition/acquire', options);
+    return data;
+  }
+
+  async acquireImageAsync(options: {
+    source: 'ai' | 'unsplash' | 'pexels' | 'pixabay' | 'url';
+    query?: string;
+    prompt?: string;
+    url?: string;
+    orientation?: 'landscape' | 'portrait' | 'square';
+    color?: string;
+    projectId: string;
+    slideId?: string;
+    autoAdd?: boolean;
+  }): Promise<{ success: boolean; jobId: string; message: string }> {
+    const { data } = await this.client.post('/image-acquisition/acquire-async', options);
+    return data;
+  }
+
+  async smartAcquireImage(options: {
+    query: string;
+    projectId: string;
+    slideId?: string;
+    orientation?: 'landscape' | 'portrait' | 'square';
+    autoAdd?: boolean;
+  }): Promise<{ success: boolean; image: { url: string; source: string; width: number; height: number } }> {
+    const { data } = await this.client.post('/image-acquisition/smart-acquire', options);
+    return data;
+  }
+
+  async bulkAcquireImages(options: {
+    topic: string;
+    count: number;
+    projectId: string;
+    autoCreateSlides?: boolean;
+  }): Promise<{ success: boolean; jobId: string; message: string }> {
+    const { data } = await this.client.post('/image-acquisition/bulk-acquire', options);
+    return data;
+  }
+
+  async getImageAcquisitionJobStatus(jobId: string): Promise<{
+    success: boolean;
+    job: { id: string; state: string; progress: number; result: unknown; failedReason?: string };
+  }> {
+    const { data } = await this.client.get(`/image-acquisition/job/${jobId}`);
+    return data;
+  }
+
+  async getImageSources(): Promise<{
+    success: boolean;
+    sources: Array<{ id: string; name: string; available: boolean; requiresQuery?: boolean; requiresPrompt?: boolean }>;
+  }> {
+    const { data } = await this.client.get('/image-acquisition/sources');
+    return data;
+  }
+
+  // ============================================
+  // IMAGE RECOGNITION ENDPOINTS
+  // ============================================
+
+  async generateImageEmbedding(uploadId: string, imageUrl: string): Promise<{ embedding: number[] }> {
+    const { data } = await this.client.post('/image-recognition/embedding', { uploadId, imageUrl });
+    return data;
+  }
+
+  async batchGenerateImageEmbeddings(uploadIds: string[]): Promise<{ message: string; count: number }> {
+    const { data } = await this.client.post('/image-recognition/embeddings/batch', { uploadIds });
+    return data;
+  }
+
+  async findSimilarImages(uploadId: string, limit?: number, minSimilarity?: number): Promise<{
+    images: Array<{ uploadId: string; similarity: number; imageUrl: string }>;
+  }> {
+    const { data } = await this.client.post('/image-recognition/similar', { uploadId, limit, minSimilarity });
+    return data;
+  }
+
+  async trackImageUsage(usage: {
+    uploadId: string;
+    projectId: string;
+    slideId?: string;
+    blockId?: string;
+    usageType?: 'content' | 'background' | 'thumbnail';
+  }): Promise<{ success: boolean }> {
+    const { data } = await this.client.post('/image-recognition/track-usage', usage);
+    return data;
+  }
+
+  async removeImageUsage(usageId: string): Promise<{ success: boolean }> {
+    const { data } = await this.client.delete(`/image-recognition/usage/${usageId}`);
+    return data;
+  }
+
+  async getImagesInPresentation(projectId: string): Promise<{
+    images: Array<{ uploadId: string; imageUrl: string; slideId: string; usageType: string }>;
+  }> {
+    const { data } = await this.client.get(`/image-recognition/presentation/${projectId}/images`);
+    return data;
+  }
+
+  async findPresentationsUsingImage(uploadId: string): Promise<{
+    presentations: Array<{ projectId: string; title: string; slideCount: number }>;
+  }> {
+    const { data } = await this.client.get(`/image-recognition/image/${uploadId}/presentations`);
+    return data;
+  }
+
+  async getImageAnalytics(): Promise<{
+    totalImages: number;
+    totalUsages: number;
+    topImages: Array<{ uploadId: string; usageCount: number }>;
+  }> {
+    const { data } = await this.client.get('/image-recognition/analytics');
+    return data;
+  }
+
+  async predictImagesForPresentation(options: {
+    title?: string;
+    description?: string;
+    tone?: string;
+    audience?: string;
+    existingTags?: string[];
+    limit?: number;
+  }): Promise<{ predictions: Array<{ uploadId: string; imageUrl: string; relevanceScore: number }> }> {
+    const { data } = await this.client.post('/image-recognition/predict', options);
+    return data;
+  }
+
+  async describeImage(imageUrl: string): Promise<{ description: string }> {
+    const { data } = await this.client.post('/image-recognition/describe', { imageUrl });
+    return data;
+  }
+
+  // ============================================
+  // PRESENTATION COACH ENDPOINTS
+  // ============================================
+
+  async analyzePresentation(input: {
+    title: string;
+    slides: Array<{ content: string; speakerNotes?: string; hasImage: boolean; layout: string }>;
+    audience?: string;
+    purpose?: string;
+  }): Promise<{
+    overallScore: number;
+    categories: Array<{ name: string; score: number; feedback: string }>;
+    suggestions: string[];
+  }> {
+    const { data } = await this.client.post('/ai/coach/analyze', input);
+    return data;
+  }
+
+  async getRehearsalFeedback(input: {
+    transcript: string;
+    duration: number;
+    slideTimings: Array<{ slideIndex: number; startTime: number; endTime: number }>;
+    suggestedDurationPerSlide: number;
+  }): Promise<{
+    pacingFeedback: string;
+    timingIssues: Array<{ slideIndex: number; issue: string }>;
+    suggestions: string[];
+  }> {
+    const { data } = await this.client.post('/ai/coach/rehearsal-feedback', input);
+    return data;
+  }
+
+  async suggestSlideImprovements(input: {
+    content: string;
+    type: string;
+    context: string;
+  }): Promise<{
+    improvements: Array<{ area: string; suggestion: string; priority: string }>;
+  }> {
+    const { data } = await this.client.post('/ai/coach/improve-slide', input);
+    return data;
+  }
+
+  async generateCoachSpeakerNotes(input: {
+    title: string;
+    content: string;
+    context: string;
+    duration: number;
+  }): Promise<{ speakerNotes: string }> {
+    const { data } = await this.client.post('/ai/coach/speaker-notes', input);
+    return data;
+  }
+
+  // ============================================
+  // DATA IMPORT ENDPOINTS
+  // ============================================
+
+  async uploadDataFile(formData: FormData): Promise<{
+    success: boolean;
+    data: { parsed: { headers: string[]; rows: unknown[][]; metadata: unknown }; analysis: unknown };
+  }> {
+    const { data } = await this.client.post('/ai/data-import/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data;
+  }
+
+  async generatePresentationFromData(formData: FormData): Promise<{
+    success: boolean;
+    data: { project: unknown; presentation: unknown; metadata: unknown };
+  }> {
+    const { data } = await this.client.post('/ai/data-import/generate-presentation', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data;
+  }
+
+  async previewExcelSheets(formData: FormData): Promise<{
+    success: boolean;
+    data: { fileName: string; sheets: Array<{ name: string; rowCount: number }> };
+  }> {
+    const { data } = await this.client.post('/ai/data-import/preview-sheets', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data;
+  }
+
+  async analyzeDataFile(formData: FormData, sheetName?: string): Promise<{
+    success: boolean;
+    data: { metadata: unknown; analysis: unknown; preview: { headers: string[]; sampleRows: unknown[][] } };
+  }> {
+    const { data } = await this.client.post('/ai/data-import/analyze', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      params: sheetName ? { sheetName } : undefined,
+    });
+    return data;
+  }
+
 
   // ============================================
   // NAMESPACED API (for cleaner usage)
@@ -3168,9 +3539,10 @@ class ApiClient {
   };
 
   readonly research = {
-    start: (projectId: string, input: { topic: string; depth?: string; sources?: string[] }) => this.startResearch(projectId, input),
+    start: (projectId: string | undefined, input: { topic: string; depth?: string; sources?: string[] }) => this.startResearch(projectId, input),
     get: (id: string) => this.getResearch(id),
     list: (projectId: string) => this.listResearch(projectId),
+    getHistory: () => this.getResearchHistory(),
     generateBlocks: (id: string) => this.generateContentBlocks(id),
     factCheck: (id: string) => this.factCheck(id),
   };
@@ -3178,8 +3550,8 @@ class ApiClient {
   readonly storyboard = {
     create: (projectId: string, input: { title: string; narrativeArc?: string; audienceType?: string }) => this.createStoryboard(projectId, input),
     get: (id: string) => this.getStoryboard(id),
-    list: (projectId: string) => this.listStoryboards(projectId),
-    apply: (id: string) => this.applyStoryboard(id),
+    list: (projectId?: string) => this.listStoryboards(projectId),
+    apply: (id: string, projectId?: string) => this.applyStoryboard(id, projectId),
   };
 
   readonly abTesting = {
@@ -3326,6 +3698,61 @@ class ApiClient {
     purchaseOffset: (offsetData: object) => this.purchaseCarbonOffset(offsetData),
     getOffsetHistory: () => this.getCarbonOffsetHistory(),
     getBadges: () => this.getEcoBadges(),
+  };
+
+  readonly brandKit = {
+    create: (data: Parameters<typeof this.createBrandKit>[0], orgId?: string) => this.createBrandKit(data, orgId),
+    list: (orgId?: string) => this.getBrandKits(orgId),
+    getDefault: (orgId?: string) => this.getDefaultBrandKit(orgId),
+    get: (id: string) => this.getBrandKit(id),
+    getAsTheme: (id: string) => this.getBrandKitAsTheme(id),
+    update: (id: string, updates: Record<string, unknown>) => this.updateBrandKit(id, updates),
+    setDefault: (id: string) => this.setDefaultBrandKit(id),
+    duplicate: (id: string, name?: string) => this.duplicateBrandKit(id, name),
+    delete: (id: string) => this.deleteBrandKit(id),
+  };
+
+  readonly library = {
+    save: (item: Parameters<typeof this.saveToLibrary>[0]) => this.saveToLibrary(item),
+    get: (options?: Parameters<typeof this.getLibrary>[0]) => this.getLibrary(options),
+    getTemplates: (type?: 'slide' | 'block') => this.getLibraryTemplates(type),
+    delete: (itemId: string) => this.deleteFromLibrary(itemId),
+  };
+
+  readonly imageAcquisition = {
+    acquire: (options: Parameters<typeof this.acquireImage>[0]) => this.acquireImage(options),
+    acquireAsync: (options: Parameters<typeof this.acquireImageAsync>[0]) => this.acquireImageAsync(options),
+    smartAcquire: (options: Parameters<typeof this.smartAcquireImage>[0]) => this.smartAcquireImage(options),
+    bulkAcquire: (options: Parameters<typeof this.bulkAcquireImages>[0]) => this.bulkAcquireImages(options),
+    getJobStatus: (jobId: string) => this.getImageAcquisitionJobStatus(jobId),
+    getSources: () => this.getImageSources(),
+  };
+
+  readonly imageRecognition = {
+    generateEmbedding: (uploadId: string, imageUrl: string) => this.generateImageEmbedding(uploadId, imageUrl),
+    batchEmbeddings: (uploadIds: string[]) => this.batchGenerateImageEmbeddings(uploadIds),
+    findSimilar: (uploadId: string, limit?: number, minSimilarity?: number) => this.findSimilarImages(uploadId, limit, minSimilarity),
+    trackUsage: (usage: Parameters<typeof this.trackImageUsage>[0]) => this.trackImageUsage(usage),
+    removeUsage: (usageId: string) => this.removeImageUsage(usageId),
+    getInPresentation: (projectId: string) => this.getImagesInPresentation(projectId),
+    findPresentations: (uploadId: string) => this.findPresentationsUsingImage(uploadId),
+    getAnalytics: () => this.getImageAnalytics(),
+    predict: (options: Parameters<typeof this.predictImagesForPresentation>[0]) => this.predictImagesForPresentation(options),
+    describe: (imageUrl: string) => this.describeImage(imageUrl),
+  };
+
+  readonly coach = {
+    analyze: (input: Parameters<typeof this.analyzePresentation>[0]) => this.analyzePresentation(input),
+    rehearsalFeedback: (input: Parameters<typeof this.getRehearsalFeedback>[0]) => this.getRehearsalFeedback(input),
+    improveSlide: (input: Parameters<typeof this.suggestSlideImprovements>[0]) => this.suggestSlideImprovements(input),
+    speakerNotes: (input: Parameters<typeof this.generateCoachSpeakerNotes>[0]) => this.generateCoachSpeakerNotes(input),
+  };
+
+  readonly dataImport = {
+    upload: (formData: FormData) => this.uploadDataFile(formData),
+    generatePresentation: (formData: FormData) => this.generatePresentationFromData(formData),
+    previewSheets: (formData: FormData) => this.previewExcelSheets(formData),
+    analyze: (formData: FormData, sheetName?: string) => this.analyzeDataFile(formData, sheetName),
   };
 }
 

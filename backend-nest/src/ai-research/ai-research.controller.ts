@@ -10,7 +10,7 @@ import {
   Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AIResearchService } from './ai-research.service';
 
 class ResearchTopicDto {
@@ -44,7 +44,7 @@ export class AIResearchController {
 
   @Get('history')
   @ApiOperation({ summary: 'Get research history' })
-  async getHistory(
+  getHistory(
     @Request() req: { user: { id: string } },
     @Query('limit') limit?: string,
   ) {
@@ -52,6 +52,83 @@ export class AIResearchController {
       req.user.id,
       limit ? parseInt(limit, 10) : 10,
     );
+  }
+
+  // --- Frontend-aligned routes under `/ai-research/research` (backwards-compatible) ---
+
+  @Post('research')
+  @ApiOperation({ summary: 'Start research (general)' })
+  async startResearchGeneral(
+    @Request() req: { user: { id: string } },
+    @Body()
+    dto: {
+      topic: string;
+      depth?: string;
+      sources?: string[];
+      projectId?: string;
+    },
+  ) {
+    return this.aiResearchService.researchTopic(req.user.id, dto.topic, {
+      projectId: dto.projectId,
+      sources: dto.sources,
+      maxResults: dto.depth ? parseInt(dto.depth, 10) : undefined,
+    });
+  }
+
+  @Post('research/:projectId')
+  @ApiOperation({ summary: 'Start research for a project (frontend route)' })
+  async startResearch(
+    @Request() req: { user: { id: string } },
+    @Param('projectId') projectId: string,
+    @Body() dto: { topic: string; depth?: string; sources?: string[] },
+  ) {
+    return this.aiResearchService.researchTopic(req.user.id, dto.topic, {
+      projectId,
+      sources: dto.sources,
+      maxResults: dto.depth ? parseInt(dto.depth, 10) : undefined,
+    });
+  }
+
+  @Get('research/:id')
+  @ApiOperation({ summary: 'Get research by ID (frontend route)' })
+  async getResearchByLegacyPath(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+  ) {
+    return this.aiResearchService.getResearch(id, req.user.id);
+  }
+
+  @Get('research/project/:projectId')
+  @ApiOperation({
+    summary: 'List research items for a project (frontend route)',
+  })
+  listResearchByProject(
+    @Request() req: { user: { id: string } },
+    @Param('projectId') projectId: string,
+  ) {
+    return this.aiResearchService.listResearchByProject(projectId, req.user.id);
+  }
+
+  @Post('research/:id/generate-blocks')
+  @ApiOperation({
+    summary: 'Generate content blocks from research (frontend route)',
+  })
+  async generateContentBlocksByLegacyPath(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+  ) {
+    // Verify ownership
+    await this.aiResearchService.getResearch(id, req.user.id);
+    return this.aiResearchService.generateContentBlocks(id);
+  }
+
+  @Post('research/:id/fact-check')
+  @ApiOperation({ summary: 'Fact-check research sources' })
+  async factCheck(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+  ) {
+    return this.aiResearchService.factCheck(id, req.user.id);
   }
 
   @Get(':id')

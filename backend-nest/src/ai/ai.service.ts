@@ -8,9 +8,13 @@ import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { PrismaService } from '../prisma/prisma.service';
-import { Prisma } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
 import { RealTimeDataService } from './realtime-data.service';
+import { HfInference } from '@huggingface/inference';
+import Replicate from 'replicate';
+
+import axios from 'axios';
 
 // Types for AI generation
 export interface GenerationParams {
@@ -75,11 +79,17 @@ export interface GeneratedPresentation {
   };
 }
 
+export type ImageProvider =
+  | 'pollinations'
+  | 'huggingface'
+  | 'replicate'
+  | 'dall-e-3';
+
 export interface ImageGenerationResult {
   imageUrl: string;
   revisedPrompt: string;
+  provider?: ImageProvider;
 }
-
 export interface TextToSpeechResult {
   audioBuffer: Buffer;
   duration: number;
@@ -99,12 +109,16 @@ export class AIService {
   private openai: OpenAI;
   private groq: OpenAI | null = null;
   private google: GoogleGenerativeAI | null = null;
+  private readonly db: PrismaClient;
+  private hf: HfInference;
+  private replicate: Replicate;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly realTimeDataService: RealTimeDataService,
   ) {
+    this.db = this.prisma as unknown as PrismaClient;
     this.openai = new OpenAI({
       apiKey: this.configService.get<string>('OPENAI_API_KEY'),
     });
@@ -123,6 +137,13 @@ export class AIService {
     if (googleApiKey) {
       this.google = new GoogleGenerativeAI(googleApiKey);
     }
+
+    this.hf = new HfInference(
+      this.configService.get<string>('HUGGINGFACE_API_KEY'),
+    );
+    this.replicate = new Replicate({
+      auth: this.configService.get<string>('REPLICATE_API_TOKEN'),
+    });
   }
 
   /**
@@ -164,23 +185,43 @@ export class AIService {
   }
 
   /**
+   * Generate text using AI with fallback and retry logic
+   */
+  public async generateText(
+    prompt: string,
+    options: { maxTokens?: number; temperature?: number; model?: string } = {},
+  ): Promise<string> {
+    const completion = await this.chatCompletion({
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: options.maxTokens || 1000,
+      temperature: options.temperature || 0.7,
+      model: options.model || 'gpt-4o-mini',
+    });
+
+    return completion.choices[0]?.message?.content || '';
+  }
+
+  /**
    * Public method to call AI with fallback (Groq -> OpenAI) and retry logic
    * Can be used by other services (AIChatService, etc.) to benefit from optimizations
    */
   public async chatCompletion(
     options: Record<string, unknown>,
   ): Promise<OpenAI.Chat.Completions.ChatCompletion> {
+    const chatParams =
+      options as unknown as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming;
+
     // 1. Try Groq first (if available) - Faster and cheaper
     if (this.groq) {
       try {
         // Use a high-performance model on Groq
         const groqOptions = {
-          ...options,
+          ...chatParams,
           model: 'llama-3.3-70b-versatile',
-        };
+        } satisfies OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming;
 
         return (await this.retryOperation(
-          () => this.groq!.chat.completions.create(groqOptions as any),
+          () => this.groq!.chat.completions.create(groqOptions),
           'Groq',
           2, // Try twice then failover
           1000,
@@ -210,7 +251,7 @@ export class AIService {
 
     // 3. Fallback to OpenAI - More reliable but slower/expensive
     return (await this.retryOperation(
-      () => this.openai.chat.completions.create(options as any),
+      () => this.openai.chat.completions.create(chatParams),
       'OpenAI',
       3, // Retry up to 3 times
       1000, // Start with 1s delay
@@ -512,7 +553,7 @@ Generate the complete ${type} structure in JSON format.`;
         tokens,
       };
 
-      await this.prisma.aIGeneration.create({
+      await this.db.aIGeneration.create({
         data: {
           userId: 'system', // Will be updated when called from service
           prompt: JSON.stringify(sanitizedPrompt),
@@ -598,10 +639,13 @@ Generate the complete ${type} structure in JSON format.`;
   }
 
   private async callGoogleAI(
-    options: any,
+    options: Record<string, unknown>,
   ): Promise<OpenAI.Chat.Completions.ChatCompletion> {
-    const generationConfig: any = {};
-    if (options.response_format?.type === 'json_object') {
+    const generationConfig: Record<string, unknown> = {};
+    const responseFormat = options.response_format as
+      | { type?: string }
+      | undefined;
+    if (responseFormat?.type === 'json_object') {
       generationConfig.responseMimeType = 'application/json';
     }
 
@@ -611,16 +655,36 @@ Generate the complete ${type} structure in JSON format.`;
       generationConfig,
     });
 
-    const messages = options.messages || [];
-    const systemMessage = messages.find((m: any) => m.role === 'system');
+    const messages =
+      options.messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[];
+    const systemMessage = messages.find((m) => m.role === 'system');
+    const systemInstructionText =
+      typeof systemMessage?.content === 'string'
+        ? systemMessage.content
+        : Array.isArray(systemMessage?.content)
+          ? systemMessage.content
+              .filter(
+                (
+                  part,
+                ): part is OpenAI.Chat.Completions.ChatCompletionContentPartText =>
+                  part.type === 'text',
+              )
+              .map((part) => part.text)
+              .join('\n')
+          : undefined;
 
     // Convert messages to Gemini history format
     // Filter out system message as it's handled separately
     const history = messages
-      .filter((m: any) => m.role !== 'system')
-      .map((m: any) => ({
+      .filter((m) => m.role !== 'system')
+      .map((m) => ({
         role: m.role === 'user' ? 'user' : 'model',
-        parts: [{ text: m.content as string }],
+        parts: [
+          {
+            text: (m as OpenAI.Chat.Completions.ChatCompletionMessage)
+              .content as string,
+          },
+        ],
       }));
 
     if (history.length === 0) {
@@ -632,9 +696,7 @@ Generate the complete ${type} structure in JSON format.`;
 
     const chat = model.startChat({
       history: previousHistory,
-      systemInstruction: systemMessage
-        ? { role: 'system', parts: [{ text: systemMessage.content }] }
-        : undefined,
+      systemInstruction: systemInstructionText,
     });
 
     const result = await chat.sendMessage(lastMessage.parts[0].text);
@@ -671,46 +733,186 @@ Generate the complete ${type} structure in JSON format.`;
   // ============================================
 
   /**
-   * Generate an image using DALL-E 3
+   * Generate an image using DALL-E 3 with fallback to Pollinations (Free)
+   */
+  /**
+   * Generate an image with priority-based fallback mechanism
+   * Priority: Pollinations -> Hugging Face -> Replicate -> DALL-E
    */
   async generateImage(
     prompt: string,
     style: 'vivid' | 'natural' = 'vivid',
-    size: '1024x1024' | '1792x1024' | '1024x1792' = '1792x1024',
+    size: '1024x1024' | '1792x1024' | '1024x1792' = '1024x1024',
+    // Optional: force a specific provider, otherwise follows strict priority
+    preferredProvider?: ImageProvider,
+  ): Promise<ImageGenerationResult> {
+    const providers: ImageProvider[] = [
+      'pollinations',
+      'huggingface',
+      'replicate',
+      'dall-e-3',
+    ];
+
+    // If a specific provider is requested, try that first, then fall back to others in order
+    const orderedProviders = preferredProvider
+      ? [preferredProvider, ...providers.filter((p) => p !== preferredProvider)]
+      : providers;
+
+    let lastError: unknown;
+
+    for (const provider of orderedProviders) {
+      try {
+        switch (provider) {
+          case 'pollinations':
+            return await this.generateImagePollinations(prompt);
+          case 'huggingface':
+            if (!this.configService.get('HUGGINGFACE_API_KEY')) continue;
+            return await this.generateImageHuggingFace(prompt);
+          case 'replicate':
+            if (!this.configService.get('REPLICATE_API_TOKEN')) continue;
+            return await this.generateImageReplicate(prompt);
+          case 'dall-e-3':
+            if (!this.configService.get('OPENAI_API_KEY')) continue;
+            return await this.generateImageDallE(
+              prompt,
+              style,
+              size as OpenAI.ImageGenerateParams['size'],
+            );
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Image generation failed with ${provider}: ${
+            (error as Error).message
+          }`,
+        );
+        lastError = error;
+        // Continue to next provider
+      }
+    }
+
+    throw new InternalServerErrorException(
+      `Failed to generate image with all providers. Last error: ${
+        (lastError as Error)?.message
+      }`,
+    );
+  }
+
+  /**
+   * Generate image using Pollinations.ai (Free, Fast, Flux Model)
+   */
+  /**
+   * 1. Pollinations.ai (Free, Fast, Flux Model)
+   */
+  async generateImagePollinations(
+    prompt: string,
   ): Promise<ImageGenerationResult> {
     try {
-      const enhancedPrompt = `Create a professional, clean presentation visual for: ${prompt}. 
-Style: Modern, minimalist, suitable for business presentations. 
-No text overlays, clean composition, high quality.`;
+      // Enhance prompt for better results with Flux
+      const enhancedPrompt = encodeURIComponent(
+        `${prompt}, professional presentation 4k, atomic visual, minimalist, high quality`,
+      );
 
-      const response = await this.openai.images.generate({
-        model: 'dall-e-3',
-        prompt: enhancedPrompt,
-        n: 1,
-        size,
-        style,
-        quality: 'hd',
-      });
+      // Pollinations API URL (Flux model is significantly better for this use case)
+      const seed = Math.floor(Math.random() * 1000000);
+      const imageUrl = `https://image.pollinations.ai/prompt/${enhancedPrompt}?model=flux&width=1024&height=1024&nologo=true&seed=${seed}`;
 
-      const imageData = response.data?.[0];
-      if (!imageData?.url) {
-        throw new InternalServerErrorException('No image generated');
-      }
+      // Verify the URL works (head request)
+      await axios.head(imageUrl);
 
       this.logger.log(
-        `Generated image for prompt: ${prompt.substring(0, 50)}...`,
+        `Generated image (Pollinations) for: ${prompt.substring(0, 30)}...`,
       );
 
       return {
-        imageUrl: imageData.url,
-        revisedPrompt: imageData.revised_prompt || prompt,
+        imageUrl,
+        revisedPrompt: prompt,
+        provider: 'pollinations',
       };
     } catch (error) {
-      this.logger.error('Image generation failed', error);
-      throw new InternalServerErrorException(
-        'Failed to generate image. Please try again.',
-      );
+      this.logger.error('Pollinations image generation failed', error);
+      throw error;
     }
+  }
+
+  /**
+   * 2. Hugging Face (Stable Diffusion XL)
+   */
+  async generateImageHuggingFace(
+    prompt: string,
+  ): Promise<ImageGenerationResult> {
+    const response = await this.hf.textToImage({
+      model: 'stabilityai/stable-diffusion-xl-base-1.0',
+      inputs: `professional presentation visual, ${prompt}, 4k, high quality`,
+      parameters: { negative_prompt: 'text, watermark, blurry, low quality' },
+    });
+
+    const buffer = await (response as unknown as Blob).arrayBuffer();
+    const base64 = Buffer.from(buffer).toString('base64');
+    const imageUrl = `data:image/jpeg;base64,${base64}`;
+
+    this.logger.log(
+      `Generated image (Hugging Face) for: ${prompt.substring(0, 30)}...`,
+    );
+
+    return {
+      imageUrl,
+      revisedPrompt: prompt,
+      provider: 'huggingface',
+    };
+  }
+
+  /**
+   * 3. Replicate (Flux Pro or SDXL)
+   */
+  async generateImageReplicate(prompt: string): Promise<ImageGenerationResult> {
+    const output = await this.replicate.run('black-forest-labs/flux-schnell', {
+      input: {
+        prompt: `professional presentation visual, ${prompt}, 4k, minimalist`,
+        disable_safety_checker: true,
+        aspect_ratio: '16:9',
+      },
+    });
+
+    const imageUrl = Array.isArray(output)
+      ? output[0]
+      : (output as unknown as string);
+
+    this.logger.log(
+      `Generated image (Replicate) for: ${prompt.substring(0, 30)}...`,
+    );
+
+    return {
+      imageUrl,
+      revisedPrompt: prompt,
+      provider: 'replicate',
+    };
+  }
+
+  /**
+   * 4. DALL-E 3 (OpenAI)
+   */
+  async generateImageDallE(
+    prompt: string,
+    style: 'vivid' | 'natural',
+    size: OpenAI.ImageGenerateParams['size'],
+  ): Promise<ImageGenerationResult> {
+    const response = await this.openai.images.generate({
+      model: 'dall-e-3',
+      prompt: `Create a professional, clean presentation visual for: ${prompt}`,
+      n: 1,
+      size,
+      style,
+      quality: 'hd',
+    });
+
+    const imageData = response.data?.[0];
+    if (!imageData?.url) throw new Error('No image URL returned from DALL-E');
+
+    return {
+      imageUrl: imageData.url,
+      revisedPrompt: imageData.revised_prompt || prompt,
+      provider: 'dall-e-3',
+    };
   }
 
   /**

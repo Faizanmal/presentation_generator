@@ -270,7 +270,7 @@ model Block {
   content   Json // Flexible content storage
   order     Int
   createdById String?
-  version   Int       @default(1) // Optimistic locking version
+  // version   Int       @default(1) // Optimistic locking version
 
   // Styling overrides
   style Json? // Custom styling for this block
@@ -284,7 +284,7 @@ model Block {
 
   @@index([projectId])
   @@index([slideId])
-  @@index([projectId, version])
+  // @@index([projectId, version])
   @@map("blocks")
 }
 
@@ -2179,9 +2179,12 @@ model SentimentSession {
   id              String   @id @default(cuid())
   projectId       String
   presenterId     String
+  hostId          String?  // Host user ID
+  slideId         String?  // Current slide ID
   status          String   @default("pending") // pending, active, completed
   webcamEnabled   Boolean  @default(false)
   feedbackEnabled Boolean  @default(true)
+  settings        Json?    // Session settings
   snapshots       SentimentSnapshot[]
   overallSentiment Json?
   heatmapData     Json?    // Confusion vs engagement heatmap
@@ -2198,12 +2201,15 @@ model SentimentSnapshot {
   id           String   @id @default(cuid())
   sessionId    String
   slideIndex   Int
+  slideId      String?  // Slide ID
   timestamp    DateTime @default(now())
   sentiment    String   // positive, neutral, negative, confused, engaged
   confidence   Float
   faceCount    Int      @default(0)
+  participantCount Int? // Number of participants
   emotions     Json?    // Detailed emotion breakdown
   feedbackData Json?    // Text/poll feedback
+  metrics      Json?    // Sentiment metrics
   
   session SentimentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
@@ -2292,6 +2298,7 @@ model SignLanguageConfig {
   avatarStyle     String   @default("realistic") // realistic, cartoon, minimal
   avatarPosition  String   @default("bottom-right")
   avatarSize      String   @default("medium") // small, medium, large
+  speed           String   @default("normal") // slow, normal, fast
   backgroundColor String?
   transparency    Float    @default(0.9)
   autoGenerate    Boolean  @default(true)
@@ -2311,6 +2318,7 @@ model SignLanguageTranslation {
   slideId       String
   blockId       String?
   sourceText    String   @db.Text
+  language      String   @default("ASL") // Sign language used
   signSequence  Json     // Array of sign animations
   videoUrl      String?
   duration      Float?   // seconds
@@ -2362,6 +2370,7 @@ model UniversalDesignReport {
   accessibilityScore Float
   culturalScore     Float
   readabilityScore  Float
+  issuesFound       Int      @default(0) // Total number of issues
   issues            Json     // Array of issues
   culturalIssues    CulturalIssue[]
   suggestions       Json     // Improvement suggestions
@@ -2401,12 +2410,15 @@ model APIKey {
   organizationId  String?
   name            String
   key             String   @unique
-  hashedKey       String   // For secure storage
-  permissions     String[] @default([])
+  keyHash         String   // For secure storage
+  keyPrefix       String?  // First 8 chars of key for identification
+  scopes          String[] @default([]) // API permissions
   rateLimit       Int      @default(1000) // requests per hour
+  rateLimits      Json?    // Detailed rate limit config
   usageCount      Int      @default(0)
   lastUsedAt      DateTime?
   expiresAt       DateTime?
+  status          String   @default("active") // active, expired, revoked
   isActive        Boolean  @default(true)
   metadata        Json?
   createdAt       DateTime @default(now())
@@ -2450,10 +2462,13 @@ model SDKConfiguration {
   id              String   @id @default(cuid())
   organizationId  String   @unique
   name            String
+  sdkKey          String   @unique // SDK key for authentication
   version         String   @default("1.0.0")
+  status          String   @default("active") // active, suspended, revoked
   isHeadless      Boolean  @default(false)
   customBranding  Json?    // Logo, colors, fonts
   customDomain    String?
+  allowedDomains  String[] @default([]) // Allowed domains for CORS
   allowedOrigins  String[] @default([])
   features        Json     // Enabled features
   theme           Json?    // Theme overrides
@@ -2473,10 +2488,13 @@ model SDKInstance {
   id            String   @id @default(cuid())
   configId      String
   instanceKey   String   @unique
+  clientName    String?  // Client application name
   domain        String
   status        String   @default("active") // active, suspended, revoked
+  usageCount    Int      @default(0) // Number of API calls
   usageStats    Json?
   lastActiveAt  DateTime?
+  lastUsedAt    DateTime? // Last usage timestamp
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

@@ -66,8 +66,8 @@ import { LearningPathsModule } from './learning-paths/learning-paths.module';
 import { SignLanguageModule } from './sign-language/sign-language.module';
 import { CognitiveAccessibilityModule } from './cognitive-accessibility/cognitive-accessibility.module';
 import { UniversalDesignModule } from './universal-design/universal-design.module';
-import { PublicAPIModule } from './public-api/public-api.module';
-import { WhiteLabelSDKModule } from './white-label-sdk/white-label-sdk.module';
+import { PublicApiModule } from './public-api/public-api.module';
+import { WhiteLabelSdkModule } from './white-label-sdk/white-label-sdk.module';
 
 // Sustainability & Wellness modules
 import { IoTIntegrationModule } from './iot-integration/iot-integration.module';
@@ -82,12 +82,15 @@ import { MonitoringModule } from './common/monitoring/monitoring.module';
 import { CsrfModule } from './common/csrf/csrf.module';
 import { AdvancedRateLimitModule } from './common/rate-limit/advanced-rate-limit.module';
 
+import { WorkersModule } from './workers/workers.module';
+
 // Services for seeding
 import { ThemesService } from './themes/themes.service';
 import { BullModule } from '@nestjs/bullmq';
 import { RedisModule } from './common/redis/redis.module';
 import { PerformanceInterceptor } from './common/monitoring/performance.interceptor';
 import { APP_INTERCEPTOR } from '@nestjs/core';
+import featureFlagsConfig from './common/config/feature-flags.config';
 
 @Module({
   imports: [
@@ -95,6 +98,7 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+      load: [featureFlagsConfig],
     }),
 
     // Redis
@@ -200,8 +204,8 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
     SignLanguageModule,
     CognitiveAccessibilityModule,
     UniversalDesignModule,
-    PublicAPIModule,
-    WhiteLabelSDKModule,
+    PublicApiModule,
+    WhiteLabelSdkModule,
 
     // Sustainability & Wellness
     IoTIntegrationModule,
@@ -215,6 +219,7 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
     MonitoringModule,
     CsrfModule,
     AdvancedRateLimitModule,
+    WorkersModule,
   ],
   providers: [
     // Global rate limiting
@@ -230,7 +235,7 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
   ],
 })
 export class AppModule implements OnModuleInit {
-  constructor(private readonly themesService: ThemesService) {}
+  constructor(private readonly themesService: ThemesService) { }
 
   async onModuleInit() {
     // Seed default themes on startup

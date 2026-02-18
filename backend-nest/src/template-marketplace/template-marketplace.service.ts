@@ -648,11 +648,11 @@ export class TemplateMarketplaceService {
       _count: true,
     });
 
-    const countMap = new Map(counts.map((c) => [c.category, c._count]));
+    const countMap = new Map(counts.map((c) => [c.category, c._count._all]));
 
     return categories.map((category) => ({
       category,
-      count: countMap.get(category) || 0,
+      count: Number(countMap.get(category) || 0),
       name: names[category],
     }));
   }

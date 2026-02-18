@@ -10,7 +10,7 @@ import {
   Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { BlockchainService } from './blockchain.service';
 
 class CreateCollectionDto {
@@ -159,7 +159,7 @@ export class BlockchainController {
   // Utilities
   @Get('pricing-suggestion')
   @ApiOperation({ summary: 'Get suggested NFT pricing' })
-  async getPricingSuggestion(
+  getPricingSuggestion(
     @Query('slideCount') slideCount: string,
     @Query('hasCustomDesign') hasCustomDesign: string,
     @Query('isPremium') isPremium: string,

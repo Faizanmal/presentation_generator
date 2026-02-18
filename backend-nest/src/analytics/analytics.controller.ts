@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AnalyticsService } from './analytics.service';
-import { CacheMedium, CacheLong } from '../common/decorators/cache.decorator';
+// import { CacheMedium, CacheLong } from '../common/decorators/cache.decorator';
 
 // DTO for tracking
 class StartViewDto {
@@ -287,7 +287,7 @@ export class AnalyticsController {
   @UseGuards(JwtAuthGuard)
   async getAIRecommendations(
     @Param('projectId') projectId: string,
-    @Body() body: { presentationContent?: any },
+    @Body() body: { presentationContent?: Record<string, unknown> },
   ) {
     return this.analyticsService.generateDetailedRecommendations(
       projectId,

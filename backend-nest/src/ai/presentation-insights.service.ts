@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AIService } from './ai.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { PrismaClient } from '@prisma/client';
 
 export interface PresentationInsight {
   category:
@@ -72,14 +73,18 @@ export interface ComprehensiveInsights {
 
 @Injectable()
 export class PresentationInsightsService {
+  private readonly db: PrismaClient;
+
   constructor(
     private configService: ConfigService,
     private prisma: PrismaService,
     private readonly aiService: AIService,
-  ) {}
+  ) {
+    this.db = this.prisma as unknown as PrismaClient;
+  }
 
   async analyzePresentation(projectId: string): Promise<ComprehensiveInsights> {
-    const project = await this.prisma.project.findUnique({
+    const project = await this.db.project.findUnique({
       where: { id: projectId },
       include: { slides: { orderBy: { order: 'asc' } } },
     });

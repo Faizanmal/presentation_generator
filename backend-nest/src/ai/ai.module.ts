@@ -17,7 +17,6 @@ import { ProjectsModule } from '../projects/projects.module';
 import { GenerationProcessor } from './generation.processor';
 import { RealTimeDataService } from './realtime-data.service';
 import { DataImportService } from './data-import.service';
-import { DataImportService } from './data-import.service';
 import { DataImportController } from './data-import.controller';
 import { ImageRecognitionService } from './image-recognition.service';
 
@@ -45,7 +44,6 @@ import { ImageRecognitionService } from './image-recognition.service';
     URLImportService,
     GenerationProcessor,
     RealTimeDataService,
-    RealTimeDataService,
     DataImportService,
     ImageRecognitionService,
   ],
@@ -59,7 +57,6 @@ import { ImageRecognitionService } from './image-recognition.service';
     AutoLayoutService,
     AIChatService,
     URLImportService,
-    RealTimeDataService,
     RealTimeDataService,
     DataImportService,
     ImageRecognitionService,

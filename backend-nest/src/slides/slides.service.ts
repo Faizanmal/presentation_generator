@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   Logger,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
@@ -12,15 +13,24 @@ interface CreateSlideDto {
   projectId: string;
   order: number;
   layout?: string;
+  title?: string;
 }
 
 interface UpdateSlideDto {
   layout?: string;
   order?: number;
+  title?: string;
+  speakerNotes?: string;
+  thumbnailUrl?: string;
 }
 
 interface ReorderSlidesDto {
   slides: Array<{ id: string; order: number }>;
+}
+
+interface BulkCreateSlidesDto {
+  projectId: string;
+  slides: Array<{ order: number; layout?: string; title?: string }>;
 }
 
 @Injectable()
@@ -46,7 +56,10 @@ export class SlidesService {
     }
 
     if (project.ownerId !== userId) {
-      const role = await this.collaborationService.getUserRole(createSlideDto.projectId, userId);
+      const role = await this.collaborationService.getUserRole(
+        createSlideDto.projectId,
+        userId,
+      );
       if (role !== 'EDITOR') {
         throw new ForbiddenException('You cannot edit this project');
       }
@@ -140,7 +153,10 @@ export class SlidesService {
     }
 
     if (slide.project.ownerId !== userId) {
-      const role = await this.collaborationService.getUserRole(slide.projectId, userId);
+      const role = await this.collaborationService.getUserRole(
+        slide.projectId,
+        userId,
+      );
       if (role !== 'EDITOR') {
         throw new ForbiddenException('You cannot edit this slide');
       }
@@ -151,6 +167,8 @@ export class SlidesService {
       data: {
         layout: updateSlideDto.layout,
         order: updateSlideDto.order,
+        title: updateSlideDto.title,
+        thumbnailUrl: updateSlideDto.thumbnailUrl,
       },
       include: {
         blocks: {
@@ -182,7 +200,10 @@ export class SlidesService {
     }
 
     if (slide.project.ownerId !== userId) {
-      const role = await this.collaborationService.getUserRole(slide.projectId, userId);
+      const role = await this.collaborationService.getUserRole(
+        slide.projectId,
+        userId,
+      );
       if (role !== 'EDITOR') {
         throw new ForbiddenException('You cannot delete this slide');
       }
@@ -216,6 +237,86 @@ export class SlidesService {
   }
 
   /**
+   * Bulk create multiple slides at once (optimized for AI-generated presentations)
+   */
+  async bulkCreate(userId: string, dto: BulkCreateSlidesDto) {
+    if (dto.slides.length === 0) {
+      throw new BadRequestException('At least one slide is required');
+    }
+    if (dto.slides.length > 100) {
+      throw new BadRequestException(
+        'Cannot create more than 100 slides at once',
+      );
+    }
+
+    const project = await this.prisma.project.findUnique({
+      where: { id: dto.projectId },
+    });
+
+    if (!project) throw new NotFoundException('Project not found');
+
+    if (project.ownerId !== userId) {
+      const role = await this.collaborationService.getUserRole(
+        dto.projectId,
+        userId,
+      );
+      if (role !== 'EDITOR')
+        throw new ForbiddenException('You cannot edit this project');
+    }
+
+    const created = await this.prisma.$transaction(
+      dto.slides.map((s) =>
+        this.prisma.slide.create({
+          data: {
+            projectId: dto.projectId,
+            order: s.order,
+            layout: s.layout || 'default',
+            title: s.title,
+          },
+        }),
+      ),
+    );
+
+    await this.prisma.project.update({
+      where: { id: dto.projectId },
+      data: { updatedAt: new Date() },
+    });
+
+    this.logger.log(
+      `Bulk created ${created.length} slides for project ${dto.projectId}`,
+    );
+    return created;
+  }
+
+  /**
+   * Get slide statistics for a project (layout breakdown, avg blocks per slide)
+   */
+  async getProjectSlideStats(projectId: string) {
+    const slides = await this.prisma.slide.findMany({
+      where: { projectId },
+      include: { _count: { select: { blocks: true } } },
+    });
+
+    if (slides.length === 0)
+      return { totalSlides: 0, avgBlocksPerSlide: 0, layoutBreakdown: {} };
+
+    const layoutBreakdown = slides.reduce(
+      (acc, s) => {
+        const l = s.layout || 'default';
+        acc[l] = (acc[l] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
+    const totalBlocks = slides.reduce((sum, s) => sum + s._count.blocks, 0);
+    const avgBlocksPerSlide =
+      Math.round((totalBlocks / slides.length) * 10) / 10;
+
+    return { totalSlides: slides.length, avgBlocksPerSlide, layoutBreakdown };
+  }
+
+  /**
    * Reorder slides within a project
    */
   async reorder(
@@ -233,19 +334,22 @@ export class SlidesService {
     }
 
     if (project.ownerId !== userId) {
-      const role = await this.collaborationService.getUserRole(projectId, userId);
+      const role = await this.collaborationService.getUserRole(
+        projectId,
+        userId,
+      );
       if (role !== 'EDITOR') {
         throw new ForbiddenException('You cannot edit this project');
       }
     }
 
     // Validate that all slide IDs belong to this project
-    const slideIds = reorderDto.slides.map(s => s.id);
+    const slideIds = reorderDto.slides.map((s) => s.id);
     const existingSlides = await this.prisma.slide.findMany({
       where: { id: { in: slideIds }, projectId },
       select: { id: true },
     });
-    
+
     if (existingSlides.length !== slideIds.length) {
       throw new ForbiddenException('Invalid slide IDs provided');
     }
@@ -286,7 +390,10 @@ export class SlidesService {
     }
 
     if (slide.project.ownerId !== userId) {
-      const role = await this.collaborationService.getUserRole(slide.projectId, userId);
+      const role = await this.collaborationService.getUserRole(
+        slide.projectId,
+        userId,
+      );
       if (role !== 'EDITOR') {
         throw new ForbiddenException('You cannot edit this slide');
       }

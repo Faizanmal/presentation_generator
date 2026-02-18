@@ -186,7 +186,7 @@ export class HolographicService {
         slideId: slide.id,
         order: slide.order,
         projectionType: '4-sided',
-        views: ['top', 'bottom', 'left', 'right'].map(side => ({
+        views: ['top', 'bottom', 'left', 'right'].map((side) => ({
           side,
           rotation: this.getRotationForSide(side),
           url: `/api/holographic/render/${slide.id}/${side}`,
@@ -205,7 +205,7 @@ export class HolographicService {
     slides: Array<{ id: string; content: unknown; order: number }>,
     config: HolographicConfig,
   ): Promise<object[]> {
-    return slides.map(slide => ({
+    return slides.map((slide) => ({
       slideId: slide.id,
       order: slide.order,
       threejsScene: this.generateThreeJSScene(slide.content, config),
@@ -230,9 +230,12 @@ export class HolographicService {
   /**
    * Generate Three.js scene configuration
    */
-  private generateThreeJSScene(slideContent: unknown, config: HolographicConfig): object {
-    const content = slideContent as Record<string, unknown> || {};
-    
+  private generateThreeJSScene(
+    slideContent: unknown,
+    config: HolographicConfig,
+  ): object {
+    const content = (slideContent as Record<string, unknown>) || {};
+
     return {
       camera: {
         type: 'PerspectiveCamera',
@@ -241,7 +244,12 @@ export class HolographicService {
       },
       lights: [
         { type: 'AmbientLight', color: '#ffffff', intensity: 0.5 },
-        { type: 'DirectionalLight', color: '#ffffff', intensity: 0.8, position: { x: 5, y: 5, z: 5 } },
+        {
+          type: 'DirectionalLight',
+          color: '#ffffff',
+          intensity: 0.8,
+          position: { x: 5, y: 5, z: 5 },
+        },
       ],
       objects: [
         {

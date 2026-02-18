@@ -9,7 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 export interface BrandKitDto {
   name: string;
   isDefault?: boolean;
-  
+
   // Colors
   primaryColor?: string;
   secondaryColor?: string;
@@ -17,7 +17,7 @@ export interface BrandKitDto {
   backgroundColor?: string;
   textColor?: string;
   colorPalette?: string[];
-  
+
   // Typography
   headingFont?: string;
   bodyFont?: string;
@@ -31,24 +31,24 @@ export interface BrandKitDto {
     '3xl'?: string;
     '4xl'?: string;
   };
-  
+
   // Logo & Images
   logoUrl?: string;
   logoLight?: string;
   logoDark?: string;
   favicon?: string;
   coverImages?: string[];
-  
+
   // Assets
   icons?: string[];
   patterns?: string[];
   watermark?: string;
   watermarkOpacity?: number;
-  
+
   // Voice & Tone
   voiceDescription?: string;
   toneKeywords?: string[];
-  
+
   // Guidelines
   doList?: string[];
   dontList?: string[];
@@ -59,16 +59,12 @@ export interface BrandKitDto {
 export class BrandKitService {
   private readonly logger = new Logger(BrandKitService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   /**
    * Create a new brand kit
    */
-  async create(
-    data: BrandKitDto,
-    userId: string,
-    organizationId?: string,
-  ) {
+  async create(data: BrandKitDto, userId: string, organizationId?: string) {
     this.logger.log(`Creating brand kit "${data.name}" for user ${userId}`);
 
     // If this is set as default, unset other defaults for this user/org
@@ -82,7 +78,7 @@ export class BrandKitService {
         isDefault: data.isDefault ?? false,
         userId: organizationId ? null : userId,
         organizationId,
-        
+
         // Colors
         primaryColor: data.primaryColor,
         secondaryColor: data.secondaryColor,
@@ -90,29 +86,29 @@ export class BrandKitService {
         backgroundColor: data.backgroundColor,
         textColor: data.textColor,
         colorPalette: data.colorPalette,
-        
+
         // Typography
         headingFont: data.headingFont,
         bodyFont: data.bodyFont,
         fontSizes: data.fontSizes,
-        
+
         // Logo & Images
         logoUrl: data.logoUrl,
         logoLight: data.logoLight,
         logoDark: data.logoDark,
         favicon: data.favicon,
         coverImages: data.coverImages,
-        
+
         // Assets
         icons: data.icons,
         patterns: data.patterns,
         watermark: data.watermark,
         watermarkOpacity: data.watermarkOpacity,
-        
+
         // Voice & Tone
         voiceDescription: data.voiceDescription,
         toneKeywords: data.toneKeywords,
-        
+
         // Guidelines
         doList: data.doList,
         dontList: data.dontList,
@@ -130,15 +126,9 @@ export class BrandKitService {
   async findAll(userId: string, organizationId?: string) {
     return this.prisma.brandKit.findMany({
       where: {
-        OR: [
-          { userId },
-          { organizationId: organizationId || undefined },
-        ],
+        OR: [{ userId }, { organizationId: organizationId || undefined }],
       },
-      orderBy: [
-        { isDefault: 'desc' },
-        { createdAt: 'desc' },
-      ],
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
     });
   }
 
@@ -163,7 +153,9 @@ export class BrandKitService {
         },
       });
       if (!isMember) {
-        throw new ForbiddenException('You do not have access to this brand kit');
+        throw new ForbiddenException(
+          'You do not have access to this brand kit',
+        );
       }
     } else if (brandKit.userId !== userId) {
       throw new ForbiddenException('You do not have access to this brand kit');
@@ -211,7 +203,7 @@ export class BrandKitService {
       data: {
         name: data.name,
         isDefault: data.isDefault,
-        
+
         // Colors
         primaryColor: data.primaryColor,
         secondaryColor: data.secondaryColor,
@@ -219,29 +211,29 @@ export class BrandKitService {
         backgroundColor: data.backgroundColor,
         textColor: data.textColor,
         colorPalette: data.colorPalette,
-        
+
         // Typography
         headingFont: data.headingFont,
         bodyFont: data.bodyFont,
         fontSizes: data.fontSizes,
-        
+
         // Logo & Images
         logoUrl: data.logoUrl,
         logoLight: data.logoLight,
         logoDark: data.logoDark,
         favicon: data.favicon,
         coverImages: data.coverImages,
-        
+
         // Assets
         icons: data.icons,
         patterns: data.patterns,
         watermark: data.watermark,
         watermarkOpacity: data.watermarkOpacity,
-        
+
         // Voice & Tone
         voiceDescription: data.voiceDescription,
         toneKeywords: data.toneKeywords,
-        
+
         // Guidelines
         doList: data.doList,
         dontList: data.dontList,
@@ -263,7 +255,7 @@ export class BrandKitService {
    */
   async setDefault(id: string, userId: string) {
     const brandKit = await this.findOne(id, userId);
-    
+
     await this.unsetDefaultBrandKits(
       brandKit.userId || userId,
       brandKit.organizationId || undefined,
@@ -281,6 +273,7 @@ export class BrandKitService {
   async duplicate(id: string, userId: string, newName?: string) {
     const original = await this.findOne(id, userId);
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { id: _, createdAt, updatedAt, ...data } = original;
 
     return this.prisma.brandKit.create({
@@ -317,10 +310,7 @@ export class BrandKitService {
   private async unsetDefaultBrandKits(userId: string, organizationId?: string) {
     await this.prisma.brandKit.updateMany({
       where: {
-        OR: [
-          { userId },
-          { organizationId: organizationId || undefined },
-        ],
+        OR: [{ userId }, { organizationId: organizationId || undefined }],
         isDefault: true,
       },
       data: { isDefault: false },

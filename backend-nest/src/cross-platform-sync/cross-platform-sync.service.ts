@@ -1,4 +1,9 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -32,12 +37,15 @@ export class CrossPlatformSyncService {
   /**
    * Register a device for sync
    */
-  async registerDevice(userId: string, deviceInfo: {
-    deviceId: string;
-    platform: string;
-    deviceName?: string;
-    appVersion?: string;
-  }) {
+  async registerDevice(
+    userId: string,
+    deviceInfo: {
+      deviceId: string;
+      platform: string;
+      deviceName?: string;
+      appVersion?: string;
+    },
+  ) {
     return this.prisma.deviceSync.upsert({
       where: {
         userId_deviceId: {
@@ -114,7 +122,7 @@ export class CrossPlatformSyncService {
    */
   private async getNextVersion(projectId: string): Promise<number> {
     const current = this.serverVersion.get(projectId) || 0;
-    
+
     // Get from DB if not cached
     if (!this.serverVersion.has(projectId)) {
       const latest = await this.prisma.operationalTransform.findFirst({
@@ -152,7 +160,11 @@ export class CrossPlatformSyncService {
     userId: string,
     operations: Operation[],
     baseVersion: number,
-  ): Promise<{ applied: Operation[]; serverVersion: number; conflicts?: Operation[] }> {
+  ): Promise<{
+    applied: Operation[];
+    serverVersion: number;
+    conflicts?: Operation[];
+  }> {
     // Get operations that happened since client's base version
     const serverOps = await this.getPendingOperations(projectId, baseVersion);
 
@@ -174,13 +186,17 @@ export class CrossPlatformSyncService {
 
       return {
         applied,
-        serverVersion: this.serverVersion.get(projectId) || baseVersion + operations.length,
+        serverVersion:
+          this.serverVersion.get(projectId) || baseVersion + operations.length,
       };
     }
 
     // Transform operations against concurrent changes
-    const transformed = this.transformOperations(operations, serverOps.map(o => o.operation as Operation));
-    
+    const transformed = this.transformOperations(
+      operations,
+      serverOps.map((o) => o.operation as Operation),
+    );
+
     const applied: Operation[] = [];
     for (const op of transformed) {
       const stored = await this.prisma.operationalTransform.create({
@@ -197,17 +213,24 @@ export class CrossPlatformSyncService {
 
     return {
       applied,
-      serverVersion: this.serverVersion.get(projectId) || baseVersion + applied.length,
-      conflicts: serverOps.length > 0 ? serverOps.map(o => o.operation as Operation) : undefined,
+      serverVersion:
+        this.serverVersion.get(projectId) || baseVersion + applied.length,
+      conflicts:
+        serverOps.length > 0
+          ? serverOps.map((o) => o.operation as Operation)
+          : undefined,
     };
   }
 
   /**
    * Transform operations (simplified OT algorithm)
    */
-  private transformOperations(clientOps: Operation[], serverOps: Operation[]): Operation[] {
-    return clientOps.map(clientOp => {
-      let transformed = { ...clientOp };
+  private transformOperations(
+    clientOps: Operation[],
+    serverOps: Operation[],
+  ): Operation[] {
+    return clientOps.map((clientOp) => {
+      const transformed = { ...clientOp };
 
       for (const serverOp of serverOps) {
         // Skip if same client
@@ -216,23 +239,32 @@ export class CrossPlatformSyncService {
         // Transform based on operation types
         if (clientOp.type === 'insert' && serverOp.type === 'insert') {
           // If server inserted before our position, shift our position
-          if (serverOp.position !== undefined && transformed.position !== undefined) {
+          if (
+            serverOp.position !== undefined &&
+            transformed.position !== undefined
+          ) {
             if (serverOp.position <= transformed.position) {
               transformed.position += serverOp.length || 1;
             }
           }
         } else if (clientOp.type === 'delete' && serverOp.type === 'insert') {
-          if (serverOp.position !== undefined && transformed.position !== undefined) {
+          if (
+            serverOp.position !== undefined &&
+            transformed.position !== undefined
+          ) {
             if (serverOp.position <= transformed.position) {
               transformed.position += serverOp.length || 1;
             }
           }
         } else if (clientOp.type === 'insert' && serverOp.type === 'delete') {
-          if (serverOp.position !== undefined && transformed.position !== undefined) {
+          if (
+            serverOp.position !== undefined &&
+            transformed.position !== undefined
+          ) {
             if (serverOp.position < transformed.position) {
               transformed.position = Math.max(
                 serverOp.position,
-                transformed.position - (serverOp.length || 1)
+                transformed.position - (serverOp.length || 1),
               );
             }
           }
@@ -247,7 +279,7 @@ export class CrossPlatformSyncService {
               // Server's operation already applied, merge or skip
               transformed.content = this.mergeContent(
                 serverOp.content,
-                clientOp.content
+                clientOp.content,
               );
             }
           }
@@ -261,13 +293,19 @@ export class CrossPlatformSyncService {
   /**
    * Merge content (for concurrent updates)
    */
-  private mergeContent(serverContent: unknown, clientContent: unknown): unknown {
+  private mergeContent(
+    serverContent: unknown,
+    clientContent: unknown,
+  ): unknown {
     if (!serverContent || !clientContent) {
       return clientContent || serverContent;
     }
 
     // Simple object merge for structured content
-    if (typeof serverContent === 'object' && typeof clientContent === 'object') {
+    if (
+      typeof serverContent === 'object' &&
+      typeof clientContent === 'object'
+    ) {
       return { ...serverContent, ...clientContent };
     }
 
@@ -305,7 +343,7 @@ export class CrossPlatformSyncService {
 
     // Update device sync state
     const currentVersion = this.serverVersion.get(projectId) || 0;
-    
+
     await this.prisma.deviceSync.update({
       where: { userId_deviceId: { userId, deviceId } },
       data: {
@@ -342,7 +380,7 @@ export class CrossPlatformSyncService {
     return {
       currentVersion: operations._max.version || 0,
       totalOperations: operations._count,
-      devices: devices.map(d => ({
+      devices: devices.map((d) => ({
         deviceId: d.deviceId,
         platform: d.platform,
         isOnline: d.isOnline,

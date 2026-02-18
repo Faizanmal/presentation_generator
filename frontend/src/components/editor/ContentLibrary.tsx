@@ -56,10 +56,10 @@ export function ContentLibrary({
     const { data: templates } = useQuery({
         queryKey: ['library-templates', filterType],
         queryFn: async () => {
-            const response = await api.get('/library/templates', {
-                params: { type: filterType === 'all' ? undefined : filterType },
-            });
-            return (response.data as { templates: LibraryItem[] }).templates;
+            const response = await api.library.getTemplates(
+                filterType === 'all' ? undefined : filterType,
+            );
+            return (response as { templates: LibraryItem[] }).templates;
         },
     });
 
@@ -67,21 +67,17 @@ export function ContentLibrary({
     const { data: myLibrary, refetch: refetchLibrary } = useQuery({
         queryKey: ['my-library', filterType, category],
         queryFn: async () => {
-            const response = await api.get('/library', {
-                params: {
-                    type: filterType === 'all' ? undefined : filterType,
-                    category: category === 'all' ? undefined : category,
-                    search: search || undefined,
-                },
+            const response = await api.library.get({
+                type: filterType === 'all' ? undefined : filterType,
+                category: category === 'all' ? undefined : category,
+                search: search || undefined,
             });
-            return (response.data as { items: LibraryItem[] }).items;
+            return (response as { items: LibraryItem[] }).items;
         },
     });
 
     const deleteMutation = useMutation({
-        mutationFn: async (id: string) => {
-            await api.delete(`/library/${id}`);
-        },
+        mutationFn: (id: string) => api.library.delete(id),
         onSuccess: () => {
             refetchLibrary();
         },

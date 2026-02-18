@@ -10,10 +10,17 @@ import {
   Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SignLanguageService } from './sign-language.service';
 
-type SignLanguageCode = 'ASL' | 'BSL' | 'JSL' | 'AUSLAN' | 'FSL' | 'DGS' | 'ISL';
+type SignLanguageCode =
+  | 'ASL'
+  | 'BSL'
+  | 'JSL'
+  | 'AUSLAN'
+  | 'FSL'
+  | 'DGS'
+  | 'ISL';
 
 class ConfigureDto {
   enabled: boolean;

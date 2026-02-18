@@ -11,7 +11,7 @@ interface ChatContext {
   recentBlocks?: Array<{ type: string; content: string }>;
 }
 
-interface CopilotAction {
+export interface CopilotAction {
   type: 'suggestion' | 'edit' | 'generate' | 'explain' | 'summarize';
   target?: string;
   data?: object;
@@ -30,7 +30,10 @@ export class AICopilotService {
   /**
    * Start a new chat session
    */
-  async createSession(userId: string, options?: { projectId?: string; slideId?: string }) {
+  async createSession(
+    userId: string,
+    options?: { projectId?: string; slideId?: string },
+  ) {
     const context: ChatContext = {};
 
     if (options?.projectId) {
@@ -47,7 +50,7 @@ export class AICopilotService {
       if (project && project.ownerId === userId) {
         context.projectId = project.id;
         context.projectTitle = project.title;
-        context.recentBlocks = project.slides.map(s => ({
+        context.recentBlocks = project.slides.map((s) => ({
           type: 'slide',
           content: s.title || 'Untitled',
         }));
@@ -76,7 +79,11 @@ export class AICopilotService {
     sessionId: string,
     userId: string,
     content: string,
-  ): Promise<{ userMessage: object; assistantMessage: object; action?: CopilotAction }> {
+  ): Promise<{
+    userMessage: object;
+    assistantMessage: object;
+    action?: CopilotAction;
+  }> {
     const session = await this.getSession(sessionId, userId);
 
     // Save user message
@@ -93,7 +100,10 @@ export class AICopilotService {
     const context = await this.buildContext(session);
 
     // Detect intent and generate response
-    const { response, action, tokens } = await this.processMessage(content, context);
+    const { response, action, tokens } = await this.processMessage(
+      content,
+      context,
+    );
 
     // Save assistant message
     const assistantMessage = await this.prisma.aIChatMessage.create({
@@ -124,11 +134,17 @@ export class AICopilotService {
   /**
    * Build context for AI from session
    */
-  private async buildContext(session: { projectId?: string | null; slideId?: string | null; context: unknown }): Promise<string> {
+  private async buildContext(session: {
+    projectId?: string | null;
+    slideId?: string | null;
+    context: unknown;
+  }): Promise<string> {
     const parts: string[] = [];
-    const storedContext = session.context as ChatContext || {};
+    const context = (session.context as ChatContext) || {};
 
-    parts.push('You are an AI copilot assistant for a presentation editor. Help users create, edit, and improve their presentations.');
+    parts.push(
+      'You are an AI copilot assistant for a presentation editor. Help users create, edit, and improve their presentations.',
+    );
 
     if (session.projectId) {
       const project = await this.prisma.project.findUnique({
@@ -145,11 +161,13 @@ export class AICopilotService {
       if (project) {
         parts.push(`\nCurrent Project: "${project.title}"`);
         parts.push(`Total Slides: ${project.slides.length}`);
-        
+
         if (project.slides.length > 0) {
           parts.push('\nSlide Overview:');
           project.slides.forEach((slide, i) => {
-            parts.push(`  ${i + 1}. ${slide.title || 'Untitled'} (${slide.blocks.length} blocks)`);
+            parts.push(
+              `  ${i + 1}. ${slide.title || 'Untitled'} (${slide.blocks.length} blocks)`,
+            );
           });
         }
       }
@@ -165,9 +183,11 @@ export class AICopilotService {
         parts.push(`\nCurrent Slide: "${slide.title || 'Untitled'}"`);
         if (slide.blocks.length > 0) {
           parts.push('Slide Content:');
-          slide.blocks.forEach(block => {
-            const content = block.content as { text?: string } || {};
-            parts.push(`  - ${block.blockType}: ${content.text?.substring(0, 100) || '...'}`);
+          slide.blocks.forEach((block) => {
+            const content = (block.content as { text?: string }) || {};
+            parts.push(
+              `  - ${block.blockType}: ${content.text?.substring(0, 100) || '...'}`,
+            );
           });
         }
       }
@@ -197,26 +217,42 @@ export class AICopilotService {
     let systemPrompt = context;
     let action: CopilotAction | undefined;
 
-    if (lowerMessage.includes('summarize') || lowerMessage.includes('summary')) {
+    if (
+      lowerMessage.includes('summarize') ||
+      lowerMessage.includes('summary')
+    ) {
       action = { type: 'summarize' };
       systemPrompt += '\n\nProvide a clear, concise summary.';
-    } else if (lowerMessage.includes('suggest') || lowerMessage.includes('improve')) {
+    } else if (
+      lowerMessage.includes('suggest') ||
+      lowerMessage.includes('improve')
+    ) {
       action = { type: 'suggestion' };
       systemPrompt += '\n\nProvide specific, actionable suggestions.';
-    } else if (lowerMessage.includes('generate') || lowerMessage.includes('create')) {
+    } else if (
+      lowerMessage.includes('generate') ||
+      lowerMessage.includes('create')
+    ) {
       action = { type: 'generate' };
-      systemPrompt += '\n\nGenerate the requested content in a ready-to-use format.';
-    } else if (lowerMessage.includes('explain') || lowerMessage.includes('what is')) {
+      systemPrompt +=
+        '\n\nGenerate the requested content in a ready-to-use format.';
+    } else if (
+      lowerMessage.includes('explain') ||
+      lowerMessage.includes('what is')
+    ) {
       action = { type: 'explain' };
       systemPrompt += '\n\nProvide a clear, educational explanation.';
-    } else if (lowerMessage.includes('meeting agenda') || lowerMessage.includes('follow-up email')) {
+    } else if (
+      lowerMessage.includes('meeting agenda') ||
+      lowerMessage.includes('follow-up email')
+    ) {
       action = { type: 'generate', target: 'document' };
     }
 
     try {
       const response = await this.aiService.generateText(
         `${systemPrompt}\n\nUser: ${message}`,
-        { maxTokens: 1000 }
+        { maxTokens: 1000 },
       );
 
       return {
@@ -227,7 +263,8 @@ export class AICopilotService {
     } catch (error) {
       this.logger.error('AI response generation failed', error);
       return {
-        response: "I'm sorry, I couldn't process your request. Please try again.",
+        response:
+          "I'm sorry, I couldn't process your request. Please try again.",
         tokens: 15,
       };
     }
@@ -243,88 +280,107 @@ export class AICopilotService {
   ): Promise<{ result: string; metadata?: object }> {
     switch (action) {
       case 'summarize_slide': {
-        if (!options.slideId) throw new BadRequestException('Slide ID required');
+        if (!options.slideId)
+          throw new BadRequestException('Slide ID required');
         const slide = await this.prisma.slide.findUnique({
           where: { id: options.slideId },
           include: { blocks: true },
         });
         if (!slide) throw new BadRequestException('Slide not found');
-        
-        const content = slide.blocks.map(b => {
-          const c = b.content as { text?: string } || {};
-          return c.text || '';
-        }).join(' ');
+
+        const content = slide.blocks
+          .map((b) => {
+            const c = (b.content as { text?: string }) || {};
+            return c.text || '';
+          })
+          .join(' ');
 
         const summary = await this.aiService.generateText(
           `Summarize this slide content in 2-3 sentences:\n\n${content}`,
-          { maxTokens: 150 }
+          { maxTokens: 150 },
         );
 
         return { result: summary };
       }
 
       case 'suggest_title': {
-        if (!options.slideId) throw new BadRequestException('Slide ID required');
+        if (!options.slideId)
+          throw new BadRequestException('Slide ID required');
         const slide = await this.prisma.slide.findUnique({
           where: { id: options.slideId },
           include: { blocks: true },
         });
         if (!slide) throw new BadRequestException('Slide not found');
 
-        const content = slide.blocks.map(b => {
-          const c = b.content as { text?: string } || {};
-          return c.text || '';
-        }).join(' ');
+        const content = slide.blocks
+          .map((b) => {
+            const c = (b.content as { text?: string }) || {};
+            return c.text || '';
+          })
+          .join(' ');
 
         const titles = await this.aiService.generateText(
           `Suggest 3 compelling titles for a slide with this content. Return as a numbered list:\n\n${content.substring(0, 500)}`,
-          { maxTokens: 100 }
+          { maxTokens: 100 },
         );
 
         return { result: titles, metadata: { type: 'title_suggestions' } };
       }
 
       case 'generate_speaker_notes': {
-        if (!options.slideId) throw new BadRequestException('Slide ID required');
+        if (!options.slideId)
+          throw new BadRequestException('Slide ID required');
         const slide = await this.prisma.slide.findUnique({
           where: { id: options.slideId },
           include: { blocks: true },
         });
         if (!slide) throw new BadRequestException('Slide not found');
 
-        const content = slide.blocks.map(b => {
-          const c = b.content as { text?: string } || {};
-          return c.text || '';
-        }).join(' ');
+        const content = slide.blocks
+          .map((b) => {
+            const c = (b.content as { text?: string }) || {};
+            return c.text || '';
+          })
+          .join(' ');
 
         const notes = await this.aiService.generateText(
           `Generate natural, conversational speaker notes for presenting this slide. Include timing cues and key talking points:\n\nSlide Title: ${slide.title || 'Untitled'}\nContent: ${content.substring(0, 500)}`,
-          { maxTokens: 300 }
+          { maxTokens: 300 },
         );
 
         return { result: notes, metadata: { type: 'speaker_notes' } };
       }
 
       case 'generate_meeting_agenda': {
-        if (!options.projectId) throw new BadRequestException('Project ID required');
+        if (!options.projectId)
+          throw new BadRequestException('Project ID required');
         const project = await this.prisma.project.findUnique({
           where: { id: options.projectId },
           include: { slides: { orderBy: { order: 'asc' } } },
         });
         if (!project) throw new BadRequestException('Project not found');
 
-        const slidesList = project.slides.map((s, i) => `${i + 1}. ${s.title || 'Slide ' + (i + 1)}`).join('\n');
+        const slidesList = project.slides
+          .map((s, i) => `${i + 1}. ${s.title || 'Slide ' + (i + 1)}`)
+          .join('\n');
 
         const agenda = await this.aiService.generateText(
-          `Generate a professional meeting agenda based on this presentation:\n\nTitle: ${project.title}\nSlides:\n${slidesList}\n\nFormat with time allocations and discussion points.`,
-          { maxTokens: 400 }
+          `Generate a professional meeting agenda based on this presentation:
+
+Title: ${project.title}
+Slides:
+${slidesList}
+
+Format with time allocations and discussion points.`,
+          { maxTokens: 400 },
         );
 
         return { result: agenda, metadata: { type: 'meeting_agenda' } };
       }
 
       case 'generate_followup_email': {
-        if (!options.projectId) throw new BadRequestException('Project ID required');
+        if (!options.projectId)
+          throw new BadRequestException('Project ID required');
         const project = await this.prisma.project.findUnique({
           where: { id: options.projectId },
           include: { slides: { take: 5, orderBy: { order: 'asc' } } },
@@ -332,8 +388,14 @@ export class AICopilotService {
         if (!project) throw new BadRequestException('Project not found');
 
         const email = await this.aiService.generateText(
-          `Generate a professional follow-up email after presenting "${project.title}". Include:\n- Thank attendees\n- Key takeaways\n- Next steps\n- Offer to answer questions\n\nPresentation topics: ${project.slides.map(s => s.title).join(', ')}`,
-          { maxTokens: 350 }
+          `Generate a professional follow-up email after presenting "${project.title}". Include:
+- Thank attendees
+- Key takeaways
+- Next steps
+- Offer to answer questions
+
+Presentation topics: ${project.slides.map((s) => s.title).join(', ')}`,
+          { maxTokens: 350 },
         );
 
         return { result: email, metadata: { type: 'followup_email' } };
@@ -347,7 +409,11 @@ export class AICopilotService {
   /**
    * Provide feedback on a message
    */
-  async provideFeedback(messageId: string, userId: string, feedback: 'thumbs_up' | 'thumbs_down') {
+  async provideFeedback(
+    messageId: string,
+    userId: string,
+    feedback: 'thumbs_up' | 'thumbs_down',
+  ) {
     const message = await this.prisma.aIChatMessage.findUnique({
       where: { id: messageId },
       include: { session: true },
@@ -398,6 +464,67 @@ export class AICopilotService {
         },
       },
     });
+  }
+
+  /**
+   * Get user's chat sessions with pagination
+   */
+  async getUserSessionsPaginated(userId: string, page = 1, limit = 10) {
+    const skip = (page - 1) * limit;
+    const [sessions, total] = await Promise.all([
+      this.prisma.aIChatSession.findMany({
+        where: { userId, status: { not: 'archived' } },
+        orderBy: { updatedAt: 'desc' },
+        take: limit,
+        skip,
+        include: {
+          messages: {
+            take: 1,
+            orderBy: { createdAt: 'desc' },
+          },
+        },
+      }),
+      this.prisma.aIChatSession.count({
+        where: { userId, status: { not: 'archived' } },
+      }),
+    ]);
+    return {
+      data: sessions,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  /**
+   * Rename a session
+   */
+  async renameSession(id: string, userId: string, title: string) {
+    const session = await this.getSession(id, userId);
+    return this.prisma.aIChatSession.update({
+      where: { id: session.id },
+      data: { title },
+    });
+  }
+
+  /**
+   * Get token usage summary for a user
+   */
+  async getTokenUsage(userId: string): Promise<{
+    totalTokens: number;
+    sessionCount: number;
+    avgTokensPerSession: number;
+  }> {
+    const sessions = await this.prisma.aIChatSession.findMany({
+      where: { userId },
+      select: { totalTokens: true },
+    });
+    const totalTokens = sessions.reduce(
+      (s, sess) => s + (sess.totalTokens || 0),
+      0,
+    );
+    const sessionCount = sessions.length;
+    const avgTokensPerSession =
+      sessionCount > 0 ? Math.round(totalTokens / sessionCount) : 0;
+    return { totalTokens, sessionCount, avgTokensPerSession };
   }
 
   /**

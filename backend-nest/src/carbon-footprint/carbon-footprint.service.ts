@@ -9,7 +9,7 @@ interface CarbonFactors {
   videoStreamingKgPerHour: number;
 }
 
-interface EmissionBreakdown {
+export interface EmissionBreakdown {
   dataTransfer: number;
   compute: number;
   storage: number;
@@ -53,8 +53,9 @@ export class CarbonFootprintService {
     }
 
     // Estimate data size
-    const dataSizeGB = JSON.stringify(presentation).length / (1024 * 1024 * 1024);
-    
+    const dataSizeGB =
+      JSON.stringify(presentation).length / (1024 * 1024 * 1024);
+
     // Calculate emissions
     const emissions: EmissionBreakdown = {
       dataTransfer: dataSizeGB * this.carbonFactors.dataTransferKgPerGB,
@@ -64,7 +65,8 @@ export class CarbonFootprintService {
       total: 0,
     };
 
-    emissions.total = emissions.dataTransfer + emissions.compute + emissions.storage;
+    emissions.total =
+      emissions.dataTransfer + emissions.compute + emissions.storage;
 
     return {
       presentationId,
@@ -77,18 +79,18 @@ export class CarbonFootprintService {
   /**
    * Calculate session carbon footprint
    */
-  async calculateSessionFootprint(sessionData: {
+  calculateSessionFootprint(sessionData: {
     durationMinutes: number;
     attendees: number;
     streamQuality: 'low' | 'medium' | 'high';
     dataSentMB: number;
     dataReceivedMB: number;
-  }): Promise<{
+  }): {
     emissions: EmissionBreakdown;
     perAttendee: number;
     comparisons: { item: string; equivalent: string }[];
     offsetCost: number;
-  }> {
+  } {
     const qualityMultiplier = {
       low: 0.5,
       medium: 1,
@@ -96,18 +98,27 @@ export class CarbonFootprintService {
     };
 
     const streamingHours = sessionData.durationMinutes / 60;
-    const totalDataGB = (sessionData.dataSentMB + sessionData.dataReceivedMB) / 1024;
+    const totalDataGB =
+      (sessionData.dataSentMB + sessionData.dataReceivedMB) / 1024;
 
     const emissions: EmissionBreakdown = {
       dataTransfer: totalDataGB * this.carbonFactors.dataTransferKgPerGB,
-      compute: streamingHours * this.carbonFactors.computeKgPerHour * sessionData.attendees * 0.1,
+      compute:
+        streamingHours *
+        this.carbonFactors.computeKgPerHour *
+        sessionData.attendees *
+        0.1,
       storage: 0,
-      streaming: streamingHours * this.carbonFactors.videoStreamingKgPerHour * 
-                 qualityMultiplier[sessionData.streamQuality] * sessionData.attendees,
+      streaming:
+        streamingHours *
+        this.carbonFactors.videoStreamingKgPerHour *
+        qualityMultiplier[sessionData.streamQuality] *
+        sessionData.attendees,
       total: 0,
     };
 
-    emissions.total = emissions.dataTransfer + emissions.compute + emissions.streaming;
+    emissions.total =
+      emissions.dataTransfer + emissions.compute + emissions.streaming;
 
     const perAttendee = emissions.total / sessionData.attendees;
 
@@ -135,7 +146,11 @@ export class CarbonFootprintService {
 
     // Calculate total footprint
     let totalEmissions = 0;
-    const breakdown: { presentationId: string; title: string; emissions: number }[] = [];
+    const breakdown: {
+      presentationId: string;
+      title: string;
+      emissions: number;
+    }[] = [];
 
     for (const pres of presentations) {
       const footprint = await this.calculatePresentationFootprint(pres.id);
@@ -154,7 +169,9 @@ export class CarbonFootprintService {
         period,
         totalEmissions,
         breakdown: breakdown as object[],
-        recommendations: this.getRecommendations({ total: totalEmissions } as EmissionBreakdown),
+        recommendations: this.getRecommendations({
+          total: totalEmissions,
+        } as EmissionBreakdown),
         generatedAt: new Date(),
       },
     });
@@ -162,7 +179,11 @@ export class CarbonFootprintService {
     return {
       ...report,
       comparisons: this.getComparisons(totalEmissions),
-      trendVsPrevious: await this.calculateTrend(userId, period, totalEmissions),
+      trendVsPrevious: await this.calculateTrend(
+        userId,
+        period,
+        totalEmissions,
+      ),
     };
   }
 
@@ -184,7 +205,10 @@ export class CarbonFootprintService {
       return { change: 0, direction: 'stable' };
     }
 
-    const change = ((currentEmissions - previousReport.totalEmissions) / previousReport.totalEmissions) * 100;
+    const change =
+      ((currentEmissions - previousReport.totalEmissions) /
+        previousReport.totalEmissions) *
+      100;
 
     return {
       change: Math.round(change),
@@ -240,12 +264,15 @@ export class CarbonFootprintService {
   /**
    * Purchase carbon offset
    */
-  async purchaseOffset(userId: string, offsetData: {
-    provider: string;
-    project: string;
-    emissionsKg: number;
-    costUSD: number;
-  }) {
+  async purchaseOffset(
+    userId: string,
+    offsetData: {
+      provider: string;
+      project: string;
+      emissionsKg: number;
+      costUSD: number;
+    },
+  ) {
     // In production, this would integrate with offset provider APIs
     const offset = await this.prisma.carbonOffset.create({
       data: {
@@ -260,20 +287,23 @@ export class CarbonFootprintService {
     });
 
     // Simulate certificate generation
-    setTimeout(async () => {
-      await this.prisma.carbonOffset.update({
-        where: { id: offset.id },
-        data: {
-          status: 'completed',
-          certificateUrl: `/certificates/${offset.id}.pdf`,
-        },
-      });
+    setTimeout(() => {
+      this.prisma.carbonOffset
+        .update({
+          where: { id: offset.id },
+          data: {
+            status: 'completed',
+            certificateUrl: `/certificates/${offset.id}.pdf`,
+          },
+        })
+        .catch((err) => this.logger.error('Failed to update carbon offset status', err));
     }, 5000);
 
     return {
       offsetId: offset.id,
       status: 'processing',
-      message: 'Your carbon offset purchase is being processed. Certificate will be available shortly.',
+      message:
+        'Your carbon offset purchase is being processed. Certificate will be available shortly.',
     };
   }
 
@@ -287,7 +317,7 @@ export class CarbonFootprintService {
     });
 
     const totalOffset = offsets
-      .filter(o => o.status === 'completed')
+      .filter((o) => o.status === 'completed')
       .reduce((sum, o) => sum + o.amount, 0);
 
     return {
@@ -356,7 +386,7 @@ export class CarbonFootprintService {
         description: 'Use eco-friendly mode for 10 presentations',
         requirement: '10 presentations in eco mode',
       },
-    ].filter(b => !earned.find(e => e.badge === b.badge));
+    ].filter((b) => !earned.find((e) => e.badge === b.badge));
 
     return { earned, available };
   }
@@ -364,11 +394,13 @@ export class CarbonFootprintService {
   /**
    * Get comparisons for emissions
    */
-  private getComparisons(emissionsKg: number): { item: string; equivalent: string }[] {
+  private getComparisons(
+    emissionsKg: number,
+  ): { item: string; equivalent: string }[] {
     return [
       {
         item: 'Car travel',
-        equivalent: `${Math.round(emissionsKg / 0.21 * 10) / 10} km driven`,
+        equivalent: `${Math.round((emissionsKg / 0.21) * 10) / 10} km driven`,
       },
       {
         item: 'Smartphone charges',
@@ -380,7 +412,7 @@ export class CarbonFootprintService {
       },
       {
         item: 'Tree absorption',
-        equivalent: `${Math.round(emissionsKg / 21 * 100) / 100} tree-years to absorb`,
+        equivalent: `${Math.round((emissionsKg / 21) * 100) / 100} tree-years to absorb`,
       },
     ];
   }
@@ -396,12 +428,18 @@ export class CarbonFootprintService {
     }
 
     if (emissions.streaming > 0.05) {
-      recommendations.push('Consider lower video quality for remote presentations');
+      recommendations.push(
+        'Consider lower video quality for remote presentations',
+      );
     }
 
-    recommendations.push('Enable eco-friendly mode for automatic optimizations');
+    recommendations.push(
+      'Enable eco-friendly mode for automatic optimizations',
+    );
     recommendations.push('Use dark mode on OLED screens to save energy');
-    recommendations.push('Download presentations for offline viewing when possible');
+    recommendations.push(
+      'Download presentations for offline viewing when possible',
+    );
 
     return recommendations;
   }

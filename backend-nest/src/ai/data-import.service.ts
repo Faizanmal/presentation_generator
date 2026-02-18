@@ -74,11 +74,11 @@ export class DataImportService {
   /**
    * Parse Excel file (supports .xlsx, .xls)
    */
-  async parseExcel(
+  parseExcel(
     buffer: Buffer,
     fileName: string,
     sheetName?: string,
-  ): Promise<ParsedDataResult> {
+  ): ParsedDataResult {
     try {
       const workbook = XLSX.read(buffer, { type: 'buffer' });
 
@@ -94,16 +94,19 @@ export class DataImportService {
       const worksheet = workbook.Sheets[targetSheet];
 
       // Convert to JSON with headers
-      const data = XLSX.utils.sheet_to_json(worksheet, {
-        defval: null,
-        raw: false,
-      });
+      const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(
+        worksheet,
+        {
+          defval: null,
+          raw: false,
+        },
+      );
 
       if (data.length === 0) {
         throw new BadRequestException('Excel sheet is empty');
       }
 
-      const headers = Object.keys(data[0]);
+      const headers = Object.keys(data[0] || {});
 
       this.logger.log(
         `Parsed Excel file: ${fileName}, Sheet: ${targetSheet}, Rows: ${data.length}`,
@@ -131,7 +134,7 @@ export class DataImportService {
   /**
    * Analyze parsed data to provide insights and recommendations
    */
-  async analyzeData(parsedData: ParsedDataResult): Promise<DataAnalysisResult> {
+  analyzeData(parsedData: ParsedDataResult): DataAnalysisResult {
     const { headers, rows } = parsedData;
 
     // Classify columns
@@ -271,16 +274,13 @@ export class DataImportService {
   ): Promise<GeneratedPresentation> {
     try {
       // Analyze the data first
-      const analysis = await this.analyzeData(parsedData);
-
-      // Build context for AI
-      const dataContext = this.buildDataContext(parsedData, analysis);
+      const analysis = this.analyzeData(parsedData);
 
       // Generate charts if requested
       const charts: ChartData[] = [];
       if (importDto.generateCharts && analysis.recommendedCharts.length > 0) {
         for (const recommendation of analysis.recommendedCharts.slice(0, 3)) {
-          const chartData = await this.generateChartFromData(
+          const chartData = this.generateChartFromData(
             parsedData,
             recommendation.columns,
             recommendation.type,
@@ -294,26 +294,8 @@ export class DataImportService {
         importDto.topic ||
         `Data Analysis: ${parsedData.metadata.fileName.replace(/\.[^/.]+$/, '')}`;
 
-      const prompt = `Create a data-driven presentation based on the following dataset:
-
-**Dataset Overview:**
-${dataContext}
-
-**Key Insights:**
-${analysis.insights.map((i) => `- ${i.description}`).join('\n')}
-
-**Available Charts:**
-${analysis.recommendedCharts.map((c, i) => `${i + 1}. ${c.type.toUpperCase()}: ${c.reason}`).join('\n')}
-
-Create a ${importDto.tone || 'professional'} presentation for ${importDto.audience || 'general audience'} that:
-1. Introduces the dataset and its context
-2. Highlights key findings from the data
-3. Uses data visualizations effectively
-4. Provides actionable insights
-5. Concludes with recommendations`;
-
       const presentation = await this.aiService.generateAdvancedPresentation({
-        topic: topic,
+        topic,
         tone: importDto.tone || 'professional',
         audience: importDto.audience || 'data analysts',
         length: Math.min(8, Math.max(5, Math.ceil(charts.length + 3))),
@@ -367,11 +349,11 @@ Create a ${importDto.tone || 'professional'} presentation for ${importDto.audien
   /**
    * Generate chart from parsed data
    */
-  private async generateChartFromData(
+  private generateChartFromData(
     parsedData: ParsedDataResult,
     columns: string[],
     chartType: ChartTypeEnum,
-  ): Promise<ChartData> {
+  ): ChartData {
     const { rows } = parsedData;
 
     // Limit to reasonable number of data points
@@ -387,8 +369,7 @@ Create a ${importDto.tone || 'professional'} presentation for ${importDto.audien
 
       // Extract labels
       limitedRows.forEach((row) => {
-        const label = row[labelColumn];
-        labels.push(String(label || 'Unknown'));
+        labels.push(this.toDisplayText(row[labelColumn], 'Unknown'));
       });
 
       // Extract data for each column
@@ -400,7 +381,7 @@ Create a ${importDto.tone || 'professional'} presentation for ${importDto.audien
           const numValue =
             typeof value === 'number'
               ? value
-              : parseFloat(String(value || '0'));
+              : parseFloat(this.toDisplayText(value, '0'));
           data.push(isNaN(numValue) ? 0 : numValue);
         });
 
@@ -427,7 +408,7 @@ Create a ${importDto.tone || 'professional'} presentation for ${importDto.audien
       const valueCounts = new Map<string, number>();
 
       limitedRows.forEach((row) => {
-        const value = String(row[column] || 'Unknown');
+        const value = this.toDisplayText(row[column], 'Unknown');
         valueCounts.set(value, (valueCounts.get(value) || 0) + 1);
       });
 
@@ -506,7 +487,7 @@ ${JSON.stringify(parsedData.rows.slice(0, 5), null, 2)}
   /**
    * Get list of available sheets in Excel file
    */
-  async getExcelSheets(buffer: Buffer): Promise<string[]> {
+  getExcelSheets(buffer: Buffer): string[] {
     try {
       const workbook = XLSX.read(buffer, { type: 'buffer' });
       return workbook.SheetNames;
@@ -514,5 +495,15 @@ ${JSON.stringify(parsedData.rows.slice(0, 5), null, 2)}
       this.logger.error('Failed to read Excel sheets', error);
       throw new BadRequestException('Invalid Excel file');
     }
+  }
+
+  private toDisplayText(value: unknown, fallback: string): string {
+    if (value == null) return fallback;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return String(value);
+    }
+    if (value instanceof Date) return value.toISOString();
+    return fallback;
   }
 }

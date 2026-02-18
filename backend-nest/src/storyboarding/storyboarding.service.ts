@@ -52,7 +52,12 @@ export class StoryboardingService {
       totalSlides: 15,
       maxDuration: 30,
       style: 'detailed',
-      focusAreas: ['architecture', 'implementation', 'technical specs', 'code examples'],
+      focusAreas: [
+        'architecture',
+        'implementation',
+        'technical specs',
+        'code examples',
+      ],
       avoidTopics: ['high-level summaries without substance'],
     },
     educational: {
@@ -66,7 +71,12 @@ export class StoryboardingService {
       totalSlides: 10,
       maxDuration: 20,
       style: 'persuasive',
-      focusAreas: ['benefits', 'social proof', 'emotional appeal', 'call to action'],
+      focusAreas: [
+        'benefits',
+        'social proof',
+        'emotional appeal',
+        'call to action',
+      ],
       avoidTopics: ['technical complexity'],
     },
     creative: {
@@ -85,16 +95,50 @@ export class StoryboardingService {
       emphasis: { intro: 0.2, key_points: 0.6, conclusion: 0.2 },
     },
     deep_dive: {
-      sections: ['intro', 'context', 'analysis', 'details', 'implications', 'conclusion'],
-      emphasis: { intro: 0.1, context: 0.15, analysis: 0.25, details: 0.25, implications: 0.15, conclusion: 0.1 },
+      sections: [
+        'intro',
+        'context',
+        'analysis',
+        'details',
+        'implications',
+        'conclusion',
+      ],
+      emphasis: {
+        intro: 0.1,
+        context: 0.15,
+        analysis: 0.25,
+        details: 0.25,
+        implications: 0.15,
+        conclusion: 0.1,
+      },
     },
     pitch: {
       sections: ['hook', 'problem', 'solution', 'proof', 'call_to_action'],
-      emphasis: { hook: 0.15, problem: 0.2, solution: 0.3, proof: 0.2, call_to_action: 0.15 },
+      emphasis: {
+        hook: 0.15,
+        problem: 0.2,
+        solution: 0.3,
+        proof: 0.2,
+        call_to_action: 0.15,
+      },
     },
     tutorial: {
-      sections: ['objectives', 'prerequisites', 'steps', 'practice', 'summary', 'resources'],
-      emphasis: { objectives: 0.1, prerequisites: 0.1, steps: 0.5, practice: 0.15, summary: 0.1, resources: 0.05 },
+      sections: [
+        'objectives',
+        'prerequisites',
+        'steps',
+        'practice',
+        'summary',
+        'resources',
+      ],
+      emphasis: {
+        objectives: 0.1,
+        prerequisites: 0.1,
+        steps: 0.5,
+        practice: 0.15,
+        summary: 0.1,
+        resources: 0.05,
+      },
     },
   };
 
@@ -129,10 +173,14 @@ export class StoryboardingService {
       tone = 'professional',
     } = options;
 
-    const audienceConfig = this.audienceTemplates[audienceType as keyof typeof this.audienceTemplates] 
-      || this.audienceTemplates.executive;
-    const structureConfig = this.presentationStructures[presentationType as keyof typeof this.presentationStructures]
-      || this.presentationStructures.summary;
+    const audienceConfig =
+      this.audienceTemplates[
+        audienceType as keyof typeof this.audienceTemplates
+      ] || this.audienceTemplates.executive;
+    const structureConfig =
+      this.presentationStructures[
+        presentationType as keyof typeof this.presentationStructures
+      ] || this.presentationStructures.summary;
 
     const estimatedDuration = duration || audienceConfig.maxDuration;
 
@@ -167,15 +215,22 @@ export class StoryboardingService {
         topic,
         narrativeArc,
         audienceConfig,
-        structureConfig,
+        structureConfig as any,
         estimatedDuration,
       );
 
       // Generate pacing recommendations
-      const pacing = this.generatePacingRecommendations(sections, audienceType, presentationType);
+      const pacing = this.generatePacingRecommendations(
+        sections,
+        audienceType,
+        presentationType,
+      );
 
       // Generate transition suggestions
-      const transitions = this.generateTransitionSuggestions(sections, presentationType);
+      const transitions = this.generateTransitionSuggestions(
+        sections,
+        presentationType,
+      );
 
       // Update storyboard
       const updatedStoryboard = await this.prisma.storyboard.update({
@@ -183,7 +238,7 @@ export class StoryboardingService {
         data: {
           narrativeArc: narrativeArc as unknown as object,
           pacing: pacing as unknown as object,
-          transitions: transitions,
+          transitions: transitions as any,
           status: 'completed',
         },
         include: {
@@ -244,7 +299,9 @@ Generate a compelling story structure with the following JSON format:
 Return only valid JSON.`;
 
     try {
-      const response = await this.aiService.generateText(prompt, { maxTokens: 1500 });
+      const response = await this.aiService.generateText(prompt, {
+        maxTokens: 1500,
+      });
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         return JSON.parse(jsonMatch[0]);
@@ -271,7 +328,10 @@ Return only valid JSON.`;
           title: 'Main Content',
           purpose: 'Deliver the core message',
           duration: Math.ceil(duration * 0.6),
-          keyPoints: keyPoints.length > 0 ? keyPoints : ['Key concept 1', 'Key concept 2'],
+          keyPoints:
+            keyPoints.length > 0
+              ? keyPoints
+              : ['Key concept 1', 'Key concept 2'],
           emotionalTone: 'Informative and compelling',
           suggestedVisuals: ['Data visualizations', 'Examples'],
         },
@@ -310,7 +370,7 @@ Return only valid JSON.`;
     _structureConfig: typeof this.presentationStructures.summary,
     totalDuration: number,
   ) {
-    const sections = [];
+    const sections: any[] = [];
     let order = 0;
 
     for (const arcSection of narrativeArc.sections) {
@@ -322,10 +382,15 @@ Return only valid JSON.`;
       );
 
       // Determine best layout
-      const suggestedLayout = this.suggestLayout(arcSection.type, arcSection.keyPoints.length);
+      const suggestedLayout = this.suggestLayout(
+        arcSection.type,
+        arcSection.keyPoints.length,
+      );
 
       // Calculate duration in seconds
-      const durationSeconds = Math.ceil((arcSection.duration / totalDuration) * totalDuration * 60);
+      const durationSeconds = Math.ceil(
+        (arcSection.duration / totalDuration) * totalDuration * 60,
+      );
 
       const section = await this.prisma.storyboardSection.create({
         data: {
@@ -407,8 +472,12 @@ Write natural, conversational speaker notes (2-3 paragraphs) that help the prese
 
     const sectionPacing = sections.map((section) => ({
       section: section.title,
-      pace: section.type === 'climax' ? 'slow' : paceMap[audienceType] || 'moderate',
-      emphasis: section.type === 'climax' ? 1 : section.type === 'intro' ? 0.8 : 0.6,
+      pace:
+        section.type === 'climax'
+          ? 'slow'
+          : paceMap[audienceType] || 'moderate',
+      emphasis:
+        section.type === 'climax' ? 1 : section.type === 'intro' ? 0.8 : 0.6,
     }));
 
     return {
@@ -417,9 +486,13 @@ Write natural, conversational speaker notes (2-3 paragraphs) that help the prese
       pausePoints: sections
         .filter((s) => s.type === 'climax' || s.type === 'call_to_action')
         .map((s) => `After ${s.title}`),
-      climaxBuild: presentationType === 'pitch' 
-        ? ['Build tension through problem statement', 'Release with solution reveal']
-        : ['Gradually increase engagement', 'Peak at key insight'],
+      climaxBuild:
+        presentationType === 'pitch'
+          ? [
+              'Build tension through problem statement',
+              'Release with solution reveal',
+            ]
+          : ['Gradually increase engagement', 'Peak at key insight'],
     };
   }
 
@@ -503,13 +576,17 @@ Write natural, conversational speaker notes (2-3 paragraphs) that help the prese
   /**
    * Update storyboard section
    */
-  async updateSection(sectionId: string, userId: string, data: Partial<{
-    title: string;
-    keyPoints: string[];
-    speakerNotes: string;
-    suggestedLayout: string;
-    duration: number;
-  }>) {
+  async updateSection(
+    sectionId: string,
+    userId: string,
+    data: Partial<{
+      title: string;
+      keyPoints: string[];
+      speakerNotes: string;
+      suggestedLayout: string;
+      duration: number;
+    }>,
+  ) {
     const section = await this.prisma.storyboardSection.findUnique({
       where: { id: sectionId },
       include: { storyboard: true },
@@ -528,7 +605,11 @@ Write natural, conversational speaker notes (2-3 paragraphs) that help the prese
   /**
    * Apply storyboard to project (create slides)
    */
-  async applyToProject(storyboardId: string, projectId: string, userId: string) {
+  async applyToProject(
+    storyboardId: string,
+    projectId: string,
+    userId: string,
+  ) {
     const storyboard = await this.getStoryboard(storyboardId, userId);
 
     // Verify project ownership
@@ -541,7 +622,7 @@ Write natural, conversational speaker notes (2-3 paragraphs) that help the prese
     }
 
     // Create slides from storyboard sections
-    const slides = [];
+    const slides: any[] = [];
     for (const section of storyboard.sections) {
       const slide = await this.prisma.slide.create({
         data: {

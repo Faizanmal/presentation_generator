@@ -35,15 +35,44 @@ interface BlockUpdate {
   projectId: string;
   slideId: string;
   blockId: string;
-  data: any;
+  data: unknown;
   userId: string;
 }
 
 interface SlideUpdate {
   projectId: string;
   slideId: string;
-  data: any;
+  data: unknown;
   userId: string;
+}
+
+interface QAQuestion {
+  id: string;
+  question: string;
+  askedBy: string;
+  askedByName: string;
+  upvotes: number;
+  upvotedBy: string[];
+  answered: boolean;
+  timestamp: Date | string;
+}
+
+interface PollOption {
+  id: string;
+  text: string;
+  votes: number;
+}
+
+interface Poll {
+  id: string;
+  projectId: string;
+  question: string;
+  options: PollOption[];
+  voters: string[];
+  createdBy: string;
+  isActive: boolean;
+  createdAt: Date | string;
+  endsAt?: Date | string;
 }
 
 @WebSocketGateway({
@@ -62,8 +91,7 @@ interface SlideUpdate {
   adapter: process.env.REDIS_HOST ? undefined : undefined, // Redis adapter configured separately
 })
 export class CollaborationGateway
-  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
-{
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
@@ -87,7 +115,7 @@ export class CollaborationGateway
     private readonly collaborationService: CollaborationService,
     private readonly jwtService: JwtService,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
-  ) {}
+  ) { }
 
   afterInit() {
     this.logger.log('Collaboration WebSocket Gateway initialized');
@@ -244,6 +272,7 @@ export class CollaborationGateway
       data.x,
       data.y,
       data.slideIndex,
+      projectId,
     );
   }
 
@@ -256,10 +285,15 @@ export class CollaborationGateway
     if (!projectId || projectId !== data.projectId) return;
 
     const userId = client.data.userId;
-    const isOwner = await this.collaborationService.isProjectOwner(projectId, userId);
+    const isOwner = await this.collaborationService.isProjectOwner(
+      projectId,
+      userId,
+    );
     const role = await this.collaborationService.getUserRole(projectId, userId);
     if (!isOwner && role !== 'EDITOR') {
-      this.logger.warn(`Unauthorized block:update attempt by ${userId} on project ${projectId}`);
+      this.logger.warn(
+        `Unauthorized block:update attempt by ${userId} on project ${projectId}`,
+      );
       return;
     }
 
@@ -283,10 +317,15 @@ export class CollaborationGateway
     if (!projectId || projectId !== data.projectId) return;
 
     const userId = client.data.userId;
-    const isOwner = await this.collaborationService.isProjectOwner(projectId, userId);
+    const isOwner = await this.collaborationService.isProjectOwner(
+      projectId,
+      userId,
+    );
     const role = await this.collaborationService.getUserRole(projectId, userId);
     if (!isOwner && role !== 'EDITOR') {
-      this.logger.warn(`Unauthorized slide:update attempt by ${userId} on ${projectId}`);
+      this.logger.warn(
+        `Unauthorized slide:update attempt by ${userId} on ${projectId}`,
+      );
       return;
     }
 
@@ -307,7 +346,10 @@ export class CollaborationGateway
     if (!projectId || projectId !== data.projectId) return;
 
     const userId = client.data.userId;
-    const isOwner = await this.collaborationService.isProjectOwner(projectId, userId);
+    const isOwner = await this.collaborationService.isProjectOwner(
+      projectId,
+      userId,
+    );
     const role = await this.collaborationService.getUserRole(projectId, userId);
     if (!isOwner && role !== 'EDITOR') {
       this.logger.warn(`Unauthorized slide:add by ${userId} on ${projectId}`);
@@ -330,10 +372,15 @@ export class CollaborationGateway
     if (!projectId || projectId !== data.projectId) return;
 
     const userId = client.data.userId;
-    const isOwner = await this.collaborationService.isProjectOwner(projectId, userId);
+    const isOwner = await this.collaborationService.isProjectOwner(
+      projectId,
+      userId,
+    );
     const role = await this.collaborationService.getUserRole(projectId, userId);
     if (!isOwner && role !== 'EDITOR') {
-      this.logger.warn(`Unauthorized slide:delete by ${userId} on ${projectId}`);
+      this.logger.warn(
+        `Unauthorized slide:delete by ${userId} on ${projectId}`,
+      );
       return;
     }
 
@@ -354,10 +401,15 @@ export class CollaborationGateway
     if (!projectId || projectId !== data.projectId) return;
 
     const userId = client.data.userId;
-    const isOwner = await this.collaborationService.isProjectOwner(projectId, userId);
+    const isOwner = await this.collaborationService.isProjectOwner(
+      projectId,
+      userId,
+    );
     const role = await this.collaborationService.getUserRole(projectId, userId);
     if (!isOwner && role !== 'EDITOR') {
-      this.logger.warn(`Unauthorized slide:reorder by ${userId} on ${projectId}`);
+      this.logger.warn(
+        `Unauthorized slide:reorder by ${userId} on ${projectId}`,
+      );
       return;
     }
 
@@ -385,10 +437,15 @@ export class CollaborationGateway
       return { success: false, error: 'User not in project' };
 
     const userId = client.data.userId;
-    const isOwner = await this.collaborationService.isProjectOwner(projectId, userId);
+    const isOwner = await this.collaborationService.isProjectOwner(
+      projectId,
+      userId,
+    );
     const role = await this.collaborationService.getUserRole(projectId, userId);
     if (!isOwner && role !== 'COMMENTER' && role !== 'EDITOR') {
-      this.logger.warn(`Unauthorized comment:add by ${userId} on project ${projectId}`);
+      this.logger.warn(
+        `Unauthorized comment:add by ${userId} on project ${projectId}`,
+      );
       return { success: false, error: 'Not allowed' };
     }
 
@@ -418,10 +475,15 @@ export class CollaborationGateway
     if (!projectId || projectId !== data.projectId) return;
 
     const userId = client.data.userId;
-    const isOwner = await this.collaborationService.isProjectOwner(projectId, userId);
+    const isOwner = await this.collaborationService.isProjectOwner(
+      projectId,
+      userId,
+    );
     const role = await this.collaborationService.getUserRole(projectId, userId);
     if (!isOwner && role !== 'EDITOR') {
-      this.logger.warn(`Unauthorized comment:resolve by ${userId} on ${projectId}`);
+      this.logger.warn(
+        `Unauthorized comment:resolve by ${userId} on ${projectId}`,
+      );
       return { success: false, error: 'Not allowed' };
     }
 
@@ -445,10 +507,15 @@ export class CollaborationGateway
     if (!projectId || projectId !== data.projectId) return;
 
     const userId = client.data.userId;
-    const isOwner = await this.collaborationService.isProjectOwner(projectId, userId);
+    const isOwner = await this.collaborationService.isProjectOwner(
+      projectId,
+      userId,
+    );
     const role = await this.collaborationService.getUserRole(projectId, userId);
     if (!isOwner && role !== 'EDITOR') {
-      this.logger.warn(`Unauthorized version:save by ${userId} on ${projectId}`);
+      this.logger.warn(
+        `Unauthorized version:save by ${userId} on ${projectId}`,
+      );
       return { success: false, error: 'Not allowed' };
     }
 
@@ -571,11 +638,11 @@ export class CollaborationGateway
     // Retrieve questions from Redis
     const key = `qa:${projectId}`;
     const rawQuestions = await this.redis.lrange(key, 0, -1);
-    const questions = rawQuestions.map((q) => JSON.parse(q));
+    const questions: QAQuestion[] = rawQuestions.map((q) => JSON.parse(q));
 
     // Find and update
     const questionIndex = questions.findIndex(
-      (q: unknown) => (q as any).id === data.questionId,
+      (q) => q.id === data.questionId,
     );
 
     if (
@@ -613,11 +680,11 @@ export class CollaborationGateway
     // Retrieve questions from Redis
     const key = `qa:${projectId}`;
     const rawQuestions = await this.redis.lrange(key, 0, -1);
-    const questions = rawQuestions.map((q) => JSON.parse(q));
+    const questions: QAQuestion[] = rawQuestions.map((q) => JSON.parse(q));
 
     // Find and update
     const questionIndex = questions.findIndex(
-      (q: unknown) => (q as any).id === (data as any).questionId,
+      (q) => q.id === data.questionId,
     );
 
     if (questionIndex !== -1) {
@@ -649,16 +716,12 @@ export class CollaborationGateway
 
     const key = `qa:${projectId}`;
     const rawQuestions = await this.redis.lrange(key, 0, -1);
-    const questions = rawQuestions
+    const questions: QAQuestion[] = rawQuestions
       .map((q) => JSON.parse(q))
-      .sort((a: unknown, b: unknown) => {
-        const aTyped = a as any;
-        const bTyped = b as any;
-        if (bTyped.upvotes !== aTyped.upvotes)
-          return bTyped.upvotes - aTyped.upvotes;
+      .sort((a: QAQuestion, b: QAQuestion) => {
+        if (b.upvotes !== a.upvotes) return b.upvotes - a.upvotes;
         return (
-          new Date(bTyped.timestamp).getTime() -
-          new Date(aTyped.timestamp).getTime()
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
         );
       });
 
@@ -761,7 +824,7 @@ export class CollaborationGateway
     const rawPoll = await this.redis.hget(pollKey, 'data');
     if (!rawPoll) return { success: false, error: 'Poll not found' };
 
-    const poll = JSON.parse(rawPoll);
+    const poll: Poll = JSON.parse(rawPoll);
 
     if (!poll || !poll.isActive) {
       return { success: false, error: 'Poll not found or inactive' };
@@ -815,7 +878,7 @@ export class CollaborationGateway
     const rawPoll = await this.redis.hget(pollKey, 'data');
     if (!rawPoll) return;
 
-    const poll = JSON.parse(rawPoll);
+    const poll: Poll = JSON.parse(rawPoll);
 
     poll.isActive = false;
     await this.redis.hset(pollKey, 'data', JSON.stringify(poll));
@@ -860,12 +923,12 @@ export class CollaborationGateway
     for (const pollId of activePollIds) {
       const rawPoll = await this.redis.hget(`poll:${pollId}`, 'data');
       if (rawPoll) {
-        const poll = JSON.parse(rawPoll);
+        const poll: Poll = JSON.parse(rawPoll);
         if (poll.isActive) {
           activePolls.push({
             id: poll.id,
             question: poll.question,
-            options: poll.options.map((o: any) => ({
+            options: poll.options.map((o) => ({
               id: o.id,
               text: o.text,
             })),

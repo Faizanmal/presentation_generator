@@ -878,8 +878,11 @@ export interface ContentResearch {
   topic: string;
   status: string;
   sources: ContentResearchSource[];
-  keyFindings: string[];
-  suggestedContent: object[];
+  // legacy/front-end-friendly fields (backend stores `summary` + `keywords`)
+  keyFindings?: string[];
+  summary?: string;
+  keywords?: string[];
+  suggestedContent?: object[];
   createdAt: string;
   updatedAt: string;
 }

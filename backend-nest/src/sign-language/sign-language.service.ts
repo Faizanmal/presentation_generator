@@ -1,9 +1,21 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
 
-type SignLanguageCode = 'ASL' | 'BSL' | 'JSL' | 'AUSLAN' | 'FSL' | 'DGS' | 'ISL';
+type SignLanguageCode =
+  | 'ASL'
+  | 'BSL'
+  | 'JSL'
+  | 'AUSLAN'
+  | 'FSL'
+  | 'DGS'
+  | 'ISL';
 
 interface AvatarConfig {
   style: 'realistic' | 'stylized' | 'minimal';
@@ -12,7 +24,7 @@ interface AvatarConfig {
   position: 'bottom-right' | 'bottom-left' | 'side-panel';
 }
 
-interface SignSequence {
+export interface SignSequence {
   text: string;
   signs: Array<{
     gloss: string;
@@ -42,11 +54,15 @@ export class SignLanguageService {
   /**
    * Configure sign language for a project
    */
-  async configureProject(projectId: string, userId: string, config: {
-    enabled: boolean;
-    language: SignLanguageCode;
-    avatarConfig?: AvatarConfig;
-  }) {
+  async configureProject(
+    projectId: string,
+    userId: string,
+    config: {
+      enabled: boolean;
+      language: SignLanguageCode;
+      avatarConfig?: AvatarConfig;
+    },
+  ) {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
     });
@@ -103,16 +119,21 @@ export class SignLanguageService {
       return {
         enabled: false,
         language: 'ASL',
-        avatarConfig: {
-          style: 'stylized',
-          speed: 'normal',
-          size: 'medium',
-          position: 'bottom-right',
-        },
+        avatarStyle: 'stylized',
+        avatarPosition: 'bottom-right',
+        avatarSize: 'medium',
+        speed: 'normal',
       };
     }
 
-    return config;
+    return {
+      enabled: config.enabled,
+      language: config.language,
+      avatarStyle: config.avatarStyle,
+      avatarPosition: config.avatarPosition,
+      avatarSize: config.avatarSize,
+      speed: config.speed,
+    };
   }
 
   /**
@@ -182,11 +203,11 @@ export class SignLanguageService {
 
     // Extract all text content
     const textContent: string[] = [];
-    
+
     if (slide.title) textContent.push(slide.title);
-    
+
     for (const block of slide.blocks) {
-      const content = block.content as { text?: string } || {};
+      const content = (block.content as { text?: string }) || {};
       if (content.text) {
         textContent.push(content.text);
       }
@@ -203,8 +224,8 @@ export class SignLanguageService {
         slideId,
         language,
         originalText: fullText,
-        glossSequence: translation.signs.map(s => s.gloss),
-        timing: translation.signs.map(s => s.duration),
+        glossSequence: translation.signs.map((s) => s.gloss),
+        timing: translation.signs.map((s) => s.duration),
         status: 'generated',
       },
     });
@@ -233,7 +254,11 @@ export class SignLanguageService {
   /**
    * Generate translations for entire project
    */
-  async translateProject(projectId: string, userId: string, language: SignLanguageCode = 'ASL') {
+  async translateProject(
+    projectId: string,
+    userId: string,
+    language: SignLanguageCode = 'ASL',
+  ) {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       include: { slides: true },
@@ -258,7 +283,7 @@ export class SignLanguageService {
       projectId,
       language,
       slides: results,
-      successCount: results.filter(r => r.status === 'success').length,
+      successCount: results.filter((r) => r.status === 'success').length,
     };
   }
 
@@ -270,10 +295,18 @@ export class SignLanguageService {
       { code: 'ASL', name: 'American Sign Language', country: 'USA' },
       { code: 'BSL', name: 'British Sign Language', country: 'UK' },
       { code: 'JSL', name: 'Japanese Sign Language', country: 'Japan' },
-      { code: 'AUSLAN', name: 'Australian Sign Language', country: 'Australia' },
+      {
+        code: 'AUSLAN',
+        name: 'Australian Sign Language',
+        country: 'Australia',
+      },
       { code: 'FSL', name: 'French Sign Language', country: 'France' },
       { code: 'DGS', name: 'German Sign Language', country: 'Germany' },
-      { code: 'ISL', name: 'International Sign Language', country: 'International' },
+      {
+        code: 'ISL',
+        name: 'International Sign Language',
+        country: 'International',
+      },
     ];
   }
 
@@ -291,10 +324,10 @@ export class SignLanguageService {
     return {
       embedCode: `<sign-language-avatar
         project-id="${projectId}"
-        language="${config.language}"
-        style="${config.avatarStyle}"
-        position="${config.avatarPosition}"
-        speed="${config.speed}"
+        language="${(config as any).language}"
+        style="${(config as any).avatarStyle}"
+        position="${(config as any).avatarPosition}"
+        speed="${(config as any).speed}"
       ></sign-language-avatar>`,
       scriptUrl: '/scripts/sign-language-avatar.js',
       config,
@@ -306,7 +339,7 @@ export class SignLanguageService {
    */
   async previewSign(word: string, language: SignLanguageCode = 'ASL') {
     const gloss = this.textToGloss(word);
-    
+
     return {
       word,
       language,

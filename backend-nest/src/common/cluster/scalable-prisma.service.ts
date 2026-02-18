@@ -1,6 +1,13 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, Prisma } from '@prisma/client';
+import { Pool } from 'pg';
 
 @Injectable()
 export class ScalablePrismaService
@@ -10,12 +17,14 @@ export class ScalablePrismaService
   private readonly logger = new Logger(ScalablePrismaService.name);
 
   constructor(private readonly configService: ConfigService) {
-    const connectionLimit = configService.get<number>('DATABASE_CONNECTION_LIMIT') || 10;
-    const poolTimeout = configService.get<number>('DATABASE_POOL_TIMEOUT') || 10;
-    
+    const connectionLimit =
+      configService.get<number>('DATABASE_CONNECTION_LIMIT') || 10;
+    const poolTimeout =
+      configService.get<number>('DATABASE_POOL_TIMEOUT') || 10;
+
     // Build connection URL with pooling parameters
-    let databaseUrl = configService.get<string>('DATABASE_URL') || '';
-    
+    const databaseUrl = configService.get<string>('DATABASE_URL') || '';
+
     // Add connection pooling parameters if not present
     const url = new URL(databaseUrl);
     if (!url.searchParams.has('connection_limit')) {
@@ -28,13 +37,12 @@ export class ScalablePrismaService
     if (!url.searchParams.has('statement_cache_size')) {
       url.searchParams.set('statement_cache_size', '100');
     }
-    
+
+    const pool = new Pool({ connectionString: url.toString() });
+    const adapter = new PrismaPg(pool);
+
     super({
-      datasources: {
-        db: {
-          url: url.toString(),
-        },
-      },
+      adapter,
       log: [
         { level: 'query', emit: 'event' },
         { level: 'warn', emit: 'event' },
@@ -61,10 +69,13 @@ export class ScalablePrismaService
     try {
       await this.$connect();
       this.logger.log('Database connection established');
-      
+
       // Log pool settings
-      const connectionLimit = this.configService.get<number>('DATABASE_CONNECTION_LIMIT') || 10;
-      this.logger.log(`Connection pool: ${connectionLimit} connections per instance`);
+      const connectionLimit =
+        this.configService.get<number>('DATABASE_CONNECTION_LIMIT') || 10;
+      this.logger.log(
+        `Connection pool: ${connectionLimit} connections per instance`,
+      );
     } catch (error) {
       this.logger.error(`Failed to connect to database: ${error}`);
       throw error;
@@ -85,19 +96,19 @@ export class ScalablePrismaService
     baseDelayMs: number = 100,
   ): Promise<T> {
     let lastError: Error | undefined;
-    
+
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         return await fn();
       } catch (error) {
         lastError = error as Error;
-        
+
         // Check if it's a retryable error
         const isRetryable = this.isRetryableError(error);
         if (!isRetryable || attempt === maxRetries - 1) {
           throw error;
         }
-        
+
         // Exponential backoff
         const delay = baseDelayMs * Math.pow(2, attempt);
         this.logger.warn(
@@ -106,7 +117,7 @@ export class ScalablePrismaService
         await this.sleep(delay);
       }
     }
-    
+
     throw lastError;
   }
 
@@ -114,7 +125,7 @@ export class ScalablePrismaService
     if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
       return false;
     }
-    
+
     // Retryable error codes
     const retryableCodes = [
       'P1001', // Can't reach database server
@@ -123,7 +134,7 @@ export class ScalablePrismaService
       'P1017', // Server has closed the connection
       'P2024', // Timed out fetching a new connection from the pool
     ];
-    
+
     return retryableCodes.includes(error.code);
   }
 

@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis, { Cluster as RedisCluster } from 'ioredis';
 
@@ -14,7 +19,8 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     const redisUrl = this.configService.get<string>('REDIS_URL');
-    const clusterMode = this.configService.get<string>('REDIS_CLUSTER_MODE') === 'true';
+    const clusterMode =
+      this.configService.get<string>('REDIS_CLUSTER_MODE') === 'true';
     const clusterNodes = this.configService.get<string>('REDIS_CLUSTER_NODES');
 
     if (clusterMode && clusterNodes) {
@@ -27,7 +33,10 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
       this.client = new RedisCluster(nodes, {
         redisOptions: {
           password: this.configService.get<string>('REDIS_PASSWORD'),
-          tls: this.configService.get<string>('REDIS_TLS') === 'true' ? {} : undefined,
+          tls:
+            this.configService.get<string>('REDIS_TLS') === 'true'
+              ? {}
+              : undefined,
         },
         scaleReads: 'slave', // Read from replicas for better performance
         enableReadyCheck: true,
@@ -39,7 +48,10 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
       this.subscriber = new RedisCluster(nodes, {
         redisOptions: {
           password: this.configService.get<string>('REDIS_PASSWORD'),
-          tls: this.configService.get<string>('REDIS_TLS') === 'true' ? {} : undefined,
+          tls:
+            this.configService.get<string>('REDIS_TLS') === 'true'
+              ? {}
+              : undefined,
         },
       });
 
@@ -91,8 +103,16 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   // Session storage methods
-  async setSession(sessionId: string, data: Record<string, unknown>, ttlSeconds: number = 86400) {
-    await this.client.setex(`session:${sessionId}`, ttlSeconds, JSON.stringify(data));
+  async setSession(
+    sessionId: string,
+    data: Record<string, unknown>,
+    ttlSeconds: number = 86400,
+  ) {
+    await this.client.setex(
+      `session:${sessionId}`,
+      ttlSeconds,
+      JSON.stringify(data),
+    );
   }
 
   async getSession(sessionId: string): Promise<Record<string, unknown> | null> {
@@ -151,7 +171,10 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
     await this.client.publish(channel, JSON.stringify(message));
   }
 
-  async subscribe(channel: string, handler: (message: Record<string, unknown>) => void) {
+  async subscribe(
+    channel: string,
+    handler: (message: Record<string, unknown>) => void,
+  ) {
     await this.subscriber.subscribe(channel);
     this.subscriber.on('message', (ch, msg) => {
       if (ch === channel) {

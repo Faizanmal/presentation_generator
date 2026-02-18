@@ -155,11 +155,17 @@ export class VRARService {
    */
   private async generateVRScenes(
     vrExportId: string,
-    slides: Array<{ id: string; title?: string | null; content: unknown; order: number }>,
+    slides: Array<{
+      id: string;
+      title?: string | null;
+      content: unknown;
+      order: number;
+    }>,
     config: VRConfig,
   ) {
-    const environment = this.environments[config.environment as keyof typeof this.environments] 
-      || this.environments.default;
+    const environment =
+      this.environments[config.environment as keyof typeof this.environments] ||
+      this.environments.default;
 
     for (const slide of slides) {
       const content = (slide.content || {}) as Record<string, unknown>;
@@ -185,10 +191,12 @@ export class VRARService {
             type: 'fade',
             duration: config.transitionDuration,
           },
-          spatialAudio: config.spatialAudio ? { 
-            enabled: true, 
-            position: { x: 0, y: 1.6, z: -2 } 
-          } : null,
+          spatialAudio: config.spatialAudio
+            ? {
+                enabled: true,
+                position: { x: 0, y: 1.6, z: -2 },
+              }
+            : (null as any),
         },
       });
     }
@@ -199,7 +207,7 @@ export class VRARService {
    */
   private convertSlideToVR3D(content: Record<string, unknown>) {
     const objects: VRSceneConfig['objects3d'] = [];
-    
+
     // Main content panel
     objects.push({
       type: 'panel',
@@ -259,7 +267,9 @@ export class VRARService {
     );
 
     // Content interaction hotspots
-    const links = content.links as Array<{ url: string; label: string }> | undefined;
+    const links = content.links as
+      | Array<{ url: string; label: string }>
+      | undefined;
     if (links && Array.isArray(links)) {
       links.forEach((link, index) => {
         hotspots.push({
@@ -292,7 +302,7 @@ export class VRARService {
 
       // Generate A-Frame HTML template
       const aframeHtml = this.generateAFrameTemplate(vrExport);
-      
+
       // In production, you would:
       // 1. Save this to S3/storage
       // 2. Generate optional compiled WebXR bundle
@@ -327,48 +337,55 @@ export class VRARService {
   /**
    * Generate A-Frame template for WebXR
    */
-  private generateAFrameTemplate(vrExport: { 
-    config: unknown; 
-    scenes: Array<{ 
-      order: number; 
-      environment: string; 
-      objects3d: unknown; 
-      hotspots: unknown 
-    }> 
+  private generateAFrameTemplate(vrExport: {
+    config: unknown;
+    scenes: Array<{
+      order: number;
+      environment: string;
+      objects3d: unknown;
+      hotspots: unknown;
+    }>;
   }): string {
     const config = vrExport.config as VRConfig;
     const scenes = vrExport.scenes.sort((a, b) => a.order - b.order);
 
-    const sceneElements = scenes.map((scene, index) => {
-      const objects = (scene.objects3d as VRSceneConfig['objects3d']) || [];
-      const hotspots = (scene.hotspots as VRSceneConfig['hotspots']) || [];
+    const sceneElements = scenes
+      .map((scene, index) => {
+        const objects = (scene.objects3d as VRSceneConfig['objects3d']) || [];
+        const hotspots = (scene.hotspots as VRSceneConfig['hotspots']) || [];
 
-      const objectsHtml = objects.map(obj => {
-        if (obj.type === 'text3d') {
-          return `<a-text value="${obj.content}" position="${obj.position.x} ${obj.position.y} ${obj.position.z}" scale="${obj.scale} ${obj.scale} ${obj.scale}" color="#ffffff" align="center"></a-text>`;
-        }
-        if (obj.type === 'panel') {
-          return `<a-plane position="${obj.position.x} ${obj.position.y} ${obj.position.z}" width="4" height="2.5" color="#1a1a2e" class="slide-panel" data-content='${obj.content}'></a-plane>`;
-        }
-        if (obj.type === 'image_panel') {
-          return `<a-image src="${obj.content}" position="${obj.position.x} ${obj.position.y} ${obj.position.z}" width="1.5" height="1" rotation="0 ${obj.rotation.y} 0"></a-image>`;
-        }
-        return '';
-      }).join('\n        ');
+        const objectsHtml = objects
+          .map((obj) => {
+            if (obj.type === 'text3d') {
+              return `<a-text value="${obj.content}" position="${obj.position.x} ${obj.position.y} ${obj.position.z}" scale="${obj.scale} ${obj.scale} ${obj.scale}" color="#ffffff" align="center"></a-text>`;
+            }
+            if (obj.type === 'panel') {
+              return `<a-plane position="${obj.position.x} ${obj.position.y} ${obj.position.z}" width="4" height="2.5" color="#1a1a2e" class="slide-panel" data-content='${obj.content}'></a-plane>`;
+            }
+            if (obj.type === 'image_panel') {
+              return `<a-image src="${obj.content}" position="${obj.position.x} ${obj.position.y} ${obj.position.z}" width="1.5" height="1" rotation="0 ${obj.rotation.y} 0"></a-image>`;
+            }
+            return '';
+          })
+          .join('\n        ');
 
-      const hotspotsHtml = hotspots.map(h => 
-        `<a-sphere position="${h.position.x} ${h.position.y} ${h.position.z}" radius="0.1" color="#4CAF50" class="hotspot" data-action="${h.action}">
+        const hotspotsHtml = hotspots
+          .map(
+            (h) =>
+              `<a-sphere position="${h.position.x} ${h.position.y} ${h.position.z}" radius="0.1" color="#4CAF50" class="hotspot" data-action="${h.action}">
           <a-text value="${h.label}" position="0 0.2 0" align="center" scale="0.3 0.3 0.3"></a-text>
-        </a-sphere>`
-      ).join('\n        ');
+        </a-sphere>`,
+          )
+          .join('\n        ');
 
-      return `
+        return `
       <!-- Scene ${index + 1} -->
       <a-entity id="scene-${index}" class="vr-scene" visible="${index === 0}">
         ${objectsHtml}
         ${hotspotsHtml}
       </a-entity>`;
-    }).join('\n');
+      })
+      .join('\n');
 
     return `<!DOCTYPE html>
 <html>
@@ -511,7 +528,10 @@ export class VRARService {
   /**
    * Generate AR.js marker HTML
    */
-  async generateARMarkerHTML(overlayId: string, userId: string): Promise<string> {
+  async generateARMarkerHTML(
+    overlayId: string,
+    userId: string,
+  ): Promise<string> {
     const overlay = await this.prisma.aROverlay.findUnique({
       where: { id: overlayId },
     });
@@ -521,16 +541,20 @@ export class VRARService {
     }
 
     const content3d = overlay.content3d as AROverlayConfig['content3d'];
-    const animations = (overlay.animations || []) as AROverlayConfig['animations'];
+    const animations = (overlay.animations ||
+      []) as AROverlayConfig['animations'];
 
     const primitives = content3d.primitives || [];
-    const primitivesHtml = primitives.map(p => {
-      const animHtml = animations && animations.length > 0 
-        ? `animation="${animations.map(a => `property: ${a.property}; from: ${a.from}; to: ${a.to}; dur: ${a.duration}; loop: ${a.loop}`).join('; ')}"`
-        : '';
-      
-      return `<a-${p.type} position="${p.position.x} ${p.position.y} ${p.position.z}" color="${p.material.color}" opacity="${p.material.opacity}" ${animHtml}></a-${p.type}>`;
-    }).join('\n        ');
+    const primitivesHtml = primitives
+      .map((p) => {
+        const animHtml =
+          animations && animations.length > 0
+            ? `animation="${animations.map((a) => `property: ${a.property}; from: ${a.from}; to: ${a.to}; dur: ${a.duration}; loop: ${a.loop}`).join('; ')}"`
+            : '';
+
+        return `<a-${p.type} position="${p.position.x} ${p.position.y} ${p.position.z}" color="${p.material.color}" opacity="${p.material.opacity}" ${animHtml}></a-${p.type}>`;
+      })
+      .join('\n        ');
 
     return `<!DOCTYPE html>
 <html>

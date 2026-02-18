@@ -31,6 +31,22 @@ export interface WebPageContent {
   url: string;
 }
 
+// Permissive Allowlist for URL Import
+const ALLOWED_DOMAINS = [
+  'wikipedia.org',
+  'wikimedia.org',
+  'creativecommons.org',
+  'gov', // .gov domains
+  'edu', // .edu domains
+  'unsplash.com',
+  'pexels.com',
+  'pixabay.com',
+  'medium.com', // Often has cc content, but needs check, strict allowlist requested so maybe careful.
+  // Adding specific permissive documentation sites could be good too.
+  'github.com', // Readmes are often MIT
+  'stackoverflow.com', // CC-BY-SA
+];
+
 @Injectable()
 export class URLImportService {
   private readonly logger = new Logger(URLImportService.name);
@@ -60,6 +76,13 @@ export class URLImportService {
 
     this.logger.log(`Importing from URL: ${url}`);
 
+    // Validate Domain
+    if (!this.isDomainAllowed(url)) {
+      throw new BadRequestException(
+        'Domain not in allowlist. Please use only approved permissive sources (e.g., Wikipedia, Creative Commons, Government/Edu sites).',
+      );
+    }
+
     // Step 1: Fetch and parse the webpage content
     const pageContent = await this.fetchPageContent(url);
 
@@ -83,16 +106,26 @@ export class URLImportService {
   }
 
   /**
+   * Check if domain is in allowlist
+   */
+  private isDomainAllowed(url: string): boolean {
+    try {
+      const hostname = new URL(url).hostname;
+      return ALLOWED_DOMAINS.some((domain) => hostname.endsWith(domain));
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Fetch and parse webpage content
    */
   private async fetchPageContent(url: string): Promise<WebPageContent> {
     try {
-      // Use a simple fetch to get the page content
-      // In production, you might want to use a headless browser for JS-rendered content
+      // Use a proper User-Agent to identify the bot
       const response = await fetch(url, {
         headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'User-Agent': 'PresentationDesignerBot/1.0 (+http://your-domain.com)',
           Accept:
             'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         },
@@ -351,7 +384,8 @@ ${pageContent.content}`,
   /**
    * Import from PDF URL
    */
-  importFromPDF(_pdfUrl: string): URLImportResult {
+  importFromPDF(pdfUrl: string): URLImportResult {
+    void pdfUrl;
     // For PDF extraction, you'd typically use a service like pdf.js or a cloud API
     // This is a placeholder that would need proper PDF parsing implementation
     throw new BadRequestException(

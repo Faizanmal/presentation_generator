@@ -792,7 +792,7 @@ export class AnalyticsService {
 
   async generateDetailedRecommendations(
     projectId: string,
-    presentationContent?: any,
+    presentationContent?: Record<string, unknown> | null,
   ): Promise<{
     recommendations: Array<{
       category: string;
@@ -879,7 +879,14 @@ Provide 5-8 specific, actionable recommendations based on the data patterns.`;
   }
 
   private getDefaultRecommendations(summary: AnalyticsSummary) {
-    const recommendations: any[] = [];
+    const recommendations: Array<{
+      category: string;
+      title: string;
+      description: string;
+      priority: 'high' | 'medium' | 'low';
+      impact: string;
+      implementation: string;
+    }> = [];
 
     if (summary.completionRate < 0.5) {
       recommendations.push({
@@ -1072,7 +1079,7 @@ Provide 5-8 specific, actionable recommendations based on the data patterns.`;
       sumY = 0,
       sumXY = 0,
       sumX2 = 0;
-    entries.forEach(([_, views], index) => {
+    entries.forEach(([, views], index) => {
       sumX += index;
       sumY += views;
       sumXY += index * views;
@@ -1248,11 +1255,11 @@ Provide 5-8 specific, actionable recommendations based on the data patterns.`;
     };
   }
 
-  private async generateAudienceInsights(
+  private generateAudienceInsights(
     devices: Map<string, number>,
     engagement: { high: number; medium: number; low: number },
     total: number,
-  ): Promise<string[]> {
+  ): string[] {
     const insights: string[] = [];
 
     const mobilePercent = ((devices.get('mobile') || 0) / total) * 100;
@@ -1351,8 +1358,8 @@ Provide 5-8 specific, actionable optimization suggestions in JSON format:
       }
 
       return JSON.parse(content);
-    } catch (error) {
-      this.logger.error('Failed to generate optimization suggestions', error);
+    } catch (err) {
+      this.logger.error('Failed to generate optimization suggestions', err);
       return {
         suggestions: this.getDefaultOptimizations(targetSlides),
       };
@@ -1360,7 +1367,14 @@ Provide 5-8 specific, actionable optimization suggestions in JSON format:
   }
 
   private getDefaultOptimizations(slides: SlideMetrics[]) {
-    const suggestions: any[] = [];
+    const suggestions: Array<{
+      slideNumber: number;
+      type: string;
+      issue: string;
+      suggestion: string;
+      priority: string;
+      expectedImpact: string;
+    }> = [];
 
     const highDropoffSlides = slides.filter((s) => s.dropOffRate > 30);
     highDropoffSlides.forEach((slide) => {

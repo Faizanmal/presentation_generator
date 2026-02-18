@@ -6,13 +6,16 @@ import {
   Body,
   BadRequestException,
   UseGuards,
-  Get,
   Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { DataImportService } from './data-import.service';
-import { ImportDataDto, DataImportSourceEnum } from './dto/data-import.dto';
+import {
+  ImportDataDto,
+  DataImportSourceEnum,
+  ParsedDataResult,
+} from './dto/data-import.dto';
 import { ProjectsService } from '../projects/projects.service';
 
 @Controller('ai/data-import')
@@ -69,9 +72,9 @@ export class DataImportController {
       : DataImportSourceEnum.CSV;
 
     // Parse file based on type
-    let parsedData;
+    let parsedData: ParsedDataResult;
     if (source === DataImportSourceEnum.EXCEL) {
-      parsedData = await this.dataImportService.parseExcel(
+      parsedData = this.dataImportService.parseExcel(
         file.buffer,
         file.originalname,
         importDto.sheetName,
@@ -85,7 +88,7 @@ export class DataImportController {
     }
 
     // Analyze the data
-    const analysis = await this.dataImportService.analyzeData(parsedData);
+    const analysis = this.dataImportService.analyzeData(parsedData);
 
     return {
       success: true,
@@ -119,9 +122,9 @@ export class DataImportController {
       file.originalname.toLowerCase().endsWith('.xlsx') ||
       file.originalname.toLowerCase().endsWith('.xls');
 
-    let parsedData;
+    let parsedData: ParsedDataResult;
     if (isExcel) {
-      parsedData = await this.dataImportService.parseExcel(
+      parsedData = this.dataImportService.parseExcel(
         file.buffer,
         file.originalname,
         importDto.sheetName,
@@ -168,12 +171,12 @@ export class DataImportController {
    */
   @Post('preview-sheets')
   @UseInterceptors(FileInterceptor('file'))
-  async previewExcelSheets(@UploadedFile() file: Express.Multer.File) {
+  previewExcelSheets(@UploadedFile() file: Express.Multer.File) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
 
-    const sheets = await this.dataImportService.getExcelSheets(file.buffer);
+    const sheets = this.dataImportService.getExcelSheets(file.buffer);
 
     return {
       success: true,
@@ -202,9 +205,9 @@ export class DataImportController {
       file.originalname.toLowerCase().endsWith('.xlsx') ||
       file.originalname.toLowerCase().endsWith('.xls');
 
-    let parsedData;
+    let parsedData: ParsedDataResult;
     if (isExcel) {
-      parsedData = await this.dataImportService.parseExcel(
+      parsedData = this.dataImportService.parseExcel(
         file.buffer,
         file.originalname,
         sheetName,
@@ -217,7 +220,7 @@ export class DataImportController {
       );
     }
 
-    const analysis = await this.dataImportService.analyzeData(parsedData);
+    const analysis = this.dataImportService.analyzeData(parsedData);
 
     return {
       success: true,

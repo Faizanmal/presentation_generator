@@ -1,4 +1,9 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import * as crypto from 'crypto';
@@ -35,13 +40,21 @@ export class IoTIntegrationService {
   /**
    * Register IoT device
    */
-  async registerDevice(userId: string, device: {
-    name: string;
-    type: 'presenter-remote' | 'smart-display' | 'smart-watch' | 'smart-speaker' | 'custom';
-    capabilities: DeviceCapabilities;
-    manufacturer?: string;
-    model?: string;
-  }) {
+  async registerDevice(
+    userId: string,
+    device: {
+      name: string;
+      type:
+        | 'presenter-remote'
+        | 'smart-display'
+        | 'smart-watch'
+        | 'smart-speaker'
+        | 'custom';
+      capabilities: DeviceCapabilities;
+      manufacturer?: string;
+      model?: string;
+    },
+  ) {
     const deviceToken = `iot_${crypto.randomBytes(24).toString('hex')}`;
 
     return this.prisma.ioTDevice.create({
@@ -124,7 +137,7 @@ export class IoTIntegrationService {
       where: { userId, status: { not: 'revoked' } },
     });
 
-    return devices.map(d => ({
+    return devices.map((d) => ({
       ...d,
       state: this.deviceStates.get(d.id) || { connected: false },
     }));
@@ -153,7 +166,7 @@ export class IoTIntegrationService {
       'pointer-off': 'pointerControl',
       'start-timer': 'timer',
       'stop-timer': 'timer',
-      'annotate': 'annotations',
+      annotate: 'annotations',
       'laser-on': 'laserPointer',
       'laser-off': 'laserPointer',
     };
@@ -206,12 +219,15 @@ export class IoTIntegrationService {
   /**
    * Handle device event
    */
-  async handleDeviceEvent(deviceId: string, event: {
-    type: string;
-    data?: object;
-  }) {
+  async handleDeviceEvent(
+    deviceId: string,
+    event: {
+      type: string;
+      data?: object;
+    },
+  ) {
     const state = this.deviceStates.get(deviceId);
-    
+
     if (!state) {
       throw new BadRequestException('Device not connected');
     }
@@ -223,21 +239,21 @@ export class IoTIntegrationService {
           lastPing: new Date(),
         });
         break;
-      
+
       case 'battery-update':
         this.deviceStates.set(deviceId, {
           ...state,
           battery: (event.data as { level?: number })?.level,
         });
         break;
-      
+
       case 'slide-changed':
         this.deviceStates.set(deviceId, {
           ...state,
           currentSlide: (event.data as { slide?: number })?.slide,
         });
         break;
-      
+
       case 'disconnected':
         this.deviceStates.set(deviceId, {
           ...state,

@@ -6,30 +6,19 @@ import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  Sparkles,
-  Plus,
   Search,
   LayoutGrid,
   List,
-  MoreVertical,
-  Pencil,
-  Copy,
-  Trash2,
-  ExternalLink,
-  Download,
   Loader2,
   FileText,
-  Clock,
+  Plus,
   Wand2,
-  LogOut,
-  Settings,
-  CreditCard,
-  User,
-  ChevronDown,
-  Star,
+  Sparkles,
+  Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input }
+  from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -68,18 +57,27 @@ import {
   FavoritesRecentPanel,
 } from "@/components/ui/favorites-recent";
 import { FeaturesHub } from "@/components/dashboard/features-hub";
+import {
+  StatCard,
+  StatsGrid,
+  QuickActionsGrid,
+  UsageCard
+} from "@/components/ui/dashboard-widgets";
+import { ProjectCard } from "@/components/ui/project-card";
 
 
 export default function DashboardPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { user, subscription, logout, isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const { user, subscription, isAuthenticated, isLoading: authLoading } = useAuthStore();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
+
+  // Create Project Modal
 
   // Favorites and recent projects
   const { favorites, toggleFavorite, isFavorite } = useFavorites();
@@ -167,11 +165,7 @@ export default function DashboardPage() {
     createProjectMutation.mutate({ title: "Untitled Presentation", type: "PRESENTATION" });
   };
 
-  // Handle logout
-  const handleLogout = () => {
-    logout();
-    router.push("/");
-  };
+
 
   if (authLoading) {
     return (
@@ -182,92 +176,11 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      {/* New Design Banner */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-center py-2 px-4 shadow-sm">
-        <p className="text-sm font-medium flex items-center justify-center gap-2">
-          New: Try the redesigned Presentation Editor experience!
-          <Link href="/dashboard-v2" className="underline hover:text-blue-100 font-bold ml-1 flex items-center">
-            Switch to V2 <span className="material-symbols-outlined text-sm ml-1">arrow_forward</span>
-          </Link>
-        </p>
-      </div>
+    <div className="space-y-8">
 
-      {/* Header */}
-      <header className="bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                <Sparkles className="h-5 w-5 text-white" />
-              </div>
-              <span className="text-xl font-bold text-slate-900 dark:text-white">
-                Presentation Designer
-              </span>
-            </Link>
-
-            <div className="flex items-center gap-4">
-              {/* Usage indicator */}
-              {subscription && (
-                <div className="hidden sm:flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                  <span>
-                    {subscription.aiGenerationsUsed}/{subscription.aiGenerationsLimit} AI generations
-                  </span>
-                  {subscription.plan === "FREE" && (
-                    <Button size="sm" variant="outline" asChild>
-                      <Link href="/settings/billing">Upgrade</Link>
-                    </Button>
-                  )}
-                </div>
-              )}
-
-              {/* User menu */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-medium">
-                      {user?.name?.charAt(0).toUpperCase() || "U"}
-                    </div>
-                    <span className="hidden sm:inline text-slate-700 dark:text-slate-300">
-                      {user?.name}
-                    </span>
-                    <ChevronDown className="h-4 w-4 text-slate-500" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <div className="px-3 py-2">
-                    <p className="font-medium">{user?.name}</p>
-                    <p className="text-sm text-slate-500">{user?.email}</p>
-                  </div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem>
-                    <User className="mr-2 h-4 w-4" />
-                    Profile
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/settings/billing">
-                      <CreditCard className="mr-2 h-4 w-4" />
-                      Billing
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Settings className="mr-2 h-4 w-4" />
-                    Settings
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="text-red-600">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Log out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        </div>
-      </header>
 
       {/* Main content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="space-y-8">
         {/* V2 Experience Card */}
         <div className="bg-white dark:bg-slate-950 rounded-xl border border-blue-200 dark:border-slate-800 p-6 mb-8 shadow-sm relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
@@ -306,6 +219,24 @@ export default function DashboardPage() {
               </Button>
             </div>
           </div>
+        </div>
+
+        {/* Stats & Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+          <UsageCard
+            plan={subscription?.plan || "free"}
+            presentations={{ used: projects?.length || 0, total: 100 }} // Mock limit
+            aiGenerations={{ used: subscription?.aiGenerationsUsed || 0, total: subscription?.aiGenerationsLimit || 10 }}
+          />
+          <QuickActionsGrid
+            onCreateNew={() => setIsCreateModalOpen(true)}
+            onAIGenerate={() => {
+              setIsCreateModalOpen(true);
+              // Pre-select AI mode could be implemented here
+            }}
+            onViewAnalytics={() => router.push("/dashboard/analytics")}
+            onInviteTeam={() => toast.info("Team invitation coming soon!")}
+          />
         </div>
 
         {/* Features Hub */}
@@ -397,30 +328,34 @@ export default function DashboardPage() {
               <ProjectCard
                 key={project.id}
                 project={project}
-                onEdit={() => router.push(`/editor/${project.id}`)}
-                onDuplicate={() => duplicateProjectMutation.mutate(project.id)}
-                onDelete={() => setDeleteProjectId(project.id)}
+                onOpen={(id) => router.push(`/editor/${id}`)}
+                onEdit={(id) => router.push(`/editor/${id}`)}
+                onDuplicate={(id) => duplicateProjectMutation.mutate(id)}
+                onDelete={(id) => setDeleteProjectId(id)}
                 isFavorite={isFavorite(project.id)}
-                onToggleFavorite={() => toggleFavorite(project.id)}
+                onToggleFavorite={(id) => toggleFavorite(id)}
+                variant="grid"
               />
             ))}
           </div>
         ) : (
           <div className="space-y-2">
             {filteredProjects?.map((project) => (
-              <ProjectListItem
+              <ProjectCard
                 key={project.id}
                 project={project}
-                onEdit={() => router.push(`/editor/${project.id}`)}
-                onDuplicate={() => duplicateProjectMutation.mutate(project.id)}
-                onDelete={() => setDeleteProjectId(project.id)}
+                onOpen={(id) => router.push(`/editor/${id}`)}
+                onEdit={(id) => router.push(`/editor/${id}`)}
+                onDuplicate={(id) => duplicateProjectMutation.mutate(id)}
+                onDelete={(id) => setDeleteProjectId(id)}
                 isFavorite={isFavorite(project.id)}
-                onToggleFavorite={() => toggleFavorite(project.id)}
+                onToggleFavorite={(id) => toggleFavorite(id)}
+                variant="list"
               />
             ))}
           </div>
         )}
-      </main>
+      </div>
 
       {/* Create Modal */}
       <CreateProjectModal
@@ -477,191 +412,6 @@ export default function DashboardPage() {
         open={showKeyboardShortcuts}
         onOpenChange={setShowKeyboardShortcuts}
       />
-    </div>
-  );
-}
-
-
-// Project Card Component
-function ProjectCard({
-  project,
-  onEdit,
-  onDuplicate,
-  onDelete,
-  isFavorite,
-  onToggleFavorite,
-}: {
-  project: Project;
-  onEdit: () => void;
-  onDuplicate: () => void;
-  onDelete: () => void;
-  isFavorite: boolean;
-  onToggleFavorite: () => void;
-}) {
-  const slideCount = project._count?.slides || project.slides?.length || 0;
-
-  return (
-    <div className="group bg-white dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden hover:shadow-lg transition-shadow">
-      {/* Thumbnail */}
-      <div
-        className="aspect-[16/10] bg-linear-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 relative cursor-pointer"
-        onClick={onEdit}
-      >
-        <div className="absolute inset-0 flex items-center justify-center">
-          <FileText className="h-12 w-12 text-slate-300 dark:text-slate-600" />
-        </div>
-        {/* Favorite button in thumbnail */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleFavorite();
-          }}
-          className={`absolute top-2 right-2 p-1.5 rounded-full transition-all ${isFavorite
-            ? "bg-yellow-100 text-yellow-500"
-            : "bg-white/80 text-slate-400 opacity-0 group-hover:opacity-100"
-            } hover:scale-110`}
-        >
-          <Star className={`h-4 w-4 ${isFavorite ? "fill-current" : ""}`} />
-        </button>
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-          <Button size="sm" variant="secondary">
-            <Pencil className="h-4 w-4 mr-2" />
-            Edit
-          </Button>
-        </div>
-      </div>
-
-      {/* Info */}
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            <h3 className="font-medium text-slate-900 dark:text-white truncate">{project.title}</h3>
-            <p className="text-sm text-slate-500 flex items-center gap-2 mt-1">
-              <Clock className="h-3 w-3" />
-              {new Date(project.updatedAt).toLocaleDateString()}
-              <span>•</span>
-              {slideCount} slide{slideCount !== 1 ? "s" : ""}
-            </p>
-          </div>
-
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onEdit}>
-                <Pencil className="mr-2 h-4 w-4" />
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onDuplicate}>
-                <Copy className="mr-2 h-4 w-4" />
-                Duplicate
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <ExternalLink className="mr-2 h-4 w-4" />
-                Share
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Download className="mr-2 h-4 w-4" />
-                Export
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onDelete} className="text-red-600">
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Project List Item Component
-function ProjectListItem({
-  project,
-  onEdit,
-  onDuplicate,
-  onDelete,
-  isFavorite,
-  onToggleFavorite,
-}: {
-  project: Project;
-  onEdit: () => void;
-  onDuplicate: () => void;
-  onDelete: () => void;
-  isFavorite: boolean;
-  onToggleFavorite: () => void;
-}) {
-  const slideCount = project._count?.slides || project.slides?.length || 0;
-
-  return (
-    <div className="bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 p-4 flex items-center gap-4 hover:shadow-md transition-shadow">
-      <div className="h-16 w-24 bg-linear-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 rounded flex items-center justify-center flex-shrink-0 relative">
-        <FileText className="h-8 w-8 text-slate-300 dark:text-slate-600" />
-      </div>
-
-      {/* Favorite button */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleFavorite();
-        }}
-        className={`p-1.5 rounded-full transition-all ${isFavorite
-          ? "text-yellow-500"
-          : "text-slate-300 hover:text-yellow-500"
-          }`}
-      >
-        <Star className={`h-5 w-5 ${isFavorite ? "fill-current" : ""}`} />
-      </button>
-
-      <div className="flex-1 min-w-0">
-        <h3 className="font-medium text-slate-900 dark:text-white truncate">{project.title}</h3>
-        <p className="text-sm text-slate-500 flex items-center gap-2 mt-1">
-          <Clock className="h-3 w-3" />
-          {new Date(project.updatedAt).toLocaleDateString()}
-          <span>•</span>
-          {slideCount} slide{slideCount !== 1 ? "s" : ""}
-        </p>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" onClick={onEdit}>
-          <Pencil className="h-4 w-4 mr-2" />
-          Edit
-        </Button>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onDuplicate}>
-              <Copy className="mr-2 h-4 w-4" />
-              Duplicate
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <ExternalLink className="mr-2 h-4 w-4" />
-              Share
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Download className="mr-2 h-4 w-4" />
-              Export
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onDelete} className="text-red-600">
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
     </div>
   );
 }
@@ -734,6 +484,7 @@ function CreateProjectModal({
               <button
                 onClick={onCreateBlank}
                 className="flex flex-col items-center gap-3 p-6 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/20 transition-colors"
+                type="button"
               >
                 <div className="h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                   <FileText className="h-6 w-6 text-slate-600 dark:text-slate-400" />
@@ -747,6 +498,7 @@ function CreateProjectModal({
               <button
                 onClick={() => setMode("generate")}
                 className="flex flex-col items-center gap-3 p-6 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-950/20 transition-colors"
+                type="button"
               >
                 <div className="h-12 w-12 rounded-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center">
                   <Wand2 className="h-6 w-6 text-white" />
@@ -885,3 +637,6 @@ function CreateProjectModal({
     </Dialog>
   );
 }
+
+
+

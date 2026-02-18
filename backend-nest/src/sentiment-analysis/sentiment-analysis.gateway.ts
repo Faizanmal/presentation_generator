@@ -24,7 +24,9 @@ interface SentimentSocket extends Socket {
     credentials: true,
   },
 })
-export class SentimentAnalysisGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class SentimentAnalysisGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server: Server;
 
@@ -43,7 +45,8 @@ export class SentimentAnalysisGateway implements OnGatewayConnection, OnGatewayD
   @SubscribeMessage('joinSession')
   async handleJoinSession(
     @ConnectedSocket() client: SentimentSocket,
-    @MessageBody() data: { sessionId: string; userId?: string; isHost?: boolean },
+    @MessageBody()
+    data: { sessionId: string; userId?: string; isHost?: boolean },
   ) {
     try {
       client.sessionId = data.sessionId;
@@ -56,7 +59,9 @@ export class SentimentAnalysisGateway implements OnGatewayConnection, OnGatewayD
         client.join(`sentiment:${data.sessionId}:host`);
       }
 
-      const current = await this.sentimentService.getCurrentSentiment(data.sessionId);
+      const current = await this.sentimentService.getCurrentSentiment(
+        data.sessionId,
+      );
 
       client.emit('joined', { currentSentiment: current });
     } catch (error) {
@@ -112,7 +117,8 @@ export class SentimentAnalysisGateway implements OnGatewayConnection, OnGatewayD
   @SubscribeMessage('expression')
   async handleExpression(
     @ConnectedSocket() client: SentimentSocket,
-    @MessageBody() data: {
+    @MessageBody()
+    data: {
       happy: number;
       sad: number;
       angry: number;
@@ -142,7 +148,9 @@ export class SentimentAnalysisGateway implements OnGatewayConnection, OnGatewayD
     }
 
     try {
-      const metrics = await this.sentimentService.createSnapshot(client.sessionId);
+      const metrics = await this.sentimentService.createSnapshot(
+        client.sessionId,
+      );
 
       // Send to all hosts for this session
       this.server.to(`sentiment:${client.sessionId}:host`).emit('snapshot', {
@@ -162,7 +170,9 @@ export class SentimentAnalysisGateway implements OnGatewayConnection, OnGatewayD
     }
 
     try {
-      const current = await this.sentimentService.getCurrentSentiment(client.sessionId);
+      const current = await this.sentimentService.getCurrentSentiment(
+        client.sessionId,
+      );
       client.emit('currentSentiment', current);
     } catch (error) {
       client.emit('error', { message: 'Failed to get sentiment' });
@@ -177,7 +187,10 @@ export class SentimentAnalysisGateway implements OnGatewayConnection, OnGatewayD
     }
 
     try {
-      const session = await this.sentimentService.endSession(client.sessionId, client.userId);
+      const session = await this.sentimentService.endSession(
+        client.sessionId,
+        client.userId,
+      );
 
       this.server.to(`sentiment:${client.sessionId}`).emit('sessionEnded', {
         message: 'Sentiment tracking session ended',

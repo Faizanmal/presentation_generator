@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
 
-interface PredictionMetrics {
+export interface PredictionMetrics {
   engagement: number;
   completion: number;
   conversion: number;
@@ -11,7 +11,7 @@ interface PredictionMetrics {
   overallScore: number;
 }
 
-interface EngagementFactors {
+export interface EngagementFactors {
   slideCount: number;
   averageWordsPerSlide: number;
   imageRatio: number;
@@ -58,7 +58,10 @@ export class PredictiveAnalyticsService {
     const predictions = this.predictMetrics(factors);
 
     // Generate AI recommendations
-    const recommendations = await this.generateRecommendations(factors, predictions);
+    const recommendations = await this.generateRecommendations(
+      factors,
+      predictions,
+    );
 
     // Store prediction
     const insight = await this.prisma.predictiveInsight.create({
@@ -101,16 +104,16 @@ export class PredictiveAnalyticsService {
     slides: Array<{ blocks: Array<{ blockType: string; content: unknown }> }>;
   }): EngagementFactors {
     const slides = project.slides;
-    const totalBlocks = slides.flatMap(s => s.blocks);
+    const totalBlocks = slides.flatMap((s) => s.blocks);
 
     let totalWords = 0;
     let imageCount = 0;
     let videoCount = 0;
     let interactiveCount = 0;
 
-    totalBlocks.forEach(block => {
-      const content = block.content as { text?: string } || {};
-      
+    totalBlocks.forEach((block) => {
+      const content = (block.content as { text?: string }) || {};
+
       if (content.text) {
         totalWords += content.text.split(/\s+/).length;
       }
@@ -124,7 +127,8 @@ export class PredictiveAnalyticsService {
 
     const slideCount = slides.length;
     const averageWordsPerSlide = slideCount > 0 ? totalWords / slideCount : 0;
-    const imageRatio = totalBlocks.length > 0 ? imageCount / totalBlocks.length : 0;
+    const imageRatio =
+      totalBlocks.length > 0 ? imageCount / totalBlocks.length : 0;
 
     return {
       slideCount,
@@ -150,7 +154,10 @@ export class PredictiveAnalyticsService {
     }
 
     // Words per slide (optimal: 30-60 words)
-    if (factors.averageWordsPerSlide >= 30 && factors.averageWordsPerSlide <= 60) {
+    if (
+      factors.averageWordsPerSlide >= 30 &&
+      factors.averageWordsPerSlide <= 60
+    ) {
       engagement += 0.1;
     } else if (factors.averageWordsPerSlide > 100) {
       engagement -= 0.15;
@@ -195,7 +202,11 @@ export class PredictiveAnalyticsService {
     shareability = Math.max(0, Math.min(1, shareability));
     conversion = Math.max(0, Math.min(1, conversion));
 
-    const overallScore = (engagement * 0.4 + completion * 0.3 + shareability * 0.2 + conversion * 0.1);
+    const overallScore =
+      engagement * 0.4 +
+      completion * 0.3 +
+      shareability * 0.2 +
+      conversion * 0.1;
 
     return {
       engagement: Math.round(engagement * 100) / 100,
@@ -217,11 +228,15 @@ export class PredictiveAnalyticsService {
 
     // Rule-based recommendations
     if (factors.slideCount > 20) {
-      recommendations.push('Consider reducing slide count to under 20 for better completion rates');
+      recommendations.push(
+        'Consider reducing slide count to under 20 for better completion rates',
+      );
     }
 
     if (factors.averageWordsPerSlide > 80) {
-      recommendations.push('Reduce text density - aim for 30-60 words per slide');
+      recommendations.push(
+        'Reduce text density - aim for 30-60 words per slide',
+      );
     }
 
     if (factors.imageRatio < 0.3) {
@@ -229,15 +244,21 @@ export class PredictiveAnalyticsService {
     }
 
     if (factors.interactiveElements === 0) {
-      recommendations.push('Add polls, quizzes, or interactive elements to boost engagement');
+      recommendations.push(
+        'Add polls, quizzes, or interactive elements to boost engagement',
+      );
     }
 
     if (!factors.videosIncluded) {
-      recommendations.push('Consider adding video content for higher shareability');
+      recommendations.push(
+        'Consider adding video content for higher shareability',
+      );
     }
 
     if (predictions.engagement < 0.5) {
-      recommendations.push('Overall engagement is low - consider restructuring content');
+      recommendations.push(
+        'Overall engagement is low - consider restructuring content',
+      );
     }
 
     // AI-powered recommendations for more specific advice
@@ -252,10 +273,10 @@ export class PredictiveAnalyticsService {
 - Predicted engagement: ${Math.round(predictions.engagement * 100)}%
 
 Return only the recommendations, one per line.`,
-          { maxTokens: 100 }
+          { maxTokens: 100 },
         );
 
-        const aiRecs = aiRecommendations.split('\n').filter(r => r.trim());
+        const aiRecs = aiRecommendations.split('\n').filter((r) => r.trim());
         recommendations.push(...aiRecs.slice(0, 2));
       } catch {
         // Use rule-based only if AI fails
@@ -329,14 +350,22 @@ Return only the recommendations, one per line.`,
   /**
    * Calculate prediction accuracy
    */
-  private async calculateAccuracy(predictions: { actualEngagement?: number | null; actualCompletion?: number | null; predictedEngagement: number; predictedCompletion: number }, analytics: { _avg: { viewDuration?: number | null } }): Promise<number | null> {
+  private async calculateAccuracy(
+    predictions: {
+      actualEngagement?: number | null;
+      actualCompletion?: number | null;
+      predictedEngagement: number;
+      predictedCompletion: number;
+    },
+    analytics: { _avg: { viewDuration?: number | null } },
+  ): Promise<number | null> {
     if (!predictions.actualEngagement) return null;
 
     const engagementError = Math.abs(
-      predictions.predictedEngagement - (predictions.actualEngagement || 0)
+      predictions.predictedEngagement - (predictions.actualEngagement || 0),
     );
     const completionError = Math.abs(
-      predictions.predictedCompletion - (predictions.actualCompletion || 0)
+      predictions.predictedCompletion - (predictions.actualCompletion || 0),
     );
 
     const avgError = (engagementError + completionError) / 2;

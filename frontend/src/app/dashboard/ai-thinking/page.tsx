@@ -14,12 +14,32 @@ export default function AIThinkingPage() {
     const router = useRouter();
     const [result, setResult] = useState<ThinkingGenerationResult | null>(null);
     const [isCreatingProject, setIsCreatingProject] = useState(false);
+    const [savedProjectId, setSavedProjectId] = useState<string | null>(null);
 
-    const handleComplete = useCallback((generationResult: ThinkingGenerationResult) => {
+    const handleComplete = useCallback(async (generationResult: ThinkingGenerationResult) => {
         setResult(generationResult);
         toast.success('Presentation generated successfully!', {
             description: `Quality score: ${generationResult.qualityReport.overallScore.toFixed(1)}/10`,
         });
+
+        // Auto-save to dashboard
+        setIsCreatingProject(true);
+        try {
+            toast.info('Saving to dashboard...');
+            const projectResult = await api.createProjectFromThinkingResult({
+                presentation: generationResult.presentation,
+                title: generationResult.presentation.title,
+                description: generationResult.presentation.metadata.summary,
+                generateImages: generationResult.metadata.generateImages,
+            });
+            setSavedProjectId(projectResult.projectId);
+            toast.success('Saved to dashboard');
+        } catch (error) {
+            console.error('Failed to auto-save project:', error);
+            toast.error('Failed to save to dashboard');
+        } finally {
+            setIsCreatingProject(false);
+        }
     }, []);
 
     const handleError = useCallback((error: Error) => {
@@ -29,7 +49,13 @@ export default function AIThinkingPage() {
     }, []);
 
     const handleCreateProject = useCallback(async () => {
-        if (!result) { return; }
+        if (!result || isCreatingProject) { return; }
+
+        // If already saved, just navigate
+        if (savedProjectId) {
+            router.push(`/editor/${savedProjectId}`);
+            return;
+        }
 
         setIsCreatingProject(true);
         try {
@@ -49,7 +75,7 @@ export default function AIThinkingPage() {
         } finally {
             setIsCreatingProject(false);
         }
-    }, [result, router]);
+    }, [result, router, savedProjectId, isCreatingProject]);
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900">

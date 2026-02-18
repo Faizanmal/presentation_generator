@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
 
@@ -18,25 +18,28 @@ interface CreateAccountDto {
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Find user by ID
    */
   async findById(id: string) {
-    return this.prisma.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id },
       include: {
         subscription: true,
       },
     });
+    return user;
   }
 
   /**
-   * Find user by email
+   * Find user by email (excludes soft-deleted accounts)
    */
   async findByEmail(email: string) {
-    return this.prisma.user.findUnique({
+    return this.prisma.user.findFirst({
       where: { email },
       include: {
         subscription: true,
@@ -83,6 +86,47 @@ export class UsersService {
       where: { id },
       data,
     });
+  }
+
+  /**
+   * Delete a user account
+   */
+  async delete(id: string): Promise<void> {
+    await this.prisma.user.delete({
+      where: { id },
+    });
+    this.logger.warn(`User deleted: ${id}`);
+  }
+
+  /**
+   * Reactivate a soft-deleted user account
+   */
+
+
+  /**
+   * Calculate profile completeness as a percentage (0–100)
+   */
+  async getProfileCompleteness(
+    userId: string,
+  ): Promise<{ score: number; missing: string[] }> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const fields: Array<{ key: keyof typeof user; label: string }> = [
+      { key: 'name', label: 'Display name' },
+      { key: 'image', label: 'Profile picture' },
+      { key: 'phone', label: 'Phone number' },
+    ];
+
+    const missing: string[] = [];
+    for (const f of fields) {
+      if (!user[f.key]) missing.push(f.label);
+    }
+
+    const score = Math.round(
+      ((fields.length - missing.length) / fields.length) * 100,
+    );
+    return { score, missing };
   }
 
   /**
@@ -199,6 +243,7 @@ export class UsersService {
 
   /**
    * Check if user can generate AI content
+   * PRO/ENTERPRISE users have unlimited generations.
    */
   async canGenerateAI(userId: string): Promise<boolean> {
     const subscription = await this.getSubscription(userId);

@@ -447,7 +447,18 @@ export class DesignSystemService {
   /**
    * Export design system as Tailwind config
    */
-  exportAsTailwindConfig(system: DesignSystem): Record<string, any> {
+  exportAsTailwindConfig(system: DesignSystem): {
+    theme: {
+      extend: {
+        colors: Record<string, string>;
+        fontFamily: Record<string, string[]>;
+        fontSize: Record<string, string>;
+        spacing: Record<string, string>;
+        boxShadow: Record<string, string>;
+        borderRadius: Record<string, string>;
+      };
+    };
+  } {
     const colors: Record<string, string> = {};
     const fontFamily: Record<string, string[]> = {};
     const fontSize: Record<string, string> = {};

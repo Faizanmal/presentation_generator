@@ -48,17 +48,18 @@ export class LiveQAGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('joinSession')
   async handleJoinSession(
     @ConnectedSocket() client: QASocket,
-    @MessageBody() data: { sessionId: string; userId?: string; isHost?: boolean },
+    @MessageBody()
+    data: { sessionId: string; userId?: string; isHost?: boolean },
   ) {
     try {
       const session = await this.qaService.getSession(data.sessionId);
-      
+
       client.sessionId = session.id;
       client.userId = data.userId;
-      client.isHost = data.isHost && session.hostId === data.userId;
-      
+      client.isHost = data.isHost && session.hostUserId === data.userId;
+
       client.join(`qa:${session.id}`);
-      
+
       if (client.isHost) {
         client.join(`qa:${session.id}:host`);
       }
@@ -71,7 +72,6 @@ export class LiveQAGateway implements OnGatewayConnection, OnGatewayDisconnect {
           id: session.id,
           title: session.title,
           status: session.status,
-          settings: session.settings,
         },
         questions,
         isHost: client.isHost,
@@ -123,12 +123,14 @@ export class LiveQAGateway implements OnGatewayConnection, OnGatewayDisconnect {
       } else {
         // Moderation blocked the question
         client.emit('questionRejected', {
-          reason: result.moderation.reason || 'Question did not pass moderation',
+          reason:
+            result.moderation.reason || 'Question did not pass moderation',
         });
       }
     } catch (error) {
-      client.emit('error', { 
-        message: error instanceof Error ? error.message : 'Failed to submit question',
+      client.emit('error', {
+        message:
+          error instanceof Error ? error.message : 'Failed to submit question',
       });
     }
   }
@@ -144,8 +146,11 @@ export class LiveQAGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     try {
-      const question = await this.qaService.upvoteQuestion(data.questionId, client.userId);
-      
+      const question = await this.qaService.upvoteQuestion(
+        data.questionId,
+        client.userId,
+      );
+
       // Broadcast to all in session
       this.server.to(`qa:${client.sessionId}`).emit('questionUpvoted', {
         questionId: data.questionId,
@@ -213,7 +218,10 @@ export class LiveQAGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     try {
-      const question = await this.qaService.pinQuestion(data.questionId, client.userId!);
+      const question = await this.qaService.pinQuestion(
+        data.questionId,
+        client.userId!,
+      );
 
       this.server.to(`qa:${client.sessionId}`).emit('questionPinned', {
         question,

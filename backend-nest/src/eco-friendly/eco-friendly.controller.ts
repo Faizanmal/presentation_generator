@@ -10,7 +10,7 @@ import {
   Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { EcoFriendlyService } from './eco-friendly.service';
 
 class UpdateEcoSettingsDto {
@@ -51,7 +51,9 @@ export class EcoFriendlyController {
 
   @Get('presets/:preset')
   @ApiOperation({ summary: 'Get eco preset settings' })
-  getPreset(@Param('preset') preset: 'maximum-savings' | 'balanced' | 'quality-first') {
+  getPreset(
+    @Param('preset') preset: 'maximum-savings' | 'balanced' | 'quality-first',
+  ) {
     return this.ecoService.applyPreset(preset);
   }
 

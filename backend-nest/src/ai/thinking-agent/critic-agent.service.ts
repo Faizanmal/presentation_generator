@@ -536,20 +536,29 @@ Return JSON:
   private formatBlockContent(content: unknown): string {
     if (content == null) return '';
     if (typeof content === 'string') return content;
+    if (typeof content === 'number' || typeof content === 'boolean') {
+      return String(content);
+    }
     if (typeof content === 'object') {
       // Common block content shapes used across the app
-      const anyContent = content as any;
-      if (typeof anyContent.text === 'string') return anyContent.text;
-      if (Array.isArray(anyContent.items)) return anyContent.items.join(' ');
-      if (typeof anyContent.url === 'string') return anyContent.url;
-      if (typeof anyContent.alt === 'string') return anyContent.alt;
+      const objectContent = content as Record<string, unknown>;
+      if (typeof objectContent.text === 'string') return objectContent.text;
+      if (Array.isArray(objectContent.items)) {
+        return objectContent.items
+          .map((item) =>
+            typeof item === 'string' ? item : JSON.stringify(item),
+          )
+          .join(' ');
+      }
+      if (typeof objectContent.url === 'string') return objectContent.url;
+      if (typeof objectContent.alt === 'string') return objectContent.alt;
       try {
         return JSON.stringify(content);
       } catch {
-        return String(content);
+        return '[unserializable object]';
       }
     }
-    return String(content);
+    return '';
   }
 
   /**

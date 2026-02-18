@@ -9,12 +9,17 @@ import {
   Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { IoTIntegrationService } from './iot-integration.service';
 
 class RegisterDeviceDto {
   name: string;
-  type: 'presenter-remote' | 'smart-display' | 'smart-watch' | 'smart-speaker' | 'custom';
+  type:
+    | 'presenter-remote'
+    | 'smart-display'
+    | 'smart-watch'
+    | 'smart-speaker'
+    | 'custom';
   capabilities: {
     display?: boolean;
     slideNavigation?: boolean;
@@ -49,7 +54,7 @@ export class IoTIntegrationController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'List user devices' })
-  async listDevices(@Request() req: { user: { id: string } }) {
+  async listDevices(@Request() req: { user: { id: string } }): Promise<unknown> {
     return this.iotService.listDevices(req.user.id);
   }
 
@@ -71,7 +76,7 @@ export class IoTIntegrationController {
   async getDevice(
     @Request() req: { user: { id: string } },
     @Param('id') id: string,
-  ) {
+  ): Promise<unknown> {
     return this.iotService.getDevice(id, req.user.id);
   }
 
