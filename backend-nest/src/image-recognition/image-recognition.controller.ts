@@ -60,7 +60,7 @@ export class ImageRecognitionController {
   @Post('embedding')
   @HttpCode(HttpStatus.OK)
   generateEmbedding(
-    @Request() req: { user: { id: string } },
+    @Request() _req: { user: { id: string } },
     @Body() dto: GenerateEmbeddingDto,
   ) {
     return this.imageRecognitionService.generateImageEmbedding(
@@ -76,7 +76,7 @@ export class ImageRecognitionController {
   @Post('embeddings/batch')
   @HttpCode(HttpStatus.ACCEPTED)
   batchGenerateEmbeddings(
-    @Request() req: { user: { id: string } },
+    @Request() _req: { user: { id: string } },
     @Body() dto: BatchEmbeddingsDto,
   ) {
     if (!dto.uploadIds || dto.uploadIds.length === 0) {
@@ -107,7 +107,7 @@ export class ImageRecognitionController {
   @Post('similar')
   @HttpCode(HttpStatus.OK)
   findSimilarImages(
-    @Request() req: { user: { id: string } },
+    @Request() _req: { user: { id: string } },
     @Body() dto: FindSimilarDto,
   ) {
     const limit = dto.limit || 10;
@@ -127,7 +127,7 @@ export class ImageRecognitionController {
   @Post('track-usage')
   @HttpCode(HttpStatus.CREATED)
   async trackUsage(
-    @Request() req: { user: { id: string } },
+    @Request() _req: { user: { id: string } },
     @Body() dto: TrackUsageDto,
   ) {
     await this.imageRecognitionService.trackImageUsage(
@@ -148,7 +148,7 @@ export class ImageRecognitionController {
   @Delete('usage/:usageId')
   @HttpCode(HttpStatus.OK)
   async removeUsage(
-    @Request() req: { user: { id: string } },
+    @Request() _req: { user: { id: string } },
     @Param('usageId') usageId: string,
   ) {
     await this.imageRecognitionService.removeImageUsage(usageId);
@@ -162,7 +162,7 @@ export class ImageRecognitionController {
   @Get('presentation/:projectId/images')
   @HttpCode(HttpStatus.OK)
   getImagesInPresentation(
-    @Request() req: { user: { id: string } },
+    @Request() _req: { user: { id: string } },
     @Param('projectId') projectId: string,
   ) {
     return this.imageRecognitionService.getImagesInPresentation(projectId);
@@ -175,7 +175,7 @@ export class ImageRecognitionController {
   @Get('image/:uploadId/presentations')
   @HttpCode(HttpStatus.OK)
   findPresentationsUsingImage(
-    @Request() req: { user: { id: string } },
+    @Request() _req: { user: { id: string } },
     @Param('uploadId') uploadId: string,
   ) {
     return this.imageRecognitionService.findPresentationsUsingImage(uploadId);
@@ -198,7 +198,7 @@ export class ImageRecognitionController {
   @Post('predict')
   @HttpCode(HttpStatus.OK)
   predictImages(
-    @Request() req: { user: { id: string } },
+    @Request() _req: { user: { id: string } },
     @Body() dto: PredictImagesDto,
   ) {
     const limit = dto.limit || 10;
@@ -223,7 +223,7 @@ export class ImageRecognitionController {
   @Post('describe')
   @HttpCode(HttpStatus.OK)
   async describeImage(
-    @Request() req: { user: { id: string } },
+    @Request() _req: { user: { id: string } },
     @Body() body: { imageUrl: string },
   ) {
     if (!body.imageUrl) {

@@ -53,7 +53,7 @@ class CreateFormDto {
 }
 
 class SubmitFormDto {
-  responses: Record<string, any>;
+  responses: Record<string, unknown>;
 }
 
 class CreateQuizDto {

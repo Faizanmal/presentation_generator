@@ -522,7 +522,7 @@ Format as a numbered list with clear structure.`;
   @Post('recommend-layout')
   @HttpCode(HttpStatus.OK)
   recommendLayout(
-    @CurrentUser() user: { id: string },
+    @CurrentUser() _user: { id: string },
     @Body() body: { blocks: GeneratedBlock[]; heading: string },
   ) {
     const layout = this.aiService.recommendLayout(body.blocks, body.heading);
@@ -838,7 +838,7 @@ Format as a numbered list with clear structure.`;
   @Post('chat/suggestions')
   @HttpCode(HttpStatus.OK)
   async getChatSuggestions(
-    @CurrentUser() user: { id: string },
+    @CurrentUser() _user: { id: string },
     @Body()
     body: {
       slideContext: SlideContext;
@@ -1030,7 +1030,7 @@ Format as a numbered list with clear structure.`;
   @Post('search-realtime-data')
   @HttpCode(HttpStatus.OK)
   async searchRealTimeData(
-    @CurrentUser() user: { id: string },
+    @CurrentUser() _user: { id: string },
     @Body()
     body: {
       query: string;
@@ -1055,7 +1055,7 @@ Format as a numbered list with clear structure.`;
   @Post('extract-chart-data')
   @HttpCode(HttpStatus.OK)
   async extractChartData(
-    @CurrentUser() user: { id: string },
+    @CurrentUser() _user: { id: string },
     @Body()
     body: {
       query: string;
@@ -1111,7 +1111,7 @@ Format as a numbered list with clear structure.`;
   @Post('topic-statistics')
   @HttpCode(HttpStatus.OK)
   async getTopicStatistics(
-    @CurrentUser() user: { id: string },
+    @CurrentUser() _user: { id: string },
     @Body()
     body: {
       topic: string;

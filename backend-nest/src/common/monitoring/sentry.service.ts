@@ -37,9 +37,7 @@ export class SentryService implements OnModuleInit {
             '0.1',
         ),
         integrations: [],
-        beforeSend(
-          event: import('@sentry/node').Event,
-        ): import('@sentry/node').Event | null {
+        beforeSend(event: Record<string, unknown>, _hint?: Record<string, unknown>): Record<string, unknown> {
           // Scrub sensitive data
           const evt = event as Record<string, unknown> & {
             request?: { headers?: Record<string, unknown> };

@@ -215,7 +215,7 @@ export class StoryboardingService {
         topic,
         narrativeArc,
         audienceConfig,
-        structureConfig as unknown as any,
+        structureConfig as unknown as typeof this.presentationStructures.summary,
         estimatedDuration,
       );
 
@@ -238,7 +238,7 @@ export class StoryboardingService {
         data: {
           narrativeArc: narrativeArc as unknown as object,
           pacing: pacing as unknown as object,
-          transitions: transitions as unknown as any,
+          transitions: transitions as unknown as object,
           status: 'completed',
         },
         include: {
@@ -370,7 +370,7 @@ Return only valid JSON.`;
     _structureConfig: typeof this.presentationStructures.summary,
     totalDuration: number,
   ) {
-    const sections: any[] = [];
+    const sections: Record<string, unknown>[] = [];
     let order = 0;
 
     for (const arcSection of narrativeArc.sections) {
@@ -622,7 +622,7 @@ Write natural, conversational speaker notes (2-3 paragraphs) that help the prese
     }
 
     // Create slides from storyboard sections
-    const slides: any[] = [];
+    const slides: Record<string, unknown>[] = [];
     for (const section of storyboard.sections) {
       const slide = await this.prisma.slide.create({
         data: {

@@ -6,7 +6,7 @@ import { IntegrationProvider } from '@prisma/client';
 
 interface WebhookPayload {
   event: string;
-  data: any;
+  data: Record<string, unknown>;
   timestamp: string;
   projectId?: string;
 }
@@ -330,7 +330,7 @@ export class AdvancedIntegrationsService {
       },
     );
 
-    const items = (itemsResponse.data as { data: Record<string, any>[] }).data;
+    const items = (itemsResponse.data as { data: Record<string, unknown>[] }).data;
 
     // Group items by frames or create slides from sticky notes
     const slides = this.convertMiroItemsToSlides(items);
@@ -341,12 +341,12 @@ export class AdvancedIntegrationsService {
     };
   }
 
-  private convertMiroItemsToSlides(items: Record<string, any>[]) {
+  private convertMiroItemsToSlides(items: Record<string, unknown>[]) {
     const slides: Array<{
       order: number;
       content: {
         title: string;
-        blocks: any[];
+        blocks: unknown[];
       };
     }> = [];
     const frames = items.filter((i) => i.type === 'frame');

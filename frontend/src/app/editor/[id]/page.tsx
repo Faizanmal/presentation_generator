@@ -236,7 +236,7 @@ export default function EditorPage() {
 
   // Handle speaker notes change
   const handleNotesChange = useCallback((notes: string) => {
-    if (!currentSlide) return;
+    if (!currentSlide) {return;}
     const updateSlideStore = useEditorStore.getState().updateSlide;
     updateSlideStore(currentSlide.id, { speakerNotes: notes });
 

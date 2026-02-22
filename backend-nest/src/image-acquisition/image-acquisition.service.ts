@@ -137,7 +137,7 @@ export class ImageAcquisitionService {
       case 'url':
         return this.downloadFromUrl(options);
       default:
-        throw new Error(`Unsupported image source: ${(options as any).source}`);
+        throw new Error(`Unsupported image source: ${String(options.source)}`);
     }
   }
 
@@ -448,6 +448,7 @@ export class ImageAcquisitionService {
       this.logger.error('Pixabay fetch failed:', error);
       throw new Error(
         `Failed to fetch from Pixabay: ${(error as Error).message}`,
+        { cause: error },
       );
     }
   }

@@ -348,7 +348,7 @@ export class ImageAcquisitionController {
    * Test image acquisition endpoint
    */
   @Post('test')
-  async testAcquisition(@Request() req, @Query('source') source: ImageSource) {
+  async testAcquisition(@Request() _req, @Query('source') source: ImageSource) {
     this.logger.log(`Testing ${source} acquisition`);
 
     const testQueries: Record<ImageSource, ImageAcquisitionOptions> = {

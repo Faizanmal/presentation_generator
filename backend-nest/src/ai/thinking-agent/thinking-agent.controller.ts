@@ -268,7 +268,7 @@ export class ThinkingAgentController {
   @Post('compare')
   @HttpCode(HttpStatus.OK)
   async compareQuality(
-    @CurrentUser() user: { id: string },
+    @CurrentUser() _user: { id: string },
     @Body() body: { topic: string; audience?: string },
   ): Promise<{
     thinking: { score: number; time: number };

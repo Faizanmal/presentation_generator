@@ -81,7 +81,7 @@ export class SendgridMailerService {
       to,
       from: { email: this.fromAddress, name: this.fromName },
       subject,
-      content: content as unknown as any,
+      content: content as unknown as sendgrid.MailDataRequired['content'],
     };
 
     try {

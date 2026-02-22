@@ -5,6 +5,7 @@ import {
   CallHandler,
   Logger,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { Reflector } from '@nestjs/core';
 import { Observable, of } from 'rxjs';
 import { tap } from 'rxjs/operators';
@@ -15,6 +16,11 @@ import { CACHE_TTL_KEY } from '../decorators/cache.decorator';
  * Interceptor for caching HTTP responses
  * Automatically caches GET requests based on URL and query params
  */
+
+interface AuthenticatedRequest extends Request {
+  user?: { id?: string; [key: string]: unknown };
+}
+
 @Injectable()
 export class CacheInterceptor implements NestInterceptor {
   private readonly logger = new Logger(CacheInterceptor.name);
@@ -84,9 +90,11 @@ export class CacheInterceptor implements NestInterceptor {
   /**
    * Generate a cache key from request details
    */
-  private generateCacheKey(request: import('express').Request): string {
+
+  private generateCacheKey(request: AuthenticatedRequest): string {
     const url = request.url;
-    const userId = request.user?.id || 'anonymous';
+    const userId =
+      (request.user as { id?: string } | undefined)?.id || 'anonymous';
 
     // For more complex cache key generation, you can include:
     // - Query parameters

@@ -452,7 +452,7 @@ export class ImageRecognitionService {
    * Update user's image usage patterns (for ML predictions)
    */
   private async updateUserImagePatterns(
-    uploadId: string,
+    _uploadId: string,
     projectId: string,
   ): Promise<void> {
     const project = await this.prisma.project.findUnique({

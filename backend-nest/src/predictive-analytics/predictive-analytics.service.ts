@@ -49,7 +49,13 @@ export class PredictiveAnalyticsService {
     }
 
     // Calculate engagement factors
-    const factors = this.calculateEngagementFactors(project as any);
+    const factors = this.calculateEngagementFactors(
+      project as {
+        slides: Array<{
+          blocks: Array<{ blockType: string; content: unknown }>;
+        }>;
+      },
+    );
 
     // Generate predictions
     const predictions = this.predictMetrics(factors);
@@ -346,22 +352,22 @@ Return only the recommendations, one per line.`,
         avgDuration: analytics._avg?.totalDuration || 0,
         avgSlideReached: 0, // Not available in current schema
       },
-      accuracy: await this.calculateAccuracy(predictions, analytics),
+      accuracy: this.calculateAccuracy(predictions, analytics),
     };
   }
 
   /**
    * Calculate prediction accuracy
    */
-  private async calculateAccuracy(
+  private calculateAccuracy(
     predictions: {
       actualEngagement?: number | null;
       actualCompletion?: number | null;
       predictedEngagement?: number | null;
       predictedCompletion?: number | null;
     },
-    analytics: { _avg?: Record<string, number | null> | null },
-  ): Promise<number | null> {
+    _analytics: { _avg?: Record<string, number | null> | null },
+  ): number | null {
     if (!predictions.actualEngagement) return null;
     if (
       predictions.predictedEngagement == null ||
@@ -387,7 +393,9 @@ Return only the recommendations, one per line.`,
    */
   async getBenchmarks(projectId?: string) {
     // If a projectId is provided, limit benchmarks to that project; otherwise use global averages
-    const where: any = projectId ? { projectId } : undefined;
+    const where: { projectId?: string } | undefined = projectId
+      ? { projectId }
+      : undefined;
 
     const benchmarks = await this.prisma.engagementPrediction.aggregate({
       where,
@@ -408,7 +416,7 @@ Return only the recommendations, one per line.`,
   /**
    * Schedule prediction updates
    */
-  async scheduleUpdate(projectId: string, userId: string) {
+  scheduleUpdate(_projectId: string, _userId: string) {
     // In production, this would create a scheduled job
     return {
       scheduled: true,

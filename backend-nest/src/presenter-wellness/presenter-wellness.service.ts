@@ -291,7 +291,7 @@ export class PresenterWellnessService {
   /**
    * Record break taken
    */
-  async recordBreak(sessionId: string, breakType: string) {
+  async recordBreak(sessionId: string, _breakType: string) {
     const session = await this.prisma.wellnessSession.findUnique({
       where: { id: sessionId },
     });

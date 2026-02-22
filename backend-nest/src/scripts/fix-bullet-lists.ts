@@ -44,7 +44,7 @@ async function fixBulletLists() {
       let i = 0;
       while (i < slideBlocks.length) {
         const currentBlock = slideBlocks[i];
-        const content = currentBlock.content as any;
+        const content = currentBlock.content as Record<string, unknown>;
 
         // Skip if already has items array
         if (content?.items && Array.isArray(content.items)) {
@@ -64,7 +64,7 @@ async function fixBulletLists() {
             j < slideBlocks.length &&
             slideBlocks[j].blockType === blockType
           ) {
-            const blockContent = slideBlocks[j].content as any;
+            const blockContent = slideBlocks[j].content as Record<string, unknown>;
             if (blockContent?.text) {
               items.push(blockContent.text);
               if (j > i) {

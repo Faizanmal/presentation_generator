@@ -1,7 +1,7 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { Logger } from '@nestjs/common';
-import { NarrationExportService } from './narration-export.service';
+import { NarrationExportService, VoiceId } from './narration-export.service';
 
 @Processor('narration', { concurrency: 2 })
 export class NarrationExportProcessor extends WorkerHost {
@@ -27,7 +27,7 @@ export class NarrationExportProcessor extends WorkerHost {
     await this.narrationService.processNarration(
       narrationProjectId,
       slides,
-      voice as unknown as any,
+      voice as VoiceId,
       speed,
     );
 

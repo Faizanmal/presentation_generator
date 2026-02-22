@@ -107,12 +107,12 @@ export class UniversalDesignService {
 
     // Run checks
     if (options?.checkAccessibility !== false) {
-      const accessibilityIssues = await this.checkAccessibility(project);
+      const accessibilityIssues = this.checkAccessibility(project);
       issues.push(...accessibilityIssues);
     }
 
     if (options?.checkCultural !== false) {
-      const cultural = await this.checkCulturalSensitivity(
+      const cultural = this.checkCulturalSensitivity(
         project,
         options?.targetRegions || ['Western', 'China', 'Middle East'],
       );
@@ -454,7 +454,7 @@ export class UniversalDesignService {
   /**
    * Get report history
    */
-  async getReportHistory(projectId: string) {
+  async getReportHistory(projectId: string, _projectId2?: never) {
     return this.prisma.universalDesignReport.findMany({
       where: { projectId },
       orderBy: { checkedAt: 'desc' },
@@ -465,7 +465,7 @@ export class UniversalDesignService {
   /**
    * Auto-fix issues
    */
-  autoFix(projectId: string, issueTypes: string[]) {
+  autoFix(_projectId: string, issueTypes: string[]) {
     // In production, this would apply automatic fixes
     return {
       fixed: issueTypes,

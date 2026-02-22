@@ -137,7 +137,7 @@ export class SentimentAnalysisService {
   ) {
     // Determine dominant expression
     const expressions = Object.entries(expressionData);
-    const dominant = expressions.reduce((a, b) => (a[1] > b[1] ? a : b));
+    const _dominant = expressions.reduce((a, b) => (a[1] > b[1] ? a : b));
 
     return this.recordSignal(sessionId, {
       type: 'expression',
@@ -525,8 +525,8 @@ Average Metrics:
 - Confusion: ${Math.round(summary.summary.confusion * 100)}%
 
 Timeline has ${timeline.length} data points.
-Peak positive at ${summary.peaks?.mostPositive?.timestamp || 'N/A'}
-Lowest engagement at ${summary.peaks?.leastEngaged?.timestamp || 'N/A'}
+Peak positive at ${String(summary.peaks?.mostPositive?.timestamp ?? 'N/A')}
+Lowest engagement at ${String(summary.peaks?.leastEngaged?.timestamp ?? 'N/A')}
 
 Provide 3-5 specific insights and recommendations.`,
         { maxTokens: 300 },

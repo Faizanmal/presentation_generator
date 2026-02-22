@@ -16,7 +16,7 @@ interface AuthResponse {
 interface ProjectResponse {
   id: string;
   title: string;
-  slides?: any[];
+  slides?: unknown[];
 }
 
 describe('Export (e2e)', () => {

@@ -314,7 +314,7 @@ export class RealTimeDataService {
    * Generate sample chart data when real data isn't available
    */
   private generateSampleChartData(
-    query: string,
+    _query: string,
     count: number,
   ): ChartDataPoint[] {
     const baseValue = Math.floor(Math.random() * 100) + 50;

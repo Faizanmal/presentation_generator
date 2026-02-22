@@ -41,7 +41,7 @@ export class PrismaService
 
     // surface low‑level errors from the pg pool so they show up in our logs
     pool.on('error', (err) => {
-      this.logger.error('Postgres pool error', err as any);
+      this.logger.error('Postgres pool error', err as unknown);
     });
 
     const adapter = new PrismaPg(pool);
@@ -59,8 +59,8 @@ export class PrismaService
     }
 
     // log any Prisma‑level errors as well, this hooks the client engine events
-    (this as PrismaClient).$on('error' as never, (e: any) => {
-      this.logger.error(`Prisma error: ${e.message}`, e);
+    (this as PrismaClient).$on('error' as never, (e: unknown) => {
+      this.logger.error(`Prisma error: ${(e as { message: string }).message}`, e);
     });
   }
 

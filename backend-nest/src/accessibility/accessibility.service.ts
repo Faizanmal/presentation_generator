@@ -259,7 +259,7 @@ export class AccessibilityService {
    */
   async autoFixIssues(
     projectId: string,
-    userId: string,
+    _userId: string,
     issueIds: string[],
   ): Promise<{
     fixed: number;

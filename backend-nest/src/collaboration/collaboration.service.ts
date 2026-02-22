@@ -496,7 +496,7 @@ export class CollaborationService {
     // The snapshot contains the full project state
     await this.prisma.project.update({
       where: { id: projectId },
-      data: versionData.snapshot as unknown as any,
+      data: versionData.snapshot as Prisma.InputJsonObject,
     });
     return versionData.snapshot;
   }

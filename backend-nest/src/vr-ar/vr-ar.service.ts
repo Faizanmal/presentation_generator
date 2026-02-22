@@ -196,7 +196,7 @@ export class VRARService {
                 enabled: true,
                 position: { x: 0, y: 1.6, z: -2 },
               }
-            : (null as unknown as any),
+            : (null as unknown as object),
         },
       });
     }

@@ -193,7 +193,7 @@ Respond in JSON format: {"relevant": true/false, "appropriate": true/false, "typ
         } catch {
           // If parsing fails, let it through with basic checks passed
         }
-      } catch (error) {
+      } catch (_error) {
         this.logger.warn('AI moderation failed, using rule-based only');
       }
     }
@@ -204,7 +204,7 @@ Respond in JSON format: {"relevant": true/false, "appropriate": true/false, "typ
   /**
    * Upvote a question
    */
-  async upvoteQuestion(questionId: string, voterId?: string) {
+  async upvoteQuestion(questionId: string, _voterId?: string) {
     const question = await this.prisma.liveQuestion.findUnique({
       where: { id: questionId },
     });

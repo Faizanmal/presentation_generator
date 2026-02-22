@@ -417,8 +417,8 @@ export class SyncService {
       // No actual conflicts, can merge
       return {
         strategy: 'merge',
-        serverVersion: serverProject as unknown as Record<string, any>,
-        clientVersion: clientData as Record<string, any>,
+        serverVersion: serverProject as unknown as Record<string, unknown>,
+        clientVersion: clientData as Record<string, unknown>,
         mergedVersion: this.mergeVersions(
           serverProject as unknown as Record<string, unknown>,
           clientData,

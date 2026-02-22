@@ -73,7 +73,7 @@ export class SecurityMiddleware implements NestMiddleware {
  */
 @Injectable()
 export class SanitizationMiddleware implements NestMiddleware {
-  use(req: Request, res: Response, next: NextFunction) {
+  use(req: Request, _res: Response, next: NextFunction) {
     // Sanitize request body
     if (req.body) {
       req.body = this.sanitizeObject(req.body);

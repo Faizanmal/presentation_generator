@@ -729,7 +729,7 @@ Return only the speaker notes, ready to be read aloud.
         } catch (ffmpegError) {
           this.logger.error('FFmpeg processing failed:', ffmpegError);
           throw new Error('Video processing failed', {
-            cause: ffmpegError as Error,
+            cause: ffmpegError,
           });
         }
       } else {

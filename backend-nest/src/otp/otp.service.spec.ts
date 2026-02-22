@@ -12,7 +12,16 @@ describe('OtpService', () => {
   // Placeholder for capturing the generated OTP during tests
   let storedRedisValue: string | null = null;
 
-  const mockRedisClient = {
+  const mockRedisClient: {
+    get: jest.Mock;
+    set: jest.Mock;
+    setex: jest.Mock;
+    del: jest.Mock;
+    incr: jest.Mock;
+    expire: jest.Mock;
+    ttl: jest.Mock;
+    exists: jest.Mock;
+  } = {
     get: jest.fn(),
     set: jest.fn(),
     setex: jest.fn(),
@@ -79,7 +88,7 @@ describe('OtpService', () => {
     storedRedisValue = null;
 
     // Default implementations
-    mockRedisClient.get.mockImplementation((key) => {
+    mockRedisClient.get.mockImplementation((key: string) => {
       // By default, no lockout, no OTP unless set
       if (key.includes('otp:lockout:')) return Promise.resolve(null);
       if (key.includes('otp:') && !key.includes('cooldown'))
@@ -87,7 +96,7 @@ describe('OtpService', () => {
       return Promise.resolve(null);
     });
 
-    mockRedisClient.set.mockImplementation((key, value) => {
+    mockRedisClient.set.mockImplementation((key: string, value: string) => {
       if (
         key.includes('otp:') &&
         !key.includes('cooldown') &&
@@ -100,7 +109,7 @@ describe('OtpService', () => {
 
     // Simulate setex using set behavior for backward compatibility if needed,
     // but the service uses set with EX now.
-    mockRedisClient.setex.mockImplementation((key, seconds, value) => {
+    mockRedisClient.setex.mockImplementation((_key, _seconds, _value) => {
       // Just in case legacy code is hit, though we know it uses set
       return Promise.resolve('OK');
     });
@@ -227,7 +236,7 @@ describe('OtpService', () => {
 
   describe('verifyOtp', () => {
     it('should verify correct OTP and delete it', async () => {
-      mockRedisClient.get.mockImplementation((key) => {
+      mockRedisClient.get.mockImplementation((key: string) => {
         if (key.includes('lockout')) return Promise.resolve(null);
         return Promise.resolve('123456');
       });
@@ -245,7 +254,7 @@ describe('OtpService', () => {
     });
 
     it('should reject incorrect OTP', async () => {
-      mockRedisClient.get.mockImplementation((key) => {
+      mockRedisClient.get.mockImplementation((key: string) => {
         if (key.includes('lockout')) return Promise.resolve(null);
         return Promise.resolve('123456');
       });
@@ -277,7 +286,7 @@ describe('OtpService', () => {
     });
 
     it('should track failed attempts', async () => {
-      mockRedisClient.get.mockImplementation((key) => {
+      mockRedisClient.get.mockImplementation((key: string) => {
         if (key.includes('lockout')) return Promise.resolve(null);
         return Promise.resolve('123456');
       });
@@ -295,7 +304,7 @@ describe('OtpService', () => {
     });
 
     it('should lockout after max failed attempts', async () => {
-      mockRedisClient.get.mockImplementation((key) => {
+      mockRedisClient.get.mockImplementation((key: string) => {
         if (key.includes('lockout')) return Promise.resolve(null);
         return Promise.resolve('123456');
       });
@@ -419,7 +428,7 @@ describe('OtpService', () => {
     });
 
     it('should use constant-time comparison for OTP verification', async () => {
-      mockRedisClient.get.mockImplementation((key) => {
+      mockRedisClient.get.mockImplementation((key: string) => {
         if (key.includes('lockout')) return Promise.resolve(null);
         return Promise.resolve('123456');
       });
@@ -435,7 +444,7 @@ describe('OtpService', () => {
       const endMatch = process.hrtime.bigint();
 
       // Reset for next test
-      mockRedisClient.get.mockImplementation((key) => {
+      mockRedisClient.get.mockImplementation((key: string) => {
         if (key.includes('lockout')) return Promise.resolve(null);
         return Promise.resolve('123456');
       });

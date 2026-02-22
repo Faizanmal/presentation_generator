@@ -224,7 +224,7 @@ export class BrandKitService {
   }
 
   async addLogo(
-    userId: string,
+    _userId: string,
     brandKitId: string,
     logo: Omit<LogoAsset, 'id'>,
   ): Promise<LogoAsset> {
@@ -241,7 +241,7 @@ export class BrandKitService {
   }
 
   async removeLogo(
-    userId: string,
+    _userId: string,
     brandKitId: string,
     logoId: string,
   ): Promise<void> {
@@ -249,7 +249,7 @@ export class BrandKitService {
     this.logger.log(`Removed logo ${logoId} from brand kit ${brandKitId}`);
   }
 
-  async setDefaultBrandKit(userId: string, brandKitId: string): Promise<void> {
+  async setDefaultBrandKit(_userId: string, brandKitId: string): Promise<void> {
     await Promise.resolve();
     this.logger.log(
       `Set brand kit ${brandKitId} as default for user ${userId}`,
@@ -257,7 +257,7 @@ export class BrandKitService {
   }
 
   async applyBrandKitToProject(
-    userId: string,
+    _userId: string,
     projectId: string,
     brandKitId: string,
   ): Promise<void> {

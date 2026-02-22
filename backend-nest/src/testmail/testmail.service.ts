@@ -156,7 +156,7 @@ export class TestMailService {
   /**
    * Clear all emails in a namespace (requires TestMail API support)
    */
-  async clearNamespace(): Promise<boolean> {
+  clearNamespace(): boolean {
     if (!this.enabled) {
       return false;
     }

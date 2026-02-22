@@ -711,7 +711,7 @@ export class MultilingualService {
 
   private applyTranslatedText(
     content: unknown,
-    blockType: string,
+    _blockType: string,
     translatedText: string,
   ): Prisma.InputJsonValue {
     if (typeof content === 'string') return translatedText;

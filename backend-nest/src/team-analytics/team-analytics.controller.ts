@@ -27,7 +27,7 @@ class TrackActivityDto {
   action: string;
   targetType: string;
   targetId: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 @Controller('team-analytics')

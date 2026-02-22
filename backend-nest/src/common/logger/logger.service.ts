@@ -75,7 +75,8 @@ export class LoggerService implements NestLoggerService {
       // Use dynamic import for optional dependency
       const initDailyRotation = (): void => {
         try {
-          const DailyRotateFile = require('winston-daily-rotate-file') as new (
+          const DailyRotateFile = (await import('winston-daily-rotate-file'))
+            .default as new (
             opts: Record<string, unknown>,
           ) => winston.transport;
 
@@ -134,7 +135,7 @@ export class LoggerService implements NestLoggerService {
       query: req.query,
       ip: this.getClientIp(req),
       userAgent: req.headers['user-agent'],
-      userId: (req as unknown as any).user?.id,
+      userId: (req as unknown as { user?: { id?: string } }).user?.id,
     });
   }
 
@@ -153,7 +154,7 @@ export class LoggerService implements NestLoggerService {
       path: req.path,
       statusCode,
       responseTime: `${responseTime}ms`,
-      userId: (req as unknown as any).user?.id,
+      userId: (req as unknown as { user?: { id?: string } }).user?.id,
     });
   }
 

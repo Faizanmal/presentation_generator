@@ -530,7 +530,7 @@ export class IntegrationsService {
    */
   async createZoomMeeting(
     userId: string,
-    projectId: string,
+    _projectId: string,
     topic: string,
     startTime?: Date,
   ) {

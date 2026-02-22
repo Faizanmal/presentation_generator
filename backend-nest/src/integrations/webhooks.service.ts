@@ -17,7 +17,7 @@ import {
 export interface WebhookPayload {
   event: string;
   timestamp: string;
-  data: Record<string, any>;
+  data: Record<string, unknown>;
   projectId?: string;
   userId?: string;
 }
@@ -251,7 +251,7 @@ export class WebhooksService {
   async trigger(
     userId: string,
     event: WebhookEvent,
-    data: Record<string, any>,
+    data: Record<string, unknown>,
     projectId?: string,
   ): Promise<void> {
     const webhooks = await this.prisma.webhook.findMany({
@@ -412,7 +412,7 @@ export class WebhooksService {
       };
     } catch (error: unknown) {
       const errMsg = error instanceof Error ? error.message : String(error);
-      throw new Error(`Request failed: ${errMsg}`, { cause: error as Error });
+      throw new Error(`Request failed: ${errMsg}`, { cause: error });
     }
   }
 

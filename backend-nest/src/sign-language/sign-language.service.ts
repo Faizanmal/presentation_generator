@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import { AIService } from '../ai/ai.service';
 
 type SignLanguageCode =
@@ -139,7 +140,7 @@ export class SignLanguageService {
   /**
    * Translate text to sign language sequence
    */
-  async translateToSigns(text: string): Promise<SignSequence> {
+  translateToSigns(text: string): SignSequence {
     // Simplified translation - real implementation would use ML models
     const words = text.toLowerCase().split(/\s+/);
     const signs: SignSequence['signs'] = [];
@@ -213,9 +214,7 @@ export class SignLanguageService {
     const fullText = textContent.join('. ');
 
     // Translate
-    const translation = await this.translateToSigns(fullText);
-
-    // Store translation
+    const translation = this.translateToSigns(fullText);
     // Ensure a config exists for this project
     let config = await this.prisma.signLanguageConfig.findFirst({
       where: { projectId: slide.projectId },
@@ -237,8 +236,10 @@ export class SignLanguageService {
         signSequence: translation.signs.map((s) => ({
           gloss: s.gloss,
           duration: s.duration,
-        })) as any,
-        glossSequence: translation.signs.map((s) => s.gloss) as any,
+        })) as unknown as Prisma.InputJsonValue,
+        glossSequence: translation.signs.map(
+          (s) => s.gloss,
+        ) as unknown as Prisma.InputJsonValue,
         status: 'generated',
       },
     });
@@ -287,7 +288,7 @@ export class SignLanguageService {
       try {
         await this.translateSlide(slide.id, language);
         results.push({ slideId: slide.id, status: 'success' });
-      } catch (error) {
+      } catch (_error) {
         results.push({ slideId: slide.id, status: 'failed' });
       }
     }
@@ -334,13 +335,14 @@ export class SignLanguageService {
     }
 
     // Generate embed configuration
+    const cfg = config as Record<string, string>;
     return {
       embedCode: `<sign-language-avatar
         project-id="${projectId}"
-        language="${(config as any).language}"
-        style="${(config as any).avatarStyle}"
-        position="${(config as any).avatarPosition}"
-        speed="${(config as any).speed}"
+        language="${cfg.language}"
+        style="${cfg.avatarStyle}"
+        position="${cfg.avatarPosition}"
+        speed="${cfg.speed}"
       ></sign-language-avatar>`,
       scriptUrl: '/scripts/sign-language-avatar.js',
       config,
@@ -350,7 +352,7 @@ export class SignLanguageService {
   /**
    * Preview sign for a word
    */
-  async previewSign(word: string, language: SignLanguageCode = 'ASL') {
+  previewSign(word: string, language: SignLanguageCode = 'ASL') {
     const gloss = this.textToGloss(word);
 
     return {

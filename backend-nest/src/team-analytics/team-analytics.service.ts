@@ -590,7 +590,7 @@ export class TeamAnalyticsService {
     action: string,
     targetType: string,
     targetId: string,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
   ): Promise<void> {
     await this.prisma.activityLog.create({
       data: {

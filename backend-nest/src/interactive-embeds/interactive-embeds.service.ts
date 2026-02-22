@@ -359,7 +359,7 @@ export class InteractiveEmbedsService {
    */
   async submitFormResponse(
     embedId: string,
-    responses: Record<string, any>,
+    responses: Record<string, unknown>,
     responderId?: string,
   ): Promise<{ success: boolean; submissionId: string }> {
     const embed = await this.getEmbed(embedId);

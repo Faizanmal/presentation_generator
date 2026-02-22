@@ -15,12 +15,24 @@ export class PublicApiGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<{
+      headers: Record<string, string | string[] | undefined>;
+      apiUser?: {
+        userId: string | null | undefined;
+        keyId: string | null | undefined;
+        scopes: string[] | null | undefined;
+      };
+      path: string;
+      method: string;
+    }>();
 
     // Get API key from header
+    const authHeader = request.headers['authorization'];
     const apiKey =
       request.headers['x-api-key'] ||
-      request.headers['authorization']?.replace('Bearer ', '');
+      (typeof authHeader === 'string'
+        ? authHeader.replace('Bearer ', '')
+        : undefined);
 
     if (!apiKey) {
       throw new UnauthorizedException('API key required');
@@ -41,7 +53,11 @@ export class PublicApiGuard implements CanActivate {
     }
 
     // Set rate limit headers
-    const response = context.switchToHttp().getResponse();
+    const response = context.switchToHttp().getResponse<{
+      setHeader(name: string, value: string | number): void;
+      on(event: string, callback: () => void): void;
+      statusCode: number;
+    }>();
     response.setHeader('X-RateLimit-Remaining', rateLimit.remaining);
     response.setHeader('X-RateLimit-Reset', rateLimit.resetAt);
 

@@ -179,7 +179,7 @@ describe('PaymentsService', () => {
       await expect(
         service.createCheckoutSession(
           'user-123',
-          'invalid_plan' as unknown as any,
+          'invalid_plan' as unknown as import('@prisma/client').SubscriptionPlan,
         ),
       ).rejects.toThrow(BadRequestException);
     });

@@ -200,7 +200,7 @@ describe('NarrationExportService', () => {
         totalDuration: 10,
         status: 'completed',
         createdAt: new Date(),
-      } as any;
+      } as unknown as Record<string, unknown>;
 
       mockPrismaService.narrationProject.findUnique.mockResolvedValue(
         mockProjectRecord,

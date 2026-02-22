@@ -6,7 +6,7 @@ import { NotFoundException } from '@nestjs/common';
 
 describe('UsersService', () => {
   let service: UsersService;
-  let prismaService: PrismaService;
+  let _prismaService: PrismaService;
 
   const mockPrismaService = {
     user: {
@@ -45,7 +45,7 @@ describe('UsersService', () => {
     }).compile();
 
     service = module.get<UsersService>(UsersService);
-    prismaService = module.get<PrismaService>(PrismaService);
+    _prismaService = module.get<PrismaService>(PrismaService);
 
     jest.clearAllMocks();
   });
@@ -89,7 +89,7 @@ describe('UsersService', () => {
 
     it('should return null when email is undefined, falsy, or non-string', async () => {
       // no database call should be made
-      const result = await service.findByEmail(undefined as any);
+      const result = await service.findByEmail(undefined as unknown as string);
       expect(result).toBeNull();
       expect(mockPrismaService.user.findUnique).not.toHaveBeenCalled();
 
@@ -97,7 +97,7 @@ describe('UsersService', () => {
       expect(result2).toBeNull();
       expect(mockPrismaService.user.findUnique).not.toHaveBeenCalled();
 
-      const result3 = await service.findByEmail({} as any);
+      const result3 = await service.findByEmail({} as unknown as string);
       expect(result3).toBeNull();
       expect(mockPrismaService.user.findUnique).not.toHaveBeenCalled();
     });

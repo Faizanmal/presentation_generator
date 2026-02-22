@@ -4,6 +4,7 @@ import {
   ExecutionContext,
   CallHandler,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { LoggerService } from '../logger/logger.service';
@@ -11,6 +12,11 @@ import { LoggerService } from '../logger/logger.service';
 /**
  * Interceptor for logging HTTP requests and responses
  */
+interface RequestWithExtras extends Request {
+  user?: { id?: string; [key: string]: unknown };
+  requestId?: string;
+}
+
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
   constructor(private readonly logger: LoggerService) {
@@ -18,9 +24,7 @@ export class LoggingInterceptor implements NestInterceptor {
   }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
-    const request = context
-      .switchToHttp()
-      .getRequest<import('express').Request>();
+    const request = context.switchToHttp().getRequest<RequestWithExtras>();
     const response = context
       .switchToHttp()
       .getResponse<import('express').Response>();
@@ -31,10 +35,11 @@ export class LoggingInterceptor implements NestInterceptor {
     const userAgent = request.get('user-agent') || '';
     const ip =
       request.ip ||
-      ((request.connection as Record<string, unknown>)
+      ((request.connection as unknown as Record<string, unknown>)
         ?.remoteAddress as string) ||
       '';
-    const userId = (request.user as Record<string, unknown>)?.id || 'anonymous';
+    const userId =
+      (request.user as { id?: string } | undefined)?.id || 'anonymous';
     const requestId =
       (request.headers as Record<string, string>)?.['x-request-id'] ||
       this.generateRequestId();
@@ -60,7 +65,7 @@ export class LoggingInterceptor implements NestInterceptor {
     return next.handle().pipe(
       tap({
         next: (): void => {
-          const statusCode = (response as Record<string, unknown>)
+          const statusCode = (response as unknown as Record<string, unknown>)
             .statusCode as number;
           const responseTime = Date.now() - startTime;
 
@@ -95,6 +100,7 @@ export class LoggingInterceptor implements NestInterceptor {
     );
   }
 
+  // helper to generate request id
   private generateRequestId(): string {
     return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }

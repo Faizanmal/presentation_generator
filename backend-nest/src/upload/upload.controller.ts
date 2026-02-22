@@ -117,7 +117,7 @@ export class UploadController {
   @Delete(':assetId')
   @HttpCode(HttpStatus.OK)
   async deleteFile(
-    @CurrentUser() user: { id: string },
+    @CurrentUser() _user: { id: string },
     @Param('assetId') assetId: string,
   ) {
     await this.uploadService.deleteFile(assetId);

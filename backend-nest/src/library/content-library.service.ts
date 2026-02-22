@@ -7,7 +7,7 @@ export interface LibraryItem {
   name: string;
   description?: string;
   type: 'slide' | 'block';
-  content: any;
+  content: unknown;
   tags: string[];
   category: string;
   usageCount: number;
@@ -19,7 +19,7 @@ interface CreateLibraryItemDto {
   name: string;
   description?: string;
   type: 'slide' | 'block';
-  content: any;
+  content: unknown;
   tags?: string[];
   category?: string;
 }

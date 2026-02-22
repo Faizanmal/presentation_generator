@@ -38,7 +38,7 @@ export class SyncController {
   async cacheProject(
     @Request() req: { user: { id: string } },
     @Param('projectId') projectId: string,
-    @Body() body: { data: Record<string, any>; version: number },
+    @Body() body: { data: Record<string, unknown>; version: number },
   ) {
     return this.syncService.cacheProject(
       req.user.id,
@@ -81,7 +81,7 @@ export class SyncController {
     body: {
       projectId: string;
       operation: 'CREATE' | 'UPDATE' | 'DELETE';
-      data: Record<string, any>;
+      data: Record<string, unknown>;
     },
   ) {
     return this.syncService.queueSyncOperation(
@@ -104,7 +104,7 @@ export class SyncController {
         operation: 'CREATE' | 'UPDATE' | 'DELETE';
         resource: string;
         resourceId?: string;
-        data: Record<string, any>;
+        data: Record<string, unknown>;
         timestamp: number;
       }>;
     },
@@ -148,7 +148,7 @@ export class SyncController {
     body: {
       projectId: string;
       clientVersion: number;
-      clientData: Record<string, any>;
+      clientData: Record<string, unknown>;
     },
   ) {
     return this.syncService.detectConflicts(
@@ -170,9 +170,9 @@ export class SyncController {
       projectId: string;
       resolution: {
         strategy: 'server-wins' | 'client-wins' | 'merge' | 'manual';
-        serverVersion?: Record<string, any>;
-        clientVersion?: Record<string, any>;
-        mergedVersion?: Record<string, any>;
+        serverVersion?: Record<string, unknown>;
+        clientVersion?: Record<string, unknown>;
+        mergedVersion?: Record<string, unknown>;
       };
     },
   ) {

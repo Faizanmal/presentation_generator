@@ -69,7 +69,7 @@ export class VersionControlService {
 
   async createVersion(
     projectId: string,
-    userId: string,
+    _userId: string,
     options: {
       name?: string;
       description?: string;
@@ -193,7 +193,7 @@ export class VersionControlService {
     });
 
     for (const slide of version.snapshot.slides) {
-      const { blocks, content, ...slideData } = slide;
+      const { blocks, content: _content, ...slideData } = slide;
       await this.prisma.slide.create({
         data: {
           ...slideData,
@@ -323,7 +323,7 @@ export class VersionControlService {
     // Copy slides
     // Copy slides
     for (const slide of version.snapshot.slides) {
-      const { blocks, content, ...slideData } = slide;
+      const { blocks, content: _content, ...slideData } = slide;
       await this.prisma.slide.create({
         data: {
           ...slideData,
@@ -387,7 +387,7 @@ export class VersionControlService {
       }
 
       if (!targetSlideIds.has(slide.id)) {
-        const { content, ...slideData } = slide;
+        const { content: _content, ...slideData } = slide;
         await this.prisma.slide.create({
           data: {
             ...slideData,

@@ -376,7 +376,7 @@ export class EmailProcessor extends WorkerHost {
           result.error || 'All providers failed',
         );
         throw new Error(`All email providers failed: ${result.error}`, {
-          cause: new Error(result.error || 'Unknown error'),
+          cause: primaryError,
         });
       }
 

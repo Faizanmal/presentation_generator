@@ -65,7 +65,16 @@ Ensure good contrast between text and background colors.`,
     });
 
     const content = response.choices[0]?.message?.content || '{}';
-    const result = JSON.parse(content);
+    const result = JSON.parse(content) as {
+      colors?: { hex: string; name: string; percentage: number }[];
+      primary?: string;
+      secondary?: string;
+      background?: string;
+      surface?: string;
+      text?: string;
+      textMuted?: string;
+      accent?: string;
+    };
 
     // Parse colors and create RGB values
     const colors: ExtractedColor[] = (result.colors || []).map(
@@ -93,7 +102,7 @@ Ensure good contrast between text and background colors.`,
    * Generate a theme from a color palette
    */
   async createThemeFromPalette(
-    userId: string,
+    _userId: string,
     palette: ColorPalette,
     themeName: string,
   ) {

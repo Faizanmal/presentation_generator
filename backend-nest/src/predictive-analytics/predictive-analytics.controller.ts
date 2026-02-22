@@ -54,7 +54,7 @@ export class PredictiveAnalyticsController {
 
   @Post('projects/:projectId/schedule')
   @ApiOperation({ summary: 'Schedule prediction updates' })
-  async scheduleUpdate(
+  scheduleUpdate(
     @Request() req: { user: { id: string } },
     @Param('projectId') projectId: string,
   ) {

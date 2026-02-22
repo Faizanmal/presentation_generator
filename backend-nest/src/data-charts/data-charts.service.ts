@@ -112,7 +112,7 @@ export class DataChartsService {
    * Create a data source from CSV
    */
   async createDataSourceFromCSV(
-    userId: string,
+    _userId: string,
     projectId: string,
     name: string,
     csvContent: string,
@@ -160,7 +160,7 @@ export class DataChartsService {
    * Create a data source from Raw JSON
    */
   async createDataSourceFromJSON(
-    userId: string,
+    _userId: string,
     projectId: string,
     name: string,
     jsonContent: string | unknown[],
@@ -221,7 +221,7 @@ export class DataChartsService {
         name,
         type: 'MANUAL',
         config: {},
-        data: rows as unknown as any,
+        data: rows as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -239,7 +239,7 @@ export class DataChartsService {
    * Connect to Google Sheets
    */
   async connectGoogleSheets(
-    userId: string,
+    _userId: string,
     projectId: string,
     name: string,
     sheetId: string,
@@ -274,7 +274,7 @@ export class DataChartsService {
    * Connect to external API
    */
   async connectAPIDataSource(
-    userId: string,
+    _userId: string,
     projectId: string,
     name: string,
     apiEndpoint: string,

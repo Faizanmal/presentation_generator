@@ -276,7 +276,7 @@ export class AICopilotService {
    * Quick actions that don't require full conversation
    */
   async quickAction(
-    userId: string,
+    _userId: string,
     action: string,
     options: { projectId?: string; slideId?: string; blockId?: string },
   ): Promise<{ result: string; metadata?: object }> {

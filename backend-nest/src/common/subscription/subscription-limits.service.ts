@@ -112,7 +112,7 @@ export const QUOTA_KEY = 'subscription_quota';
 export const RequireQuota = (quotaType: keyof UsageQuotas) => {
   return (
     target: object,
-    key?: string | symbol,
+    _key?: string | symbol,
     descriptor?: PropertyDescriptor,
   ) => {
     if (descriptor) {

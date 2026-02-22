@@ -14,7 +14,7 @@ describe('Payments (e2e)', () => {
   let prisma: PrismaService;
   let authToken: string;
   let testUserId: string;
-  let testSubscriptionId: string;
+  let _testSubscriptionId: string;
 
   // Mock Stripe methods
   const mockStripe = {
@@ -250,7 +250,7 @@ describe('Payments (e2e)', () => {
           currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         },
       });
-      testSubscriptionId = subscription.id;
+      _testSubscriptionId = subscription.id;
     });
 
     it('should return user subscription', async () => {

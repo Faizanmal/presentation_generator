@@ -8,7 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
 
-interface ModuleContent {
+interface _ModuleContent {
   slides: string[];
   quizzes?: Array<{ question: string; options: string[]; correct: number }>;
   resources?: string[];
@@ -355,7 +355,7 @@ Format as JSON array:
 
     // Add AI-based recommendation context
     if (completedPathIds.length > 0) {
-      const categories = completedProgress
+      const _categories = completedProgress
         .map((p) => p.module.path.category)
         .filter(Boolean);
       // Could enhance with AI-based category matching
@@ -424,7 +424,7 @@ Format as JSON array:
     }
 
     // module.content is stored as a JSON string (or plain text). Parse if possible.
-    let contentObj: { quizzes?: any[]; text?: string } = {};
+    let contentObj: { quizzes?: Record<string, unknown>[]; text?: string } = {};
     if (typeof module.content === 'string' && module.content.trim()) {
       try {
         contentObj = JSON.parse(module.content);

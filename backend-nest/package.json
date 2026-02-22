@@ -104,6 +104,7 @@
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.1",
     "@types/bcryptjs": "^2.4.6",
+    "@types/compression": "^1.8.1",
     "@types/cookie-parser": "^1.4.7",
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
@@ -113,6 +114,7 @@
     "@types/passport-jwt": "^4.0.1",
     "@types/supertest": "^6.0.2",
     "@types/uuid": "^10.0.0",
+    "ajv": "^8.12.0",
     "ajv-draft-04": "^1.0.0",
     "globals": "^17.3.0",
     "husky": "^9.0.11",
@@ -127,8 +129,7 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3",
-    "typescript-eslint": "^8.56.0",
-    "ajv": "^8.12.0"
+    "typescript-eslint": "^8.56.0"
   },
   "overrides": {
     "fast-xml-parser": "5.3.6"

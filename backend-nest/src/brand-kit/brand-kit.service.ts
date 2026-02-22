@@ -284,7 +284,7 @@ export class BrandKitService {
       updatedAt: _updatedAt,
       ...data
     } = original;
-    const dataAny = data as any;
+    const dataAny = data as Record<string, unknown>;
 
     return this.prisma.brandKit.create({
       data: {

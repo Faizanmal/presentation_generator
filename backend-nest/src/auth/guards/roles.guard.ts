@@ -14,7 +14,7 @@ export const ROLES_KEY = 'roles';
 export const Roles = (...roles: string[]) => {
   return (
     target: object,
-    key?: string | symbol,
+    _key?: string | symbol,
     descriptor?: PropertyDescriptor,
   ) => {
     if (descriptor) {

@@ -41,10 +41,7 @@ export class UniversalDesignController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Auto-fix issues' })
-  async autoFix(
-    @Param('projectId') projectId: string,
-    @Body() dto: AutoFixDto,
-  ) {
+  autoFix(@Param('projectId') projectId: string, @Body() dto: AutoFixDto) {
     return this.designService.autoFix(projectId, dto.issueTypes);
   }
 

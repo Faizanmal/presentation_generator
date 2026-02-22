@@ -14,7 +14,7 @@ describe('TestMailService', () => {
           provide: ConfigService,
           useValue: {
             get: jest.fn((key: string) => {
-              const config: Record<string, any> = {
+              const config: Record<string, unknown> = {
                 TESTMAIL_ENABLED: true,
                 TESTMAIL_API_KEY: 'test-api-key',
                 TESTMAIL_NAMESPACE: 'presentation-designer',

@@ -432,7 +432,7 @@ export class ContentGovernanceService {
 
     const updated = await this.prisma.approvalRequest.update({
       where: { id: requestId },
-      data: { comments },
+      data: { comments: comments as Prisma.InputJsonValue },
     });
 
     return this.mapApprovalRequest(updated);

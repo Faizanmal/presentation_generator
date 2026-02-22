@@ -442,7 +442,7 @@ export class DataImportService {
         valueCounts.set(value, (valueCounts.get(value) || 0) + 1);
       });
 
-      valueCounts.forEach((count, value) => {
+      valueCounts.forEach((_count, value) => {
         labels.push(value);
       });
 

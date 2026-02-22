@@ -383,7 +383,7 @@ Provide the adapted text and list the specific changes made.
 
   private applyAdaptedText(
     content: Prisma.JsonValue,
-    blockType: string,
+    _blockType: string,
     adaptedText: string,
   ): Prisma.JsonValue {
     if (typeof content === 'string') return adaptedText;

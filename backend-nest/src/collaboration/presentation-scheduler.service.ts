@@ -50,7 +50,7 @@ export class PresentationSchedulerService {
   constructor(private prisma: PrismaService) {}
 
   schedulePresentation(
-    userId: string,
+    _userId: string,
     data: {
       projectId: string;
       title: string;

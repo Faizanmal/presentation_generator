@@ -187,7 +187,7 @@ export class SentimentAnalysisGateway
     }
 
     try {
-      const session = await this.sentimentService.endSession(
+      const _session = await this.sentimentService.endSession(
         client.sessionId,
         client.userId,
       );

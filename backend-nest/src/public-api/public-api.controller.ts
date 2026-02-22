@@ -19,6 +19,7 @@ import {
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PublicApiService } from './public-api.service';
 import { PublicApiGuard } from './public-api.guard';
+import { PrismaService } from '../prisma/prisma.service';
 
 // Decorator for required API scope
 export const RequireScope = (scope: string) => SetMetadata('apiScope', scope);
@@ -114,12 +115,12 @@ export class PublicApiController {
 @UseGuards(PublicApiGuard)
 @ApiHeader({ name: 'X-API-Key', description: 'API Key', required: true })
 export class PublicApiEndpointsController {
-  constructor(private readonly prisma: any) {} // Would inject PrismaService
+  constructor(private readonly prisma: PrismaService) {} // Would inject PrismaService
 
   @Get('projects')
   @RequireScope('read:projects')
   @ApiOperation({ summary: 'List projects (Public API)' })
-  async listProjects(@Request() req: { apiUser: { userId: string } }) {
+  listProjects(@Request() req: { apiUser: { userId: string } }) {
     // Return user's projects via API
     return { message: 'Projects endpoint', userId: req.apiUser.userId };
   }
@@ -127,8 +128,8 @@ export class PublicApiEndpointsController {
   @Get('projects/:id')
   @RequireScope('read:projects')
   @ApiOperation({ summary: 'Get project (Public API)' })
-  async getProject(
-    @Request() req: { apiUser: { userId: string } },
+  getProject(
+    @Request() _req: { apiUser: { userId: string } },
     @Param('id') id: string,
   ) {
     return { message: 'Project details endpoint', projectId: id };

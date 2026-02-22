@@ -99,7 +99,7 @@ export class IoTIntegrationGateway
   }
 
   @SubscribeMessage('command')
-  async handleCommand(
+  handleCommand(
     @ConnectedSocket() client: IoTSocket,
     @MessageBody() data: { action: string; payload?: object },
   ) {

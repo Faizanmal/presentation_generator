@@ -7,7 +7,16 @@ import { ForbiddenException } from '@nestjs/common';
 describe('SlidesService (permissions)', () => {
   let service: SlidesService;
 
-  const mockPrisma: any = {
+  const mockPrisma: {
+    project: { findUnique: jest.Mock };
+    slide: {
+      create: jest.Mock;
+      findUnique: jest.Mock;
+      update: jest.Mock;
+      delete: jest.Mock;
+      updateMany: jest.Mock;
+    };
+  } = {
     project: { findUnique: jest.fn() },
     slide: {
       create: jest.fn(),
@@ -17,7 +26,7 @@ describe('SlidesService (permissions)', () => {
       updateMany: jest.fn(),
     },
   };
-  const mockCollab: any = { getUserRole: jest.fn() };
+  const mockCollab: { getUserRole: jest.Mock } = { getUserRole: jest.fn() };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({

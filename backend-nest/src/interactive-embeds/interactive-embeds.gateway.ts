@@ -85,7 +85,7 @@ export class InteractiveEmbedsGateway
 
   @SubscribeMessage('poll-vote')
   async handlePollVote(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() _client: Socket,
     @MessageBody()
     data: { embedId: string; optionIds: string[]; voterId?: string },
   ) {
@@ -109,7 +109,7 @@ export class InteractiveEmbedsGateway
 
   @SubscribeMessage('qa-question')
   async handleQAQuestion(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() _client: Socket,
     @MessageBody()
     data: {
       embedId: string;
@@ -139,7 +139,7 @@ export class InteractiveEmbedsGateway
 
   @SubscribeMessage('qa-upvote')
   async handleQAUpvote(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() _client: Socket,
     @MessageBody()
     data: { embedId: string; questionId: string; voterId?: string },
   ) {
@@ -162,7 +162,7 @@ export class InteractiveEmbedsGateway
 
   @SubscribeMessage('wordcloud-submit')
   async handleWordCloudSubmit(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() _client: Socket,
     @MessageBody()
     data: { embedId: string; words: string[]; responderId?: string },
   ) {

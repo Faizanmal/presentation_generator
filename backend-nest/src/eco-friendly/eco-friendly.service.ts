@@ -279,7 +279,7 @@ export class EcoFriendlyService {
    * Track eco metrics
    */
   trackEcoMetrics(
-    userId: string,
+    _userId: string,
     metrics: {
       sessionDuration: number;
       dataTransferred: number;

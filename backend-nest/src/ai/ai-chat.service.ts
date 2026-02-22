@@ -113,7 +113,7 @@ export class AIChatService {
    * Quick actions - predefined AI operations
    */
   async quickAction(
-    userId: string,
+    _userId: string,
     action:
       | 'improve'
       | 'shorten'

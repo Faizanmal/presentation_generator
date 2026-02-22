@@ -151,7 +151,7 @@ describe('Collaboration (e2e)', () => {
           .set('Authorization', `Bearer ${authToken}`)
           .expect(200);
 
-        const body = response.body as any[];
+        const body = response.body as unknown[];
         expect(Array.isArray(body)).toBe(true);
         expect(body.length).toBeGreaterThan(0);
       });
@@ -213,7 +213,7 @@ describe('Collaboration (e2e)', () => {
           .set('Authorization', `Bearer ${authToken}`)
           .expect(200);
 
-        const body = response.body as any[];
+        const body = response.body as unknown[];
         expect(Array.isArray(body)).toBe(true);
         expect(body.length).toBeGreaterThan(0);
       });
@@ -270,7 +270,7 @@ describe('Collaboration (e2e)', () => {
           .set('Authorization', `Bearer ${authToken}`)
           .expect(200);
 
-        const body = response.body as any[];
+        const body = response.body as unknown[];
         expect(Array.isArray(body)).toBe(true);
         expect(body.length).toBeGreaterThan(0);
       });

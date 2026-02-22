@@ -13,7 +13,7 @@ describe('ProjectsService', () => {
   let _prismaService: PrismaService;
   let _usersService: UsersService;
   let _aiService: AIService;
-  let _queue: any;
+  let _queue: unknown;
 
   const mockPrismaService = {
     project: {
