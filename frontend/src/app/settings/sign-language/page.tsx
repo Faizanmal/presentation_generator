@@ -1,13 +1,9 @@
 'use client';
 
-import { useState } from 'react';
 import { toast } from 'sonner';
 import {
-  Hand, Loader2, Globe, Check, Languages, Play, Settings,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
+  Hand, Globe, Check} from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useSignLanguage } from '@/hooks/use-new-features';

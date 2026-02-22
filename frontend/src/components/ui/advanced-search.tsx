@@ -402,7 +402,7 @@ function SearchResultItem({
             onClick={onClick}
             className="w-full flex items-start gap-3 p-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-left"
         >
-            <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 flex-shrink-0">
+            <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 shrink-0">
                 <Icon className="h-4 w-4 text-slate-500" />
             </div>
 

@@ -215,7 +215,7 @@ export class StoryboardingService {
         topic,
         narrativeArc,
         audienceConfig,
-        structureConfig as any,
+        structureConfig as unknown as any,
         estimatedDuration,
       );
 
@@ -238,7 +238,7 @@ export class StoryboardingService {
         data: {
           narrativeArc: narrativeArc as unknown as object,
           pacing: pacing as unknown as object,
-          transitions: transitions as any,
+          transitions: transitions as unknown as any,
           status: 'completed',
         },
         include: {

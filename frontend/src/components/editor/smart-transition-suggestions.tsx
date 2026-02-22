@@ -249,7 +249,7 @@ export function SmartTransitionSuggestions({
             {/* All Transitions */}
             <div className="space-y-2">
                 <Label>All Transitions</Label>
-                <ScrollArea className="h-[200px]">
+                <ScrollArea className="h-50">
                     <div className="grid grid-cols-2 gap-2 pr-4">
                         {TRANSITION_TYPES.map((transition) => {
                             const Icon = transition.icon;

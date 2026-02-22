@@ -300,12 +300,12 @@ export function AnimationBuilder({
             {/* Left Panel - Animation List / Presets */}
             <div className="w-64 shrink-0">
               <TabsContent value="elements" className="m-0">
-                <Card className="h-[500px]">
+                <Card className="h-125">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm">Elements</CardTitle>
                   </CardHeader>
                   <CardContent className="p-2">
-                    <ScrollArea className="h-[430px]">
+                    <ScrollArea className="h-107.5">
                       <div className="space-y-2">
                         {elements.map((element) => (
                           <div
@@ -380,7 +380,7 @@ export function AnimationBuilder({
               </TabsContent>
 
               <TabsContent value="transitions" className="m-0">
-                <Card className="h-[500px]">
+                <Card className="h-125">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm">Transition Presets</CardTitle>
                   </CardHeader>
@@ -410,12 +410,12 @@ export function AnimationBuilder({
               </TabsContent>
 
               <TabsContent value="timeline" className="m-0">
-                <Card className="h-[500px]">
+                <Card className="h-125">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm">Animation Order</CardTitle>
                   </CardHeader>
                   <CardContent className="p-2">
-                    <ScrollArea className="h-[430px]">
+                    <ScrollArea className="h-107.5">
                       <div className="space-y-1">
                         {animations
                           .sort((a, b) => a.order - b.order)
@@ -479,7 +479,7 @@ export function AnimationBuilder({
             <div className="flex-1">
               <TabsContent value="elements" className="m-0">
                 {selectedAnimation ? (
-                  <Card className="h-[500px]">
+                  <Card className="h-125">
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-sm">
@@ -522,7 +522,7 @@ export function AnimationBuilder({
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <ScrollArea className="h-[380px] pr-4">
+                      <ScrollArea className="h-95 pr-4">
                         <div className="space-y-6">
                           {/* Duration */}
                           <div className="space-y-2">
@@ -689,7 +689,7 @@ export function AnimationBuilder({
                     </CardContent>
                   </Card>
                 ) : (
-                  <Card className="h-[500px] flex items-center justify-center">
+                  <Card className="h-125 flex items-center justify-center">
                     <div className="text-center text-muted-foreground">
                       <Settings2 className="h-12 w-12 mx-auto mb-3 opacity-50" />
                       <p>Select an animation to edit</p>
@@ -702,7 +702,7 @@ export function AnimationBuilder({
               </TabsContent>
 
               <TabsContent value="transitions" className="m-0">
-                <Card className="h-[500px]">
+                <Card className="h-125">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm">Transition Settings</CardTitle>
                     <CardDescription>
@@ -807,7 +807,7 @@ export function AnimationBuilder({
               </TabsContent>
 
               <TabsContent value="timeline" className="m-0">
-                <Card className="h-[500px]">
+                <Card className="h-125">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm">Animation Timeline</CardTitle>
                     <CardDescription>
@@ -817,7 +817,7 @@ export function AnimationBuilder({
                   <CardContent>
                     <div className="space-y-4">
                       {/* Timeline visualization */}
-                      <div className="relative h-[300px] border rounded bg-muted/30 overflow-hidden">
+                      <div className="relative h-75 border rounded bg-muted/30 overflow-hidden">
                         {/* Time markers */}
                         <div className="absolute top-0 left-0 right-0 h-6 border-b bg-muted flex items-center text-xs text-muted-foreground">
                           {[0, 25, 50, 75, 100].map((percent) => (

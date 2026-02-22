@@ -163,9 +163,9 @@ export class VRARService {
     }>,
     config: VRConfig,
   ) {
-    const environment =
-      this.environments[config.environment as keyof typeof this.environments] ||
-      this.environments.default;
+    // const environment =
+    //   this.environments[config.environment as keyof typeof this.environments] ||
+    //   this.environments.default;
 
     for (const slide of slides) {
       const content = (slide.content || {}) as Record<string, unknown>;
@@ -196,7 +196,7 @@ export class VRARService {
                 enabled: true,
                 position: { x: 0, y: 1.6, z: -2 },
               }
-            : (null as any),
+            : (null as unknown as any),
         },
       });
     }

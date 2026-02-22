@@ -14,16 +14,12 @@ import {
 type Theme = "light" | "dark" | "system";
 
 export function useTheme() {
-    const [theme, setTheme] = useState<Theme>("system");
-    const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
-
-    useEffect(() => {
+    const [theme, setTheme] = useState<Theme>(() => {
+        if (typeof window === 'undefined') {return "system";}
         const savedTheme = localStorage.getItem("theme") as Theme | null;
-        if (savedTheme) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            setTheme(savedTheme);
-        }
-    }, []);
+        return savedTheme || "system";
+    });
+    const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
 
     useEffect(() => {
         const root = document.documentElement;

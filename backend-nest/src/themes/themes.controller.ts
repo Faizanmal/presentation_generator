@@ -13,7 +13,7 @@ import { ColorPaletteService, ColorPalette } from './color-palette.service';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { CacheVeryLong, CacheLong } from '../common/decorators/cache.decorator';
+import { CacheVeryLong } from '../common/decorators/cache.decorator';
 
 @Controller('themes')
 export class ThemesController {

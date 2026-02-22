@@ -78,7 +78,7 @@ export default function AIThinkingPage() {
     }, [result, router, savedProjectId, isCreatingProject]);
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900">
+        <div className="min-h-screen bg-linear-to-br from-slate-900 via-purple-900/20 to-slate-900">
             {/* Header */}
             <header className="border-b border-white/10 bg-black/20 backdrop-blur-sm">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -94,7 +94,7 @@ export default function AIThinkingPage() {
                         </div>
 
                         <div className="flex items-center gap-3">
-                            <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-500/20 to-blue-500/20 border border-purple-500/30">
+                            <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-full bg-linear-to-r from-purple-500/20 to-blue-500/20 border border-purple-500/30">
                                 <Brain className="h-5 w-5 text-purple-400" />
                                 <span className="text-sm font-medium text-white">AI Thinking Mode</span>
                             </div>
@@ -107,13 +107,13 @@ export default function AIThinkingPage() {
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
                 {/* Hero Section */}
                 <div className="text-center mb-12">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-500/20 to-blue-500/20 border border-purple-500/30 mb-6">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-linear-to-r from-purple-500/20 to-blue-500/20 border border-purple-500/30 mb-6">
                         <Sparkles className="h-4 w-4 text-yellow-400" />
                         <span className="text-sm font-medium text-white">Advanced AI Generation</span>
                     </div>
                     <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
                         AI{' '}
-                        <span className="bg-gradient-to-r from-purple-400 via-pink-500 to-red-500 bg-clip-text text-transparent">
+                        <span className="bg-linear-to-r from-purple-400 via-pink-500 to-red-500 bg-clip-text text-transparent">
                             Thinking Mode
                         </span>
                     </h1>
@@ -165,7 +165,7 @@ export default function AIThinkingPage() {
                                     <Button
                                         onClick={handleCreateProject}
                                         disabled={isCreatingProject}
-                                        className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                                        className="flex-1 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
                                     >
                                         {isCreatingProject ? 'Creating...' : 'Create Project'}
                                     </Button>
@@ -213,7 +213,7 @@ function FeatureCard({
     };
 
     return (
-        <div className={`p-6 rounded-xl border bg-gradient-to-br ${colorClasses[color]}`}>
+        <div className={`p-6 rounded-xl border bg-linear-to-br ${colorClasses[color]}`}>
             <div className="mb-4">{icon}</div>
             <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
             <p className="text-sm text-white/60">{description}</p>

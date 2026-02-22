@@ -66,8 +66,7 @@ export class AdvancedRateLimitService {
 
       const results = await pipeline.exec();
 
-      // @ts-ignore - results from pipeline
-      const count = (results[1][1] as number) || 0;
+      const count = ((results as unknown[])[1] as [unknown, number])[1] || 0;
 
       const remaining = Math.max(0, config.points - count);
       const allowed = count < config.points;

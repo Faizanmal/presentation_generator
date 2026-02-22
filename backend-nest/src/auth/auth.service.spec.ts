@@ -4,16 +4,19 @@ import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
-import { UnauthorizedException, ConflictException } from '@nestjs/common';
+import { OtpService } from '../otp/otp.service';
+import { EmailService } from '../email/email.service';
+import {
+  UnauthorizedException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 
 jest.mock('bcryptjs');
 
 describe('AuthService', () => {
   let service: AuthService;
-  let _usersService: UsersService;
-  let _jwtService: JwtService;
-  let _prisma: PrismaService;
 
   const mockUser = {
     id: 'user-123',
@@ -31,6 +34,9 @@ describe('AuthService', () => {
     create: jest.fn(),
     update: jest.fn(),
     updatePassword: jest.fn(),
+    createAccount: jest.fn(),
+    findAccount: jest.fn(),
+    createSubscription: jest.fn(),
   };
 
   const mockJwtService = {
@@ -44,6 +50,29 @@ describe('AuthService', () => {
       create: jest.fn(),
       update: jest.fn(),
     },
+  };
+
+  const mockOtpService = {
+    generateOtp: jest.fn(),
+    verifyOtp: jest.fn(),
+    getOtpStatus: jest.fn(),
+  };
+
+  const mockEmailService = {
+    sendWelcomeEmail: jest.fn(),
+    sendNotificationEmail: jest.fn(),
+    sendPasswordResetEmail: jest.fn(),
+  };
+
+  const mockRedis = {
+    get: jest.fn(),
+    set: jest.fn(),
+    del: jest.fn(),
+    incr: jest.fn(),
+    expire: jest.fn(),
+    exists: jest.fn(),
+    scan: jest.fn(),
+    mget: jest.fn(),
   };
 
   const mockConfigService = {
@@ -65,13 +94,13 @@ describe('AuthService', () => {
         { provide: JwtService, useValue: mockJwtService },
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: ConfigService, useValue: mockConfigService },
+        { provide: OtpService, useValue: mockOtpService },
+        { provide: EmailService, useValue: mockEmailService },
+        { provide: 'REDIS_CLIENT', useValue: mockRedis },
       ],
     }).compile();
 
     service = module.get<AuthService>(AuthService);
-    _usersService = module.get<UsersService>(UsersService);
-    _jwtService = module.get<JwtService>(JwtService);
-    _prisma = module.get<PrismaService>(PrismaService);
 
     // Reset mocks
     jest.clearAllMocks();
@@ -225,6 +254,110 @@ describe('AuthService', () => {
     });
   });
 
+  describe('googleAuth', () => {
+    const googleProfile = {
+      email: 'oauth@example.com',
+      name: 'OAuth User',
+      picture: 'https://example.com/avatar.png',
+      googleId: 'google-id-123',
+    };
+
+    it('should throw when profile has no email or invalid email value', async () => {
+      await expect(
+        service.googleAuth({
+          ...googleProfile,
+          email: '' as string,
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        service.googleAuth({
+          ...googleProfile,
+          email: {} as unknown as string,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should create a new user when none exists and return auth response', async () => {
+      const newUser = {
+        id: 'new-user-1',
+        email: googleProfile.email,
+        name: googleProfile.name,
+        image: googleProfile.picture,
+      };
+      mockUsersService.findByEmail.mockResolvedValue(null);
+      mockUsersService.create.mockResolvedValue(newUser);
+      mockUsersService.createAccount.mockResolvedValue({});
+      mockUsersService.createSubscription.mockResolvedValue({});
+
+      const response = await service.googleAuth(googleProfile);
+
+      expect(mockUsersService.findByEmail).toHaveBeenCalledWith(
+        googleProfile.email,
+      );
+      expect(mockUsersService.create).toHaveBeenCalledWith({
+        email: googleProfile.email,
+        name: googleProfile.name,
+        image: googleProfile.picture,
+      });
+      expect(mockUsersService.createAccount).toHaveBeenCalledWith({
+        userId: newUser.id,
+        type: 'oauth',
+        provider: 'google',
+        providerAccountId: googleProfile.googleId,
+      });
+      expect(mockUsersService.createSubscription).toHaveBeenCalledWith(
+        newUser.id,
+      );
+      expect(response).toEqual({
+        accessToken: 'mock-jwt-token',
+        refreshToken: undefined,
+        expiresIn: expect.any(Number),
+        user: expect.objectContaining({ id: newUser.id }),
+      });
+    });
+
+    it('should log in existing user and link account if necessary', async () => {
+      const existingUser = { ...mockUser };
+      mockUsersService.findByEmail.mockResolvedValue(existingUser);
+      mockUsersService.findAccount.mockResolvedValue(null);
+      mockUsersService.createAccount.mockResolvedValue({});
+
+      const response = await service.googleAuth(googleProfile);
+
+      expect(mockUsersService.findByEmail).toHaveBeenCalledWith(
+        googleProfile.email,
+      );
+      expect(mockUsersService.findAccount).toHaveBeenCalledWith(
+        existingUser.id,
+        'google',
+      );
+      expect(mockUsersService.createAccount).toHaveBeenCalledWith({
+        userId: existingUser.id,
+        type: 'oauth',
+        provider: 'google',
+        providerAccountId: googleProfile.googleId,
+      });
+      expect(response).toEqual({
+        accessToken: 'mock-jwt-token',
+        refreshToken: undefined,
+        expiresIn: expect.any(Number),
+        user: expect.objectContaining({ id: existingUser.id }),
+      });
+    });
+
+    it('should not create account link when one already exists', async () => {
+      const existingUser = { ...mockUser };
+      mockUsersService.findByEmail.mockResolvedValue(existingUser);
+      mockUsersService.findAccount.mockResolvedValue({ provider: 'google' });
+
+      const response = await service.googleAuth(googleProfile);
+
+      expect(mockUsersService.createAccount).not.toHaveBeenCalled();
+      expect(response.user.id).toEqual(existingUser.id);
+    });
+  });
+
   describe('changePassword', () => {
     const userId = 'user-123';
     const oldPassword = 'OldPassword123!';
@@ -317,17 +450,21 @@ describe('AuthService', () => {
     it('should return new access token for valid refresh token', async () => {
       const payload = { sub: mockUser.id, email: mockUser.email };
       mockJwtService.verify.mockReturnValue(payload);
-      mockUsersService.findById.mockResolvedValue(mockUser);
-
-      const result = await service.refreshToken('valid-refresh-token');
+      mockRedis.get.mockResolvedValue(mockUser.id);
+      const result = await service.refreshToken(
+        mockUser.id,
+        'valid-refresh-token',
+      );
 
       expect(result).toEqual({
-        access_token: 'mock-jwt-token',
+        accessToken: 'mock-jwt-token',
+        expiresIn: expect.any(Number),
       });
-      expect(mockJwtService.verify).toHaveBeenCalledWith('valid-refresh-token');
+      expect(mockRedis.get).toHaveBeenCalled();
       expect(mockJwtService.sign).toHaveBeenCalledWith({
         sub: mockUser.id,
         email: mockUser.email,
+        name: mockUser.name,
       });
     });
   });

@@ -67,12 +67,21 @@ export class SendgridMailerService {
       }
     }
 
+    const content = [
+      ...(finalHtml ? [{ type: 'text/html', value: finalHtml }] : []),
+      ...(finalText ? [{ type: 'text/plain', value: finalText }] : []),
+    ];
+
+    // Ensure at least one content item
+    if (content.length === 0) {
+      content.push({ type: 'text/plain', value: '' });
+    }
+
     const msg: sendgrid.MailDataRequired = {
       to,
       from: { email: this.fromAddress, name: this.fromName },
       subject,
-      html: finalHtml || undefined,
-      text: finalText || undefined,
+      content: content as unknown as any,
     };
 
     try {

@@ -49,7 +49,7 @@ class GenerateVariationsDto {
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class ABTestingController {
-  constructor(private readonly abTestingService: ABTestingService) { }
+  constructor(private readonly abTestingService: ABTestingService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a new A/B test' })
@@ -147,7 +147,7 @@ export class ABTestingController {
 
   @Post('generate-variations')
   @ApiOperation({ summary: 'Generate theme variations for testing' })
-  async generateVariations(@Body() dto: GenerateVariationsDto) {
+  generateVariations(@Body() dto: GenerateVariationsDto) {
     return this.abTestingService.generateThemeVariations(
       dto.baseTheme,
       dto.count || 3,

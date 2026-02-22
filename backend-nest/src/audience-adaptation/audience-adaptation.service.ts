@@ -193,7 +193,7 @@ export class AudienceAdaptationService {
 
     for (const slide of project.slides) {
       const adaptedBlocks: Prisma.JsonValue[] = [];
-      const changes: string[] = []; 
+      const changes: string[] = [];
 
       for (const block of slide.blocks) {
         const adaptedBlock = await this.adaptBlock(
@@ -368,9 +368,14 @@ Provide the adapted text and list the specific changes made.
     if (typeof content === 'string') return content;
     if (content && typeof content === 'object') {
       const obj = content as Record<string, unknown>;
-      if (typeof (obj as any).text === 'string') return (obj as any).text;
-      if (typeof (obj as any).content === 'string') return (obj as any).content;
-      if (Array.isArray((obj as any).items)) return (obj as any).items.join('\n');
+      if (typeof (obj as { text?: string }).text === 'string')
+        return (obj as { text?: string }).text ?? '';
+      if (typeof (obj as { content?: string }).content === 'string')
+        return (obj as { content?: string }).content ?? '';
+      if (Array.isArray((obj as Record<string, { items?: string[] }>).items))
+        return (
+          (obj as Record<string, { items?: string[] }>).items as string[]
+        ).join('\n');
       return JSON.stringify(obj);
     }
     return '';
@@ -383,15 +388,23 @@ Provide the adapted text and list the specific changes made.
   ): Prisma.JsonValue {
     if (typeof content === 'string') return adaptedText;
     if (content && typeof content === 'object') {
-      const obj = { ...(content as Record<string, unknown>) } as Record<string, unknown> & {
+      const obj = { ...(content as Record<string, unknown>) } as Record<
+        string,
+        unknown
+      > & {
         text?: string;
         content?: string;
         items?: string[];
       };
-      if ('text' in obj) return { ...obj, text: adaptedText } as Prisma.JsonValue;
-      if ('content' in obj) return { ...obj, content: adaptedText } as Prisma.JsonValue;
+      if ('text' in obj)
+        return { ...obj, text: adaptedText } as Prisma.JsonValue;
+      if ('content' in obj)
+        return { ...obj, content: adaptedText } as Prisma.JsonValue;
       if (Array.isArray(obj.items)) {
-        return { ...obj, items: adaptedText.split('\n').filter(Boolean) } as Prisma.JsonValue;
+        return {
+          ...obj,
+          items: adaptedText.split('\n').filter(Boolean),
+        } as Prisma.JsonValue;
       }
       // Fallback: set a content property
       return { ...obj, content: adaptedText } as Prisma.JsonValue;

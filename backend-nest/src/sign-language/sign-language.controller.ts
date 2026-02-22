@@ -52,7 +52,7 @@ export class SignLanguageController {
   @Post('translate')
   @ApiOperation({ summary: 'Translate text to sign language' })
   async translateText(@Body() dto: TranslateTextDto) {
-    return this.signService.translateToSigns(dto.text, dto.language);
+    return this.signService.translateToSigns(dto.text);
   }
 
   @Get('preview/:word')

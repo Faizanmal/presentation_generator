@@ -67,7 +67,7 @@ export class IoTIntegrationGateway
       client.join(`device:${client.deviceId}`);
 
       client.emit('authenticated', { device: result.device });
-    } catch (error) {
+    } catch {
       client.emit('error', { message: 'Authentication error' });
     }
   }
@@ -93,7 +93,7 @@ export class IoTIntegrationGateway
       client.join(`session:${data.sessionId}`);
 
       client.emit('sessionLinked', result);
-    } catch (error) {
+    } catch {
       client.emit('error', { message: 'Failed to link session' });
     }
   }
@@ -129,7 +129,7 @@ export class IoTIntegrationGateway
     try {
       await this.iotService.handleDeviceEvent(client.deviceId, data);
       client.emit('eventAck', { type: data.type });
-    } catch (error) {
+    } catch {
       client.emit('error', { message: 'Event processing failed' });
     }
   }

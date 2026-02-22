@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import {
-  Search, BookOpen, Sparkles, FileText, CheckCircle2, Loader2,
-  ExternalLink, Shield, BarChart3, ArrowLeft,
+  Search, BookOpen, Sparkles, FileText, Loader2,
+  Shield, ArrowLeft,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,20 +13,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useResearch } from '@/hooks/use-new-features';
-import { useAuthStore } from '@/stores/auth-store';
+import type { ContentResearch } from '@/types';
 import Link from 'next/link';
 
+interface ResearchBlock {
+  type: string;
+  content: string | Record<string, unknown>;
+}
+
 export default function AIResearchPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const projectId = searchParams.get('projectId') || '';
-  const { isAuthenticated } = useAuthStore();
   const { researches, isLoading, startResearch, generateBlocks, factCheck } = useResearch(projectId);
   const [topic, setTopic] = useState('');
   const [depth, setDepth] = useState('standard');
 
   const handleStartResearch = () => {
-    if (!topic.trim()) return;
+    if (!topic.trim()) { return; }
     startResearch.mutate(
       { topic, depth },
       {
@@ -102,7 +105,7 @@ export default function AIResearchPage() {
             </div>
           ) : researches?.length ? (
             <div className="grid gap-4">
-              {researches.map((research: { id: string; topic: string; status: string; summary?: string; keywords?: string[]; sources: { id: string }[]; createdAt: string }) => (
+              {researches.map((research: ContentResearch) => (
                 <Card key={research.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-6">
                     <div className="flex items-start justify-between">
@@ -137,13 +140,24 @@ export default function AIResearchPage() {
                           <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
                             <FileText className="w-4 h-4" /> Generated Content
                           </h4>
-                          {/* Check if content is a string or object */}
+                          {/* Check if content is a string or object/array */}
                           {typeof research.content === 'string' ? (
                             <p className="text-sm text-muted-foreground whitespace-pre-wrap">{research.content}</p>
-                          ) : Array.isArray(research.content?.blocks) ? (
+                          ) : Array.isArray(research.content) ? (
                             <div className="space-y-2">
-                              {research.content.blocks.map((block: any, i: number) => (
-                                <div key={i} className="text-sm border-l-2 border-primary/20 pl-3">
+                              {(research.content as ResearchBlock[]).map((block: ResearchBlock, i: number) => (
+                                // eslint-disable-next-line react/no-array-index-key
+                                <div key={`block-${block.type}-${i}`} className="text-sm border-l-2 border-primary/20 pl-3">
+                                  <p className="font-medium text-foreground">{block.type}</p>
+                                  <p className="text-muted-foreground line-clamp-2">{typeof block.content === 'string' ? block.content : JSON.stringify(block.content)}</p>
+                                </div>
+                              ))}
+                            </div>
+                          ) : Array.isArray((research.content as Record<string, unknown>)?.blocks) ? (
+                            <div className="space-y-2">
+                              {((research.content as Record<string, ResearchBlock[]>).blocks).map((block: ResearchBlock, i: number) => (
+                                // eslint-disable-next-line react/no-array-index-key
+                                <div key={`nested-block-${block.type}-${i}`} className="text-sm border-l-2 border-primary/20 pl-3">
                                   <p className="font-medium text-foreground">{block.type}</p>
                                   <p className="text-muted-foreground line-clamp-2">{typeof block.content === 'string' ? block.content : JSON.stringify(block.content)}</p>
                                 </div>

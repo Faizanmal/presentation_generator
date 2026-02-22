@@ -305,7 +305,7 @@ export function AITextTools({
                                 placeholder="Describe how you want to change the text..."
                                 value={customPrompt}
                                 onChange={(e) => setCustomPrompt(e.target.value)}
-                                className="min-h-[60px] text-sm"
+                                className="min-h-15 text-sm"
                             />
                         </div>
                         <Button

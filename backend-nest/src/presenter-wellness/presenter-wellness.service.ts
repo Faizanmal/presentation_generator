@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 
 interface WellnessMetrics {
   speakingPaceWPM: number;
@@ -33,16 +34,17 @@ export class PresenterWellnessService {
     return this.prisma.wellnessSession.create({
       data: {
         userId,
-        presentationId,
+        projectId: presentationId,
         startTime: new Date(),
-        metrics: {
+        // store aggregated metrics in `summary` JSON; raw metric records live in `WellnessMetric` table
+        summary: {
           speakingPaceWPM: 0,
           pauseFrequency: 0,
           avgPauseDuration: 0,
           volumeVariation: 0,
           fillerWordCount: 0,
           stressIndicators: 0,
-        },
+        } as Prisma.InputJsonValue,
         breaksTaken: 0,
         wellnessScore: 100,
       },
@@ -61,16 +63,25 @@ export class PresenterWellnessService {
       throw new NotFoundException('Wellness session not found');
     }
 
-    const currentMetrics = session.metrics as WellnessMetrics;
+    const currentMetrics = (session.summary as unknown as WellnessMetrics) || {
+      speakingPaceWPM: 0,
+      pauseFrequency: 0,
+      avgPauseDuration: 0,
+      volumeVariation: 0,
+      fillerWordCount: 0,
+      stressIndicators: 0,
+    };
     const updatedMetrics = { ...currentMetrics, ...metrics };
 
     // Calculate wellness score
-    const wellnessScore = this.calculateWellnessScore(updatedMetrics);
+    const wellnessScore = this.calculateWellnessScore(
+      updatedMetrics as WellnessMetrics,
+    );
 
     return this.prisma.wellnessSession.update({
       where: { id: sessionId },
       data: {
-        metrics: updatedMetrics as object,
+        summary: updatedMetrics as Prisma.InputJsonValue,
         wellnessScore,
       },
     });
@@ -116,10 +127,18 @@ export class PresenterWellnessService {
     }
 
     const endTime = new Date();
+    const start = session.startTime ?? session.startedAt;
     const duration =
-      (endTime.getTime() - session.startTime.getTime()) / 1000 / 60; // minutes
+      (endTime.getTime() - (start?.getTime() ?? endTime.getTime())) / 1000 / 60; // minutes
 
-    const metrics = session.metrics as WellnessMetrics;
+    const metrics = (session.summary as unknown as WellnessMetrics) || {
+      speakingPaceWPM: 0,
+      pauseFrequency: 0,
+      avgPauseDuration: 0,
+      volumeVariation: 0,
+      fillerWordCount: 0,
+      stressIndicators: 0,
+    };
     const recommendations = this.generateRecommendations(metrics, duration);
 
     const updated = await this.prisma.wellnessSession.update({
@@ -453,16 +472,22 @@ export class PresenterWellnessService {
    * Get wellness history for user
    */
   async getWellnessHistory(userId: string, limit = 10) {
-    return this.prisma.wellnessSession.findMany({
+    const sessions = await this.prisma.wellnessSession.findMany({
       where: { userId },
       orderBy: { startTime: 'desc' },
       take: limit,
-      include: {
-        presentation: {
-          select: { title: true },
-        },
+      select: {
+        id: true,
+        startTime: true,
+        endTime: true,
+        wellnessScore: true,
+        breaksTaken: true,
+        presentation: true,
       },
     });
+
+    // presentation is a JSON column; return as-is so frontend can access title if present
+    return sessions;
   }
 
   /**
@@ -483,9 +508,10 @@ export class PresenterWellnessService {
     }
 
     const recentAvg =
-      sessions.slice(0, 5).reduce((sum, s) => sum + s.wellnessScore, 0) / 5;
+      sessions.slice(0, 5).reduce((sum, s) => sum + (s.wellnessScore ?? 0), 0) /
+      5;
     const olderAvg =
-      sessions.slice(-5).reduce((sum, s) => sum + s.wellnessScore, 0) /
+      sessions.slice(-5).reduce((sum, s) => sum + (s.wellnessScore ?? 0), 0) /
       Math.min(5, sessions.length);
 
     const trend =
@@ -500,7 +526,12 @@ export class PresenterWellnessService {
       recentAverageScore: Math.round(recentAvg),
       historicalAverageScore: Math.round(olderAvg),
       totalSessions: sessions.length,
-      insights: this.generateTrendInsights(sessions),
+      insights: this.generateTrendInsights(
+        sessions.map((s) => ({
+          metrics: (s.summary as unknown as object) || {},
+          wellnessScore: s.wellnessScore || 0,
+        })),
+      ),
     };
   }
 

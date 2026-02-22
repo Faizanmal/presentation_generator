@@ -25,6 +25,7 @@ model User {
   emailVerified DateTime?
   phoneVerified DateTime?
   image         String?
+  settings      Json?    // User preferences and settings
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -42,6 +43,7 @@ model User {
   otpLogs             OtpLog[]
   uploads             Upload[]
   imagePatterns       PresentationImagePattern?
+  carbonOffsets       CarbonOffset[]
 
   @@index([createdAt])
   @@index([subscriptionTier])
@@ -173,6 +175,7 @@ model Project {
   tone                String?
   audience            String?
   metadata            Json?
+  analytics           Json? // Analytics data
 
   // Timestamps
   createdAt   DateTime @default(now())
@@ -205,8 +208,11 @@ model Slide {
   projectId String
   title     String?
   content   Json? // Slide content as JSON
+  speakerNotes String? @db.Text
+  thumbnailUrl String?
   order     Int
   layout    String @default("default") // layout template name
+  transition String? @default("fade") // slide transition effect
   createdById String?
 
   createdAt DateTime @default(now())
@@ -270,7 +276,7 @@ model Block {
   content   Json // Flexible content storage
   order     Int
   createdById String?
-  // version   Int       @default(1) // Optimistic locking version
+  version   Int       @default(1) // Optimistic locking version
 
   // Styling overrides
   style Json? // Custom styling for this block
@@ -284,7 +290,7 @@ model Block {
 
   @@index([projectId])
   @@index([slideId])
-  // @@index([projectId, version])
+  @@index([projectId, version])
   @@map("blocks")
 }
 
@@ -410,6 +416,7 @@ model Upload {
   localPath     String?
   thumbnailUrl  String?
   filename      String
+  originalName  String?  // Original filename before upload
   mimeType      String
   size          Int      @default(0)
   width         Int?
@@ -1553,6 +1560,7 @@ model ActivityLog {
   action     String
   targetType String
   targetId   String
+  timestamp  DateTime @default(now())
   metadata   Json?
   createdAt  DateTime @default(now())
 
@@ -2068,10 +2076,13 @@ model LiveQuestion {
   sessionId     String
   userId        String?
   anonymousName String?
+  isAnonymous   Boolean  @default(false)
+  hostId        String?
   content       String   @db.Text
   status        String   @default("pending") // pending, approved, rejected, answered, spam
   moderationScore Float? // AI moderation score
   moderationReason String?
+  aiAnalysis    Json?    // AI analysis results
   upvotes       Int      @default(0)
   isHighlighted Boolean  @default(false)
   isPinned      Boolean  @default(false)
@@ -2095,14 +2106,16 @@ model OperationalTransform {
   id            String   @id @default(cuid())
   projectId     String
   userId        String
-  operation     String   // insert, delete, update, move
+  operation     Json     // insert, delete, update, move - stored as JSON
   path          String   // JSON path to the changed element
   oldValue      Json?
   newValue      Json?
+  version       Int      // Operation version number
   vectorClock   Json     // Vector clock for conflict resolution
   serverSeq     Int      // Server sequence number
   clientSeq     Int      // Client sequence number
   isApplied     Boolean  @default(false)
+  appliedAt     DateTime? // When the operation was applied
   conflictWith  String?  // ID of conflicting operation
   resolvedBy    String?  // merge, theirs, ours
   createdAt     DateTime @default(now())
@@ -2120,14 +2133,17 @@ model DeviceSync {
   deviceName   String?
   deviceType   String   // mobile, tablet, desktop, web
   platform     String?  // ios, android, windows, macos, web
+  appVersion   String?
   lastSyncAt   DateTime @default(now())
   syncVersion  Int      @default(0)
+  syncState    Json?    // Current sync state
   offlineData  Json?    // Cached offline changes
   isOnline     Boolean  @default(true)
   pushToken    String?  // For push notifications
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  @@unique([userId, deviceId])
   @@index([userId])
   @@index([deviceId])
   @@map("device_syncs")
@@ -2139,8 +2155,10 @@ model DeviceSync {
 
 model PredictiveInsight {
   id              String   @id @default(cuid())
+  userId          String
   projectId       String
   type            String   // engagement, dropoff, length, visual
+  insightType     String?  // specific insight type
   prediction      Json     // Prediction details
   confidence      Float    // 0-1 confidence score
   recommendations Json     // Array of recommendations
@@ -2151,20 +2169,26 @@ model PredictiveInsight {
   expiresAt       DateTime?
 
   @@index([projectId])
+  @@index([userId])
   @@index([type])
   @@map("predictive_insights")
 }
 
 model EngagementPrediction {
-  id              String   @id @default(cuid())
-  projectId       String
-  slideId         String?
-  predictedScore  Float    // 0-100
-  actualScore     Float?   // After measurement
-  factors         Json     // Contributing factors
-  suggestions     Json     // Improvement suggestions
-  calculatedAt    DateTime @default(now())
-  measuredAt      DateTime?
+  id                  String   @id @default(cuid())
+  projectId           String
+  slideId             String?
+  predictedScore      Float    // 0-100
+  predictedEngagement Float?   // Engagement prediction
+  predictedCompletion Float?   // Completion prediction
+  predictedShares     Float?   // Shares prediction
+  actualScore         Float?   // After measurement
+  modelVersion        String?  // ML model version used
+  factors             Json     // Contributing factors
+  suggestions         Json     // Improvement suggestions
+  createdAt           DateTime @default(now())
+  calculatedAt        DateTime @default(now())
+  measuredAt          DateTime?
 
   @@index([projectId])
   @@index([slideId])
@@ -2225,7 +2249,7 @@ model SentimentSnapshot {
 model LearningPath {
   id              String   @id @default(cuid())
   userId          String
-  projectId       String
+  projectId       String?
   title           String
   description     String?  @db.Text
   modules         LearningModule[]
@@ -2248,9 +2272,11 @@ model LearningModule {
   pathId        String
   slideId       String?
   title         String
+  description   String?  @db.Text
   content       String?  @db.Text
   order         Int
   type          String   @default("lesson") // lesson, quiz, assignment, resource
+  estimatedMinutes Int?  // estimated time in minutes
   resources     Json?    // Additional resources
   quizConfig    Json?    // Quiz configuration
   completionCriteria Json? // What counts as complete
@@ -2318,8 +2344,10 @@ model SignLanguageTranslation {
   slideId       String
   blockId       String?
   sourceText    String   @db.Text
+  originalText  String   @db.Text
   language      String   @default("ASL") // Sign language used
   signSequence  Json     // Array of sign animations
+  glossSequence Json?    // Sequence of gloss annotations
   videoUrl      String?
   duration      Float?   // seconds
   status        String   @default("pending") // pending, processing, completed, failed
@@ -2372,6 +2400,7 @@ model UniversalDesignReport {
   readabilityScore  Float
   issuesFound       Int      @default(0) // Total number of issues
   issues            Json     // Array of issues
+  details           Json?    // Detailed report data
   culturalIssues    CulturalIssue[]
   suggestions       Json     // Improvement suggestions
   targetRegions     String[] @default([])
@@ -2466,6 +2495,7 @@ model SDKConfiguration {
   version         String   @default("1.0.0")
   status          String   @default("active") // active, suspended, revoked
   isHeadless      Boolean  @default(false)
+  branding        Json?    // Branding configuration
   customBranding  Json?    // Logo, colors, fonts
   customDomain    String?
   allowedDomains  String[] @default([]) // Allowed domains for CORS
@@ -2490,6 +2520,7 @@ model SDKInstance {
   instanceKey   String   @unique
   clientName    String?  // Client application name
   domain        String
+  customBranding Json?   // Instance-specific branding
   status        String   @default("active") // active, suspended, revoked
   usageCount    Int      @default(0) // Number of API calls
   usageStats    Json?
@@ -2510,18 +2541,20 @@ model SDKInstance {
 // ============================================
 
 model IoTDevice {
-  id            String   @id @default(cuid())
-  userId        String
-  deviceType    String   // alexa, google_home, fitbit, custom
-  deviceId      String   @unique
-  name          String
-  capabilities  String[] @default([])
-  authToken     String?
-  status        String   @default("connected") // connected, disconnected, error
-  lastPing      DateTime?
-  metadata      Json?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id              String   @id @default(cuid())
+  userId          String
+  deviceType      String   // alexa, google_home, fitbit, custom
+  deviceId        String   @unique
+  deviceToken     String?  @unique
+  name            String
+  capabilities    String[] @default([])
+  authToken       String?
+  status          String   @default("connected") // connected, disconnected, error
+  lastConnectedAt DateTime?
+  lastPing        DateTime?
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   commands IoTCommand[]
 
@@ -2535,6 +2568,7 @@ model IoTCommand {
   deviceId      String
   projectId     String?
   command       String   // next_slide, previous_slide, pause, resume, goto_slide
+  payload       Json?    // Command payload data
   parameters    Json?
   status        String   @default("pending") // pending, executed, failed
   executedAt    DateTime?
@@ -2563,6 +2597,9 @@ model EcoReport {
   heavyMediaCount   Int      @default(0)
   optimizations     Json     // Applied optimizations
   suggestions       Json     // Suggested improvements
+  period            String?  // reporting period
+  generatedAt       DateTime? // when report was generated
+  totalEmissions    Float?   // total emissions calculated
   createdAt         DateTime @default(now())
 
   @@index([projectId])
@@ -2601,6 +2638,9 @@ model WellnessSession {
   status          String   @default("active") // active, paused, completed
   webcamEnabled   Boolean  @default(false)
   duration        Int      @default(0) // seconds
+  wellnessScore   Float?
+  startTime       DateTime?
+  endTime         DateTime?
   breaksTaken     Int      @default(0)
   hydrationReminders Int   @default(0)
   metrics         WellnessMetric[]
@@ -2608,6 +2648,7 @@ model WellnessSession {
   recommendations Json?
   startedAt       DateTime @default(now())
   endedAt         DateTime?
+  presentation    Json?    // Presentation data
 
   @@index([userId])
   @@index([projectId])
@@ -2629,4 +2670,30 @@ model WellnessMetric {
   @@index([sessionId])
   @@index([metricType])
   @@map("wellness_metrics")
+}
+
+// ============================================
+// CARBON OFFSET
+// ============================================
+
+model CarbonOffset {
+  id             String   @id @default(cuid())
+  userId         String
+  provider       String   // 'gold_standard', 'verra', etc.
+  project        String   // Project name
+  amount         Float    // Tons of CO2 offset
+  cost           Float    // Cost in USD
+  status         String   @default("pending") // pending, purchased, certified
+  certificateUrl String?
+  transactionId  String?
+  emissionsKg    Float    // Original emissions amount
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@map("carbon_offsets")
 }

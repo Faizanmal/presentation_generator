@@ -1,11 +1,10 @@
 'use client';
 
-import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import {
-  ScanEye, ArrowLeft, Loader2, CheckCircle2, XCircle, AlertTriangle,
-  Globe, Eye, RefreshCw,
+  ScanEye, Loader2, CheckCircle2, XCircle, AlertTriangle,
+  Globe, RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -141,8 +140,8 @@ export default function UniversalDesignPage() {
         <CardContent>
           {culturalGuide.data ? (
             <div className="space-y-3">
-              {culturalGuide.data.tips?.map((tip: { title: string; description: string }, i: number) => (
-                <div key={i} className="p-3 rounded-lg bg-muted/50">
+              {culturalGuide.data.tips?.map((tip: { title: string; description: string }) => (
+                <div key={tip.title} className="p-3 rounded-lg bg-muted/50">
                   <p className="font-medium text-sm">{tip.title}</p>
                   <p className="text-xs text-muted-foreground mt-1">{tip.description}</p>
                 </div>

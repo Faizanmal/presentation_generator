@@ -84,7 +84,7 @@ export class SanitizationMiddleware implements NestMiddleware {
       const sanitizedQuery = this.sanitizeObject(req.query) as ParsedQs;
       try {
         req.query = sanitizedQuery;
-      } catch (error) {
+      } catch {
         // If req.query is read-only (getter only), mutate the object properties
         if (typeof req.query === 'object' && req.query !== null) {
           Object.keys(req.query).forEach((key) => delete req.query[key]);

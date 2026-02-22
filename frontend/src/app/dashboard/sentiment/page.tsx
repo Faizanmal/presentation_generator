@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   SmilePlus, ArrowLeft, Play, Square, Loader2, Smile, Frown, Meh,
-  ThumbsUp, ThumbsDown, TrendingUp, BarChart3,
+  TrendingUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -124,8 +124,8 @@ export default function SentimentPage() {
               <CardContent>
                 {session?.dataPoints?.length > 0 ? (
                   <div className="space-y-2">
-                    {session.dataPoints.slice(-10).map((dp: { timestamp: string; score: number; label: string }, i: number) => (
-                      <div key={i} className="flex items-center gap-3">
+                    {session.dataPoints.slice(-10).map((dp: { timestamp: string; score: number; label: string }) => (
+                      <div key={dp.timestamp} className="flex items-center gap-3">
                         <span className="text-xs text-muted-foreground w-16">
                           {new Date(dp.timestamp).toLocaleTimeString()}
                         </span>

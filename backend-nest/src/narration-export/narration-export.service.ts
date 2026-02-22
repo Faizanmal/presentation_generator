@@ -653,7 +653,8 @@ Return only the speaker notes, ready to be read aloud.
         '1080p': { width: 1920, height: 1080 },
         '4k': { width: 3840, height: 2160 },
       };
-      const res = resolutions[job.resolution || '1080p'] || resolutions['1080p'];
+      const res =
+        resolutions[job.resolution || '1080p'] || resolutions['1080p'];
 
       // Check if FFmpeg is available
       let ffmpegAvailable = false;
@@ -727,14 +728,19 @@ Return only the speaker notes, ready to be read aloud.
           }
         } catch (ffmpegError) {
           this.logger.error('FFmpeg processing failed:', ffmpegError);
-          throw new Error('Video processing failed');
+          throw new Error('Video processing failed', {
+            cause: ffmpegError as Error,
+          });
         }
       } else {
         // Fallback: Create a slideshow-style export using HTML
         // This generates a downloadable HTML presentation with autoplay
         const htmlContent = this.generateVideoFallbackHtml(
           project,
-          narrationSlides,
+          narrationSlides.map((slide) => ({
+            duration: slide.duration || undefined,
+            audioUrl: slide.audioUrl || undefined,
+          })),
           slideDuration,
         );
         const filename = `video_${project.id}_${Date.now()}.html`;
@@ -988,7 +994,7 @@ Return only the speaker notes, ready to be read aloud.
       include: {
         slides: {
           orderBy: { order: 'asc' },
-          select: { id: true },
+          select: { id: true, speakerNotes: true },
         },
       },
     });

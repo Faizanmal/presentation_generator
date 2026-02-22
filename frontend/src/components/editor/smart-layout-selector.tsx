@@ -247,12 +247,12 @@ export function SmartLayoutSelector({
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[400px] p-0" align="start">
+      <PopoverContent className="w-100 p-0" align="start">
         <div className="p-4 border-b">
           <h4 className="font-semibold">Choose Layout</h4>
           <p className="text-sm text-slate-500">Select a layout for your slide</p>
         </div>
-        <div className="grid grid-cols-3 gap-2 p-4 max-h-[400px] overflow-y-auto">
+        <div className="grid grid-cols-3 gap-2 p-4 max-h-100 overflow-y-auto">
           {LAYOUTS.map((layout) => (
             <button
               key={layout.id}

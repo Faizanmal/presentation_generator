@@ -4,16 +4,16 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { AIService } from '../ai/ai.service';
 import { getQueueToken } from '@nestjs/bullmq';
-import { ProjectType, BlockType } from '@prisma/client';
+import { ProjectType } from '@prisma/client';
 import { GenerationTone } from './dto/generate-project.dto';
 import { NotFoundException, ForbiddenException } from '@nestjs/common';
 
 describe('ProjectsService', () => {
   let service: ProjectsService;
-  let prismaService: PrismaService;
-  let usersService: UsersService;
-  let aiService: AIService;
-  let queue: unknown;
+  let _prismaService: PrismaService;
+  let _usersService: UsersService;
+  let _aiService: AIService;
+  let _queue: any;
 
   const mockPrismaService = {
     project: {
@@ -78,10 +78,10 @@ describe('ProjectsService', () => {
     }).compile();
 
     service = module.get<ProjectsService>(ProjectsService);
-    prismaService = module.get<PrismaService>(PrismaService);
-    usersService = module.get<UsersService>(UsersService);
-    aiService = module.get<AIService>(AIService);
-    queue = module.get(getQueueToken('generation'));
+    _prismaService = module.get<PrismaService>(PrismaService);
+    _usersService = module.get<UsersService>(UsersService);
+    _aiService = module.get<AIService>(AIService);
+    _queue = module.get(getQueueToken('generation'));
 
     jest.clearAllMocks();
   });

@@ -8,7 +8,6 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useVRExport, useHolographic } from '@/hooks/use-new-features';
@@ -18,7 +17,7 @@ export default function ImmersivePage() {
   const searchParams = useSearchParams();
   const projectId = searchParams.get('projectId') || '';
   const { exportToVR, generateARMarker } = useVRExport(projectId);
-  const { formats, createPreview } = useHolographic(projectId);
+  const { createPreview } = useHolographic(projectId);
   const [vrFormat, setVrFormat] = useState('webxr');
   const [holoFormat, setHoloFormat] = useState('looking-glass');
 
@@ -76,7 +75,7 @@ export default function ImmersivePage() {
                 <Button
                   className="w-full"
                   onClick={() => exportToVR.mutate({ format: vrFormat }, {
-                    onSuccess: (data) => toast.success('VR export started! Check downloads when ready.'),
+                    onSuccess: (_data) => toast.success('VR export started! Check downloads when ready.'),
                     onError: () => toast.error('Export failed'),
                   })}
                   disabled={exportToVR.isPending}

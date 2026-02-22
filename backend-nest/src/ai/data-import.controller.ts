@@ -9,6 +9,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import type { Express } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { DataImportService } from './data-import.service';
 import {
@@ -32,7 +33,7 @@ export class DataImportController {
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
   async uploadDataFile(
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: Express.Multer.File | undefined,
     @Body() importDto: ImportDataDto,
   ) {
     if (!file) {
@@ -74,7 +75,7 @@ export class DataImportController {
     // Parse file based on type
     let parsedData: ParsedDataResult;
     if (source === DataImportSourceEnum.EXCEL) {
-      parsedData = this.dataImportService.parseExcel(
+      parsedData = await this.dataImportService.parseExcel(
         file.buffer,
         file.originalname,
         importDto.sheetName,
@@ -105,7 +106,7 @@ export class DataImportController {
   @Post('generate-presentation')
   @UseInterceptors(FileInterceptor('file'))
   async generatePresentationFromData(
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: Express.Multer.File | undefined,
     @Body() importDto: ImportDataDto,
     @Body('userId') userId: string,
   ) {
@@ -124,7 +125,7 @@ export class DataImportController {
 
     let parsedData: ParsedDataResult;
     if (isExcel) {
-      parsedData = this.dataImportService.parseExcel(
+      parsedData = await this.dataImportService.parseExcel(
         file.buffer,
         file.originalname,
         importDto.sheetName,
@@ -171,12 +172,14 @@ export class DataImportController {
    */
   @Post('preview-sheets')
   @UseInterceptors(FileInterceptor('file'))
-  previewExcelSheets(@UploadedFile() file: Express.Multer.File) {
+  async previewExcelSheets(
+    @UploadedFile() file: Express.Multer.File | undefined,
+  ) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
 
-    const sheets = this.dataImportService.getExcelSheets(file.buffer);
+    const sheets = await this.dataImportService.getExcelSheets(file.buffer);
 
     return {
       success: true,
@@ -193,7 +196,7 @@ export class DataImportController {
   @Post('analyze')
   @UseInterceptors(FileInterceptor('file'))
   async analyzeDataFile(
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: Express.Multer.File | undefined,
     @Query('sheetName') sheetName?: string,
     @Query('autoDetectHeaders') autoDetectHeaders?: string,
   ) {
@@ -207,7 +210,7 @@ export class DataImportController {
 
     let parsedData: ParsedDataResult;
     if (isExcel) {
-      parsedData = this.dataImportService.parseExcel(
+      parsedData = await this.dataImportService.parseExcel(
         file.buffer,
         file.originalname,
         sheetName,

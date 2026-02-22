@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import { AIService } from '../ai/ai.service';
 
 interface DesignIssue {
@@ -145,8 +146,17 @@ export class UniversalDesignService {
       data: {
         projectId,
         overallScore: score,
+        accessibilityScore: score,
+        culturalScore: 0,
+        readabilityScore: 0,
         issuesFound: issues.length + culturalIssues.length,
-        details: { issues, culturalIssues, passedChecks },
+        issues: issues as unknown as Prisma.InputJsonValue,
+        suggestions: [] as unknown as Prisma.InputJsonValue,
+        details: {
+          issues,
+          culturalIssues,
+          passedChecks,
+        } as unknown as Prisma.InputJsonValue,
         targetRegions: options?.targetRegions || ['Universal'],
       },
     });
@@ -162,11 +172,11 @@ export class UniversalDesignService {
   /**
    * Check accessibility compliance
    */
-  private async checkAccessibility(project: {
+  private checkAccessibility(project: {
     slides: Array<{
       blocks: Array<{ blockType: string; content: unknown; styles?: unknown }>;
     }>;
-  }): Promise<DesignIssue[]> {
+  }): DesignIssue[] {
     const issues: DesignIssue[] = [];
 
     for (const slide of project.slides) {
@@ -206,10 +216,7 @@ export class UniversalDesignService {
 
         // Check color contrast (simplified)
         if (styles.color && styles.backgroundColor) {
-          const contrast = this.calculateContrast(
-            styles.color,
-            styles.backgroundColor,
-          );
+          const contrast = this.calculateContrast();
           if (contrast < 4.5) {
             issues.push({
               type: 'contrast',
@@ -230,7 +237,7 @@ export class UniversalDesignService {
   /**
    * Calculate color contrast ratio
    */
-  private calculateContrast(foreground: string, background: string): number {
+  private calculateContrast(): number {
     // Simplified contrast calculation
     // Real implementation would parse hex/rgb colors and calculate luminance
     return 5; // Placeholder
@@ -239,12 +246,12 @@ export class UniversalDesignService {
   /**
    * Check cultural sensitivity
    */
-  private async checkCulturalSensitivity(
+  private checkCulturalSensitivity(
     project: {
       slides: Array<{ blocks: Array<{ content: unknown; styles?: unknown }> }>;
     },
     regions: string[],
-  ): Promise<CulturalIssue[]> {
+  ): CulturalIssue[] {
     const issues: CulturalIssue[] = [];
 
     for (const slide of project.slides) {
@@ -458,7 +465,7 @@ export class UniversalDesignService {
   /**
    * Auto-fix issues
    */
-  async autoFix(projectId: string, issueTypes: string[]) {
+  autoFix(projectId: string, issueTypes: string[]) {
     // In production, this would apply automatic fixes
     return {
       fixed: issueTypes,

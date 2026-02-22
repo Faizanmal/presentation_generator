@@ -17,14 +17,27 @@ export class LoggingInterceptor implements NestInterceptor {
     this.logger.setContext('HTTP');
   }
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    const request = context.switchToHttp().getRequest();
-    const { method, url, body, query, params } = request;
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
+    const request = context
+      .switchToHttp()
+      .getRequest<import('express').Request>();
+    const response = context
+      .switchToHttp()
+      .getResponse<import('express').Response>();
+    const { method, url, body, query, params } = request as unknown as Record<
+      string,
+      unknown
+    >;
     const userAgent = request.get('user-agent') || '';
-    const ip = request.ip || request.connection.remoteAddress;
-    const userId = request.user?.id || 'anonymous';
+    const ip =
+      request.ip ||
+      ((request.connection as Record<string, unknown>)
+        ?.remoteAddress as string) ||
+      '';
+    const userId = (request.user as Record<string, unknown>)?.id || 'anonymous';
     const requestId =
-      request.headers['x-request-id'] || this.generateRequestId();
+      (request.headers as Record<string, string>)?.['x-request-id'] ||
+      this.generateRequestId();
 
     // Add request ID to request for tracking
     request.requestId = requestId;
@@ -32,7 +45,7 @@ export class LoggingInterceptor implements NestInterceptor {
     const startTime = Date.now();
 
     this.logger.log(
-      `Incoming ${method} ${url}`,
+      `Incoming ${method as string} ${url as string}`,
       JSON.stringify({
         requestId,
         userId,
@@ -46,13 +59,13 @@ export class LoggingInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       tap({
-        next: (data) => {
-          const response = context.switchToHttp().getResponse();
-          const { statusCode } = response;
+        next: (): void => {
+          const statusCode = (response as Record<string, unknown>)
+            .statusCode as number;
           const responseTime = Date.now() - startTime;
 
           this.logger.log(
-            `Completed ${method} ${url} ${statusCode} - ${responseTime}ms`,
+            `Completed ${method as string} ${url as string} ${statusCode} - ${responseTime}ms`,
             JSON.stringify({
               requestId,
               userId,
@@ -61,16 +74,19 @@ export class LoggingInterceptor implements NestInterceptor {
             }),
           );
         },
-        error: (error) => {
+        error: (error: unknown): void => {
           const responseTime = Date.now() - startTime;
+          const errorMessage =
+            error instanceof Error ? error.message : 'Unknown error';
+          const errorStack = error instanceof Error ? error.stack : '';
 
           this.logger.error(
-            `Failed ${method} ${url} - ${responseTime}ms`,
-            error.stack,
+            `Failed ${method as string} ${url as string} - ${responseTime}ms`,
+            errorStack,
             JSON.stringify({
               requestId,
               userId,
-              error: error.message,
+              error: errorMessage,
               responseTime,
             }),
           );

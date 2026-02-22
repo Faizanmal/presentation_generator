@@ -244,7 +244,7 @@ function OutlineItemCard({
             {/* Slide Number */}
             <div
                 className={cn(
-                    "flex-shrink-0 w-8 h-8 rounded-md flex items-center justify-center text-sm font-medium",
+                    "shrink-0 w-8 h-8 rounded-md flex items-center justify-center text-sm font-medium",
                     isActive
                         ? "bg-blue-500 text-white"
                         : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
@@ -362,7 +362,7 @@ export function CompactSlideOutline({
                     >
                         <span
                             className={cn(
-                                "flex-shrink-0 w-5 h-5 rounded text-xs flex items-center justify-center",
+                                "shrink-0 w-5 h-5 rounded text-xs flex items-center justify-center",
                                 isActive
                                     ? "bg-blue-500 text-white font-medium"
                                     : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400"
@@ -380,7 +380,7 @@ export function CompactSlideOutline({
                         </span>
                         <ChevronRight
                             className={cn(
-                                "h-3 w-3 flex-shrink-0 transition-opacity",
+                                "h-3 w-3 shrink-0 transition-opacity",
                                 isActive ? "opacity-100" : "opacity-0"
                             )}
                         />

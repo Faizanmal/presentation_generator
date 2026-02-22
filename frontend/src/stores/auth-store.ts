@@ -8,6 +8,8 @@ interface AuthState {
   subscription: Subscription | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  // indicates that the initial profile check has completed (success or failure)
+  initialized: boolean;
 
   // Actions
   login: (email: string, password: string) => Promise<void>;
@@ -26,6 +28,7 @@ export const useAuthStore = create<AuthState>()(
       subscription: null,
       isAuthenticated: false,
       isLoading: true,
+      initialized: false,
 
       login: async (email: string, password: string) => {
         set({ isLoading: true });
@@ -35,11 +38,12 @@ export const useAuthStore = create<AuthState>()(
             user: response.user,
             isAuthenticated: true,
             isLoading: false,
+            initialized: true,
           });
           // Fetch subscription after login
           get().fetchSubscription();
         } catch (error) {
-          set({ isLoading: false });
+          set({ isLoading: false, initialized: true });
           throw error;
         }
       },
@@ -54,11 +58,12 @@ export const useAuthStore = create<AuthState>()(
             user: response.user,
             isAuthenticated: true,
             isLoading: false,
+            initialized: true,
           });
           // Fetch subscription after login
           get().fetchSubscription();
         } catch (error) {
-          set({ isLoading: false });
+          set({ isLoading: false, initialized: true });
           throw error;
         }
       },
@@ -71,11 +76,12 @@ export const useAuthStore = create<AuthState>()(
             user: response.user,
             isAuthenticated: true,
             isLoading: false,
+            initialized: true,
           });
           // Fetch subscription after register
           get().fetchSubscription();
         } catch (error) {
-          set({ isLoading: false });
+          set({ isLoading: false, initialized: true });
           throw error;
         }
       },
@@ -92,7 +98,12 @@ export const useAuthStore = create<AuthState>()(
 
       fetchProfile: async () => {
         if (!api.getToken()) {
-          set({ isLoading: false });
+          set({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false,
+            initialized: true
+          });
           return;
         }
 
@@ -102,12 +113,14 @@ export const useAuthStore = create<AuthState>()(
             user,
             isAuthenticated: true,
             isLoading: false,
+            initialized: true,
           });
         } catch {
           set({
             user: null,
             isAuthenticated: false,
             isLoading: false,
+            initialized: true,
           });
         }
       },

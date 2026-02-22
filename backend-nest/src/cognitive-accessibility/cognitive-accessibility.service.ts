@@ -52,7 +52,7 @@ export class CognitiveAccessibilityService {
       return this.prisma.cognitiveAccessibilityProfile.update({
         where: { id: existing.id },
         data: {
-          settings: fullProfile as object,
+          preferences: fullProfile as object,
           updatedAt: new Date(),
         },
       });
@@ -61,8 +61,7 @@ export class CognitiveAccessibilityService {
     return this.prisma.cognitiveAccessibilityProfile.create({
       data: {
         userId,
-        settings: fullProfile as object,
-        presetName: this.determinePreset(fullProfile),
+        preferences: fullProfile as object,
       },
     });
   }
@@ -79,7 +78,7 @@ export class CognitiveAccessibilityService {
       return this.getDefaultProfile();
     }
 
-    return profile.settings as AccessibilityProfile;
+    return profile.preferences as unknown as AccessibilityProfile;
   }
 
   /**

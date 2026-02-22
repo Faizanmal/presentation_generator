@@ -3,7 +3,6 @@ import { Inject } from '@nestjs/common';
 import { Redis } from 'ioredis';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AdvancedCacheService } from '../cache/advanced-cache.service';
-import { AdvancedRateLimitService } from '../rate-limit/advanced-rate-limit.service';
 
 export interface SystemMetrics {
   timestamp: Date;
@@ -71,18 +70,20 @@ export class PerformanceMonitoringService {
    * Start collecting metrics every minute
    */
   private startMetricsCollection(): void {
-    setInterval(async () => {
-      try {
-        const metrics = await this.collectMetrics();
-        this.logger.log(
-          `System Metrics | DB Conn: ${metrics.database.activeConnections}/${metrics.database.poolSize} | ` +
-            `Cache Hit Rate: ${metrics.cache.hitRate.toFixed(2)}% | ` +
-            `Avg Response: ${metrics.performance.avgResponseTimeMs.toFixed(0)}ms | ` +
-            `RPS: ${metrics.performance.requestsPerSecond.toFixed(0)}`,
-        );
-      } catch (error) {
-        this.logger.error('Failed to collect metrics:', error);
-      }
+    setInterval((): void => {
+      void (async (): Promise<void> => {
+        try {
+          const metrics = await this.collectMetrics();
+          this.logger.log(
+            `System Metrics | DB Conn: ${metrics.database.activeConnections}/${metrics.database.poolSize} | ` +
+              `Cache Hit Rate: ${metrics.cache.hitRate.toFixed(2)}% | ` +
+              `Avg Response: ${metrics.performance.avgResponseTimeMs.toFixed(0)}ms | ` +
+              `RPS: ${metrics.performance.requestsPerSecond.toFixed(0)}`,
+          );
+        } catch (error) {
+          this.logger.error('Failed to collect metrics:', error);
+        }
+      })();
     }, 60000); // Every minute
   }
 
@@ -108,10 +109,10 @@ export class PerformanceMonitoringService {
    */
   async collectMetrics(): Promise<SystemMetrics> {
     const [database, cache, queues, performance] = await Promise.all([
-      this.getDatabaseMetrics(),
-      this.getCacheMetrics(),
-      this.getQueueMetrics(),
-      this.getPerformanceMetrics(),
+      Promise.resolve(this.getDatabaseMetrics()),
+      Promise.resolve(this.getCacheMetrics()),
+      Promise.resolve(this.getQueueMetrics()),
+      Promise.resolve(this.getPerformanceMetrics()),
     ]);
 
     return {
@@ -129,7 +130,9 @@ export class PerformanceMonitoringService {
   private async getDatabaseMetrics(): Promise<DatabaseMetrics> {
     try {
       // Query PostgreSQL for connection stats
-      const result = await this.prisma.$queryRaw<any[]>`
+      const result = await this.prisma.$queryRaw<
+        Array<Record<string, unknown>>
+      >`
         SELECT 
           count(*) as active_connections,
           sum(case when state = 'idle' then 1 else 0 end) as idle_connections,

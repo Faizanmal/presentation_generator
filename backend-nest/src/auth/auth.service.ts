@@ -57,6 +57,22 @@ export class AuthService {
   private readonly ACCESS_TOKEN_EXPIRY = 900; // 15 minutes in seconds
   private readonly REFRESH_TOKEN_EXPIRY = 7 * 24 * 60 * 60; // 7 days in seconds
 
+  // Password must be ≥8 chars and contain at least:
+  // one uppercase letter, one lowercase letter, one digit, one special character
+  private static readonly PASSWORD_REGEX =
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>?`~]).{8,}$/;
+
+  private static readonly PASSWORD_RULES =
+    'Password must be at least 8 characters and include an uppercase letter, ' +
+    'a lowercase letter, a number, and a special character.';
+
+  /** Throws BadRequestException when the password does not meet complexity requirements. */
+  private validatePasswordStrength(password: string): void {
+    if (!password || !AuthService.PASSWORD_REGEX.test(password)) {
+      throw new BadRequestException(AuthService.PASSWORD_RULES);
+    }
+  }
+
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
@@ -120,12 +136,8 @@ export class AuthService {
       throw new ConflictException('Email already registered');
     }
 
-    // Validate password strength
-    if (registerDto.password.length < 8) {
-      throw new BadRequestException(
-        'Password must be at least 8 characters long',
-      );
-    }
+    // Validate password strength (complexity + minimum length)
+    this.validatePasswordStrength(registerDto.password);
 
     // Hash password
     const hashedPassword = await bcrypt.hash(registerDto.password, 12);
@@ -447,6 +459,9 @@ export class AuthService {
       throw new BadRequestException('Invalid request');
     }
 
+    // Validate password strength before verifying the OTP to give early feedback
+    this.validatePasswordStrength(newPassword);
+
     // Verify OTP
     const result = await this.otpService.verifyOtp(
       email,
@@ -495,7 +510,21 @@ export class AuthService {
     picture: string;
     googleId: string;
   }): Promise<AuthResponse> {
-    let user = await this.usersService.findByEmail(profile.email);
+    // Google occasionally returns a profile without an email address (e.g.
+    // when the user has chosen to hide their email).  We have also encountered
+    // rare occasions where the value is an object/array instead of a string.
+    // Both scenarios would break the Prisma query, so validate strictly.
+    const email = profile?.email;
+    if (!email || typeof email !== 'string') {
+      this.logger.warn(
+        `googleAuth called with invalid email: ${JSON.stringify(email)}`,
+      );
+      throw new BadRequestException(
+        'Google account did not provide a valid email',
+      );
+    }
+
+    let user = await this.usersService.findByEmail(email);
 
     if (!user) {
       // Create new user
@@ -607,6 +636,17 @@ export class AuthService {
       throw new BadRequestException('Current password is incorrect');
     }
 
+    // Reject re-use of the current password
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    if (isSamePassword) {
+      throw new BadRequestException(
+        'New password must be different from the current password',
+      );
+    }
+
+    // Validate complexity of the new password
+    this.validatePasswordStrength(newPassword);
+
     const hashedNewPassword = await bcrypt.hash(newPassword, 12);
     await this.usersService.update(user.id, {
       password: hashedNewPassword,
@@ -700,10 +740,25 @@ export class AuthService {
   // ─── Get Recent Audit Events ───────────────────────────────
   async getAuditLog(userId: string, limit = 20): Promise<AuditEvent[]> {
     const pattern = `audit:${userId}:*`;
-    const keys = await this.redis.keys(pattern);
+    const keys: string[] = [];
+
+    // Use SCAN instead of KEYS to avoid blocking Redis in production
+    let cursor = '0';
+    do {
+      const [nextCursor, batch] = await this.redis.scan(
+        cursor,
+        'MATCH',
+        pattern,
+        'COUNT',
+        200,
+      );
+      cursor = nextCursor;
+      keys.push(...batch);
+    } while (cursor !== '0');
+
     if (!keys.length) return [];
 
-    // Sort keys by timestamp (embedded in key) descending
+    // Sort keys by embedded timestamp descending
     keys.sort((a, b) => {
       const tsA = parseInt(a.split(':').pop() || '0', 10);
       const tsB = parseInt(b.split(':').pop() || '0', 10);
@@ -720,11 +775,26 @@ export class AuthService {
   // ─── Refresh Token ─────────────────────────────────────────
   async refreshToken(
     userId: string,
+    refreshTokenRaw: string,
   ): Promise<{ accessToken: string; expiresIn: number }> {
     const user = await this.usersService.findById(userId);
 
     if (!user) {
       throw new UnauthorizedException('User not found');
+    }
+
+    // Validate the refresh token against the Redis store before issuing a new access token
+    if (refreshTokenRaw) {
+      const refreshKey = `refresh:${userId}:${refreshTokenRaw}`;
+      const storedUserId = await this.redis.get(refreshKey);
+
+      if (!storedUserId || storedUserId !== userId) {
+        throw new UnauthorizedException(
+          'Refresh token is invalid or has expired',
+        );
+      }
+    } else {
+      throw new UnauthorizedException('Refresh token is required');
     }
 
     const payload: JwtPayload = {
@@ -734,7 +804,9 @@ export class AuthService {
     };
 
     return {
-      accessToken: this.jwtService.sign(payload),
+      accessToken: this.jwtService.sign(payload, {
+        expiresIn: this.ACCESS_TOKEN_EXPIRY,
+      }),
       expiresIn: this.ACCESS_TOKEN_EXPIRY,
     };
   }

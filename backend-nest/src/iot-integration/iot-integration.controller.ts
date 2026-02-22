@@ -54,7 +54,9 @@ export class IoTIntegrationController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'List user devices' })
-  async listDevices(@Request() req: { user: { id: string } }): Promise<unknown> {
+  async listDevices(
+    @Request() req: { user: { id: string } },
+  ): Promise<unknown> {
     return this.iotService.listDevices(req.user.id);
   }
 

@@ -624,7 +624,7 @@ export function PresentationRecorder() {
           </TabsContent>
 
           <TabsContent value="recordings">
-            <ScrollArea className="h-[400px]">
+            <ScrollArea className="h-100">
               {recordings.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                   <Video className="h-12 w-12 mb-4" />

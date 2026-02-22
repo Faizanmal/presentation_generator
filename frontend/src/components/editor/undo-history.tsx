@@ -330,7 +330,7 @@ export function UndoHistoryPanel({
                         ) : (
                             <div className="relative">
                                 {/* Timeline line */}
-                                <div className="absolute left-[19px] top-6 bottom-6 w-0.5 bg-slate-200 dark:bg-slate-700" />
+                                <div className="absolute left-4.75 top-6 bottom-6 w-0.5 bg-slate-200 dark:bg-slate-700" />
 
                                 <div className="space-y-2">
                                     {/* Current state indicator */}

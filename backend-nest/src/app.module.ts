@@ -235,7 +235,7 @@ import featureFlagsConfig from './common/config/feature-flags.config';
   ],
 })
 export class AppModule implements OnModuleInit {
-  constructor(private readonly themesService: ThemesService) { }
+  constructor(private readonly themesService: ThemesService) {}
 
   async onModuleInit() {
     // Seed default themes on startup

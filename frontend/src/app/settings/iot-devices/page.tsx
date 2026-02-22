@@ -4,10 +4,10 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import {
   Router, Plus, Loader2, Wifi, WifiOff, Trash2, Monitor,
-  Smartphone, Speaker, Tv, Watch, Settings, Send,
+  Smartphone, Speaker, Tv, Watch, Send,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -36,7 +36,7 @@ export default function IoTDevicesPage() {
   const [connectionString, setConnectionString] = useState('');
 
   const handleRegister = async () => {
-    if (!name.trim()) return;
+    if (!name.trim()) {return;}
     try {
       await registerDevice.mutateAsync({ name, type, connectionString });
       setOpen(false);

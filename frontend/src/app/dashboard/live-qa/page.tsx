@@ -4,13 +4,12 @@ import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import {
-  MessageSquareMore, Play, Square, Loader2, ArrowLeft, ThumbsUp, Shield,
+  MessageSquareMore, Play, Square, Loader2, ArrowLeft,
   ChevronUp, ChevronDown, Bot, Users, Clock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useLiveQA, useQASession } from '@/hooks/use-new-features';
@@ -40,7 +39,7 @@ export default function LiveQAPage() {
   };
 
   const handleEnd = async () => {
-    if (!activeSessionId) return;
+    if (!activeSessionId) {return;}
     try {
       await endSession.mutateAsync(activeSessionId);
       toast.success('Session ended');

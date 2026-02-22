@@ -131,7 +131,7 @@ export function AIChatPanel({
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
                         onClick={() => setIsOpen(true)}
-                        className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg shadow-blue-500/25 flex items-center justify-center text-white hover:shadow-xl transition-shadow"
+                        className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full bg-linear-to-r from-blue-600 to-purple-600 shadow-lg shadow-blue-500/25 flex items-center justify-center text-white hover:shadow-xl transition-shadow"
                     >
                         <Sparkles className="h-6 w-6" />
                     </motion.button>
@@ -147,11 +147,11 @@ export function AIChatPanel({
                         exit={{ opacity: 0, y: 20, scale: 0.95 }}
                         className={`fixed z-50 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col ${isExpanded
                             ? "inset-4 md:inset-8"
-                            : "bottom-6 right-6 w-96 h-[600px] max-h-[80vh]"
+                            : "bottom-6 right-6 w-96 h-150 max-h-[80vh]"
                             }`}
                     >
                         {/* Header */}
-                        <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white shrink-0">
+                        <div className="flex items-center justify-between px-4 py-3 bg-linear-to-r from-blue-600 to-purple-600 text-white shrink-0">
                             <div className="flex items-center gap-2">
                                 <Sparkles className="h-5 w-5" />
                                 <span className="font-semibold">AI Assistant</span>
@@ -256,7 +256,7 @@ export function AIChatPanel({
                                         animate={{ opacity: 1 }}
                                         className="flex items-center gap-2 text-slate-500"
                                     >
-                                        <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center">
+                                        <div className="w-8 h-8 rounded-full bg-linear-to-r from-blue-500 to-purple-500 flex items-center justify-center">
                                             <Sparkles className="h-4 w-4 text-white" />
                                         </div>
                                         <div className="flex gap-1">
@@ -287,14 +287,14 @@ export function AIChatPanel({
                                     onChange={(e) => setInput(e.target.value)}
                                     onKeyDown={handleKeyDown}
                                     placeholder="Ask me anything..."
-                                    className="min-h-[44px] max-h-32 resize-none"
+                                    className="min-h-11 max-h-32 resize-none"
                                     rows={1}
                                 />
                                 <Button
                                     onClick={() => sendMessage(input)}
                                     disabled={!input.trim() || isLoading}
                                     size="icon"
-                                    className="h-11 w-11 shrink-0 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                                    className="h-11 w-11 shrink-0 bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
                                 >
                                     {isLoading ? (
                                         <Loader2 className="h-5 w-5 animate-spin" />
@@ -339,7 +339,7 @@ export function AIAssistButton({
             onClick={onClick}
             variant="ghost"
             size={variant === "compact" ? "sm" : "default"}
-            className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 hover:from-blue-500/20 hover:to-purple-500/20 text-blue-600 dark:text-blue-400"
+            className="bg-linear-to-r from-blue-500/10 to-purple-500/10 hover:from-blue-500/20 hover:to-purple-500/20 text-blue-600 dark:text-blue-400"
         >
             <Sparkles className="h-4 w-4 mr-2" />
             {variant === "compact" ? "AI" : "Ask AI"}

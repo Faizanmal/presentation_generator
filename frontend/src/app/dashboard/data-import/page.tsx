@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import {
     FileSpreadsheet, ArrowLeft, Loader2, Upload, Table, BarChart3,
-    Sparkles, FileText, ChevronRight, AlertTriangle, CheckCircle2,
+    Sparkles, FileText, ChevronRight, CheckCircle2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,7 +15,7 @@ import { useRouter } from 'next/navigation';
 
 export default function DataImportPage() {
     const router = useRouter();
-    const { upload, generatePresentation, previewSheets, analyzeData } = useDataImport();
+    const { generatePresentation, previewSheets, analyzeData } = useDataImport();
     const [dragOver, setDragOver] = useState(false);
     const [file, setFile] = useState<File | null>(null);
     const [analysisResult, setAnalysisResult] = useState<{
@@ -68,11 +68,11 @@ export default function DataImportPage() {
     }, [handleFile]);
 
     const handleGenerate = async () => {
-        if (!file) return;
+        if (!file) { return; }
         try {
             const formData = new FormData();
             formData.append('file', file);
-            if (selectedSheet) formData.append('sheetName', selectedSheet);
+            if (selectedSheet) { formData.append('sheetName', selectedSheet); }
             const result = await generatePresentation.mutateAsync(formData);
             toast.success('Presentation generated from data!');
             const project = result.data.project as { id?: string };
@@ -143,7 +143,7 @@ export default function DataImportPage() {
                                     input.accept = '.csv,.xlsx,.xls';
                                     input.onchange = (e) => {
                                         const f = (e.target as HTMLInputElement).files?.[0];
-                                        if (f) handleFile(f);
+                                        if (f) { handleFile(f); }
                                     };
                                     input.click();
                                 }}
@@ -215,9 +215,11 @@ export default function DataImportPage() {
                                         </thead>
                                         <tbody>
                                             {analysisResult.preview.sampleRows.map((row, ri) => (
-                                                <tr key={ri} className="border-t">
+                                                // eslint-disable-next-line react/no-array-index-key
+                                                <tr key={`row-${ri}`} className="border-t">
                                                     {(row as unknown[]).map((cell, ci) => (
-                                                        <td key={ci} className="px-3 py-2 whitespace-nowrap max-w-[200px] truncate">
+                                                        // eslint-disable-next-line react/no-array-index-key
+                                                        <td key={`cell-${ri}-${ci}`} className="px-3 py-2 whitespace-nowrap max-w-50 truncate">
                                                             {String(cell ?? '')}
                                                         </td>
                                                     ))}

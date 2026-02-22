@@ -317,6 +317,7 @@ export function InteractiveEmbedsPanel({
                                 <div className="space-y-2">
                                     <Label>Options</Label>
                                     {pollOptions.map((option, index) => (
+
                                         <div
                                             // eslint-disable-next-line react/no-array-index-key
                                             key={`poll-opt-${index}`}
@@ -495,6 +496,7 @@ export function InteractiveEmbedsPanel({
                                 <div className="space-y-4">
                                     <Label>Questions</Label>
                                     {quizQuestions.map((q, qIndex) => (
+
                                         <Card
                                             // eslint-disable-next-line react/no-array-index-key
                                             key={`quiz-q-${qIndex}`}
@@ -523,6 +525,7 @@ export function InteractiveEmbedsPanel({
                                                 />
                                                 <div className="space-y-2">
                                                     {q.options.map((opt, optIndex) => (
+
                                                         <div
                                                             // eslint-disable-next-line react/no-array-index-key
                                                             key={`quiz-q-${qIndex}-opt-${optIndex}`}
@@ -616,46 +619,48 @@ export function InteractiveEmbedsPanel({
             </div>
 
             {/* Existing Embeds */}
-            {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
-                </div>
-            ) : embeds && embeds.length > 0 ? (
-                <div className="space-y-2">
-                    {embeds.map((embed) => {
-                        const info = embedTypeInfo[embed.type as keyof typeof embedTypeInfo];
-                        const Icon = info?.icon || BarChart3;
+            {
+                isLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+                    </div>
+                ) : embeds && embeds.length > 0 ? (
+                    <div className="space-y-2">
+                        {embeds.map((embed) => {
+                            const info = embedTypeInfo[embed.type as keyof typeof embedTypeInfo];
+                            const Icon = info?.icon || BarChart3;
 
-                        return (
-                            <Card key={embed.id} className="p-3">
-                                <div className="flex items-center gap-3">
-                                    <div className={`p-2 rounded-lg bg-slate-100 dark:bg-slate-800 ${info?.color || ""}`}>
-                                        <Icon className="h-4 w-4" />
+                            return (
+                                <Card key={embed.id} className="p-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`p-2 rounded-lg bg-slate-100 dark:bg-slate-800 ${info?.color || ""}`}>
+                                            <Icon className="h-4 w-4" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-medium text-sm truncate">{info?.title || embed.type}</p>
+                                            <p className="text-xs text-slate-500">{info?.description || ""}</p>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <Button size="icon" variant="ghost" className="h-8 w-8">
+                                                <Eye className="h-4 w-4" />
+                                            </Button>
+                                            <Button size="icon" variant="ghost" className="h-8 w-8">
+                                                <Settings className="h-4 w-4" />
+                                            </Button>
+                                        </div>
                                     </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="font-medium text-sm truncate">{info?.title || embed.type}</p>
-                                        <p className="text-xs text-slate-500">{info?.description || ""}</p>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <Button size="icon" variant="ghost" className="h-8 w-8">
-                                            <Eye className="h-4 w-4" />
-                                        </Button>
-                                        <Button size="icon" variant="ghost" className="h-8 w-8">
-                                            <Settings className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                </div>
-                            </Card>
-                        );
-                    })}
-                </div>
-            ) : (
-                <div className="text-center py-8 text-slate-500">
-                    <Cloud className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No interactive elements yet</p>
-                    <p className="text-xs">Add polls, Q&A, quizzes and more!</p>
-                </div>
-            )}
+                                </Card>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <div className="text-center py-8 text-slate-500">
+                        <Cloud className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">No interactive elements yet</p>
+                        <p className="text-xs">Add polls, Q&A, quizzes and more!</p>
+                    </div>
+                )
+            }
 
             {/* Quick Add Buttons */}
             <div className="grid grid-cols-5 gap-2">
@@ -676,6 +681,6 @@ export function InteractiveEmbedsPanel({
                     );
                 })}
             </div>
-        </div>
+        </div >
     );
 }

@@ -102,7 +102,7 @@ export function ImageAIControls({
                     />
 
                     {/* Gradient overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900/40 to-transparent opacity-0 group-hover/image:opacity-100 transition-opacity" />
+                    <div className="absolute inset-0 bg-linear-to-t from-slate-900/40 to-transparent opacity-0 group-hover/image:opacity-100 transition-opacity" />
 
                     {/* AI Generated badge */}
                     <div className="absolute bottom-4 left-4 text-white font-medium text-sm bg-black/30 backdrop-blur-md px-3 py-1 rounded-full border border-white/20">

@@ -2,17 +2,12 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import {
-  Boxes, Plus, Loader2, Code, Copy, Palette, Settings, Globe,
-  ExternalLink,
-} from 'lucide-react';
+import { Boxes, Plus, Loader2, Code, Copy, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
@@ -20,7 +15,7 @@ import {
 import { useSDKConfigurations } from '@/hooks/use-new-features';
 
 export default function WhiteLabelPage() {
-  const { configs, createConfig, updateConfig, getEmbedCode, getReactComponent } = useSDKConfigurations();
+  const { configs, createConfig, getEmbedCode, getReactComponent } = useSDKConfigurations();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [domain, setDomain] = useState('');
@@ -28,7 +23,7 @@ export default function WhiteLabelPage() {
   const [reactCode, setReactCode] = useState<string | null>(null);
 
   const handleCreate = async () => {
-    if (!name.trim()) return;
+    if (!name.trim()) {return;}
     try {
       await createConfig.mutateAsync({
         name,

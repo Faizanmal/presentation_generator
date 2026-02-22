@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import {
-  MonitorSmartphone, RefreshCw, Loader2, ArrowLeft, Laptop, Smartphone,
+  MonitorSmartphone, Loader2, ArrowLeft, Laptop, Smartphone,
   Tablet, CheckCircle2, AlertTriangle, Wifi, WifiOff,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -21,12 +21,12 @@ const deviceIcons: Record<string, React.ReactNode> = {
 };
 
 export default function CrossSyncPage() {
-  const { devices, syncStatus, registerDevice, resolveConflict } = useCrossPlatformSync();
+  const { devices, syncStatus, registerDevice } = useCrossPlatformSync();
   const [deviceName, setDeviceName] = useState('');
   const [deviceType, setDeviceType] = useState('desktop');
 
   const handleRegister = async () => {
-    if (!deviceName.trim()) return;
+    if (!deviceName.trim()) {return;}
     try {
       await registerDevice.mutateAsync({
         name: deviceName,

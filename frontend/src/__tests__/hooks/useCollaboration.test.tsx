@@ -1,4 +1,4 @@
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import { useCollaboration } from '@/hooks/use-collaboration';
 import { io } from 'socket.io-client';
 

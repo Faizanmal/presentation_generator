@@ -34,9 +34,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       if (typeof exceptionResponse === 'string') {
         message = exceptionResponse;
       } else if (typeof exceptionResponse === 'object') {
-        const responseObj = exceptionResponse as any;
-        message = responseObj.message || message;
-        error = responseObj.error || error;
+        const responseObj = exceptionResponse as Record<string, unknown>;
+        message = (responseObj.message as string) || message;
+        error = (responseObj.error as string) || error;
         details = responseObj.details;
       }
     } else if (exception instanceof Error) {
@@ -47,7 +47,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       this.logger.logError(exception, 'ExceptionFilter', {
         path: request.url,
         method: request.method,
-        userId: (request as any).user?.id,
+        userId: (request as unknown as { user?: { id?: string } }).user?.id,
       });
     }
 
@@ -107,9 +107,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message = exceptionResponse;
       error = exception.name;
     } else {
-      const responseObj = exceptionResponse as any;
-      message = responseObj.message || 'An error occurred';
-      error = responseObj.error || exception.name;
+      const responseObj = exceptionResponse as Record<string, unknown>;
+      message = (responseObj.message as string) || 'An error occurred';
+      error = (responseObj.error as string) || exception.name;
     }
 
     // Log based on severity

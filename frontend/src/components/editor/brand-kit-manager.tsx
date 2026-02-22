@@ -441,6 +441,7 @@ export function BrandKitManager({ onApplyBrandKit }: BrandKitManagerProps) {
                                 </div>
                                 <div className="grid gap-3">
                                     {editingKit.colors?.map((color, index) => (
+                                         
                                         <div key={color.usage === 'accent' ? `accent-${color.hex}-${index}` : color.usage} className="flex items-center gap-3">
                                             <input
                                                 type="color"

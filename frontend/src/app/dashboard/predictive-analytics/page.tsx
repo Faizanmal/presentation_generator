@@ -2,11 +2,11 @@
 
 import { useSearchParams } from 'next/navigation';
 import {
-  TrendingUp, ArrowLeft, Brain, Target, BarChart3, Lightbulb,
+  TrendingUp, ArrowLeft, Brain, BarChart3, Lightbulb,
   ArrowUpRight, ArrowDownRight, Minus, Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { usePredictiveAnalytics } from '@/hooks/use-new-features';
@@ -21,6 +21,7 @@ export default function PredictiveAnalyticsPage() {
   const searchParams = useSearchParams();
   const projectId = searchParams.get('projectId') || '';
   const { insights, recommendations, benchmarks } = usePredictiveAnalytics(projectId);
+  // `insights`, `recommendations`, and `benchmarks` are React Query objects now
 
   return (
     <div className="min-h-screen bg-background">

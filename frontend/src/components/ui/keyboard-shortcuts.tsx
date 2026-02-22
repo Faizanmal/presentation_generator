@@ -154,7 +154,7 @@ export function KeyboardShortcutsDialog({
                                             {shortcut.keys.map((key) => (
                                                 <kbd
                                                     key={key}
-                                                    className="inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm"
+                                                    className="inline-flex items-center justify-center min-w-6 h-6 px-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm"
                                                 >
                                                     {key}
                                                 </kbd>

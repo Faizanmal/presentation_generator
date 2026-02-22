@@ -28,15 +28,16 @@ export class ThrottlerGuard extends NestThrottlerGuard {
     );
   }
 
-  protected async getTracker(req: Record<string, unknown>): Promise<string> {
+  // The base ThrottlerGuard now requires a Promise<string> return value
+  protected getTracker(req: Record<string, unknown>): Promise<string> {
     // Use user ID for authenticated users, IP for anonymous
     const user = req.user as { id?: string } | undefined;
     if (user && user.id) {
-      return `user:${user.id}`;
+      return Promise.resolve(`user:${user.id}`);
     }
 
     // Get real IP behind proxies
-    return this.getRealIp(req);
+    return Promise.resolve(this.getRealIp(req));
   }
 
   protected getRealIp(req: Record<string, unknown>): string {

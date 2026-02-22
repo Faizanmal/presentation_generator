@@ -121,6 +121,7 @@ function OtpInput({
       <div className="flex gap-2 justify-center">
         {[0, 1, 2, 3, 4, 5].map((index) => (
           <input
+             
             key={index}
             ref={(el) => { inputRefs.current[index] = el; }}
             type="text"
@@ -238,14 +239,14 @@ function EmailSentAnimation({ channel }: { channel: "email" | "sms" }) {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading: isAuthLoading, login, loginWithOtp } = useAuthStore();
+  const { isAuthenticated, isLoading: isAuthLoading, initialized, login, loginWithOtp } = useAuthStore();
 
-  // Redirect to dashboard if already authenticated
+  // Redirect to dashboard if already authenticated and we've finished the initial profile check
   useEffect(() => {
-    if (!isAuthLoading && isAuthenticated) {
+    if (initialized && !isAuthLoading && isAuthenticated) {
       router.push('/dashboard');
     }
-  }, [isAuthenticated, isAuthLoading, router]);
+  }, [isAuthenticated, isAuthLoading, initialized, router]);
 
   // Loading & UI states
   const [isLoading, setIsLoading] = useState(false);

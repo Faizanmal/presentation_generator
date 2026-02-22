@@ -36,10 +36,13 @@ export function createNewRelicMiddleware() {
         newrelic.setTransactionName(transactionName);
 
         // Add custom attributes
-        newrelic.addCustomAttribute('user_id', (req.user as any)?.id);
+        newrelic.addCustomAttribute(
+          'user_id',
+          (req.user as unknown as { id?: string })?.id,
+        );
         newrelic.addCustomAttribute(
           'tenant_id',
-          (req.user as any)?.organizationId,
+          (req.user as unknown as { organizationId?: string })?.organizationId,
         );
         newrelic.addCustomAttribute('ip_address', req.ip);
       } catch (error) {
@@ -70,11 +73,11 @@ export function TrackNewRelic(segmentName: string) {
         const newrelic = require('newrelic');
         // `newrelic.startWebTransaction` typing is not strict here — treat as unknown and forward.
         return await newrelic.startWebTransaction(segmentName, async () => {
-          return await originalMethod.apply(this, args as any[]);
+          return await originalMethod.apply(this, args);
         });
       } catch (error) {
         // If New Relic fails, still execute the original method
-        return await originalMethod.apply(this, args as any[]);
+        return await originalMethod.apply(this, args);
       }
     };
 

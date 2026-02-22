@@ -6,15 +6,20 @@ import { doubleCsrf } from 'csrf-csrf';
 @ApiTags('Security')
 @Controller('csrf')
 export class CsrfController {
-  private generateToken;
+  private generateToken: (
+    req: Request,
+    res: Response,
+  ) => string | { token: string };
 
   constructor() {
     const isProduction = process.env.NODE_ENV === 'production';
 
-    // Create new instance of doubleCsrf with identical configuration
-    const { generateToken } = doubleCsrf({
+    // Create new instance of doubleCsrf with required configuration
+    const { generateCsrfToken } = doubleCsrf({
       getSecret: () =>
         process.env.CSRF_SECRET || 'default-csrf-secret-change-in-production',
+      getSessionIdentifier: (req) =>
+        (req.headers['authorization'] as string) || req.ip || '',
       cookieName: isProduction
         ? '__Host-psifi.x-csrf-token'
         : 'psifi.x-csrf-token',
@@ -26,12 +31,12 @@ export class CsrfController {
       },
       size: 64,
       ignoredMethods: ['GET', 'HEAD', 'OPTIONS'],
-      getTokenFromRequest: (req) => {
+      getCsrfTokenFromRequest: (req) => {
         return req.headers['x-csrf-token'] as string;
       },
     });
 
-    this.generateToken = generateToken;
+    this.generateToken = (req, res) => generateCsrfToken(req, res);
   }
 
   @Get('token')
@@ -51,10 +56,13 @@ export class CsrfController {
   })
   getCsrfToken(@Req() req: Request, @Res() res: Response) {
     try {
-      const result = this.generateToken(req, res);
+      const generateTokenResult = this.generateToken(req, res);
       // doubleCsrf generateToken returns the token string directly in some versions/configs
       // or an object with token property. Let's handle both.
-      const token = typeof result === 'string' ? result : result.token;
+      const token =
+        typeof generateTokenResult === 'string'
+          ? generateTokenResult
+          : (generateTokenResult as Record<string, string>).token;
 
       console.log('[CsrfController] Generated token:', {
         token: token ? token.substring(0, 10) + '...' : 'null',

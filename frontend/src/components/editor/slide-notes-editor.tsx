@@ -279,7 +279,7 @@ export function SlideNotesEditor({
                 value={notes}
                 onChange={(e) => handleNotesChange(e.target.value)}
                 placeholder="Add speaker notes for this slide..."
-                className="min-h-[200px] resize-none"
+                className="min-h-50 resize-none"
               />
 
               {/* Footer Actions */}
@@ -315,7 +315,7 @@ export function SlideNotesEditor({
             </TabsContent>
 
             <TabsContent value="preview">
-              <ScrollArea className="h-[250px]">
+              <ScrollArea className="h-62.5">
                 <div className="prose prose-sm dark:prose-invert max-w-none p-2">
                   {notes ? (
                     <div className="whitespace-pre-wrap">

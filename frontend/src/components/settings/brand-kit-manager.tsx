@@ -483,7 +483,7 @@ export function BrandKitManager() {
                   <div className="grid grid-cols-4 gap-4">
                     {['primary', 'secondary', 'icon', 'wordmark'].map((type) => (
                       <Card key={type} className="relative group">
-                        <CardContent className="p-4 flex flex-col items-center justify-center min-h-[120px]">
+                        <CardContent className="p-4 flex flex-col items-center justify-center min-h-30">
                           <Upload className="h-8 w-8 text-slate-300 mb-2" />
                           <p className="text-sm text-slate-500 capitalize">{type}</p>
                           <Button

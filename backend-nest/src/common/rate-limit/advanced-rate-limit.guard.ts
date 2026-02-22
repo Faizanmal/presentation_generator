@@ -6,6 +6,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { Response } from 'express';
 import {
   AdvancedRateLimitService,
   RateLimitConfig,
@@ -61,7 +62,9 @@ export class AdvancedRateLimitGuard implements CanActivate {
     const result = await this.rateLimitService.checkLimit(key, finalConfig);
 
     // Add rate limit headers to response
-    const response = context.switchToHttp().getResponse();
+    const response = context
+      .switchToHttp()
+      .getResponse<import('express').Response>();
     response.setHeader('X-RateLimit-Limit', finalConfig.points);
     response.setHeader('X-RateLimit-Remaining', result.remaining);
     response.setHeader('X-RateLimit-Reset', result.resetTime.toISOString());

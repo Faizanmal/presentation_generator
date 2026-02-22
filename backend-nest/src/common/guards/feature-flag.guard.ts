@@ -1,4 +1,4 @@
-import { Module, CanActivate, ExecutionContext } from '@nestjs/common';
+import { CanActivate } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 export class FeatureFlagGuard implements CanActivate {
@@ -7,7 +7,7 @@ export class FeatureFlagGuard implements CanActivate {
     private configService: ConfigService,
   ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  canActivate(): boolean {
     const isEnabled = this.configService.get<boolean>(
       `features.${this.featureName}`,
     );

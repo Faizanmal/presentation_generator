@@ -32,7 +32,11 @@ export class AdvancedCacheService {
   /**
    * Set value in cache with automatic serialization
    */
-  async set(key: string, value: any, options?: CacheOptions): Promise<void> {
+  async set(
+    key: string,
+    value: unknown,
+    options?: CacheOptions,
+  ): Promise<void> {
     try {
       const ttl = options?.ttl || 300; // Default 5 minutes
       const serialized = JSON.stringify(value);
@@ -111,7 +115,7 @@ export class AdvancedCacheService {
   /**
    * Cache project metadata
    */
-  async cacheProject(projectId: string, data: any): Promise<void> {
+  async cacheProject(projectId: string, data: unknown): Promise<void> {
     await this.set(`project:${projectId}:metadata`, data, {
       ttl: CacheTTLConfig.projectMetadata,
     });
@@ -120,28 +124,28 @@ export class AdvancedCacheService {
   /**
    * Get cached project metadata
    */
-  async getProjectCache(projectId: string): Promise<any> {
+  async getProjectCache(projectId: string): Promise<unknown> {
     return this.get(`project:${projectId}:metadata`);
   }
 
   /**
    * Cache block data with short TTL for collaboration
    */
-  async cacheBlock(blockId: string, data: any): Promise<void> {
+  async cacheBlock(blockId: string, data: unknown): Promise<void> {
     await this.set(`block:${blockId}`, data, { ttl: CacheTTLConfig.blockData });
   }
 
   /**
    * Get cached block data
    */
-  async getBlockCache(blockId: string): Promise<any> {
+  async getBlockCache(blockId: string): Promise<unknown> {
     return this.get(`block:${blockId}`);
   }
 
   /**
    * Cache user profile
    */
-  async cacheUserProfile(userId: string, data: any): Promise<void> {
+  async cacheUserProfile(userId: string, data: unknown): Promise<void> {
     await this.set(`user:${userId}:profile`, data, {
       ttl: CacheTTLConfig.userProfile,
     });
@@ -150,7 +154,7 @@ export class AdvancedCacheService {
   /**
    * Get cached user profile
    */
-  async getUserProfileCache(userId: string): Promise<any> {
+  async getUserProfileCache(userId: string): Promise<unknown> {
     return this.get(`user:${userId}:profile`);
   }
 
@@ -180,7 +184,7 @@ export class AdvancedCacheService {
    * Batch set multiple keys
    */
   async mset(
-    items: Array<{ key: string; value: any; ttl?: number }>,
+    items: Array<{ key: string; value: unknown; ttl?: number }>,
   ): Promise<void> {
     try {
       const pipeline = this.redis.pipeline();
@@ -230,7 +234,7 @@ export class AdvancedCacheService {
   /**
    * Get cache statistics
    */
-  async getStats(): Promise<any> {
+  async getStats(): Promise<Record<string, unknown> | null> {
     try {
       const info = await this.redis.info('stats');
       const memory = await this.redis.info('memory');

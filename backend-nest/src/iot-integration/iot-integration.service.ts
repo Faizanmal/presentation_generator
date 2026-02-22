@@ -57,16 +57,23 @@ export class IoTIntegrationService {
   ) {
     const deviceToken = `iot_${crypto.randomBytes(24).toString('hex')}`;
 
+    const caps = Object.entries(device.capabilities || {})
+      .filter(([, v]) => !!v)
+      .map(([k]) => k);
+
     return this.prisma.ioTDevice.create({
       data: {
         userId,
+        deviceId: `dev_${crypto.randomBytes(8).toString('hex')}`,
         name: device.name,
         deviceType: device.type,
-        capabilities: device.capabilities as object,
-        manufacturer: device.manufacturer,
-        model: device.model,
+        capabilities: caps,
         deviceToken,
         status: 'registered',
+        metadata: {
+          manufacturer: device.manufacturer,
+          model: device.model,
+        },
       },
     });
   }

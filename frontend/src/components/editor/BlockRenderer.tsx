@@ -2,7 +2,7 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import type { Block, Theme } from "@/types";
 import { GripVertical, Trash2, MoreHorizontal } from "lucide-react";
 import {
@@ -25,7 +25,20 @@ interface BlockRendererProps {
   onDelete: () => void;
 }
 
-export default function BlockRenderer({
+const normalizeKeyPart = (value: string) =>
+  value.trim().replace(/\s+/g, "-").replace(/[^a-zA-Z0-9-_]/g, "").toLowerCase().slice(0, 24) || "empty";
+
+const buildKeyedTextItems = (items: string[], prefix: string) => {
+  const seen = new Map<string, number>();
+  return items.map((item) => {
+    const normalized = normalizeKeyPart(item);
+    const count = (seen.get(normalized) || 0) + 1;
+    seen.set(normalized, count);
+    return { item, key: `${prefix}-${normalized}-${count}` };
+  });
+};
+
+const BlockRenderer = React.memo(({
   block,
   theme,
   isActive,
@@ -33,20 +46,7 @@ export default function BlockRenderer({
   onBlur,
   onChange,
   onDelete,
-}: BlockRendererProps) {
-  const normalizeKeyPart = (value: string) =>
-    value.trim().replace(/\s+/g, "-").replace(/[^a-zA-Z0-9-_]/g, "").toLowerCase().slice(0, 24) || "empty";
-
-  const buildKeyedTextItems = (items: string[], prefix: string) => {
-    const seen = new Map<string, number>();
-    return items.map((item) => {
-      const normalized = normalizeKeyPart(item);
-      const count = (seen.get(normalized) || 0) + 1;
-      seen.set(normalized, count);
-      return { item, key: `${prefix}-${normalized}-${count}` };
-    });
-  };
-
+}: BlockRendererProps) => {
   const {
     attributes,
     listeners,
@@ -92,6 +92,37 @@ export default function BlockRenderer({
     const text = (e.target as HTMLElement).innerText;
     setContent({ ...content, text });
   };
+
+  const bulletItems = content?.items || ["Item 1", "Item 2", "Item 3"];
+  const keyedBulletItems = useMemo(() => buildKeyedTextItems(bulletItems, "bullet"), [bulletItems]);
+
+  const numberedItems = content?.items || ["Item 1", "Item 2", "Item 3"];
+  const keyedNumberedItems = useMemo(() => buildKeyedTextItems(numberedItems, "numbered"), [numberedItems]);
+
+  const rows = content?.rows || [
+    ["Header 1", "Header 2", "Header 3"],
+    ["Cell 1", "Cell 2", "Cell 3"],
+    ["Cell 4", "Cell 5", "Cell 6"],
+  ];
+  const keyedRows = useMemo(() => {
+    const seenRows = new Map<string, number>();
+    return rows.map((row: string[]) => {
+      const rowSignature = normalizeKeyPart(row.join("|"));
+      const count = (seenRows.get(rowSignature) || 0) + 1;
+      seenRows.set(rowSignature, count);
+      const rowKey = `row-${rowSignature}-${count}`;
+
+      const seenCells = new Map<string, number>();
+      const keyedCells = row.map((cell: string) => {
+        const cellSig = normalizeKeyPart(cell);
+        const cellCount = (seenCells.get(cellSig) || 0) + 1;
+        seenCells.set(cellSig, cellCount);
+        return { cell, key: `${rowKey}-cell-${cellSig}-${cellCount}` };
+      });
+
+      return { row, key: rowKey, cells: keyedCells };
+    });
+  }, [rows]);
 
   // Render based on block type
   const renderBlockContent = () => {
@@ -157,58 +188,54 @@ export default function BlockRenderer({
         );
 
       case "BULLET_LIST":
-        const bulletItems = content?.items || ["Item 1", "Item 2", "Item 3"];
-        const keyedBulletItems = buildKeyedTextItems(bulletItems, "bullet");
         return (
           <ul className="list-disc list-inside space-y-2">
             {keyedBulletItems.map(({ item, key }, i: number) => {
-                return (
-                  <li
-                    key={key}
-                    contentEditable
-                    suppressContentEditableWarning
-                    onInput={(e) => {
-                      const items = [...bulletItems] as string[];
-                      items[i] = (e.target as HTMLElement).innerText;
-                      setContent({ ...content, items });
-                    }}
-                    onFocus={onFocus}
-                    onBlur={onBlur}
-                    className="text-lg outline-none"
-                    style={{ fontFamily: theme?.fonts?.body || "system-ui" }}
-                  >
-                    {item}
-                  </li>
-                );
-              })}
+              return (
+                <li
+                  key={key}
+                  contentEditable
+                  suppressContentEditableWarning
+                  onInput={(e) => {
+                    const items = [...bulletItems] as string[];
+                    items[i] = (e.target as HTMLElement).innerText;
+                    setContent({ ...content, items });
+                  }}
+                  onFocus={onFocus}
+                  onBlur={onBlur}
+                  className="text-lg outline-none"
+                  style={{ fontFamily: theme?.fonts?.body || "system-ui" }}
+                >
+                  {item}
+                </li>
+              );
+            })}
           </ul>
         );
 
       case "NUMBERED_LIST":
-        const numberedItems = content?.items || ["Item 1", "Item 2", "Item 3"];
-        const keyedNumberedItems = buildKeyedTextItems(numberedItems, "numbered");
         return (
           <ol className="list-decimal list-inside space-y-2">
             {keyedNumberedItems.map(({ item, key }, i: number) => {
-                return (
-                  <li
-                    key={key}
-                    contentEditable
-                    suppressContentEditableWarning
-                    onInput={(e) => {
-                      const items = [...numberedItems] as string[];
-                      items[i] = (e.target as HTMLElement).innerText;
-                      setContent({ ...content, items });
-                    }}
-                    onFocus={onFocus}
-                    onBlur={onBlur}
-                    className="text-lg outline-none"
-                    style={{ fontFamily: theme?.fonts?.body || "system-ui" }}
-                  >
-                    {item}
-                  </li>
-                );
-              })}
+              return (
+                <li
+                  key={key}
+                  contentEditable
+                  suppressContentEditableWarning
+                  onInput={(e) => {
+                    const items = [...numberedItems] as string[];
+                    items[i] = (e.target as HTMLElement).innerText;
+                    setContent({ ...content, items });
+                  }}
+                  onFocus={onFocus}
+                  onBlur={onBlur}
+                  className="text-lg outline-none"
+                  style={{ fontFamily: theme?.fonts?.body || "system-ui" }}
+                >
+                  {item}
+                </li>
+              );
+            })}
           </ol>
         );
 
@@ -289,152 +316,133 @@ export default function BlockRenderer({
         );
 
       case "TABLE":
-        const rows = content?.rows || [
-          ["Header 1", "Header 2", "Header 3"],
-          ["Cell 1", "Cell 2", "Cell 3"],
-          ["Cell 4", "Cell 5", "Cell 6"],
-        ];
-        const seenRows = new Map<string, number>();
-        const keyedRows = rows.map((row) => {
-          const rowSignature = normalizeKeyPart(row.join("|"));
-          const rowCount = (seenRows.get(rowSignature) || 0) + 1;
-          seenRows.set(rowSignature, rowCount);
-
-          const seenCells = new Map<string, number>();
-          const cells = row.map((cell) => {
-            const cellSignature = normalizeKeyPart(cell);
-            const cellCount = (seenCells.get(cellSignature) || 0) + 1;
-            seenCells.set(cellSignature, cellCount);
-            return { value: cell, key: `cell-${cellSignature}-${cellCount}` };
-          });
-
-          return { row, cells, key: `row-${rowSignature}-${rowCount}` };
-        });
         return (
-          <table className="w-full border-collapse">
-            <tbody>
-              {keyedRows.map(({ cells, key: rowKey }, rowIndex: number) => {
-                return (
+          <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
+            <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-left">
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                {keyedRows.map(({ cells, key: rowKey }, rowIndex: number) => (
                   <tr key={rowKey}>
-                    {cells.map(({ value, key: cellKey }, cellIndex: number) => {
-                      return (
-                        <td
-                          key={`${rowKey}-${cellKey}`}
-                          contentEditable
-                          suppressContentEditableWarning
-                          onInput={(e) => {
-                            const newRows = [...rows] as string[][];
-                            newRows[rowIndex][cellIndex] = (e.target as HTMLElement).innerText;
-                            setContent({ ...content, rows: newRows });
-                          }}
-                          onFocus={onFocus}
-                          onBlur={onBlur}
-                          className={`border p-2 outline-none ${rowIndex === 0 ? "font-semibold bg-slate-100 dark:bg-slate-800" : ""
-                            }`}
-                          style={{
-                            borderColor: theme?.colors?.secondary || "#e2e8f0",
-                            fontFamily: theme?.fonts?.body || "system-ui",
-                          }}
-                        >
-                          {value}
-                        </td>
-                      );
-                    })}
+                    {cells.map(({ cell: value, key: cellKey }, cellIndex: number) => (
+                      <td
+                        key={cellKey}
+                        contentEditable
+                        suppressContentEditableWarning
+                        onInput={(e) => {
+                          const newRows = [...rows] as string[][];
+                          newRows[rowIndex] = [...newRows[rowIndex]];
+                          newRows[rowIndex][cellIndex] = (e.target as HTMLElement).innerText;
+                          setContent({ ...content, rows: newRows });
+                        }}
+                        onFocus={onFocus}
+                        onBlur={onBlur}
+                        className={`border-b p-3 outline-none transition-colors focus:bg-slate-50 dark:focus:bg-slate-800/50 ${rowIndex === 0 ? "font-semibold bg-slate-100 dark:bg-slate-800" : ""}`}
+                        style={{
+                          borderColor: theme?.colors?.secondary || "#e2e8f0",
+                          fontFamily: theme?.fonts?.body || "system-ui",
+                        }}
+                      >
+                        {value}
+                      </td>
+                    ))}
                   </tr>
-                );
-              })}
-            </tbody>
-          </table >
-        );
-
-      case "EMBED":
-        return (
-          <div className="aspect-video bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center">
-            {content?.url ? (
-              <iframe
-                src={content.url}
-                className="w-full h-full rounded-lg"
-                allowFullScreen
-              />
-            ) : (
-              <span className="text-slate-500">Click to add embed URL</span>
-            )}
+                ))}
+              </tbody>
+            </table>
           </div>
         );
 
-      case "CHART": {
-        const chartData = (block.chartData || block.content.chartData) as {
-          type?: string;
-          datasets?: Array<{
-            data: number[];
-            backgroundColor?: string | string[];
-          }>;
-          labels?: string[];
-        } | undefined;
+      case "EMBED":
+return (
+  <div className="aspect-video bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center">
+    {content?.url ? (
+      <iframe
+        src={content.url}
+        className="w-full h-full rounded-lg"
+        allowFullScreen
+      />
+    ) : (
+      <span className="text-slate-500">Click to add embed URL</span>
+    )}
+  </div>
+);
 
-        return (
-          <ChartBlock
-            data={chartData ? {
-              type: (chartData.type || 'bar') as 'bar' | 'line' | 'pie' | 'doughnut' | 'radar' | 'polarArea',
-              data: chartData.datasets?.[0]?.data.map((val, i) => ({
-                label: chartData.labels?.[i] || `Item ${i}`,
-                value: val,
-                color: Array.isArray(chartData.datasets?.[0]?.backgroundColor)
-                  ? chartData.datasets[0].backgroundColor[0]
-                  : (chartData.datasets?.[0]?.backgroundColor as string) || '#3b82f6'
-              })) || [],
-              title: typeof block.content.text === 'string' ? block.content.text : 'Chart',
-            } : undefined}
-            isEditable={isActive}
-          />
-        );
-      }
+      case "CHART": {
+  const chartData = (block.chartData || block.content.chartData) as {
+    type?: string;
+    datasets?: Array<{
+      data: number[];
+      backgroundColor?: string | string[];
+    }>;
+    labels?: string[];
+  } | undefined;
+
+  return (
+    <ChartBlock
+      data={chartData ? {
+        type: (chartData.type || 'bar') as 'bar' | 'line' | 'pie' | 'doughnut' | 'radar' | 'polarArea',
+        data: chartData.datasets?.[0]?.data.map((val, i) => ({
+          label: chartData.labels?.[i] || `Item ${i}`,
+          value: val,
+          color: Array.isArray(chartData.datasets?.[0]?.backgroundColor)
+            ? chartData.datasets[0].backgroundColor[0]
+            : (chartData.datasets?.[0]?.backgroundColor as string) || '#3b82f6'
+        })) || [],
+        title: typeof block.content.text === 'string' ? block.content.text : 'Chart',
+      } : undefined}
+      isEditable={isActive}
+    />
+  );
+}
 
       default:
-        return (
-          <p className="text-slate-500">Unknown block type: {blockType}</p>
-        );
+return (
+  <p className="text-slate-500">Unknown block type: {blockType}</p>
+);
     }
   };
 
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`group relative rounded-lg transition-all ${isActive
-        ? "ring-2 ring-blue-500"
-        : "hover:ring-1 hover:ring-slate-300"
-        } ${isDragging ? "opacity-50" : ""}`}
-    >
-      {/* Controls */}
-      <div className="absolute -left-8 top-1/2 -translate-y-1/2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <div
-          {...attributes}
-          {...listeners}
-          className="h-6 w-6 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center cursor-grab hover:bg-slate-300 dark:hover:bg-slate-600"
-        >
-          <GripVertical className="h-4 w-4 text-slate-500" />
-        </div>
+return (
+  <div
+    ref={setNodeRef}
+    style={style}
+    className={`group relative rounded-lg transition-all ${isActive
+      ? "ring-2 ring-blue-500"
+      : "hover:ring-1 hover:ring-slate-300"
+      } ${isDragging ? "opacity-50" : ""}`}
+  >
+    {/* Controls */}
+    <div className="absolute -left-8 top-1/2 -translate-y-1/2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div
+        {...attributes}
+        {...listeners}
+        className="h-6 w-6 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center cursor-grab hover:bg-slate-300 dark:hover:bg-slate-600"
+      >
+        <GripVertical className="h-4 w-4 text-slate-500" />
       </div>
-
-      <div className="absolute -right-8 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-6 w-6">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem onClick={onDelete} className="text-red-600">
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {/* Block content */}
-      <div className="p-2">{renderBlockContent()}</div>
     </div>
-  );
-}
+
+    <div className="absolute -right-8 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-6 w-6">
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuItem onClick={onDelete} className="text-red-600">
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+
+    {/* Block content */}
+    <div className="p-2">{renderBlockContent()}</div>
+  </div>
+);
+});
+
+BlockRenderer.displayName = "BlockRenderer";
+
+export default BlockRenderer;

@@ -319,7 +319,7 @@ export function MagicResize({ currentFormat, onResize }: MagicResizeProps) {
 
               {['presentation', 'social', 'print', 'mobile'].map((category) => (
                 <TabsContent key={category} value={category}>
-                  <ScrollArea className="h-[300px]">
+                  <ScrollArea className="h-75">
                     <div className="grid grid-cols-2 gap-3 p-1">
                       {formatPresets
                         .filter((f) => f.category === category)

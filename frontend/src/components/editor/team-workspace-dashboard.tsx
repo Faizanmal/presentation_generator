@@ -483,7 +483,7 @@ export function TeamWorkspaceDashboard() {
               </div>
             </div>
 
-            <ScrollArea className="h-[400px]">
+            <ScrollArea className="h-100">
               {viewMode === 'grid' ? (
                 <div className="grid grid-cols-3 gap-4">
                   {filteredPresentations.map((presentation) => (
@@ -644,7 +644,7 @@ export function TeamWorkspaceDashboard() {
               </Button>
             </div>
 
-            <ScrollArea className="h-[400px]">
+            <ScrollArea className="h-100">
               <div className="space-y-2">
                 {members.map((member) => (
                   <Card key={member.id}>
@@ -775,7 +775,7 @@ export function TeamWorkspaceDashboard() {
           </TabsContent>
 
           <TabsContent value="activity" className="mt-4">
-            <ScrollArea className="h-[400px]">
+            <ScrollArea className="h-100">
               <div className="space-y-4">
                 {activities.map((activity) => (
                   <div
@@ -804,7 +804,7 @@ export function TeamWorkspaceDashboard() {
           </TabsContent>
 
           <TabsContent value="settings" className="mt-4">
-            <ScrollArea className="h-[400px]">
+            <ScrollArea className="h-100">
               <div className="space-y-6 pr-4">
                 <Card>
                   <CardHeader>

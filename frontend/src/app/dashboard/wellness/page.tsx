@@ -4,10 +4,10 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import {
   HeartPulse, ArrowLeft, Loader2, Play, Square, Timer, Brain,
-  Activity, Coffee, TrendingUp, AlertTriangle, Smile,
+  Activity, Coffee, TrendingUp, Smile,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { usePresenterWellness } from '@/hooks/use-new-features';
@@ -15,8 +15,8 @@ import Link from 'next/link';
 
 export default function WellnessPage() {
   const {
-    startSession, endSession, recordBreak, analyzePace,
-    detectStress, history, trends, breakReminders,
+    startSession, endSession, recordBreak, analyzePace: _analyzePace,
+    detectStress: _detectStress, history, trends, breakReminders,
   } = usePresenterWellness();
   const [sessionId, setSessionId] = useState<string | null>(null);
 
@@ -34,7 +34,7 @@ export default function WellnessPage() {
   };
 
   const handleEnd = async () => {
-    if (!sessionId) return;
+    if (!sessionId) { return; }
     try {
       await endSession.mutateAsync(sessionId);
       setSessionId(null);
@@ -45,7 +45,7 @@ export default function WellnessPage() {
   };
 
   const handleBreak = async () => {
-    if (!sessionId) return;
+    if (!sessionId) { return; }
     try {
       await recordBreak.mutateAsync({ sessionId, duration: 5, type: 'short' });
       toast.success('Break recorded. Well done!');

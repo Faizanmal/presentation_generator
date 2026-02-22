@@ -137,7 +137,7 @@ export function MagicLayoutButton({
                         disabled={magicLayoutMutation.isPending}
                         className={cn(
                             "w-full flex items-center gap-3 p-3 rounded-lg transition-colors",
-                            "bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30",
+                            "bg-linear-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30",
                             "hover:from-blue-100 hover:to-indigo-100 dark:hover:from-blue-950/50 dark:hover:to-indigo-950/50",
                             "border border-blue-200 dark:border-blue-800"
                         )}
@@ -216,6 +216,7 @@ export function MagicLayoutButton({
                         <div className="p-2 space-y-1">
                             {suggestedLayouts.map((layout, index) => (
                                 <button
+                                     
                                     key={layout.name || `ai-layout-${index}`}
                                     onClick={() => {
                                         onApplyLayout?.(layout);

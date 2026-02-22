@@ -5,6 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 
 export interface BrandKitDto {
   name: string;
@@ -59,7 +60,7 @@ export interface BrandKitDto {
 export class BrandKitService {
   private readonly logger = new Logger(BrandKitService.name);
 
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Create a new brand kit
@@ -85,12 +86,14 @@ export class BrandKitService {
         accentColor: data.accentColor,
         backgroundColor: data.backgroundColor,
         textColor: data.textColor,
-        colorPalette: data.colorPalette,
+        colorPalette: data.colorPalette ?? undefined,
 
         // Typography
         headingFont: data.headingFont,
         bodyFont: data.bodyFont,
-        fontSizes: data.fontSizes,
+        fontSizes: data.fontSizes
+          ? (data.fontSizes as unknown as Prisma.InputJsonValue)
+          : undefined,
 
         // Logo & Images
         logoUrl: data.logoUrl,
@@ -210,12 +213,14 @@ export class BrandKitService {
         accentColor: data.accentColor,
         backgroundColor: data.backgroundColor,
         textColor: data.textColor,
-        colorPalette: data.colorPalette,
+        colorPalette: data.colorPalette ?? undefined,
 
         // Typography
         headingFont: data.headingFont,
         bodyFont: data.bodyFont,
-        fontSizes: data.fontSizes,
+        fontSizes: data.fontSizes
+          ? (data.fontSizes as unknown as Prisma.InputJsonValue)
+          : undefined,
 
         // Logo & Images
         logoUrl: data.logoUrl,
@@ -273,15 +278,72 @@ export class BrandKitService {
   async duplicate(id: string, userId: string, newName?: string) {
     const original = await this.findOne(id, userId);
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { id: _, createdAt, updatedAt, ...data } = original;
+    const {
+      id: _id,
+      createdAt: _createdAt,
+      updatedAt: _updatedAt,
+      ...data
+    } = original;
+    const dataAny = data as any;
 
     return this.prisma.brandKit.create({
       data: {
-        ...data,
+        // copy allowed scalar fields explicitly to avoid mismatched Prisma types
+        organizationId: data.organizationId ?? undefined,
         name: newName || `${original.name} (Copy)`,
         isDefault: false,
         userId,
+
+        // Colors
+        primaryColor: dataAny.primaryColor ?? undefined,
+        secondaryColor: dataAny.secondaryColor ?? undefined,
+        accentColor: dataAny.accentColor ?? undefined,
+        backgroundColor: dataAny.backgroundColor ?? undefined,
+        textColor: dataAny.textColor ?? undefined,
+        colorPalette: dataAny.colorPalette
+          ? (dataAny.colorPalette as unknown as Prisma.InputJsonValue)
+          : undefined,
+
+        // Typography
+        headingFont: dataAny.headingFont ?? undefined,
+        bodyFont: dataAny.bodyFont ?? undefined,
+        fontSizes: dataAny.fontSizes
+          ? (dataAny.fontSizes as unknown as Prisma.InputJsonValue)
+          : undefined,
+
+        // Logo & Images
+        logoUrl: dataAny.logoUrl ?? undefined,
+        logoLight: dataAny.logoLight ?? undefined,
+        logoDark: dataAny.logoDark ?? undefined,
+        favicon: dataAny.favicon ?? undefined,
+        coverImages: dataAny.coverImages
+          ? (dataAny.coverImages as unknown as Prisma.InputJsonValue)
+          : undefined,
+
+        // Assets
+        icons: dataAny.icons
+          ? (dataAny.icons as unknown as Prisma.InputJsonValue)
+          : undefined,
+        patterns: dataAny.patterns
+          ? (dataAny.patterns as unknown as Prisma.InputJsonValue)
+          : undefined,
+        watermark: dataAny.watermark ?? undefined,
+        watermarkOpacity: dataAny.watermarkOpacity ?? undefined,
+
+        // Voice & Tone
+        voiceDescription: dataAny.voiceDescription ?? undefined,
+        toneKeywords: dataAny.toneKeywords
+          ? (dataAny.toneKeywords as unknown as Prisma.InputJsonValue)
+          : undefined,
+
+        // Guidelines
+        doList: dataAny.doList
+          ? (dataAny.doList as unknown as Prisma.InputJsonValue)
+          : undefined,
+        dontList: dataAny.dontList
+          ? (dataAny.dontList as unknown as Prisma.InputJsonValue)
+          : undefined,
+        styleGuideUrl: dataAny.styleGuideUrl ?? undefined,
       },
     });
   }

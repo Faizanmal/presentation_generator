@@ -14,8 +14,6 @@ import {
     AlertCircle,
     // Link as LinkIcon, // Removing Link icon
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-// import { Input } from "@/components/ui/input"; // Removing Input
 import { Progress } from "@/components/ui/progress";
 import {
     Dialog,
@@ -226,7 +224,7 @@ export function ImageUploadZone({
                             key={file.id}
                             className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg"
                         >
-                            <div className="h-10 w-10 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center flex-shrink-0">
+                            <div className="h-10 w-10 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center shrink-0">
                                 {file.status === "uploading" ? (
                                     <Loader2 className="h-5 w-5 text-blue-600 animate-spin" />
                                 ) : file.status === "success" ? (

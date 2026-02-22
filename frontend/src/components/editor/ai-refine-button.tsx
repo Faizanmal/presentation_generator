@@ -116,7 +116,7 @@ export function AIRefineButton({
                 </button>
             </PopoverTrigger>
             <PopoverContent className="w-72 p-0" align="end">
-                <div className="p-3 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30">
+                <div className="p-3 border-b border-slate-200 dark:border-slate-700 bg-linear-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30">
                     <h4 className="font-semibold text-sm flex items-center gap-2 text-blue-700 dark:text-blue-400">
                         <Sparkles className="h-4 w-4" />
                         AI Refine

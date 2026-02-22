@@ -11,6 +11,8 @@ export interface User {
 
 export interface AuthResponse {
   accessToken: string;
+  refreshToken?: string;
+  expiresIn?: number;
   user: User;
 }
 
@@ -84,6 +86,7 @@ export interface Slide {
   order: number;
   layout: string;
   blocks: Block[];
+  speakerNotes?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -883,6 +886,8 @@ export interface ContentResearch {
   summary?: string;
   keywords?: string[];
   suggestedContent?: object[];
+  // optional generated content (string or block-structured)
+  content?: string | { blocks: ContentBlock[] } | ContentBlock[];
   createdAt: string;
   updatedAt: string;
 }

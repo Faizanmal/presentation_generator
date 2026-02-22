@@ -4,7 +4,7 @@ import {
   BadRequestException,
   InternalServerErrorException,
 } from '@nestjs/common';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import * as Papa from 'papaparse';
 import {
   ParsedDataResult,
@@ -74,42 +74,72 @@ export class DataImportService {
   /**
    * Parse Excel file (supports .xlsx, .xls)
    */
-  parseExcel(
-    buffer: Buffer,
+  async parseExcel(
+    buffer: Buffer | ArrayBuffer | Uint8Array,
     fileName: string,
     sheetName?: string,
-  ): ParsedDataResult {
+  ): Promise<ParsedDataResult> {
     try {
-      const workbook = XLSX.read(buffer, { type: 'buffer' });
+      const workbook = new ExcelJS.Workbook();
+      // ExcelJS expects a Node Buffer; normalize incoming types explicitly
+      let buf: Buffer;
+      if (Buffer.isBuffer(buffer)) {
+        buf = buffer;
+      } else if (buffer instanceof ArrayBuffer) {
+        buf = Buffer.from(new Uint8Array(buffer));
+      } else if (buffer instanceof Uint8Array) {
+        buf = Buffer.from(buffer);
+      } else {
+        buf = Buffer.from(buffer as unknown as Uint8Array);
+      }
+      // load using unknown to bypass slice signature mismatch
+      await workbook.xlsx.load(
+        buf as unknown as Parameters<typeof workbook.xlsx.load>[0],
+      );
 
       // Get the sheet (either specified or first available)
-      const targetSheet = sheetName || workbook.SheetNames[0];
+      const worksheet = sheetName
+        ? workbook.getWorksheet(sheetName)
+        : workbook.worksheets[0];
 
-      if (!workbook.SheetNames.includes(targetSheet)) {
+      if (!worksheet) {
+        const available = workbook.worksheets.map((w) => w.name).join(', ');
         throw new BadRequestException(
-          `Sheet "${targetSheet}" not found. Available sheets: ${workbook.SheetNames.join(', ')}`,
+          `Sheet "${sheetName || ''}" not found. Available sheets: ${available}`,
         );
       }
 
-      const worksheet = workbook.Sheets[targetSheet];
+      const headerRow = worksheet.getRow(1);
+      const headers: string[] = [];
+      const headerValues = headerRow.values as Array<unknown>;
+      for (let i = 1; i < headerValues.length; i++) {
+        const v = headerValues[i];
+        headers.push(
+          v == null ? `Column${i}` : this.toDisplayText(v, `Column${i}`),
+        );
+      }
 
       // Convert to JSON with headers
-      const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(
-        worksheet,
-        {
-          defval: null,
-          raw: false,
-        },
-      );
+      const data: Record<string, unknown>[] = [];
+
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return; // Skip header row
+        const record: Record<string, unknown> = {};
+        const rowValues = row.values as Array<unknown>;
+        rowValues.forEach((value, colIndex) => {
+          if (colIndex > 0 && headers[colIndex - 1]) {
+            record[headers[colIndex - 1]] = value ?? null;
+          }
+        });
+        data.push(record);
+      });
 
       if (data.length === 0) {
         throw new BadRequestException('Excel sheet is empty');
       }
 
-      const headers = Object.keys(data[0] || {});
-
       this.logger.log(
-        `Parsed Excel file: ${fileName}, Sheet: ${targetSheet}, Rows: ${data.length}`,
+        `Parsed Excel file: ${fileName}, Sheet: ${worksheet.name}, Rows: ${data.length}`,
       );
 
       return {
@@ -118,7 +148,7 @@ export class DataImportService {
         metadata: {
           totalRows: data.length,
           totalColumns: headers.length,
-          sheetName: targetSheet,
+          sheetName: worksheet.name,
           fileName,
         },
       };
@@ -487,10 +517,26 @@ ${JSON.stringify(parsedData.rows.slice(0, 5), null, 2)}
   /**
    * Get list of available sheets in Excel file
    */
-  getExcelSheets(buffer: Buffer): string[] {
+  async getExcelSheets(
+    buffer: Buffer | ArrayBuffer | Uint8Array,
+  ): Promise<string[]> {
     try {
-      const workbook = XLSX.read(buffer, { type: 'buffer' });
-      return workbook.SheetNames;
+      const workbook = new ExcelJS.Workbook();
+      // ExcelJS accepts Buffer/Uint8Array/ArrayBuffer - normalize to Buffer
+      let buf: Buffer;
+      if (Buffer.isBuffer(buffer)) {
+        buf = buffer;
+      } else if (buffer instanceof ArrayBuffer) {
+        buf = Buffer.from(new Uint8Array(buffer));
+      } else if (buffer instanceof Uint8Array) {
+        buf = Buffer.from(buffer);
+      } else {
+        buf = Buffer.from(buffer as unknown as Uint8Array);
+      }
+      await workbook.xlsx.load(
+        buf as unknown as Parameters<typeof workbook.xlsx.load>[0],
+      );
+      return workbook.worksheets.map((sheet) => sheet.name);
     } catch (error) {
       this.logger.error('Failed to read Excel sheets', error);
       throw new BadRequestException('Invalid Excel file');

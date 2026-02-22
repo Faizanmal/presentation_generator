@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import { AIService } from '../ai/ai.service';
 
 export interface PredictionMetrics {
@@ -40,10 +41,6 @@ export class PredictiveAnalyticsService {
         slides: {
           include: { blocks: true },
         },
-        analytics: {
-          take: 100,
-          orderBy: { viewedAt: 'desc' },
-        },
       },
     });
 
@@ -52,7 +49,7 @@ export class PredictiveAnalyticsService {
     }
 
     // Calculate engagement factors
-    const factors = this.calculateEngagementFactors(project);
+    const factors = this.calculateEngagementFactors(project as any);
 
     // Generate predictions
     const predictions = this.predictMetrics(factors);
@@ -68,12 +65,17 @@ export class PredictiveAnalyticsService {
       data: {
         projectId,
         userId,
+        type: 'engagement',
         insightType: 'engagement_prediction',
-        predictions: predictions as object,
-        factors: factors as object,
-        recommendations,
-        confidence: this.calculateConfidence(project.analytics.length),
-        validUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Valid for 7 days
+        prediction: {
+          metrics: predictions,
+          factors,
+        } as unknown as Prisma.InputJsonValue,
+        recommendations: recommendations as unknown as Prisma.InputJsonValue,
+        confidence: this.calculateConfidence(
+          Array.isArray(project.analytics) ? project.analytics.length : 0,
+        ),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Valid for 7 days
       },
     });
 
@@ -84,7 +86,9 @@ export class PredictiveAnalyticsService {
         predictedEngagement: predictions.engagement,
         predictedCompletion: predictions.completion,
         predictedShares: Math.round(predictions.shareability * 10),
-        factors: factors as object,
+        predictedScore: Math.round(predictions.overallScore * 100),
+        factors: factors as unknown as Prisma.InputJsonValue,
+        suggestions: recommendations as unknown as Prisma.InputJsonValue,
         modelVersion: '1.0.0',
       },
     });
@@ -317,12 +321,11 @@ Return only the recommendations, one per line.`,
         where: { projectId },
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.analytics.aggregate({
+      this.prisma.presentationView.aggregate({
         where: { projectId },
         _count: true,
         _avg: {
-          viewDuration: true,
-          slideIndex: true,
+          totalDuration: true,
         },
       }),
     ]);
@@ -340,8 +343,8 @@ Return only the recommendations, one per line.`,
       },
       actual: {
         views: totalAnalytics,
-        avgDuration: analytics._avg.viewDuration || 0,
-        avgSlideReached: analytics._avg.slideIndex || 0,
+        avgDuration: analytics._avg?.totalDuration || 0,
+        avgSlideReached: 0, // Not available in current schema
       },
       accuracy: await this.calculateAccuracy(predictions, analytics),
     };
@@ -354,18 +357,25 @@ Return only the recommendations, one per line.`,
     predictions: {
       actualEngagement?: number | null;
       actualCompletion?: number | null;
-      predictedEngagement: number;
-      predictedCompletion: number;
+      predictedEngagement?: number | null;
+      predictedCompletion?: number | null;
     },
-    analytics: { _avg: { viewDuration?: number | null } },
+    analytics: { _avg?: Record<string, number | null> | null },
   ): Promise<number | null> {
     if (!predictions.actualEngagement) return null;
+    if (
+      predictions.predictedEngagement == null ||
+      predictions.predictedCompletion == null
+    )
+      return null;
 
     const engagementError = Math.abs(
-      predictions.predictedEngagement - (predictions.actualEngagement || 0),
+      (predictions.predictedEngagement || 0) -
+        (predictions.actualEngagement || 0),
     );
     const completionError = Math.abs(
-      predictions.predictedCompletion - (predictions.actualCompletion || 0),
+      (predictions.predictedCompletion || 0) -
+        (predictions.actualCompletion || 0),
     );
 
     const avgError = (engagementError + completionError) / 2;
@@ -375,9 +385,12 @@ Return only the recommendations, one per line.`,
   /**
    * Get benchmarks for comparison
    */
-  async getBenchmarks(category?: string) {
+  async getBenchmarks(projectId?: string) {
+    // If a projectId is provided, limit benchmarks to that project; otherwise use global averages
+    const where: any = projectId ? { projectId } : undefined;
+
     const benchmarks = await this.prisma.engagementPrediction.aggregate({
-      where: category ? { project: { category } } : undefined,
+      where,
       _avg: {
         predictedEngagement: true,
         predictedCompletion: true,
@@ -386,9 +399,9 @@ Return only the recommendations, one per line.`,
     });
 
     return {
-      averageEngagement: benchmarks._avg.predictedEngagement || 0.5,
-      averageCompletion: benchmarks._avg.predictedCompletion || 0.6,
-      averageShares: benchmarks._avg.predictedShares || 5,
+      averageEngagement: benchmarks._avg?.predictedEngagement ?? 0.5,
+      averageCompletion: benchmarks._avg?.predictedCompletion ?? 0.6,
+      averageShares: benchmarks._avg?.predictedShares ?? 5,
     };
   }
 

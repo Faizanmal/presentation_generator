@@ -23,7 +23,12 @@ export class ScalablePrismaService
       configService.get<number>('DATABASE_POOL_TIMEOUT') || 10;
 
     // Build connection URL with pooling parameters
-    const databaseUrl = configService.get<string>('DATABASE_URL') || '';
+    const databaseUrl = configService.get<string>('DATABASE_URL');
+    if (!databaseUrl) {
+      // logger not available until after super; use console
+      console.error('DATABASE_URL must be defined for scalable connections');
+      throw new Error('DATABASE_URL is required');
+    }
 
     // Add connection pooling parameters if not present
     const url = new URL(databaseUrl);
@@ -118,7 +123,9 @@ export class ScalablePrismaService
       }
     }
 
-    throw lastError;
+    throw new Error('Database operation failed after retries', {
+      cause: lastError,
+    });
   }
 
   private isRetryableError(error: unknown): boolean {

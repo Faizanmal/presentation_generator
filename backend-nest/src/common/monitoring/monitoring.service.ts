@@ -18,7 +18,7 @@ export class MonitoringService implements OnModuleInit {
     private readonly metrics: MetricsService,
   ) {}
 
-  async onModuleInit() {
+  onModuleInit() {
     this.datadogEnabled = !!this.configService.get<string>('DATADOG_API_KEY');
 
     const status = [
@@ -159,12 +159,14 @@ export class MonitoringService implements OnModuleInit {
   private sendDatadogEvent(
     type: string,
     message: string,
-    _context?: Record<string, unknown>,
+    context?: Record<string, unknown>,
   ): void {
     // Datadog events can be sent via StatsD protocol or their API
     // For production, install 'hot-shots' or 'datadog-metrics' package
     // This is a placeholder for the integration
-    this.logger.debug(`[Datadog] ${type}: ${message}`);
+    this.logger.debug(
+      `[Datadog] ${type}: ${message}${context ? ` | Context: ${JSON.stringify(context)}` : ''}`,
+    );
   }
 
   // ─── Helpers ───────────────────────────────────────────────

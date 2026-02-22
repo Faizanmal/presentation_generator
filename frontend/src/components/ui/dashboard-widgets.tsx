@@ -41,7 +41,7 @@ export function StatCard({
         >
             <div className="flex items-start justify-between mb-4">
                 <div
-                    className={`h-12 w-12 rounded-xl bg-gradient-to-br ${iconColor} flex items-center justify-center text-white shadow-lg`}
+                    className={`h-12 w-12 rounded-xl bg-linear-to-br ${iconColor} flex items-center justify-center text-white shadow-lg`}
                 >
                     {icon}
                 </div>
@@ -97,7 +97,7 @@ export function QuickActionCard({
         >
             <div className="flex items-start gap-4">
                 <div
-                    className={`h-12 w-12 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center text-white shrink-0 group-hover:scale-110 transition-transform`}
+                    className={`h-12 w-12 rounded-xl bg-linear-to-br ${color} flex items-center justify-center text-white shrink-0 group-hover:scale-110 transition-transform`}
                 >
                     {icon}
                 </div>

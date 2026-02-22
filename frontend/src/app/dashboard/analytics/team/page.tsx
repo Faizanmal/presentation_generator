@@ -171,7 +171,7 @@ export default function TeamAnalyticsPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        <div className="min-h-screen bg-linear-to-br from-slate-50 via-white to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
             {/* Header */}
             <header className="sticky top-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-lg border-b border-slate-200 dark:border-slate-800">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -184,7 +184,7 @@ export default function TeamAnalyticsPage() {
                                 </Button>
                             </Link>
                             <div className="flex items-center gap-2">
-                                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                                <div className="h-8 w-8 rounded-lg bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
                                     <BarChart3 className="h-5 w-5 text-white" />
                                 </div>
                                 <span className="text-xl font-bold text-slate-900 dark:text-white">
@@ -195,7 +195,7 @@ export default function TeamAnalyticsPage() {
 
                         <div className="flex items-center gap-3">
                             <Select value={timeRange} onValueChange={(v) => setTimeRange(v as typeof timeRange)}>
-                                <SelectTrigger className="w-[130px]">
+                                <SelectTrigger className="w-32.5">
                                     <Calendar className="h-4 w-4 mr-2" />
                                     <SelectValue />
                                 </SelectTrigger>
@@ -218,7 +218,7 @@ export default function TeamAnalyticsPage() {
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 {/* Stats Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0">
+                    <Card className="bg-linear-to-br from-blue-500 to-blue-600 text-white border-0">
                         <CardHeader className="pb-2">
                             <CardDescription className="text-blue-100">Total Projects</CardDescription>
                             <CardTitle className="text-4xl font-bold">
@@ -233,7 +233,7 @@ export default function TeamAnalyticsPage() {
                         </CardContent>
                     </Card>
 
-                    <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-0">
+                    <Card className="bg-linear-to-br from-purple-500 to-purple-600 text-white border-0">
                         <CardHeader className="pb-2">
                             <CardDescription className="text-purple-100">Total Presentations</CardDescription>
                             <CardTitle className="text-4xl font-bold">
@@ -248,7 +248,7 @@ export default function TeamAnalyticsPage() {
                         </CardContent>
                     </Card>
 
-                    <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white border-0">
+                    <Card className="bg-linear-to-br from-green-500 to-green-600 text-white border-0">
                         <CardHeader className="pb-2">
                             <CardDescription className="text-green-100">Avg. Engagement</CardDescription>
                             <CardTitle className="text-4xl font-bold">
@@ -263,7 +263,7 @@ export default function TeamAnalyticsPage() {
                         </CardContent>
                     </Card>
 
-                    <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white border-0">
+                    <Card className="bg-linear-to-br from-orange-500 to-orange-600 text-white border-0">
                         <CardHeader className="pb-2">
                             <CardDescription className="text-orange-100">Active Members</CardDescription>
                             <CardTitle className="text-4xl font-bold">
@@ -318,7 +318,7 @@ export default function TeamAnalyticsPage() {
                                                 <div className="text-lg font-bold text-slate-400 w-6">#{index + 1}</div>
                                                 <Avatar className="h-10 w-10">
                                                     <AvatarImage src={member.avatar} />
-                                                    <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
+                                                    <AvatarFallback className="bg-linear-to-br from-indigo-500 to-purple-600 text-white">
                                                         {member.userName.split(" ").map(n => n[0]).join("")}
                                                     </AvatarFallback>
                                                 </Avatar>
@@ -394,7 +394,7 @@ export default function TeamAnalyticsPage() {
                                                 <div className="flex items-center justify-between">
                                                     <div className="flex items-center gap-2">
                                                         <Avatar className="h-6 w-6">
-                                                            <AvatarFallback className="text-[10px] bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
+                                                            <AvatarFallback className="text-[10px] bg-linear-to-br from-indigo-500 to-purple-600 text-white">
                                                                 {member.userName.split(" ").map(n => n[0]).join("")}
                                                             </AvatarFallback>
                                                         </Avatar>
@@ -440,7 +440,7 @@ export default function TeamAnalyticsPage() {
                                                             <div className="flex items-center gap-3">
                                                                 <Avatar className="h-10 w-10">
                                                                     <AvatarImage src={member.avatar} />
-                                                                    <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
+                                                                    <AvatarFallback className="bg-linear-to-br from-indigo-500 to-purple-600 text-white">
                                                                         {member.userName.split(" ").map(n => n[0]).join("")}
                                                                     </AvatarFallback>
                                                                 </Avatar>
@@ -483,7 +483,7 @@ export default function TeamAnalyticsPage() {
                                         <div key={`${activity.timestamp}-${activity.userId}`} className="flex gap-4">
                                             <div className="flex flex-col items-center">
                                                 <Avatar className="h-10 w-10 border-2 border-white dark:border-slate-900 shadow">
-                                                    <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-sm">
+                                                    <AvatarFallback className="bg-linear-to-br from-indigo-500 to-purple-600 text-white text-sm">
                                                         {activity.userName?.split(" ").map(n => n[0]).join("") || "U"}
                                                     </AvatarFallback>
                                                 </Avatar>
@@ -523,12 +523,13 @@ export default function TeamAnalyticsPage() {
                                 <CardDescription>Daily activity over the selected period</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <div className="h-[300px] flex items-end justify-between gap-1 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                                <div className="h-75 flex items-end justify-between gap-1 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                                     {/* Simple bar chart visualization */}
                                     {trendData.map((item) => (
                                         <div
+                                             
                                             key={`trend-${item.index}`}
-                                            className="flex-1 bg-gradient-to-t from-indigo-500 to-purple-500 rounded-t-sm opacity-80 hover:opacity-100 transition-opacity cursor-pointer relative group"
+                                            className="flex-1 bg-linear-to-t from-indigo-500 to-purple-500 rounded-t-sm opacity-80 hover:opacity-100 transition-opacity cursor-pointer relative group"
                                             style={{ height: `${item.height}%` }}
                                         >
                                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">

@@ -3,12 +3,12 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import {
-    Library, ArrowLeft, Loader2, Search, Trash2, LayoutGrid, List,
-    FileText, Blocks, Star, Filter, Plus,
+    Library, ArrowLeft, Loader2, Search, Trash2, LayoutGrid,
+    FileText, Blocks, Star,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -27,13 +27,13 @@ export default function ContentLibraryPage() {
     const [typeFilter, setTypeFilter] = useState<'slide' | 'block' | undefined>(undefined);
     const [deleteId, setDeleteId] = useState<string | null>(null);
 
-    const { items, templates, saveItem, deleteItem } = useContentLibrary({
+    const { items, templates, deleteItem } = useContentLibrary({
         type: typeFilter,
         search: search || undefined,
     });
 
     const handleDelete = async () => {
-        if (!deleteId) return;
+        if (!deleteId) {return;}
         try {
             await deleteItem.mutateAsync(deleteId);
             setDeleteId(null);

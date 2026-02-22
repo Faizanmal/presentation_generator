@@ -1,15 +1,14 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import {
-  Bot, Send, Loader2, Sparkles, FileText, Lightbulb, MessageSquare,
-  Mic, StickyNote, Mail, Users, X,
+  Bot, Send, Loader2, FileText, Lightbulb,
+  StickyNote, Mail, Users, X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAICopilot } from '@/hooks/use-new-features';
@@ -42,7 +41,7 @@ export default function AICopilotPanel({ projectId, onClose }: { projectId: stri
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const initSession = async () => {
+  const initSession = useCallback(async () => {
     try {
       const session = await createSession.mutateAsync();
       setSessionId(session.id);
@@ -55,12 +54,12 @@ export default function AICopilotPanel({ projectId, onClose }: { projectId: stri
     } catch {
       toast.error('Failed to start AI session');
     }
-  };
+  }, [createSession]);
 
-  useEffect(() => { initSession(); }, [projectId]);
+  useEffect(() => { initSession(); }, [initSession]);
 
   const handleSend = async () => {
-    if (!input.trim() || !sessionId) return;
+    if (!input.trim() || !sessionId) { return; }
     const userMsg: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -87,7 +86,7 @@ export default function AICopilotPanel({ projectId, onClose }: { projectId: stri
   };
 
   const handleQuickAction = async (actionId: string) => {
-    if (!sessionId) return;
+    if (!sessionId) { return; }
     setIsTyping(true);
     setMessages(prev => [...prev, {
       id: Date.now().toString(),
@@ -112,7 +111,7 @@ export default function AICopilotPanel({ projectId, onClose }: { projectId: stri
   };
 
   return (
-    <Card className="flex flex-col h-[600px] w-full max-w-md">
+    <Card className="flex flex-col h-150 w-full max-w-md">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b">
         <div className="flex items-center gap-2">
@@ -135,11 +134,10 @@ export default function AICopilotPanel({ projectId, onClose }: { projectId: stri
               key={msg.id}
               className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
-              <div className={`max-w-[80%] rounded-lg p-3 text-sm ${
-                msg.role === 'user'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted'
-              }`}>
+              <div className={`max-w-[80%] rounded-lg p-3 text-sm ${msg.role === 'user'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted'
+                }`}>
                 {msg.content}
               </div>
             </div>

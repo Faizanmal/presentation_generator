@@ -4,14 +4,20 @@ import { doubleCsrf } from 'csrf-csrf';
 
 @Injectable()
 export class CsrfMiddleware implements NestMiddleware {
-  private csrfProtection;
+  private csrfProtection: (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => void;
 
   constructor() {
     const isProduction = process.env.NODE_ENV === 'production';
 
-    const { generateToken, doubleCsrfProtection } = doubleCsrf({
+    const { doubleCsrfProtection } = doubleCsrf({
       getSecret: () =>
         process.env.CSRF_SECRET || 'default-csrf-secret-change-in-production',
+      getSessionIdentifier: (req) =>
+        (req.headers['authorization'] as string) || req.ip || '',
       cookieName: isProduction
         ? '__Host-psifi.x-csrf-token'
         : 'psifi.x-csrf-token',
@@ -23,7 +29,7 @@ export class CsrfMiddleware implements NestMiddleware {
       },
       size: 64,
       ignoredMethods: ['GET', 'HEAD', 'OPTIONS'],
-      getTokenFromRequest: (req) => {
+      getCsrfTokenFromRequest: (req) => {
         return req.headers['x-csrf-token'] as string;
       },
     });

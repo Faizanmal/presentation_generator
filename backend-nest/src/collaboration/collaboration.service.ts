@@ -47,7 +47,7 @@ export class CollaborationService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
-  ) { }
+  ) {}
 
   // ============================================
   // SESSION MANAGEMENT
@@ -114,7 +114,7 @@ export class CollaborationService {
       if (cursors && cursors[session.socketId]) {
         try {
           cursorData = JSON.parse(cursors[session.socketId]);
-        } catch (_e) {
+        } catch {
           // Ignore parse errors
         }
       }
@@ -324,7 +324,7 @@ export class CollaborationService {
   async assertOwnerOrRole(
     projectId: string,
     userId: string,
-    allowedRoles: Array<'VIEWER' | 'COMMENTER' | 'EDITOR'>,
+    allowedRoles: Array<'VIEWER' | 'COMMENTER' | 'EDITOR' | 'OWNER'>,
   ): Promise<void> {
     const isOwner = await this.isProjectOwner(projectId, userId);
     if (isOwner) return;
@@ -381,9 +381,10 @@ export class CollaborationService {
 
     const repliesByParent = new Map<string, Record<string, unknown>[]>();
     replies.forEach((r) => {
-      const list = repliesByParent.get(r.parentId) || [];
+      const parentId = r.parentId || 'root';
+      const list = repliesByParent.get(parentId) || [];
       list.push({ ...r, user: userMap.get(r.userId) });
-      repliesByParent.set(r.parentId, list);
+      repliesByParent.set(parentId, list);
     });
 
     return comments.map((c) => ({
@@ -495,7 +496,7 @@ export class CollaborationService {
     // The snapshot contains the full project state
     await this.prisma.project.update({
       where: { id: projectId },
-      data: versionData.snapshot,
+      data: versionData.snapshot as unknown as any,
     });
     return versionData.snapshot;
   }

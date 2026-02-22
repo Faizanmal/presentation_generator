@@ -44,6 +44,7 @@ export class CrossPlatformSyncService {
       platform: string;
       deviceName?: string;
       appVersion?: string;
+      deviceType?: string;
     },
   ) {
     return this.prisma.deviceSync.upsert({
@@ -63,6 +64,7 @@ export class CrossPlatformSyncService {
       create: {
         userId,
         deviceId: deviceInfo.deviceId,
+        deviceType: deviceInfo.deviceType || 'web',
         platform: deviceInfo.platform,
         deviceName: deviceInfo.deviceName,
         appVersion: deviceInfo.appVersion,
@@ -104,13 +106,16 @@ export class CrossPlatformSyncService {
     userId: string,
     projectId: string,
     operation: Omit<Operation, 'id' | 'timestamp'>,
-    deviceId: string,
   ) {
     return this.prisma.operationalTransform.create({
       data: {
         projectId,
         userId,
         operation: operation as object,
+        path: operation.path || '/',
+        vectorClock: {},
+        serverSeq: 0,
+        clientSeq: 0,
         version: await this.getNextVersion(projectId),
         appliedAt: null, // Not applied until synced
       },
@@ -177,6 +182,10 @@ export class CrossPlatformSyncService {
             projectId,
             userId,
             operation: op as object,
+            path: op.path || '/',
+            vectorClock: {},
+            serverSeq: 0,
+            clientSeq: 0,
             version: await this.getNextVersion(projectId),
             appliedAt: new Date(),
           },
@@ -194,7 +203,7 @@ export class CrossPlatformSyncService {
     // Transform operations against concurrent changes
     const transformed = this.transformOperations(
       operations,
-      serverOps.map((o) => o.operation as Operation),
+      serverOps.map((o) => o.operation as unknown as Operation),
     );
 
     const applied: Operation[] = [];
@@ -204,6 +213,10 @@ export class CrossPlatformSyncService {
           projectId,
           userId,
           operation: op as object,
+          path: op.path || '/',
+          vectorClock: {},
+          serverSeq: 0,
+          clientSeq: 0,
           version: await this.getNextVersion(projectId),
           appliedAt: new Date(),
         },
@@ -217,7 +230,7 @@ export class CrossPlatformSyncService {
         this.serverVersion.get(projectId) || baseVersion + applied.length,
       conflicts:
         serverOps.length > 0
-          ? serverOps.map((o) => o.operation as Operation)
+          ? serverOps.map((o) => o.operation as unknown as Operation)
           : undefined,
     };
   }
@@ -333,7 +346,7 @@ export class CrossPlatformSyncService {
 
     // Check access
     if (project.ownerId !== userId) {
-      const collaborator = await this.prisma.collaborator.findFirst({
+      const collaborator = await this.prisma.projectCollaborator.findFirst({
         where: { projectId, userId },
       });
       if (!collaborator) {
@@ -413,6 +426,10 @@ export class CrossPlatformSyncService {
           projectId,
           userId,
           operation: op as object,
+          path: op.path || '/',
+          vectorClock: {},
+          serverSeq: 0,
+          clientSeq: 0,
           version: await this.getNextVersion(projectId),
           appliedAt: new Date(),
         },

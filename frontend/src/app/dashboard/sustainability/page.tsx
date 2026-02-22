@@ -3,13 +3,12 @@
 import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import {
-  Leaf, ArrowLeft, Loader2, Zap, Recycle, Award, TreePine,
-  Droplets, Sun, Wind, BarChart3, Settings,
+  Leaf, ArrowLeft, Loader2, Zap, Recycle, TreePine,
+  Droplets, Sun, Settings,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useEcoFriendly } from '@/hooks/use-new-features';
@@ -18,7 +17,7 @@ import Link from 'next/link';
 export default function EcoSustainabilityPage() {
   const searchParams = useSearchParams();
   const projectId = searchParams.get('projectId') || '';
-  const { settings, tips, optimize, updateSettings, trackMetrics } = useEcoFriendly(projectId);
+  const { settings, tips, optimize, updateSettings, trackMetrics: _trackMetrics } = useEcoFriendly(projectId);
 
   const handleOptimize = async () => {
     if (!projectId) {
@@ -172,8 +171,9 @@ export default function EcoSustainabilityPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {tips.data?.map((tip: { title: string; description: string; impact: string }, i: number) => (
-                <div key={i} className="p-3 rounded-lg bg-green-500/5 border border-green-500/10">
+              {tips.data?.map((tip: { title: string; description: string; impact: string }, index: number) => (
+                // eslint-disable-next-line react/no-array-index-key
+                <div key={index} className="p-3 rounded-lg bg-green-500/5 border border-green-500/10">
                   <div className="flex items-center justify-between">
                     <p className="font-medium text-sm">{tip.title}</p>
                     <Badge variant="outline" className="text-xs text-green-600 border-green-600">{tip.impact}</Badge>

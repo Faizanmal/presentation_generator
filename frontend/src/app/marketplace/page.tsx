@@ -141,7 +141,7 @@ export default function MarketplacePage() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        <div className="min-h-screen bg-linear-to-br from-slate-50 via-white to-blue-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
             {/* Header */}
             <header className="sticky top-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-lg border-b border-slate-200 dark:border-slate-800">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -154,7 +154,7 @@ export default function MarketplacePage() {
                                 </Button>
                             </Link>
                             <div className="flex items-center gap-2">
-                                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+                                <div className="h-8 w-8 rounded-lg bg-linear-to-br from-purple-500 to-pink-600 flex items-center justify-center">
                                     <ShoppingCart className="h-5 w-5 text-white" />
                                 </div>
                                 <span className="text-xl font-bold text-slate-900 dark:text-white">
@@ -178,7 +178,7 @@ export default function MarketplacePage() {
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 {/* Hero Section */}
                 <div className="mb-8 text-center">
-                    <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 bg-clip-text text-transparent mb-4">
+                    <h1 className="text-4xl font-bold bg-linear-to-r from-purple-600 via-pink-600 to-blue-600 bg-clip-text text-transparent mb-4">
                         Professional Presentation Templates
                     </h1>
                     <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
@@ -200,7 +200,7 @@ export default function MarketplacePage() {
 
                     <div className="flex gap-3">
                         <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                            <SelectTrigger className="w-[160px] h-12">
+                            <SelectTrigger className="w-40 h-12">
                                 <Tag className="h-4 w-4 mr-2" />
                                 <SelectValue placeholder="Category" />
                             </SelectTrigger>
@@ -215,7 +215,7 @@ export default function MarketplacePage() {
                         </Select>
 
                         <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
-                            <SelectTrigger className="w-[150px] h-12">
+                            <SelectTrigger className="w-37.5 h-12">
                                 <SelectValue placeholder="Sort by" />
                             </SelectTrigger>
                             <SelectContent>
@@ -247,7 +247,7 @@ export default function MarketplacePage() {
                         </Select>
 
                         <Select value={priceFilter} onValueChange={(v) => setPriceFilter(v as typeof priceFilter)}>
-                            <SelectTrigger className="w-[120px] h-12">
+                            <SelectTrigger className="w-30 h-12">
                                 <SelectValue placeholder="Price" />
                             </SelectTrigger>
                             <SelectContent>
@@ -290,7 +290,7 @@ export default function MarketplacePage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                             {featuredTemplates.map((template) => (
                                 <Card key={template.id} className="group overflow-hidden hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-purple-500/30">
-                                    <div className="aspect-[16/10] bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 relative overflow-hidden">
+                                    <div className="aspect-16/10 bg-linear-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 relative overflow-hidden">
                                         <div className="absolute inset-0 flex items-center justify-center">
                                             {template.thumbnail ? (
                                                 <img src={template.thumbnail} alt={template.title} className="w-full h-full object-cover" />
@@ -372,7 +372,7 @@ export default function MarketplacePage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                             {templates.map((template) => (
                                 <Card key={template.id} className="group overflow-hidden hover:shadow-lg transition-all duration-300">
-                                    <div className="aspect-[16/10] bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 relative overflow-hidden">
+                                    <div className="aspect-16/10 bg-linear-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 relative overflow-hidden">
                                         <div className="absolute inset-0 flex items-center justify-center">
                                             {template.thumbnail ? (
                                                 <img src={template.thumbnail} alt={template.title} className="w-full h-full object-cover" />
@@ -420,7 +420,7 @@ export default function MarketplacePage() {
                         <div className="space-y-4">
                             {templates.map((template) => (
                                 <Card key={template.id} className="flex overflow-hidden hover:shadow-lg transition-all">
-                                    <div className="w-48 h-32 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 flex-shrink-0">
+                                    <div className="w-48 h-32 bg-linear-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 shrink-0">
                                         {template.thumbnail ? (
                                             <img src={template.thumbnail} alt={template.title} className="w-full h-full object-cover" />
                                         ) : (
@@ -476,7 +476,7 @@ export default function MarketplacePage() {
 
                     {selectedTemplate && (
                         <div className="py-4">
-                            <div className="aspect-[16/9] bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 rounded-lg overflow-hidden mb-6">
+                            <div className="aspect-video bg-linear-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 rounded-lg overflow-hidden mb-6">
                                 {selectedTemplate.thumbnail ? (
                                     <img
                                         src={selectedTemplate.thumbnail}

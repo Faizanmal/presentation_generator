@@ -5,7 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { BlockType } from '@prisma/client';
+import { Prisma, BlockType } from '@prisma/client';
 import { AdvancedCacheService } from '../common/cache/advanced-cache.service';
 import { CollaborationService } from '../collaboration/collaboration.service';
 
@@ -38,7 +38,7 @@ export class BlocksService {
     private readonly prisma: PrismaService,
     private readonly cacheService: AdvancedCacheService,
     private readonly collaborationService: CollaborationService,
-  ) { }
+  ) {}
 
   /**
    * Create a new block
@@ -68,9 +68,9 @@ export class BlocksService {
         projectId: createBlockDto.projectId,
         slideId: createBlockDto.slideId,
         blockType: createBlockDto.blockType,
-        content: createBlockDto.content as import('@prisma/client').Prisma.InputJsonValue,
+        content: createBlockDto.content as Prisma.InputJsonValue,
         order: createBlockDto.order,
-        style: (createBlockDto.style || {}) as import('@prisma/client').Prisma.InputJsonValue,
+        style: (createBlockDto.style || {}) as Prisma.InputJsonValue,
       },
     });
 
@@ -147,9 +147,9 @@ export class BlocksService {
       const updated = await this.prisma.block.update({
         where: { id: blockId },
         data: {
-          content: updateBlockDto.content as import('@prisma/client').Prisma.InputJsonValue,
+          content: updateBlockDto.content as Prisma.InputJsonValue,
           order: updateBlockDto.order,
-          style: updateBlockDto.style as import('@prisma/client').Prisma.InputJsonValue,
+          style: updateBlockDto.style as Prisma.InputJsonValue,
           blockType: updateBlockDto.blockType,
           version: { increment: 1 },
         },
@@ -168,9 +168,9 @@ export class BlocksService {
     const updated = await this.prisma.block.update({
       where: { id: blockId },
       data: {
-        content: updateBlockDto.content as import('@prisma/client').Prisma.InputJsonValue,
+        content: updateBlockDto.content as Prisma.InputJsonValue,
         order: updateBlockDto.order,
-        style: updateBlockDto.style as import('@prisma/client').Prisma.InputJsonValue,
+        style: updateBlockDto.style as Prisma.InputJsonValue,
         blockType: updateBlockDto.blockType,
         version: { increment: 1 },
       },
@@ -310,9 +310,9 @@ export class BlocksService {
             projectId,
             slideId: b.slideId,
             blockType: b.blockType,
-            content: b.content as import('@prisma/client').Prisma.InputJsonValue,
+            content: b.content as Prisma.InputJsonValue,
             order: b.order,
-            style: (b.style || {}) as import('@prisma/client').Prisma.InputJsonValue,
+            style: (b.style || {}) as Prisma.InputJsonValue,
           },
         }),
       ),
@@ -412,8 +412,8 @@ export class BlocksService {
         this.prisma.block.update({
           where: { id: block.id },
           data: {
-            content: block.content as import('@prisma/client').Prisma.InputJsonValue,
-            style: block.style as import('@prisma/client').Prisma.InputJsonValue,
+            content: block.content as Prisma.InputJsonValue,
+            style: block.style as Prisma.InputJsonValue,
           },
         }),
       ),

@@ -39,7 +39,7 @@ export interface StatisticalAnalysis {
 export class ABTestingService {
   private readonly logger = new Logger(ABTestingService.name);
 
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Create a new A/B test
@@ -306,9 +306,9 @@ export class ABTestingService {
         bounceRate:
           results.length > 0
             ? (results.filter((r) => !r.engaged && (r.viewTime || 0) < 10)
-              .length /
-              results.length) *
-            100
+                .length /
+                results.length) *
+              100
             : 0,
       },
     });
@@ -393,21 +393,21 @@ export class ABTestingService {
     );
 
     // Calculate improvement
-    let improvement = 0;
+    let improvement: number;
     switch (test.goalMetric) {
       case 'completion':
         improvement =
           control.conversionRate > 0
             ? ((best.conversionRate - control.conversionRate) /
-              control.conversionRate) *
-            100
+                control.conversionRate) *
+              100
             : 0;
         break;
       case 'view_time':
         improvement =
           control.avgViewTime > 0
             ? ((best.avgViewTime - control.avgViewTime) / control.avgViewTime) *
-            100
+              100
             : 0;
         break;
       case 'engagement':
@@ -415,8 +415,8 @@ export class ABTestingService {
         improvement =
           control.engagementScore > 0
             ? ((best.engagementScore - control.engagementScore) /
-              control.engagementScore) *
-            100
+                control.engagementScore) *
+              100
             : 0;
     }
 

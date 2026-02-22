@@ -217,7 +217,7 @@ export function QuizPollBuilder({
           </div>
 
           {/* Questions List */}
-          <ScrollArea className="h-[400px]">
+          <ScrollArea className="h-100">
             {questions.length === 0 ? (
               <div className="py-12 text-center text-muted-foreground">
                 <HelpCircle className="mx-auto h-12 w-12 opacity-50" />

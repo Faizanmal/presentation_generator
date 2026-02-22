@@ -108,7 +108,7 @@ class BatchUpdateDto {
 @Controller('blocks')
 @UseGuards(JwtAuthGuard)
 export class BlocksController {
-  constructor(private readonly blocksService: BlocksService) { }
+  constructor(private readonly blocksService: BlocksService) {}
 
   /**
    * Create a new block

@@ -238,7 +238,7 @@ export class RealTimeDataService {
    * Smart search with fallback: Tavily -> Google -> Bing -> Mock
    */
   async search(query: string, limit: number = 5): Promise<RealTimeDataResult> {
-    let result: RealTimeDataResult | null = null;
+    let result: RealTimeDataResult | null;
 
     // 1. Try Tavily (Best for AI context)
     if (this.tavilyApiKey) {
@@ -287,7 +287,7 @@ export class RealTimeDataService {
       ];
 
       for (const pattern of patterns) {
-        let match: RegExpExecArray | null = null;
+        let match: RegExpExecArray | null;
         while ((match = pattern.exec(result.snippet)) !== null) {
           const label = match[1].trim();
           const value = parseFloat(match[2]);

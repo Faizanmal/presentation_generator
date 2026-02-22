@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import {
-  Layout, Sparkles, Plus, Loader2, ArrowLeft, BookTemplate,
+  Layout, Sparkles, Loader2, ArrowLeft, BookTemplate,
   ArrowRight, GripVertical,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,22 @@ const audienceTypes = [
   { value: 'general', label: 'General Audience' },
 ];
 
+interface StoryboardSection {
+  id?: string;
+  title: string;
+  order?: number;
+  duration: number;
+}
+
+interface StoryboardItem {
+  id: string;
+  title: string;
+  narrativeArc: string;
+  status: string;
+  sections?: StoryboardSection[];
+  content?: { sections?: StoryboardSection[] };
+}
+
 export default function StoryboardingPage() {
   const searchParams = useSearchParams();
   const projectId = searchParams.get('projectId') || '';
@@ -38,7 +54,7 @@ export default function StoryboardingPage() {
   const [audience, setAudience] = useState('general');
 
   const handleCreate = () => {
-    if (!title.trim()) return;
+    if (!title.trim()) { return; }
     createStoryboard.mutate(
       { title, narrativeArc: arc, audienceType: audience },
       {
@@ -114,7 +130,7 @@ export default function StoryboardingPage() {
           {isLoading ? (
             <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>
           ) : storyboards?.length ? (
-            storyboards.map((sb: any) => (
+            storyboards.map((sb: StoryboardItem) => (
               <Card key={sb.id}>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-4">
@@ -137,8 +153,8 @@ export default function StoryboardingPage() {
                   {/* Ensure sections is an array before mapping */}
                   {Array.isArray(sb.sections) && sb.sections.length > 0 ? (
                     <div className="space-y-2">
-                      {sb.sections.map((section: any, idx: number) => (
-                        <div key={section.id || idx} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                      {sb.sections.map((section: StoryboardSection, idx: number) => (
+                        <div key={section.id || `section-${idx}`} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
                           <GripVertical className="w-4 h-4 text-muted-foreground" />
                           <span className="font-medium text-sm">{(section.order || idx) + 1}.</span>
                           <span className="text-sm flex-1">{typeof section.title === 'string' ? section.title : 'Untitled Section'}</span>
@@ -150,8 +166,8 @@ export default function StoryboardingPage() {
                     // Fallback if sections is wrapped or structure is different
                     Array.isArray(sb.content?.sections) && (
                       <div className="space-y-2">
-                        {sb.content.sections.map((section: any, idx: number) => (
-                          <div key={idx} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                        {sb.content.sections.map((section: StoryboardSection, idx: number) => (
+                          <div key={section.id || `fallback-section-${idx}`} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
                             <GripVertical className="w-4 h-4 text-muted-foreground" />
                             <span className="font-medium text-sm">{idx + 1}.</span>
                             <span className="text-sm flex-1">{section.title}</span>

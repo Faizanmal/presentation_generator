@@ -49,7 +49,9 @@ describe('SubscriptionLimitsService', () => {
     });
 
     it('should default to FREE tier for unknown tiers', () => {
-      const limits = service.getLimits('UNKNOWN' as any);
+      const limits = service.getLimits(
+        'UNKNOWN' as unknown as import('@prisma/client').SubscriptionPlan,
+      );
 
       expect(limits.maxProjects).toBe(5);
     });

@@ -96,11 +96,11 @@ export default function EditorPageV2() {
         collaborators: wsCollaborators,
         cursors,
         sendCursorPosition,
-        sendBlockUpdate,
+        sendBlockUpdate: _sendBlockUpdate,
         sendSlideAdd,
         sendSlideDelete,
         sendSlideReorder,
-        addComment: addCollaborationComment,
+        addComment: _addCollaborationComment,
     } = useCollaboration({
         projectId,
         token,

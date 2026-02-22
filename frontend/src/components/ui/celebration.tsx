@@ -91,7 +91,7 @@ export function Confetti({
     if (!isActive || pieces.length === 0) { return null; }
 
     return (
-        <div className="fixed inset-0 pointer-events-none z-[200] overflow-hidden">
+        <div className="fixed inset-0 pointer-events-none z-200 overflow-hidden">
             {pieces.map((piece) => (
                 <motion.div
                     key={piece.id}
@@ -188,18 +188,18 @@ export function CelebrationModal({
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[150]"
+                            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-150"
                             onClick={onClose}
                         />
                         <motion.div
                             initial={{ opacity: 0, scale: 0.9, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[151] w-full max-w-md"
+                            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-151 w-full max-w-md"
                         >
                             <div className="mx-4 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden">
                                 {/* Header with gradient */}
-                                <div className="h-32 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center">
+                                <div className="h-32 bg-linear-to-r from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center">
                                     <motion.div
                                         animate={{
                                             scale: [1, 1.2, 1],
@@ -228,7 +228,7 @@ export function CelebrationModal({
                                         {primaryAction && (
                                             <button
                                                 onClick={primaryAction.onClick}
-                                                className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all"
+                                                className="px-6 py-2.5 bg-linear-to-r from-blue-600 to-purple-600 text-white font-medium rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all"
                                             >
                                                 {primaryAction.label}
                                             </button>
@@ -280,7 +280,7 @@ export function AchievementBadge({
             whileTap={{ scale: 0.98 }}
             onClick={onClick}
             className={`relative p-4 rounded-xl border text-left transition-all ${unlocked
-                ? "bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-950/30 dark:to-amber-950/30 border-yellow-200 dark:border-yellow-800"
+                ? "bg-linear-to-br from-yellow-50 to-amber-50 dark:from-yellow-950/30 dark:to-amber-950/30 border-yellow-200 dark:border-yellow-800"
                 : "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 grayscale"
                 }`}
         >
@@ -333,7 +333,7 @@ export function AchievementBadge({
 
             {/* Unlocked badge */}
             {unlocked && (
-                <div className="absolute -top-2 -right-2 h-6 w-6 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-full flex items-center justify-center shadow-lg">
+                <div className="absolute -top-2 -right-2 h-6 w-6 bg-linear-to-br from-yellow-400 to-amber-500 rounded-full flex items-center justify-center shadow-lg">
                     <span className="text-xs">✓</span>
                 </div>
             )}
@@ -354,7 +354,7 @@ export function PointsAnimation({
             initial={{ opacity: 1, y: 0, scale: 1 }}
             animate={{ opacity: 0, y: -50, scale: 1.2 }}
             transition={{ duration: 1, ease: "easeOut" }}
-            className="fixed pointer-events-none z-[200] font-bold text-2xl text-yellow-500"
+            className="fixed pointer-events-none z-200 font-bold text-2xl text-yellow-500"
             style={{ left: `${position.x}%`, top: `${position.y}%` }}
         >
             +{points}

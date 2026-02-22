@@ -207,7 +207,7 @@ export default function AccessibilitySettingsPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-green-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        <div className="min-h-screen bg-linear-to-br from-slate-50 via-white to-green-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
             {/* Header */}
             <header className="sticky top-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-lg border-b border-slate-200 dark:border-slate-800">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -220,7 +220,7 @@ export default function AccessibilitySettingsPage() {
                                 </Button>
                             </Link>
                             <div className="flex items-center gap-2">
-                                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
+                                <div className="h-8 w-8 rounded-lg bg-linear-to-br from-green-500 to-emerald-600 flex items-center justify-center">
                                     <Eye className="h-5 w-5 text-white" />
                                 </div>
                                 <span className="text-xl font-bold text-slate-900 dark:text-white">
@@ -493,7 +493,7 @@ export default function AccessibilitySettingsPage() {
                                 </CardHeader>
                                 <CardContent>
                                     <div
-                                        className="rounded-lg p-8 min-h-[300px] flex flex-col justify-center"
+                                        className="rounded-lg p-8 min-h-75 flex flex-col justify-center"
                                         style={{ backgroundColor }}
                                     >
                                         <h2
@@ -577,19 +577,19 @@ export default function AccessibilitySettingsPage() {
                                     <h3 className="font-semibold mb-3">Alt Text Best Practices</h3>
                                     <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
                                         <li className="flex items-start gap-2">
-                                            <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                                            <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
                                             Be specific and concise - describe the image content, not just what it is
                                         </li>
                                         <li className="flex items-start gap-2">
-                                            <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                                            <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
                                             Include relevant context - mention text, colors, or actions shown
                                         </li>
                                         <li className="flex items-start gap-2">
-                                            <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                                            <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
                                             Avoid phrases like &ldquo;image of&rdquo; or &ldquo;picture of&rdquo; - screen readers already announce it as an image
                                         </li>
                                         <li className="flex items-start gap-2">
-                                            <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                                            <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
                                             For decorative images, use empty alt text (alt=&ldquo;&rdquo;) to skip them
                                         </li>
                                     </ul>

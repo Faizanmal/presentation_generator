@@ -81,7 +81,7 @@ const PLANS = [
 
 export default function BillingPage() {
   const router = useRouter();
-  const { subscription, isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const { subscription, isAuthenticated, isLoading: authLoading, initialized } = useAuthStore();
 
   // Compute renewal date to avoid calling Date.now() during render
   const renewalDate = useMemo(() => {
@@ -91,10 +91,10 @@ export default function BillingPage() {
 
   // Redirect if not authenticated
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push("/login");
+    if (initialized && !authLoading && !isAuthenticated) {
+      router.push('/login');
     }
-  }, [authLoading, isAuthenticated, router]);
+  }, [authLoading, isAuthenticated, initialized, router]);
 
   // Create checkout session mutation
   const checkoutMutation = useMutation({
@@ -296,7 +296,7 @@ export default function BillingPage() {
                   <ul className="space-y-3 mb-6">
                     {plan.features.map((feature) => (
                       <li key={feature} className="flex items-start gap-2">
-                        <Check className="h-5 w-5 text-green-500 flex-shrink-0" />
+                        <Check className="h-5 w-5 text-green-500 shrink-0" />
                         <span className="text-sm text-slate-700 dark:text-slate-300">{feature}</span>
                       </li>
                     ))}

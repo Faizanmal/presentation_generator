@@ -158,7 +158,7 @@ export function CommentsPanel({
                     )}
                 </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-96 sm:w-[420px] flex flex-col p-0">
+            <SheetContent side="right" className="w-96 sm:w-105flex flex-col p-0">
                 <SheetHeader className="px-4 py-3 border-b">
                     <div className="flex items-center justify-between">
                         <SheetTitle className="flex items-center gap-2">
@@ -225,7 +225,7 @@ export function CommentsPanel({
                             value={newComment}
                             onChange={(e) => setNewComment(e.target.value)}
                             placeholder="Add a comment... Use @ to mention"
-                            className="min-h-[80px] resize-none pr-12"
+                            className="min-h-20 resize-none pr-12"
                             onKeyDown={(e) => {
                                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                                     handleAddComment();
@@ -400,7 +400,7 @@ function CommentItem({
                         <Textarea
                             value={editContent}
                             onChange={(e) => setEditContent(e.target.value)}
-                            className="min-h-[60px] resize-none"
+                            className="min-h-15 resize-none"
                         />
                         <div className="flex justify-end gap-2">
                             <Button
@@ -476,7 +476,7 @@ function CommentItem({
                             value={replyContent}
                             onChange={(e) => setReplyContent(e.target.value)}
                             placeholder="Write a reply..."
-                            className="min-h-[60px] resize-none text-sm"
+                            className="min-h-15 resize-none text-sm"
                         />
                         <div className="flex justify-end gap-2">
                             <Button

@@ -27,13 +27,6 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
-// import {
-//     Dialog,
-//     DialogContent,
-//     DialogDescription,
-//     DialogHeader,
-//     DialogTitle,
-// } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
@@ -227,7 +220,7 @@ export function PresentationMode({
             <div className="flex-1 flex items-center justify-center relative overflow-hidden">
                 {/* Slide Content */}
                 <div
-                    className="w-full h-full max-w-[1920px] max-h-[1080px] bg-white shadow-2xl relative"
+                    className="w-full h-full max-w-480 max-h-270 bg-white shadow-2xl relative"
                     style={{ aspectRatio: "16/9" }}
                     onClick={(e) => e.stopPropagation()}
                 >
@@ -294,7 +287,7 @@ export function PresentationMode({
                                     <TooltipContent>Previous (←)</TooltipContent>
                                 </Tooltip>
 
-                                <span className="text-white text-sm font-medium min-w-[80px] text-center">
+                                <span className="text-white text-sm font-medium min-w-20 text-center">
                                     {currentSlide + 1} / {slides.length}
                                 </span>
 

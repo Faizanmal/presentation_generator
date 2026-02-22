@@ -26,7 +26,7 @@ interface CacheStats {
 @Injectable()
 export class CacheService implements OnModuleDestroy {
   private readonly logger = new Logger(CacheService.name);
-  private readonly cache = new Map<string, CacheEntry<any>>();
+  private readonly cache = new Map<string, CacheEntry<unknown>>();
   private readonly accessOrder: string[] = [];
   private hits = 0;
   private misses = 0;

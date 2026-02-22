@@ -26,7 +26,7 @@ export class UsersService {
    * Find user by ID
    */
   async findById(id: string) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.user.findFirst({
       where: { id },
       include: {
         subscription: true,
@@ -36,11 +36,25 @@ export class UsersService {
   }
 
   /**
-   * Find user by email (excludes soft-deleted accounts)
+   * Find user by email. Returns null if no email is supplied or the user
+   * does not exist.  The `email` field is unique in the database so we
+   * can use `findUnique` instead of `findFirst`.
    */
-  async findByEmail(email: string) {
-    return this.prisma.user.findFirst({
-      where: { email },
+  async findByEmail(email?: string | null) {
+    // Protect against bad caller input; we have seen cases where a non-string
+    // value (empty object, array, etc.) arrives from the OAuth flow.  These
+    // are truthy so the earlier `if (!email)` check would miss them and Prisma
+    // would attempt to build a query with an invalid `where` clause, resulting
+    // in the `(not available)` error seen in logs.
+    if (!email || typeof email !== 'string') {
+      this.logger.warn(
+        `findByEmail received invalid email value: ${JSON.stringify(email)}`,
+      );
+      return null;
+    }
+
+    return this.prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
       include: {
         subscription: true,
       },
@@ -102,14 +116,13 @@ export class UsersService {
    * Reactivate a soft-deleted user account
    */
 
-
   /**
    * Calculate profile completeness as a percentage (0–100)
    */
   async getProfileCompleteness(
     userId: string,
   ): Promise<{ score: number; missing: string[] }> {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const user = await this.prisma.user.findFirst({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
 
     const fields: Array<{ key: keyof typeof user; label: string }> = [
@@ -174,7 +187,7 @@ export class UsersService {
    * Get user subscription
    */
   async getSubscription(userId: string) {
-    const subscription = await this.prisma.subscription.findUnique({
+    const subscription = await this.prisma.subscription.findFirst({
       where: { userId },
     });
 
@@ -282,7 +295,7 @@ export class UsersService {
    * Get email preferences for user
    */
   async getEmailPreferences(userId: string) {
-    const preferences = await this.prisma.emailPreferences.findUnique({
+    const preferences = await this.prisma.emailPreferences.findFirst({
       where: { userId },
     });
 

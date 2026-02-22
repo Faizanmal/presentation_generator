@@ -173,7 +173,7 @@ export function OfflineModeManager({ onOpenPresentation }: OfflineModeManagerPro
           </TabsList>
 
           <TabsContent value="presentations">
-            <ScrollArea className="h-[300px]">
+            <ScrollArea className="h-75">
               {offlinePresentations.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
                   <CloudOff className="h-12 w-12 mb-4" />

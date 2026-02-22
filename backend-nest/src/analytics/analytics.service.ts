@@ -1247,7 +1247,7 @@ Provide 5-8 specific, actionable recommendations based on the data patterns.`;
       browsers: Object.fromEntries(browserSegments),
       engagement: engagementSegments,
       totalAudience: views.length,
-      insights: await this.generateAudienceInsights(
+      insights: this.generateAudienceInsights(
         deviceSegments,
         engagementSegments,
         views.length,

@@ -113,7 +113,7 @@ export function AutoLayoutEngine({
         <div className="space-y-4">
             {/* Header */}
             <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg">
+                <div className="p-2 bg-linear-to-br from-blue-500 to-cyan-500 rounded-lg">
                     <Wand2 className="w-5 h-5 text-white" />
                 </div>
                 <div>
@@ -128,7 +128,7 @@ export function AutoLayoutEngine({
             <button
                 onClick={() => autoLayoutMutation.mutate()}
                 disabled={blocks.length === 0 || autoLayoutMutation.isPending}
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-slate-400 disabled:to-slate-400 text-white font-medium py-3 rounded-lg flex items-center justify-center gap-2 transition-all"
+                className="w-full bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-slate-400 disabled:to-slate-400 text-white font-medium py-3 rounded-lg flex items-center justify-center gap-2 transition-all"
             >
                 {autoLayoutMutation.isPending ? (
                     <>

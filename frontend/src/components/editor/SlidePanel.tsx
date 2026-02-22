@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Slide, Theme } from "@/types";
@@ -27,7 +28,7 @@ interface SlidePanelProps {
   theme?: Theme;
 }
 
-export default function SlidePanel({
+const SlidePanel = React.memo(({
   slide,
   index,
   isActive,
@@ -35,7 +36,7 @@ export default function SlidePanel({
   onDelete,
   onDuplicate,
   theme,
-}: SlidePanelProps) {
+}: SlidePanelProps) => {
   const {
     attributes,
     listeners,
@@ -57,11 +58,10 @@ export default function SlidePanel({
     <div
       ref={setNodeRef}
       style={style}
-      className={`group relative mb-2 rounded-lg border-2 overflow-hidden cursor-pointer transition-all ${
-        isActive
-          ? "border-blue-500 shadow-md"
-          : "border-transparent hover:border-slate-300 dark:hover:border-slate-600"
-      } ${isDragging ? "opacity-50" : ""}`}
+      className={`group relative mb-2 rounded-lg border-2 overflow-hidden cursor-pointer transition-all ${isActive
+        ? "border-blue-500 shadow-md"
+        : "border-transparent hover:border-slate-300 dark:hover:border-slate-600"
+        } ${isDragging ? "opacity-50" : ""}`}
       onClick={onClick}
     >
       {/* Slide number */}
@@ -107,7 +107,7 @@ export default function SlidePanel({
 
       {/* Slide thumbnail */}
       <div
-        className="aspect-[16/10] p-2"
+        className="aspect-16/10 p-2"
         style={{ backgroundColor: bgColor }}
       >
         {/* Mini representation of slide content */}
@@ -115,13 +115,12 @@ export default function SlidePanel({
           {slide.blocks?.slice(0, 3).map((block) => (
             <div
               key={block.id}
-              className={`rounded ${
-                block.type === "HEADING"
-                  ? "h-3 bg-slate-700 dark:bg-slate-300 w-2/3"
-                  : block.type === "SUBHEADING"
+              className={`rounded ${block.type === "HEADING"
+                ? "h-3 bg-slate-700 dark:bg-slate-300 w-2/3"
+                : block.type === "SUBHEADING"
                   ? "h-2 bg-slate-500 dark:bg-slate-400 w-1/2"
                   : "h-1.5 bg-slate-300 dark:bg-slate-600 w-full"
-              }`}
+                }`}
             />
           ))}
         </div>
@@ -135,4 +134,6 @@ export default function SlidePanel({
       </div>
     </div>
   );
-}
+});
+
+export default SlidePanel;

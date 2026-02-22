@@ -109,8 +109,9 @@ export function URLImporter({ onImport, onClose }: URLImporterProps) {
                     includeImages,
                 });
                 return response.data as ImportResult;
-            } catch (err: any) {
-                const msg = err.response?.data?.message || err.message || 'Import failed';
+            } catch (err: unknown) {
+                const error = err as { response?: { data?: { message?: string } }; message?: string };
+                const msg = error.response?.data?.message || error.message || 'Import failed';
                 console.error("Import error:", msg); // Log explicitly
                 throw new Error(msg);
             }
@@ -152,7 +153,7 @@ export function URLImporter({ onImport, onClose }: URLImporterProps) {
     return (
         <div className="space-y-6">
             <div className="text-center">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-linear-to-br from-blue-500 to-purple-600">
                     <Link className="h-6 w-6 text-white" />
                 </div>
                 <h2 className="mt-4 text-2xl font-bold">Import from URL</h2>
@@ -391,11 +392,11 @@ export function URLImporter({ onImport, onClose }: URLImporterProps) {
                             </Card>
 
                             {/* Slides Preview */}
-                            <ScrollArea className="h-[400px]">
+                            <ScrollArea className="h-100">
                                 <div className="grid grid-cols-2 gap-4 p-1">
                                     {importResult.slides.map((slide, index) => (
                                         <Card key={slide.heading} className="overflow-hidden">
-                                            <div className="bg-gradient-to-br from-slate-100 to-slate-200 p-4">
+                                            <div className="bg-linear-to-br from-slate-100 to-slate-200 p-4">
                                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                                     <Layout className="h-3 w-3" />
                                                     Slide {index + 1}

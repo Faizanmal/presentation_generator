@@ -28,14 +28,14 @@ type RegisterForm = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { register: registerUser, isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
+  const { register: registerUser, isAuthenticated, isLoading: isAuthLoading, initialized } = useAuthStore();
 
   // Redirect authenticated users to dashboard
   useEffect(() => {
-    if (!isAuthLoading && isAuthenticated) {
+    if (initialized && !isAuthLoading && isAuthenticated) {
       router.push('/dashboard');
     }
-  }, [isAuthenticated, isAuthLoading, router]);
+  }, [isAuthenticated, isAuthLoading, initialized, router]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);

@@ -101,17 +101,17 @@ export class HolographicService {
 
       if (!preview) return;
 
-      const config = preview.config as HolographicConfig;
+      const config = preview.config as unknown as HolographicConfig;
 
       // Generate quilts based on display type
       let quilts: LookingGlassQuilt[] | object[] = [];
 
       if (config.displayType === 'looking_glass') {
-        quilts = await this.generateLookingGlassQuilts(slides, config);
+        quilts = this.generateLookingGlassQuilts(slides, config);
       } else if (config.displayType === 'pepper_ghost') {
-        quilts = await this.generatePepperGhostViews(slides, config);
+        quilts = this.generatePepperGhostViews(slides, config);
       } else {
-        quilts = await this.generateWebGL3DViews(slides, config);
+        quilts = this.generateWebGL3DViews(slides, config);
       }
 
       // Generate output URLs
@@ -143,14 +143,14 @@ export class HolographicService {
   /**
    * Generate Looking Glass quilt images
    */
-  private async generateLookingGlassQuilts(
+  private generateLookingGlassQuilts(
     slides: Array<{ id: string; content: unknown; order: number }>,
     config: HolographicConfig,
-  ): Promise<LookingGlassQuilt[]> {
+  ): LookingGlassQuilt[] {
     const preset = this.lookingGlassPresets.portrait;
     const quilts: LookingGlassQuilt[] = [];
 
-    for (const slide of slides) {
+    for (const _slide of slides) {
       // In production, you would:
       // 1. Render slide from multiple angles
       // 2. Compose views into quilt image
@@ -173,10 +173,10 @@ export class HolographicService {
   /**
    * Generate Pepper's Ghost projection views
    */
-  private async generatePepperGhostViews(
+  private generatePepperGhostViews(
     slides: Array<{ id: string; content: unknown; order: number }>,
     config: HolographicConfig,
-  ): Promise<object[]> {
+  ): object[] {
     const views: object[] = [];
 
     for (const slide of slides) {
@@ -201,10 +201,10 @@ export class HolographicService {
   /**
    * Generate WebGL 3D views
    */
-  private async generateWebGL3DViews(
+  private generateWebGL3DViews(
     slides: Array<{ id: string; content: unknown; order: number }>,
     config: HolographicConfig,
-  ): Promise<object[]> {
+  ): object[] {
     return slides.map((slide) => ({
       slideId: slide.id,
       order: slide.order,
@@ -274,7 +274,7 @@ export class HolographicService {
    */
   async generateViewerHTML(previewId: string, userId: string): Promise<string> {
     const preview = await this.getPreview(previewId, userId);
-    const config = preview.config as HolographicConfig;
+    const config = preview.config as unknown as HolographicConfig;
 
     return `<!DOCTYPE html>
 <html>

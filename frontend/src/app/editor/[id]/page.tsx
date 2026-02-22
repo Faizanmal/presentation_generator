@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -31,6 +31,8 @@ import {
   Palette,
   Save,
   Layout,
+  AlignLeft,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -75,23 +77,22 @@ export default function EditorPage() {
   const queryClient = useQueryClient();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
 
-  const {
-    project,
-    currentSlideIndex,
-    isDirty,
-    loadProject,
-    setCurrentSlideIndex,
-    updateProject,
-    addSlide,
-    deleteSlide,
-    reorderSlides,
-    setTheme,
-  } = useEditorStore();
+  const project = useEditorStore((state) => state.project);
+  const currentSlideIndex = useEditorStore((state) => state.currentSlideIndex);
+  const isDirty = useEditorStore((state) => state.isDirty);
+  const loadProject = useEditorStore((state) => state.loadProject);
+  const setCurrentSlideIndex = useEditorStore((state) => state.setCurrentSlideIndex);
+  const updateProject = useEditorStore((state) => state.updateProject);
+  const addSlide = useEditorStore((state) => state.addSlide);
+  const deleteSlide = useEditorStore((state) => state.deleteSlide);
+  const reorderSlides = useEditorStore((state) => state.reorderSlides);
+  const setTheme = useEditorStore((state) => state.setTheme);
 
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(true);
   const [isThemePanelOpen, setIsThemePanelOpen] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState("");
+  const [showSpeakerNotes, setShowSpeakerNotes] = useState(false);
 
   // New usability feature states
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
@@ -155,7 +156,7 @@ export default function EditorPage() {
 
   // Save project mutation
   const saveMutation = useMutation({
-    mutationFn: (data: Partial<Project>) => api.projects.update(projectId, data),
+    mutationFn: (data: Partial<Project>) => api.updateProject(projectId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["project", projectId] });
     },
@@ -165,13 +166,13 @@ export default function EditorPage() {
   });
 
   // Handle title update
-  const handleTitleSave = () => {
+  const handleTitleSave = useCallback(() => {
     if (titleInput.trim() && titleInput !== project?.title) {
       updateProject({ title: titleInput.trim() });
       saveMutation.mutate({ title: titleInput.trim() });
     }
     setIsEditingTitle(false);
-  };
+  }, [titleInput, project?.title, updateProject, saveMutation]);
 
   // Current slide
   const currentSlide = project?.slides?.[currentSlideIndex];
@@ -186,7 +187,7 @@ export default function EditorPage() {
   );
 
   // Handle slide reorder
-  const handleSlideReorder = (event: DragEndEvent) => {
+  const handleSlideReorder = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id || !project?.slides) { return; }
 
@@ -197,17 +198,18 @@ export default function EditorPage() {
       reorderSlides(oldIndex, newIndex);
       // Update via API
       const reordered = arrayMove(project.slides, oldIndex, newIndex);
-      api.slides.reorder(
+      api.reorderSlides(
         projectId,
         reordered.map((s, i) => ({ id: s.id, order: i }))
       );
     }
-  };
+  }, [project?.slides, reorderSlides, projectId]);
 
   // Handle add slide
-  const handleAddSlide = async () => {
+  const handleAddSlide = useCallback(async () => {
     try {
-      const newSlide = await api.slides.create(projectId, {
+      const newSlide = await api.createSlide({
+        projectId,
         title: `Slide ${(project?.slides?.length || 0) + 1}`,
         order: project?.slides?.length || 0,
       });
@@ -216,34 +218,50 @@ export default function EditorPage() {
     } catch {
       toast.error("Failed to add slide");
     }
-  };
+  }, [projectId, project?.slides?.length, addSlide, setCurrentSlideIndex]);
 
   // Handle delete slide
-  const handleDeleteSlide = async (slideId: string) => {
+  const handleDeleteSlide = useCallback(async (slideId: string) => {
     if (project?.slides?.length === 1) {
       toast.error("Cannot delete the last slide");
       return;
     }
     try {
-      await api.slides.delete(projectId, slideId);
+      await api.deleteSlide(slideId);
       deleteSlide(slideId);
     } catch {
       toast.error("Failed to delete slide");
     }
-  };
+  }, [project?.slides?.length, projectId, deleteSlide]);
+
+  // Handle speaker notes change
+  const handleNotesChange = useCallback((notes: string) => {
+    if (!currentSlide) return;
+    const updateSlideStore = useEditorStore.getState().updateSlide;
+    updateSlideStore(currentSlide.id, { speakerNotes: notes });
+
+    // Auto-save using the same mechanism or debounce
+    try {
+      api.updateSlide(currentSlide.id, { speakerNotes: notes });
+    } catch (error) {
+      console.error("Failed to save speaker notes", error);
+    }
+  }, [currentSlide]);
 
   // Handle duplicate slide
-  const handleDuplicateSlide = async (slide: Slide) => {
+  const handleDuplicateSlide = useCallback(async (slide: Slide) => {
     try {
-      const newSlide = await api.slides.create(projectId, {
+      const newSlide = await api.createSlide({
+        projectId,
         title: `${slide.title} (copy)`,
         order: (project?.slides?.length || 0),
       });
       // Also duplicate blocks
       if (slide.blocks) {
         for (const block of slide.blocks) {
-          await api.blocks.create(projectId, newSlide.id, {
+          await api.createBlock({
             projectId,
+            slideId: newSlide.id,
             blockType: block.type,
             content: block.content,
             order: block.order,
@@ -255,22 +273,22 @@ export default function EditorPage() {
     } catch {
       toast.error("Failed to duplicate slide");
     }
-  };
+  }, [projectId, project?.slides?.length, queryClient]);
 
   // Handle theme change
-  const handleThemeChange = async (theme: Theme) => {
+  const handleThemeChange = useCallback(async (theme: Theme) => {
     try {
-      await api.projects.update(projectId, { themeId: theme.id });
+      await api.updateProject(projectId, { themeId: theme.id });
       setTheme(theme);
       setIsThemePanelOpen(false);
       toast.success("Theme applied");
     } catch {
       toast.error("Failed to apply theme");
     }
-  };
+  }, [projectId, setTheme]);
 
   // Handle export
-  const handleExport = async (format: "html" | "json" | "pdf") => {
+  const handleExport = useCallback(async (format: "html" | "json" | "pdf") => {
     try {
       const data = await api.export.export(projectId, format);
       if (format === "json") {
@@ -294,12 +312,12 @@ export default function EditorPage() {
     } catch {
       toast.error("Failed to export");
     }
-  };
+  }, [projectId, project?.title]);
 
   // Handle present
-  const handlePresent = () => {
+  const handlePresent = useCallback(() => {
     window.open(`/present/${projectId}`, "_blank");
-  };
+  }, [projectId]);
 
   if (authLoading || projectLoading) {
     return (
@@ -541,27 +559,62 @@ export default function EditorPage() {
             )}
           </div>
 
+          {/* Speaker Notes */}
+          {showSpeakerNotes && currentSlide && (
+            <div className="h-48 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4 shrink-0 flex flex-col shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                  <AlignLeft className="w-4 h-4" /> Speaker Notes
+                </span>
+                <Button variant="ghost" size="sm" onClick={() => setShowSpeakerNotes(false)}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <textarea
+                className="flex-1 w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                placeholder="Add speaker notes here... These will be visible when you present."
+                value={currentSlide.speakerNotes || ""}
+                onChange={(e) => handleNotesChange(e.target.value)}
+              />
+            </div>
+          )}
+
           {/* Slide navigation */}
-          <div className="h-12 bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex items-center justify-center gap-4 flex-shrink-0">
-            <Button
-              variant="ghost"
-              size="icon"
-              disabled={currentSlideIndex === 0}
-              onClick={() => setCurrentSlideIndex(currentSlideIndex - 1)}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-sm text-slate-600 dark:text-slate-400">
-              {currentSlideIndex + 1} / {project.slides?.length || 0}
-            </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              disabled={currentSlideIndex === (project.slides?.length || 1) - 1}
-              onClick={() => setCurrentSlideIndex(currentSlideIndex + 1)}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+          <div className="h-12 bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 flex-shrink-0">
+            <div className="flex-1">
+              <Button
+                variant={showSpeakerNotes ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setShowSpeakerNotes(!showSpeakerNotes)}
+                className="text-xs flex-shrink-0"
+              >
+                <AlignLeft className="h-4 w-4 mr-1.5" />
+                Notes
+              </Button>
+            </div>
+
+            <div className="flex items-center justify-center gap-4 flex-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={currentSlideIndex === 0}
+                onClick={() => setCurrentSlideIndex(currentSlideIndex - 1)}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm text-slate-600 dark:text-slate-400">
+                {currentSlideIndex + 1} / {project.slides?.length || 0}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={currentSlideIndex === (project.slides?.length || 1) - 1}
+                onClick={() => setCurrentSlideIndex(currentSlideIndex + 1)}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex-1" />
           </div>
         </div>
       </div>

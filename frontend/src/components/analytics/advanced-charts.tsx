@@ -326,7 +326,7 @@ function RenderChart({ data, type }: RenderChartProps) {
   };
 
   return (
-    <div className="h-[300px]">
+    <div className="h-75">
       {type === 'bar' && <Bar {...chartProps} />}
       {type === 'line' && <Line {...chartProps} />}
       {type === 'pie' && <Pie {...chartProps} />}

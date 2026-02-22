@@ -11,16 +11,13 @@ import {
     Settings,
     LifeBuoy,
     LogOut,
-    ChevronDown,
     ChevronsUpDown,
     Search,
-    Plus,
     PanelLeftClose,
     PanelLeftOpen,
     Zap,
     FlaskConical,
     Glasses,
-    Link2,
     MessageSquareMore,
     MonitorSmartphone,
     TrendingUp,
@@ -32,25 +29,15 @@ import {
     FileSpreadsheet,
     ImageIcon,
     Palette,
-    Key,
-    Wifi,
-    Accessibility,
-    Globe,
-    Hand,
-    BrainCircuit,
-    ScanEye,
     Boxes,
-    Target,
-    Bot,
     BrainCog,
-    UsersRound,
     Layers
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -59,11 +46,6 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
-import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger
-} from "@/components/ui/collapsible";
 import { useAuthStore } from "@/stores/auth-store";
 import { useState } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -80,9 +62,9 @@ interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
 export function Sidebar({ className, isCollapsed = false, onCollapse, onLinkClick }: SidebarProps) {
     const pathname = usePathname();
     const { user, logout, subscription } = useAuthStore();
-    const [openGroups, setOpenGroups] = useState<string[]>(["creative"]);
+    const [, setOpenGroups] = useState<string[]>(["creative"]);
 
-    const toggleGroup = (group: string) => {
+    const _toggleGroup = (group: string) => {
         setOpenGroups(prev =>
             prev.includes(group)
                 ? prev.filter(g => g !== group)
@@ -158,14 +140,14 @@ export function Sidebar({ className, isCollapsed = false, onCollapse, onLinkClic
             <div className={cn("flex items-center h-16 px-4 border-b", isCollapsed ? "justify-center" : "justify-between")}>
                 {!isCollapsed && (
                     <Link href="/dashboard" className="flex items-center gap-2 font-bold text-lg text-slate-900 dark:text-white">
-                        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 shadow-sm">
+                        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-linear-to-br from-blue-600 to-indigo-600 shadow-sm">
                             <Sparkles className="w-5 h-5 text-white" />
                         </div>
                         <span>Present.AI</span>
                     </Link>
                 )}
                 {isCollapsed && (
-                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 shadow-sm">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-linear-to-br from-blue-600 to-indigo-600 shadow-sm">
                         <Sparkles className="w-5 h-5 text-white" />
                     </div>
                 )}
@@ -259,14 +241,14 @@ export function Sidebar({ className, isCollapsed = false, onCollapse, onLinkClic
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className={cn("w-full", isCollapsed ? "px-0 justify-center" : "justify-start px-2")}>
                             <Avatar className="h-8 w-8">
-                                <AvatarFallback className="bg-gradient-to-br from-purple-500 to-pink-500 text-white">
+                                <AvatarFallback className="bg-linear-to-br from-purple-500 to-pink-500 text-white">
                                     {user?.name?.charAt(0).toUpperCase() || "U"}
                                 </AvatarFallback>
                             </Avatar>
                             {!isCollapsed && (
                                 <div className="flex flex-col items-start ml-3 text-left">
                                     <span className="text-sm font-medium leading-none">{user?.name || "User"}</span>
-                                    <span className="text-xs text-muted-foreground mt-1 truncate max-w-[120px]">
+                                    <span className="text-xs text-muted-foreground mt-1 truncate max-w-30">
                                         {user?.email || "user@example.com"}
                                     </span>
                                 </div>

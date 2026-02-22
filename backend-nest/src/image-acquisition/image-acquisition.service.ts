@@ -260,6 +260,7 @@ export class ImageAcquisitionService {
       this.logger.error('AI image generation failed:', error);
       throw new Error(
         `Failed to generate AI image: ${(error as Error).message}`,
+        { cause: error },
       );
     }
   }
@@ -327,6 +328,7 @@ export class ImageAcquisitionService {
       this.logger.error('Unsplash fetch failed:', error);
       throw new Error(
         `Failed to fetch from Unsplash: ${(error as Error).message}`,
+        { cause: error },
       );
     }
   }
@@ -383,6 +385,7 @@ export class ImageAcquisitionService {
       this.logger.error('Pexels fetch failed:', error);
       throw new Error(
         `Failed to fetch from Pexels: ${(error as Error).message}`,
+        { cause: error },
       );
     }
   }
@@ -491,6 +494,7 @@ export class ImageAcquisitionService {
       this.logger.error('URL download failed:', error);
       throw new Error(
         `Failed to download from URL: ${(error as Error).message}`,
+        { cause: error },
       );
     }
   }

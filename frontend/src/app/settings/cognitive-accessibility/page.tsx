@@ -1,19 +1,15 @@
 'use client';
 
 import { toast } from 'sonner';
-import {
-  BrainCircuit, Loader2, Palette, Type, Gauge, Eye, LayoutGrid,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { BrainCircuit, Palette, Type, Gauge} from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { useCognitiveAccessibility } from '@/hooks/use-new-features';
 
 export default function CognitiveAccessibilityPage() {
-  const { profile, presets, updateProfile, applyPreset, simplifyText } = useCognitiveAccessibility();
+  const { profile, presets, updateProfile, applyPreset } = useCognitiveAccessibility();
 
   const handleUpdate = async (partial: Record<string, unknown>) => {
     try {

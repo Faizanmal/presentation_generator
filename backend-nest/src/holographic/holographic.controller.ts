@@ -15,15 +15,9 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { HolographicService } from './holographic.service';
 
-class CreatePreviewDto {
-  projectId: string;
-  displayType?: 'looking_glass' | 'pepper_ghost' | 'webgl_3d';
-  depth?: number;
-  viewAngle?: number;
-  quiltColumns?: number;
-  quiltRows?: number;
-  views?: number;
-}
+import { CreatePreviewDto } from './dto/create-preview.dto';
+
+// (CreatePreviewDto definition moved to shared DTO file)
 
 @ApiTags('Holographic')
 @Controller('holographic')

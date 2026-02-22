@@ -33,10 +33,17 @@ export class LoggerService implements NestLoggerService {
           format: winston.format.combine(
             winston.format.colorize(),
             winston.format.printf(
-              ({ timestamp, level, message, context, ...metadata }) => {
-                let msg = `${timestamp} [${level}]`;
-                if (context) msg += ` [${context}]`;
-                msg += `: ${message}`;
+              ({
+                timestamp,
+                level,
+                message,
+                context,
+                ...metadata
+              }: Record<string, unknown>) => {
+                let msg = `${String(timestamp)} [${String(level)}]`;
+                if (context)
+                  msg += ` [${typeof context === 'string' ? context : JSON.stringify(context)}]`;
+                msg += `: ${String(message)}`;
 
                 if (Object.keys(metadata).length > 0) {
                   msg += ` ${JSON.stringify(metadata)}`;
@@ -65,17 +72,27 @@ export class LoggerService implements NestLoggerService {
 
     // Add daily rotation in production
     if (process.env.NODE_ENV === 'production') {
-      const DailyRotateFile = require('winston-daily-rotate-file');
+      // Use dynamic import for optional dependency
+      const initDailyRotation = (): void => {
+        try {
+          const DailyRotateFile = require('winston-daily-rotate-file') as new (
+            opts: Record<string, unknown>,
+          ) => winston.transport;
 
-      this.logger.add(
-        new DailyRotateFile({
-          filename: 'logs/application-%DATE%.log',
-          datePattern: 'YYYY-MM-DD',
-          zippedArchive: true,
-          maxSize: '20m',
-          maxFiles: '14d',
-        }),
-      );
+          this.logger.add(
+            new DailyRotateFile({
+              filename: 'logs/application-%DATE%.log',
+              datePattern: 'YYYY-MM-DD',
+              zippedArchive: true,
+              maxSize: '20m',
+              maxFiles: '14d',
+            }),
+          );
+        } catch {
+          // If daily-rotate-file is not installed, skip this transport
+        }
+      };
+      void initDailyRotation();
     }
   }
 
@@ -117,7 +134,7 @@ export class LoggerService implements NestLoggerService {
       query: req.query,
       ip: this.getClientIp(req),
       userAgent: req.headers['user-agent'],
-      userId: (req as any).user?.id,
+      userId: (req as unknown as any).user?.id,
     });
   }
 
@@ -136,7 +153,7 @@ export class LoggerService implements NestLoggerService {
       path: req.path,
       statusCode,
       responseTime: `${responseTime}ms`,
-      userId: (req as any).user?.id,
+      userId: (req as unknown as any).user?.id,
     });
   }
 
@@ -146,7 +163,7 @@ export class LoggerService implements NestLoggerService {
   logError(
     error: Error,
     context?: string,
-    additionalInfo?: Record<string, any>,
+    additionalInfo?: Record<string, unknown>,
   ) {
     this.logger.error('Error occurred', {
       context: context || this.context,
@@ -162,7 +179,7 @@ export class LoggerService implements NestLoggerService {
    */
   logSecurityEvent(
     event: string,
-    details: Record<string, any>,
+    details: Record<string, unknown>,
     context?: string,
   ) {
     this.logger.warn('Security Event', {

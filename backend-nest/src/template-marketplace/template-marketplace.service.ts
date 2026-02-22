@@ -648,7 +648,7 @@ export class TemplateMarketplaceService {
       _count: true,
     });
 
-    const countMap = new Map(counts.map((c) => [c.category, c._count._all]));
+    const countMap = new Map(counts.map((c) => [c.category, c._count]));
 
     return categories.map((category) => ({
       category,

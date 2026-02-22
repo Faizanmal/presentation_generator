@@ -82,7 +82,7 @@ export class LiveQAGateway implements OnGatewayConnection, OnGatewayDisconnect {
         participantId: client.id,
         isHost: client.isHost,
       });
-    } catch (error) {
+    } catch {
       client.emit('error', { message: 'Failed to join session' });
     }
   }
@@ -127,10 +127,12 @@ export class LiveQAGateway implements OnGatewayConnection, OnGatewayDisconnect {
             result.moderation.reason || 'Question did not pass moderation',
         });
       }
-    } catch (error) {
+    } catch (_error) {
       client.emit('error', {
         message:
-          error instanceof Error ? error.message : 'Failed to submit question',
+          _error instanceof Error
+            ? _error.message
+            : 'Failed to submit question',
       });
     }
   }
@@ -156,7 +158,7 @@ export class LiveQAGateway implements OnGatewayConnection, OnGatewayDisconnect {
         questionId: data.questionId,
         upvotes: question.upvotes,
       });
-    } catch (error) {
+    } catch {
       client.emit('error', { message: 'Failed to upvote' });
     }
   }
@@ -181,7 +183,7 @@ export class LiveQAGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.server.to(`qa:${client.sessionId}`).emit('questionAnswered', {
         question,
       });
-    } catch (error) {
+    } catch {
       client.emit('error', { message: 'Failed to mark as answered' });
     }
   }
@@ -202,7 +204,7 @@ export class LiveQAGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.server.to(`qa:${client.sessionId}`).emit('questionDismissed', {
         questionId: data.questionId,
       });
-    } catch (error) {
+    } catch {
       client.emit('error', { message: 'Failed to dismiss question' });
     }
   }
@@ -226,7 +228,7 @@ export class LiveQAGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.server.to(`qa:${client.sessionId}`).emit('questionPinned', {
         question,
       });
-    } catch (error) {
+    } catch {
       client.emit('error', { message: 'Failed to pin question' });
     }
   }
@@ -245,7 +247,7 @@ export class LiveQAGateway implements OnGatewayConnection, OnGatewayDisconnect {
       );
 
       client.emit('questionsSummary', summary);
-    } catch (error) {
+    } catch (_error) {
       client.emit('error', { message: 'Failed to generate summary' });
     }
   }
@@ -263,7 +265,7 @@ export class LiveQAGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.server.to(`qa:${client.sessionId}`).emit('sessionEnded', {
         message: 'Q&A session has ended',
       });
-    } catch (error) {
+    } catch {
       client.emit('error', { message: 'Failed to end session' });
     }
   }

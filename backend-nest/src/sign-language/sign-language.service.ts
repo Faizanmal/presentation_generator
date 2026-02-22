@@ -139,10 +139,7 @@ export class SignLanguageService {
   /**
    * Translate text to sign language sequence
    */
-  async translateToSigns(
-    text: string,
-    language: SignLanguageCode = 'ASL',
-  ): Promise<SignSequence> {
+  async translateToSigns(text: string): Promise<SignSequence> {
     // Simplified translation - real implementation would use ML models
     const words = text.toLowerCase().split(/\s+/);
     const signs: SignSequence['signs'] = [];
@@ -216,16 +213,32 @@ export class SignLanguageService {
     const fullText = textContent.join('. ');
 
     // Translate
-    const translation = await this.translateToSigns(fullText, language);
+    const translation = await this.translateToSigns(fullText);
 
     // Store translation
+    // Ensure a config exists for this project
+    let config = await this.prisma.signLanguageConfig.findFirst({
+      where: { projectId: slide.projectId },
+    });
+    if (!config) {
+      config = await this.prisma.signLanguageConfig.create({
+        data: { projectId: slide.projectId, enabled: true },
+      });
+    }
+
     const stored = await this.prisma.signLanguageTranslation.create({
       data: {
+        configId: config.id,
         slideId,
-        language,
+        blockId: null,
+        sourceText: fullText,
         originalText: fullText,
-        glossSequence: translation.signs.map((s) => s.gloss),
-        timing: translation.signs.map((s) => s.duration),
+        language,
+        signSequence: translation.signs.map((s) => ({
+          gloss: s.gloss,
+          duration: s.duration,
+        })) as any,
+        glossSequence: translation.signs.map((s) => s.gloss) as any,
         status: 'generated',
       },
     });

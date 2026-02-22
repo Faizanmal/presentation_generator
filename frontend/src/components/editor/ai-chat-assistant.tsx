@@ -229,12 +229,12 @@ export function AIChatAssistant({
         <Card
             className={cn(
                 'fixed bottom-4 right-4 z-50 w-96 shadow-2xl transition-all duration-300',
-                isMinimized ? 'h-14' : 'h-[600px]'
+                isMinimized ? 'h-14' : 'h-150'
             )}
         >
             {/* Header */}
             <div
-                className="flex items-center justify-between border-b bg-gradient-to-r from-violet-500 to-purple-600 p-3 text-white cursor-pointer rounded-t-lg"
+                className="flex items-center justify-between border-b bg-linear-to-r from-violet-500 to-purple-600 p-3 text-white cursor-pointer rounded-t-lg"
                 onClick={() => setIsMinimized(!isMinimized)}
             >
                 <div className="flex items-center gap-2">
@@ -491,7 +491,7 @@ export function AIChatTrigger({ onClick }: { onClick: () => void }) {
                     <Button
                         onClick={onClick}
                         size="icon"
-                        className="fixed bottom-4 right-4 z-40 h-14 w-14 rounded-full bg-gradient-to-r from-violet-500 to-purple-600 shadow-lg hover:from-violet-600 hover:to-purple-700"
+                        className="fixed bottom-4 right-4 z-40 h-14 w-14 rounded-full bg-linear-to-r from-violet-500 to-purple-600 shadow-lg hover:from-violet-600 hover:to-purple-700"
                     >
                         <MessageCircle className="h-6 w-6" />
                     </Button>

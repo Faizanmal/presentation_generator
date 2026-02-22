@@ -62,6 +62,7 @@ export class LearningPathsService {
     const learningPath = await this.prisma.learningPath.create({
       data: {
         userId: creatorId,
+        projectId: data.projectIds[0], // Use first project as main project
         title: data.title,
         description: data.description,
         category: data.category,
@@ -220,7 +221,7 @@ Format as JSON array:
     }
 
     // Create progress records for each module
-    const progressRecords = path.modules.map(module => ({
+    const progressRecords = path.modules.map((module) => ({
       pathId,
       userId: learnerId,
       moduleId: module.id,
@@ -250,7 +251,9 @@ Format as JSON array:
     }
 
     const status = update.completed ? 'completed' : 'in_progress';
-    const progressValue = update.completed ? 100 : Math.max(progress.progress, 50); // Assume 50% if in progress
+    const progressValue = update.completed
+      ? 100
+      : Math.max(progress.progress, 50); // Assume 50% if in progress
 
     return this.prisma.learnerProgress.update({
       where: { id: progress.id },
@@ -280,10 +283,22 @@ Format as JSON array:
     }
 
     const path = await this.getLearningPath(pathId);
-    const completedModules = progressRecords.filter(p => p.status === 'completed').map(p => p.moduleId);
-    const totalProgress = progressRecords.reduce((sum, p) => sum + p.progress, 0) / progressRecords.length;
-    const totalTimeSpent = progressRecords.reduce((sum, p) => sum + p.timeSpent, 0);
-    const status = totalProgress >= 100 ? 'completed' : totalProgress > 0 ? 'in_progress' : 'not_started';
+    const completedModules = progressRecords
+      .filter((p) => p.status === 'completed')
+      .map((p) => p.moduleId);
+    const totalProgress =
+      progressRecords.reduce((sum, p) => sum + p.progress, 0) /
+      progressRecords.length;
+    const totalTimeSpent = progressRecords.reduce(
+      (sum, p) => sum + p.timeSpent,
+      0,
+    );
+    const status =
+      totalProgress >= 100
+        ? 'completed'
+        : totalProgress > 0
+          ? 'in_progress'
+          : 'not_started';
 
     return {
       pathId,
@@ -293,10 +308,7 @@ Format as JSON array:
       completedModules,
       timeSpent: totalTimeSpent,
       path,
-      nextModule: this.getNextModule(
-        path.modules,
-        completedModules,
-      ),
+      nextModule: this.getNextModule(path.modules, completedModules),
     };
   }
 
@@ -320,7 +332,9 @@ Format as JSON array:
       include: { module: { include: { path: true } } },
     });
 
-    const completedPathIds = [...new Set(completedProgress.map(p => p.pathId))];
+    const completedPathIds = [
+      ...new Set(completedProgress.map((p) => p.pathId)),
+    ];
 
     // Get public paths learner hasn't enrolled in
     const enrolledPathIds = await this.prisma.learnerProgress.findMany({
@@ -328,7 +342,7 @@ Format as JSON array:
       select: { pathId: true },
     });
 
-    const enrolledIds = [...new Set(enrolledPathIds.map(e => e.pathId))];
+    const enrolledIds = [...new Set(enrolledPathIds.map((e) => e.pathId))];
 
     const recommendations = await this.prisma.learningPath.findMany({
       where: {
@@ -360,7 +374,9 @@ Format as JSON array:
       include: { module: { include: { path: true } } },
     });
 
-    const inProgressPathIds = [...new Set(inProgressRecords.map(p => p.pathId))];
+    const inProgressPathIds = [
+      ...new Set(inProgressRecords.map((p) => p.pathId)),
+    ];
     const inProgress = await this.prisma.learningPath.findMany({
       where: { id: { in: inProgressPathIds } },
       take: 5,
@@ -408,13 +424,13 @@ Format as JSON array:
     }
 
     // module.content is stored as a JSON string (or plain text). Parse if possible.
-    let contentObj: { quizzes?: any[] } = {};
+    let contentObj: { quizzes?: any[]; text?: string } = {};
     if (typeof module.content === 'string' && module.content.trim()) {
       try {
-        contentObj = JSON.parse(module.content as string);
+        contentObj = JSON.parse(module.content);
       } catch {
         // legacy plain-text content - preserve as `text` field
-        contentObj = { text: module.content as string };
+        contentObj = { text: module.content };
       }
     }
 

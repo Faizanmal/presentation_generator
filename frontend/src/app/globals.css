@@ -93,11 +93,15 @@ body {
   @apply bg-background text-foreground;
 }
 
-/* Utilities */
-.bg-linear-to-br {
-  background-image: linear-gradient(to bottom right, var(--tw-gradient-stops));
+@utility text-gradient-hero {
+  background-image: linear-gradient(to right, #60a5fa, #c084fc, #f472b6);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
 }
 
-.bg-linear-to-r {
-  background-image: linear-gradient(to right, var(--tw-gradient-stops));
+@utility bg-brand-gradient {
+  background-image: linear-gradient(to right, #2563eb, #9333ea);
 }

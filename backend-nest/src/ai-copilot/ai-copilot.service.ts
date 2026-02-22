@@ -1,6 +1,7 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import { AIService } from '../ai/ai.service';
 
 interface ChatContext {
@@ -112,7 +113,9 @@ export class AICopilotService {
         role: 'assistant',
         content: response,
         tokens,
-        metadata: action ? { action } : undefined,
+        metadata: action
+          ? ({ action } as unknown as Prisma.InputJsonValue)
+          : undefined,
       },
     });
 
@@ -140,7 +143,6 @@ export class AICopilotService {
     context: unknown;
   }): Promise<string> {
     const parts: string[] = [];
-    const context = (session.context as ChatContext) || {};
 
     parts.push(
       'You are an AI copilot assistant for a presentation editor. Help users create, edit, and improve their presentations.',

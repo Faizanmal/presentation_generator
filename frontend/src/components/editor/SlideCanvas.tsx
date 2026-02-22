@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useMutation } from "@tanstack/react-query";
 import type {
   DragEndEvent
@@ -50,8 +50,9 @@ const COMMAND_TO_BLOCK: Record<string, { type: BlockType; content: BlockContent 
 };
 
 export default function SlideCanvas({ projectId, slide, theme }: SlideCanvasProps) {
-
-  const { updateBlock, deleteBlock, reorderBlocks } = useEditorStore();
+  const updateBlock = useEditorStore((state) => state.updateBlock);
+  const deleteBlock = useEditorStore((state) => state.deleteBlock);
+  const reorderBlocks = useEditorStore((state) => state.reorderBlocks);
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
 
@@ -150,6 +151,15 @@ export default function SlideCanvas({ projectId, slide, theme }: SlideCanvasProp
     [deleteBlockMutation]
   );
 
+  // Handle block focus/blur
+  const handleBlockFocus = useCallback((blockId: string) => {
+    setActiveBlockId(blockId);
+  }, []);
+
+  const handleBlockBlur = useCallback(() => {
+    setActiveBlockId(null);
+  }, []);
+
   // Handle block reorder
   const handleBlockReorder = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -171,7 +181,7 @@ export default function SlideCanvas({ projectId, slide, theme }: SlideCanvasProp
   };
 
   // Sort blocks by order
-  const sortedBlocks = [...(slide.blocks || [])].sort((a, b) => a.order - b.order);
+  const sortedBlocks = useMemo(() => [...(slide.blocks || [])].sort((a, b) => a.order - b.order), [slide.blocks]);
 
   return (
     <DndContext

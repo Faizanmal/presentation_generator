@@ -88,7 +88,7 @@ function ThemeCard({
     >
       {/* Theme preview */}
       <div
-        className="aspect-[4/3] p-3"
+        className="aspect-4/3 p-3"
         style={{ backgroundColor: bgColor }}
       >
         <div

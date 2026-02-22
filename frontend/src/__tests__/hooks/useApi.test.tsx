@@ -204,4 +204,41 @@ describe('useApi Hook', () => {
             expect(result.current.data).toBeUndefined();
         });
     });
+
+    // ------------------------------------------------------------------
+    // predictive analytics hook tests
+    // ------------------------------------------------------------------
+    describe('usePredictiveAnalytics hook', () => {
+        it('returns query objects and handles loading/success', async () => {
+            const { usePredictiveAnalytics } = await import('@/hooks/use-new-features');
+            const apiModule = await import('@/lib/api');
+
+            const insights = [{ id: '1', metric: 'views', predicted: 50, confidence: 80, trend: 'up', description: 'test' }];
+            const recs = [{ id: 'r1', title: 'Tip', description: 'desc', impact: 'high', priority: 'low' }];
+            const benches = [{ id: 'b1', metric: 'views', yourScore: 40, industryAvg: 50, topPerformer: 90 }];
+
+            /* eslint-disable @typescript-eslint/no-explicit-any */
+            jest.spyOn(apiModule.api.predictive, 'getInsights').mockResolvedValue(insights as any);
+            jest.spyOn(apiModule.api.predictive, 'getRecommendations').mockResolvedValue(recs as any);
+            jest.spyOn(apiModule.api.predictive, 'getBenchmarks').mockResolvedValue(benches as any);
+            /* eslint-enable @typescript-eslint/no-explicit-any */
+
+            const projectId = 'proj-123';
+            const { result } = renderHook(() => usePredictiveAnalytics(projectId), { wrapper: createWrapper() });
+
+            expect(result.current.insights.isLoading).toBe(true);
+            expect(result.current.recommendations.isLoading).toBe(true);
+            expect(result.current.benchmarks.isLoading).toBe(true);
+
+            await waitFor(() => {
+                expect(result.current.insights.isSuccess).toBe(true);
+                expect(result.current.recommendations.isSuccess).toBe(true);
+                expect(result.current.benchmarks.isSuccess).toBe(true);
+            });
+
+            expect(result.current.insights.data).toEqual(insights);
+            expect(result.current.recommendations.data).toEqual(recs);
+            expect(result.current.benchmarks.data).toEqual(benches);
+        });
+    });
 });

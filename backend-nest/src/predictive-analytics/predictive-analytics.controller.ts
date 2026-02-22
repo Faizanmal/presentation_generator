@@ -42,7 +42,14 @@ export class PredictiveAnalyticsController {
   @Get('benchmarks')
   @ApiOperation({ summary: 'Get industry benchmarks' })
   async getBenchmarks(@Query('category') category?: string) {
+    // backward-compatible: accepts `category` query (legacy) — forwarded as-is
     return this.analyticsService.getBenchmarks(category);
+  }
+
+  @Get('benchmarks/:projectId')
+  @ApiOperation({ summary: 'Get benchmarks for a specific project' })
+  async getBenchmarksForProject(@Param('projectId') projectId: string) {
+    return this.analyticsService.getBenchmarks(projectId);
   }
 
   @Post('projects/:projectId/schedule')

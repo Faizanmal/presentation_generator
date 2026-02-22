@@ -275,7 +275,7 @@ export function ExportOptionsPanel({
           Export
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[550px]">
+      <DialogContent className="sm:max-w-137.5">
         <DialogHeader>
           <DialogTitle>Export Presentation</DialogTitle>
           <DialogDescription>
@@ -359,7 +359,7 @@ export function ExportOptionsPanel({
                 <div className="flex items-center justify-between">
                   <Label className="text-sm">Quality</Label>
                   <Select value={quality} onValueChange={(v) => setQuality(v as 'standard' | 'high')}>
-                    <SelectTrigger className="w-[120px]">
+                    <SelectTrigger className="w-30">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -375,7 +375,7 @@ export function ExportOptionsPanel({
                   <div className="flex items-center justify-between">
                     <Label className="text-sm">Resolution</Label>
                     <Select value={videoResolution} onValueChange={(v) => setVideoResolution(v as '720p' | '1080p' | '4k')}>
-                      <SelectTrigger className="w-[120px]">
+                      <SelectTrigger className="w-30">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>

@@ -17,7 +17,7 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
 
   constructor(private readonly configService: ConfigService) {}
 
-  async onModuleInit() {
+  onModuleInit() {
     const redisUrl = this.configService.get<string>('REDIS_URL');
     const clusterMode =
       this.configService.get<string>('REDIS_CLUSTER_MODE') === 'true';

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Sparkles,
@@ -83,7 +83,7 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
                         transition={{ type: "spring", duration: 0.5 }}
-                        className="h-24 w-24 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mx-auto mb-6"
+                        className="h-24 w-24 rounded-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center mx-auto mb-6"
                     >
                         <Sparkles className="h-12 w-12 text-white" />
                     </motion.div>
@@ -216,7 +216,7 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
                         transition={{ type: "spring", duration: 0.5 }}
-                        className="h-24 w-24 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center mx-auto mb-6"
+                        className="h-24 w-24 rounded-full bg-linear-to-br from-green-500 to-emerald-600 flex items-center justify-center mx-auto mb-6"
                     >
                         <CheckCircle2 className="h-12 w-12 text-white" />
                     </motion.div>
@@ -276,7 +276,7 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
                     </div>
                     <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                         <motion.div
-                            className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"
+                            className="h-full bg-linear-to-r from-blue-500 to-purple-500 rounded-full"
                             initial={{ width: 0 }}
                             animate={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
                             transition={{ duration: 0.3 }}
@@ -321,7 +321,7 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
                     <Button
                         onClick={handleNext}
                         disabled={!canProceed()}
-                        className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                        className="bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
                     >
                         {currentStep === steps.length - 1 ? (
                             <>
@@ -343,19 +343,14 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
 
 // Hook to manage onboarding state
 export function useOnboarding() {
-    const [showOnboarding, setShowOnboarding] = useState(false);
-    const [hasCompleted, setHasCompleted] = useState(true);
-
-    useEffect(() => {
-        const completed = localStorage.getItem("onboarding_completed");
-        if (!completed) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            setShowOnboarding(true);
-
-
-            setHasCompleted(false);
-        }
-    }, []);
+    const [showOnboarding, setShowOnboarding] = useState(() => {
+        if (typeof window === 'undefined') { return false; }
+        return !localStorage.getItem("onboarding_completed");
+    });
+    const [hasCompleted, setHasCompleted] = useState(() => {
+        if (typeof window === 'undefined') { return true; }
+        return !!localStorage.getItem("onboarding_completed");
+    });
 
     const completeOnboarding = (data: OnboardingData) => {
         localStorage.setItem("onboarding_completed", "true");

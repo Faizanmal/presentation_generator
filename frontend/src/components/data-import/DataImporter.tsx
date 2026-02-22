@@ -119,9 +119,10 @@ export function DataImporter({ onSuccess, trigger }: DataImportProps) {
 
             const result = await api.dataImport.previewSheets(formData);
             const data = result.data;
-            setSheets(data.sheets);
+            // API returns Array<{ name: string; rowCount: number }>
+            setSheets(data.sheets.map((s: { name: string; rowCount: number }) => s.name));
             if (data.sheets.length > 0) {
-                setSelectedSheet(data.sheets[0]);
+                setSelectedSheet(data.sheets[0].name);
             }
         } catch (err) {
             setError(
@@ -145,7 +146,20 @@ export function DataImporter({ onSuccess, trigger }: DataImportProps) {
             formData.append("file", targetFile);
 
             const result = await api.dataImport.analyze(formData, sheetName);
-            setParsedData(result.data as ParsedData);
+            const apiData = result.data;
+            // Normalize API shape -> ParsedData
+            const headers: string[] = apiData.preview?.headers ?? [];
+            const sampleRows: Record<string, unknown>[] = (apiData.preview?.sampleRows ?? []).map((row: unknown[]) => {
+                const obj: Record<string, unknown> = {};
+                headers.forEach((h, i) => { obj[h] = row[i]; });
+                return obj;
+            });
+            setParsedData({
+                headers,
+                sampleRows,
+                metadata: apiData.metadata as ParsedData['metadata'],
+                analysis: apiData.analysis as ParsedData['analysis'],
+            });
             setProgress(100);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to analyze file");

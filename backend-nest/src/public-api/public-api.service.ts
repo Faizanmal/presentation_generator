@@ -127,7 +127,7 @@ export class PublicApiService {
     return {
       valid: true,
       userId: apiKey.userId,
-      scopes: apiKey.scopes as string[],
+      scopes: apiKey.scopes,
       keyId: apiKey.id,
     };
   }
@@ -224,7 +224,7 @@ export class PublicApiService {
 
     const endpointStats: Record<string, number> = {};
     endpoints.forEach((e) => {
-      endpointStats[e.endpoint] = e._count as number;
+      endpointStats[e.endpoint] = e._count;
     });
 
     return {

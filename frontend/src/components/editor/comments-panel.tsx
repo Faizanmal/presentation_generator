@@ -162,7 +162,7 @@ export function CommentsPanel({
           placeholder="Add a comment..."
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
-          className="min-h-[80px] mb-2"
+          className="min-h-20 mb-2"
         />
         <div className="flex justify-end">
           <Button onClick={handleSubmitComment} disabled={!newComment.trim()}>
@@ -308,7 +308,7 @@ function CommentItem({
             placeholder="Write a reply..."
             value={replyContent}
             onChange={(e) => onReplyContentChange(e.target.value)}
-            className="min-h-[60px] text-sm"
+            className="min-h-15 text-sm"
           />
           <div className="flex justify-end gap-2 mt-2">
             <Button variant="ghost" size="sm" onClick={onCancelReply}>

@@ -36,14 +36,14 @@ type ResetPasswordForm = z.infer<typeof resetPasswordSchema>;
 
 export default function PasswordResetPage() {
     const router = useRouter();
-    const { isAuthenticated, isLoading: authLoading } = useAuthStore();
+    const { isAuthenticated, isLoading: authLoading, initialized } = useAuthStore();
 
     // If already authenticated, go to dashboard
     useEffect(() => {
-        if (!authLoading && isAuthenticated) {
+        if (initialized && !authLoading && isAuthenticated) {
             router.push('/dashboard');
         }
-    }, [authLoading, isAuthenticated, router]);
+    }, [authLoading, isAuthenticated, initialized, router]);
 
     const [step, setStep] = useState<1 | 2>(1);
     const [isLoading, setIsLoading] = useState(false);

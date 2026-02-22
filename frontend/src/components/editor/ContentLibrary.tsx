@@ -107,7 +107,7 @@ export function ContentLibrary({
         <div className="space-y-4">
             {/* Header */}
             <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg">
+                <div className="p-2 bg-linear-to-br from-indigo-500 to-purple-500 rounded-lg">
                     <Library className="w-5 h-5 text-white" />
                 </div>
                 <div>
@@ -182,7 +182,7 @@ export function ContentLibrary({
             </div>
 
             {/* Items Grid */}
-            <div className="grid grid-cols-2 gap-3 max-h-[400px] overflow-y-auto">
+            <div className="grid grid-cols-2 gap-3 max-h-100 overflow-y-auto">
                 {filteredItems?.map((item: LibraryItem) => (
                     <div
                         key={item.id}

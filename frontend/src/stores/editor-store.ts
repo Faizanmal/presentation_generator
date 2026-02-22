@@ -15,6 +15,7 @@ interface EditorState {
 
   // Actions - Slides
   addSlide: (slide: Slide) => void;
+  updateSlide: (slideId: string, data: Partial<Slide>) => void;
   deleteSlide: (slideId: string) => void;
   duplicateSlide: (slideId: string) => void;
   reorderSlides: (fromIndex: number, toIndex: number) => void;
@@ -89,6 +90,21 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
     });
   },
 
+  updateSlide: (slideId: string, data: Partial<Slide>) => {
+    const { project } = get();
+    if (!project || !project.slides) { return; }
+
+    const updatedSlides = project.slides.map((s) =>
+      s.id === slideId ? { ...s, ...data } : s
+    );
+
+    set({
+      project: { ...project, slides: updatedSlides },
+      isDirty: true,
+    });
+  },
+
+
   deleteSlide: (slideId: string) => {
     const { project, currentSlideIndex } = get();
     if (!project) { return; }
@@ -120,7 +136,7 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
     if (slideIndex === -1) { return; }
 
     const slideToDuplicate = project.slides?.[slideIndex];
-    if (!slideToDuplicate) {return;}
+    if (!slideToDuplicate) { return; }
     const newSlide: Slide = {
       ...slideToDuplicate,
       id: `${slideId}-copy-${Date.now()}`,

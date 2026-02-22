@@ -421,7 +421,7 @@ export class ContentGovernanceService {
       select: { name: true },
     });
 
-    const comments = (request.comments as any[]) || [];
+    const comments = (request.comments as Array<Record<string, unknown>>) || [];
     comments.push({
       id: this.generateId(),
       userId,

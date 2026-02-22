@@ -7,7 +7,7 @@ import {
   Clock, Award, Download, ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
@@ -20,14 +20,14 @@ import { useLearningPaths } from '@/hooks/use-new-features';
 import Link from 'next/link';
 
 export default function LearningPathsPage() {
-  const { paths, createPath, updateProgress, getCertificate } = useLearningPaths();
+  const { paths, createPath, getCertificate } = useLearningPaths();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [expandedPath, setExpandedPath] = useState<string | null>(null);
 
   const handleCreate = async () => {
-    if (!title.trim()) return;
+    if (!title.trim()) {return;}
     try {
       await createPath.mutateAsync({ title, description, modules: [] });
       setOpen(false);

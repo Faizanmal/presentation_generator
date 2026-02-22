@@ -191,7 +191,7 @@ function SlidePerformance({ slides, topSlides, lowPerforming }: SlidePerformance
           <CardDescription>Engagement metrics for each slide</CardDescription>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[400px]">
+          <ScrollArea className="h-100">
             <div className="space-y-4">
               {slides.map((slide) => (
                 <div key={slide.slideId} className="flex items-center gap-4">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useSyncExternalStore } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { Button } from "./button";
@@ -21,6 +21,10 @@ interface FeatureTourProps {
     onSkip?: () => void;
 }
 
+const emptySubscribe = () => () => { };
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
+
 export function FeatureTour({
     steps,
     isOpen,
@@ -29,12 +33,7 @@ export function FeatureTour({
 }: FeatureTourProps) {
     const [currentStep, setCurrentStep] = useState(0);
     const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
-    const [mounted, setMounted] = useState(false);
-
-    useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setMounted(true);
-    }, []);
+    const mounted = useSyncExternalStore(emptySubscribe, getClientSnapshot, getServerSnapshot);
 
     // Update target element position
     useEffect(() => {
@@ -123,7 +122,7 @@ export function FeatureTour({
     const tooltipPosition = getTooltipPosition();
 
     return createPortal(
-        <div className="fixed inset-0 z-[9999]">
+        <div className="fixed inset-0 z-9999">
             {/* Backdrop with spotlight cutout */}
             <div className="absolute inset-0">
                 <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
@@ -193,7 +192,7 @@ export function FeatureTour({
                     }}
                 >
                     {/* Header */}
-                    <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white">
+                    <div className="flex items-center justify-between px-4 py-3 bg-linear-to-r from-blue-500 to-purple-500 text-white">
                         <div className="flex items-center gap-2">
                             <Sparkles className="h-5 w-5" />
                             <span className="font-medium">Feature Tour</span>
@@ -261,15 +260,10 @@ export function FeatureTour({
 // Hook to manage feature tour
 export function useFeatureTour(tourId: string) {
     const [isOpen, setIsOpen] = useState(false);
-    const [hasCompleted, setHasCompleted] = useState(true);
-
-    useEffect(() => {
-        const completed = localStorage.getItem(`tour_${tourId}_completed`);
-        if (!completed) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            setHasCompleted(false);
-        }
-    }, [tourId]);
+    const [hasCompleted, setHasCompleted] = useState(() => {
+        if (typeof window === 'undefined') { return true; }
+        return !!localStorage.getItem(`tour_${tourId}_completed`);
+    });
 
     const startTour = useCallback(() => {
         setIsOpen(true);

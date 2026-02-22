@@ -10,7 +10,6 @@ import {
   Hand, BrainCircuit, ScanEye, Boxes,
   BrainCog, UsersRound, Target,
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
 
 const featureCategories = [
   {
@@ -100,7 +99,7 @@ export function FeaturesHub() {
                     href={f.href}
                     className="flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md transition-all group"
                   >
-                    <div className={`p-2 rounded-lg bg-slate-50 dark:bg-slate-900 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 transition-colors`}>
+                    <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-900 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 transition-colors">
                       <Icon className={`w-4 h-4 ${f.color}`} />
                     </div>
                     <div className="flex-1 min-w-0">

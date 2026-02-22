@@ -120,7 +120,7 @@ export class ImageAcquisitionController {
   constructor(
     private readonly imageAcquisitionService: ImageAcquisitionService,
     @InjectQueue('image-acquisition') private readonly imageQueue: Queue,
-  ) { }
+  ) {}
 
   /**
    * Acquire single image (synchronous)

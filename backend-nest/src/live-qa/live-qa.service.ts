@@ -315,7 +315,7 @@ Respond in JSON format: {"relevant": true/false, "appropriate": true/false, "typ
   async summarizeQuestions(sessionId: string, hostId: string) {
     const session = await this.getSession(sessionId);
 
-    if (session.hostId !== hostId) {
+    if (session.hostUserId !== hostId) {
       throw new BadRequestException('Unauthorized');
     }
 

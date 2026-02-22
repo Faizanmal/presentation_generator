@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
 
 interface BrandingConfig {
@@ -59,10 +60,13 @@ export class WhiteLabelSdkService {
         organizationId,
         name: config.name,
         sdkKey,
-        branding: config.branding as object,
-        features: config.features as object,
+        branding: config.branding
+          ? (config.branding as unknown as Prisma.InputJsonValue)
+          : undefined,
+        features: config.features
+          ? (config.features as unknown as Prisma.InputJsonValue)
+          : ({} as Prisma.InputJsonValue),
         allowedDomains: config.allowedDomains,
-        plan: config.plan || 'starter',
         status: 'active',
       },
     });
@@ -152,7 +156,9 @@ export class WhiteLabelSdkService {
         instanceKey,
         domain: clientInfo.domain,
         clientName: clientInfo.clientName,
-        customBranding: clientInfo.customBranding as object,
+        customBranding: clientInfo.customBranding
+          ? (clientInfo.customBranding as unknown as Prisma.InputJsonValue)
+          : undefined,
         status: 'active',
       },
     });
@@ -243,10 +249,10 @@ export default MyPresentationEditor;
    */
   async trackUsage(
     instanceKey: string,
-    event: {
-      type: string;
-      metadata?: object;
-    },
+    // event: {
+    //   type: string;
+    //   metadata?: object;
+    // },
   ) {
     const instance = await this.prisma.sDKInstance.findFirst({
       where: { instanceKey },

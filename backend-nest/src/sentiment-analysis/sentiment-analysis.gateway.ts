@@ -64,7 +64,7 @@ export class SentimentAnalysisGateway
       );
 
       client.emit('joined', { currentSentiment: current });
-    } catch (error) {
+    } catch {
       client.emit('error', { message: 'Failed to join session' });
     }
   }
@@ -91,7 +91,7 @@ export class SentimentAnalysisGateway
         reaction: data.reaction,
         participantId: client.id,
       });
-    } catch (error) {
+    } catch {
       client.emit('error', { message: 'Failed to record reaction' });
     }
   }
@@ -109,7 +109,7 @@ export class SentimentAnalysisGateway
         data.level,
         client.userId,
       );
-    } catch (error) {
+    } catch (_error) {
       // Silent fail for engagement tracking
     }
   }
@@ -135,7 +135,7 @@ export class SentimentAnalysisGateway
         data,
         client.userId,
       );
-    } catch (error) {
+    } catch (_error) {
       // Silent fail for expression tracking
     }
   }
@@ -157,7 +157,7 @@ export class SentimentAnalysisGateway
         metrics,
         timestamp: new Date(),
       });
-    } catch (error) {
+    } catch (_error) {
       client.emit('error', { message: 'Failed to create snapshot' });
     }
   }
@@ -174,7 +174,7 @@ export class SentimentAnalysisGateway
         client.sessionId,
       );
       client.emit('currentSentiment', current);
-    } catch (error) {
+    } catch (_error) {
       client.emit('error', { message: 'Failed to get sentiment' });
     }
   }
@@ -195,7 +195,7 @@ export class SentimentAnalysisGateway
       this.server.to(`sentiment:${client.sessionId}`).emit('sessionEnded', {
         message: 'Sentiment tracking session ended',
       });
-    } catch (error) {
+    } catch (_error) {
       client.emit('error', { message: 'Failed to end session' });
     }
   }

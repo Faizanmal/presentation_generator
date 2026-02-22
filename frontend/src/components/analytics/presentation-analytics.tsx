@@ -335,7 +335,7 @@ function ViewerActivityTable({ sessions }: { sessions: ViewerSession[] }) {
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <ScrollArea className="h-[400px]">
+                <ScrollArea className="h-100">
                     <div className="space-y-2">
                         {sessions.map((session) => {
                             const DeviceIcon = deviceIcons[session.device];

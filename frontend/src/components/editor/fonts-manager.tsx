@@ -277,11 +277,11 @@ export function FontsManager({ onFontSelect, selectedFontFamily }: FontsManagerP
                   placeholder="Search fonts..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 w-[200px]"
+                  className="pl-9 w-50"
                 />
               </div>
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-[130px]">
+                <SelectTrigger className="w-32.5">
                   <Filter className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="Category" />
                 </SelectTrigger>
@@ -316,7 +316,7 @@ export function FontsManager({ onFontSelect, selectedFontFamily }: FontsManagerP
           </div>
 
           <TabsContent value="installed" className="flex-1 overflow-hidden m-0">
-            <ScrollArea className="h-[400px]">
+            <ScrollArea className="h-100">
               {/* Favorites */}
               {favoriteFontsList.length > 0 && (
                 <div className="mb-6">
@@ -365,7 +365,7 @@ export function FontsManager({ onFontSelect, selectedFontFamily }: FontsManagerP
           </TabsContent>
 
           <TabsContent value="google" className="flex-1 overflow-hidden m-0">
-            <ScrollArea className="h-[400px]">
+            <ScrollArea className="h-100">
               <div className={viewMode === 'grid' ? 'grid grid-cols-2 gap-3' : 'space-y-2'}>
                 {filteredGoogleFonts.map((font) => (
                   <GoogleFontCard

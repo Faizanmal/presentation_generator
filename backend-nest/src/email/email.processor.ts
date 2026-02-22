@@ -375,7 +375,9 @@ export class EmailProcessor extends WorkerHost {
           'all-providers',
           result.error || 'All providers failed',
         );
-        throw new Error(`All email providers failed: ${result.error}`);
+        throw new Error(`All email providers failed: ${result.error}`, {
+          cause: new Error(result.error || 'Unknown error'),
+        });
       }
 
       // No fallback available, track failure and rethrow
@@ -476,7 +478,7 @@ export class EmailProcessor extends WorkerHost {
   }
 
   // ─── Worker Events ─────────────────────────────────────────
-  /* eslint-disable @typescript-eslint/unbound-method */
+
   @OnWorkerEvent('completed')
   onCompleted(job: Job) {
     this.logger.debug(`Job ${job.id} (${job.name}) completed successfully`);
@@ -504,5 +506,4 @@ export class EmailProcessor extends WorkerHost {
   onStalled(jobId: string) {
     this.logger.warn(`Job ${jobId} has stalled`);
   }
-  /* eslint-enable @typescript-eslint/unbound-method */
 }

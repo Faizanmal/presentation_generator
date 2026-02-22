@@ -138,7 +138,7 @@ export class CarbonFootprintService {
 
     const presentations = await this.prisma.project.findMany({
       where: {
-        userId,
+        ownerId: userId,
         createdAt: { gte: startDate },
       },
       include: { slides: true },
@@ -162,16 +162,26 @@ export class CarbonFootprintService {
       });
     }
 
-    // Store report
+    // Store report (fill required fields expected by the schema)
+    const fileSizeBytes = presentations.reduce(
+      (sum, p) => sum + JSON.stringify(p).length,
+      0,
+    );
     const report = await this.prisma.ecoReport.create({
       data: {
+        // required schema fields
+        projectId: presentations.length > 0 ? presentations[0].id : 'aggregate',
         userId,
+        ecoScore: Math.max(0, Math.round(100 - totalEmissions)),
+        fileSize: fileSizeBytes,
+        optimizations: {} as import('@prisma/client').Prisma.InputJsonValue,
+
+        // summary fields
         period,
         totalEmissions,
-        breakdown: breakdown as object[],
-        recommendations: this.getRecommendations({
+        suggestions: this.getRecommendations({
           total: totalEmissions,
-        } as EmissionBreakdown),
+        } as EmissionBreakdown) as unknown as import('@prisma/client').Prisma.InputJsonValue,
         generatedAt: new Date(),
       },
     });
@@ -201,7 +211,7 @@ export class CarbonFootprintService {
       skip: 1,
     });
 
-    if (!previousReport) {
+    if (!previousReport || previousReport.totalEmissions == null) {
       return { change: 0, direction: 'stable' };
     }
 
@@ -280,6 +290,7 @@ export class CarbonFootprintService {
         provider: offsetData.provider,
         project: offsetData.project,
         amount: offsetData.emissionsKg,
+        emissionsKg: offsetData.emissionsKg,
         cost: offsetData.costUSD,
         status: 'pending',
         certificateUrl: null,
@@ -296,7 +307,9 @@ export class CarbonFootprintService {
             certificateUrl: `/certificates/${offset.id}.pdf`,
           },
         })
-        .catch((err) => this.logger.error('Failed to update carbon offset status', err));
+        .catch((err) =>
+          this.logger.error('Failed to update carbon offset status', err),
+        );
     }, 5000);
 
     return {

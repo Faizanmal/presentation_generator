@@ -209,7 +209,7 @@ export function NotificationBell() {
                 </div>
 
                 {/* Notifications list */}
-                <ScrollArea className="max-h-[400px]">
+                <ScrollArea className="max-h-100">
                     {notifications.length === 0 ? (
                         <div className="py-12 text-center">
                             <Bell className="h-12 w-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
@@ -376,7 +376,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             {children}
 
             {/* Toast container */}
-            <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
+            <div className="fixed bottom-4 right-4 z-100 flex flex-col gap-2 pointer-events-none">
                 <AnimatePresence>
                     {toasts.map((toast) => (
                         <motion.div

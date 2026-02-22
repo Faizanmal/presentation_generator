@@ -26,6 +26,16 @@ export interface GenerationParams {
   generateImages?: boolean;
   imageSource?: 'ai' | 'stock';
   smartLayout?: boolean;
+  templateType?:
+    | 'pitch-deck'
+    | 'training'
+    | 'report'
+    | 'sales'
+    | 'product-launch'
+    | 'case-study'
+    | 'keynote';
+  templateStructure?: string[];
+  contextData?: string;
 }
 
 export interface GeneratedBlock {
@@ -112,6 +122,12 @@ export class AIService {
   private readonly db: PrismaClient;
   private hf: HfInference;
   private replicate: Replicate;
+
+  /** In-memory cache for generated presentations (TTL: 1h, max 100 entries) */
+  private readonly generationCache = new Map<
+    string,
+    { result: GeneratedPresentation; timestamp: number; hits: number }
+  >();
 
   constructor(
     private readonly configService: ConfigService,

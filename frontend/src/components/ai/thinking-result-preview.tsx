@@ -50,7 +50,7 @@ export function ThinkingResultPreview({ result, className = '' }: ThinkingResult
         <div className={`space-y-6 ${className}`}>
             {/* Quality Overview */}
             {result.qualityReport ? (
-                <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-white/10">
+                <div className="bg-linear-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-white/10">
                     <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                         <Star className="h-5 w-5 text-yellow-400" />
                         Quality Report
@@ -95,7 +95,7 @@ export function ThinkingResultPreview({ result, className = '' }: ThinkingResult
                     </div>
                 </div>
             ) : (
-                <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-white/10">
+                <div className="bg-linear-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-white/10">
                     <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                         <Star className="h-5 w-5 text-yellow-400" />
                         Quality Report
@@ -133,7 +133,7 @@ export function ThinkingResultPreview({ result, className = '' }: ThinkingResult
             </div>
 
             {/* Presentation Preview */}
-            <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl border border-white/10 overflow-hidden">
+            <div className="bg-linear-to-br from-slate-800 to-slate-900 rounded-xl border border-white/10 overflow-hidden">
                 <div className="p-6 border-b border-white/10 flex items-center justify-between">
                     <div>
                         <h3 className="text-xl font-bold text-white">{result.presentation.title}</h3>
@@ -238,7 +238,11 @@ export function ThinkingResultPreview({ result, className = '' }: ThinkingResult
                                             }
 
                                             return (
-                                                <div key={block.id || `block-${idx}`} className="h-64 w-full">
+                                                <div
+                                                     
+                                                    key={block.id || `block-${idx}`}
+                                                    className="h-64 w-full"
+                                                >
                                                     <ChartBlock
                                                         data={chartProps}
                                                         isEditable={false}
@@ -252,6 +256,7 @@ export function ThinkingResultPreview({ result, className = '' }: ThinkingResult
                                             const isCard = block.formatting?.variant === 'card';
                                             return (
                                                 <div
+                                                     
                                                     key={block.id || `paragraph-${idx}`}
                                                     className={`text-lg leading-relaxed ${isCard
                                                         ? 'p-6 bg-slate-50 rounded-xl border border-slate-200 shadow-sm'
@@ -264,7 +269,11 @@ export function ThinkingResultPreview({ result, className = '' }: ThinkingResult
                                         }
 
                                         return (
-                                            <div key={block.id || `generic-${idx}`} className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                            <div
+                                                 
+                                                key={block.id || `generic-${idx}`}
+                                                className="p-4 bg-slate-50 rounded-lg border border-slate-200"
+                                            >
                                                 <span className="text-xs font-mono text-slate-400 uppercase mb-2 block">{block.type}</span>
                                                 <p className="text-slate-700">{typeof block.content === 'string' ? block.content : JSON.stringify(block.content)}</p>
                                             </div>
@@ -305,7 +314,11 @@ export function ThinkingResultPreview({ result, className = '' }: ThinkingResult
                     /* Sections List */
                     <div className="divide-y divide-white/10">
                         {result.presentation.sections.map((section, index) => (
-                            <div key={section.id || index} className="transition-all">
+                            <div
+                                 
+                                key={section.id || index}
+                                className="transition-all"
+                            >
                                 <button
                                     onClick={() => toggleSection(index)}
                                     className="w-full p-4 flex items-center justify-between hover:bg-white/5 transition-colors"
@@ -335,6 +348,7 @@ export function ThinkingResultPreview({ result, className = '' }: ThinkingResult
                                         )}
                                         {section.blocks.map((block, blockIndex) => (
                                             <div
+                                                 
                                                 key={block.id || blockIndex}
                                                 className="p-3 rounded-lg bg-white/5 text-sm text-white/80"
                                             >
@@ -362,7 +376,7 @@ export function ThinkingResultPreview({ result, className = '' }: ThinkingResult
 
             {/* Improvement Suggestions */}
             {result.qualityReport.improvements.length > 0 && (
-                <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-white/10">
+                <div className="bg-linear-to-br from-slate-800 to-slate-900 rounded-xl p-6 border border-white/10">
                     <h3 className="text-lg font-semibold text-white mb-4">Improvement Suggestions</h3>
                     <div className="space-y-3">
                         {result.qualityReport.improvements.slice(0, 5).map((improvement) => (
@@ -442,7 +456,7 @@ function StatCard({
     };
 
     return (
-        <div className={`p-4 rounded-xl border bg-gradient-to-br ${colorClasses[color]}`}>
+        <div className={`p-4 rounded-xl border bg-linear-to-br ${colorClasses[color]}`}>
             <div className="mb-2">{icon}</div>
             <p className="text-2xl font-bold text-white">{value}</p>
             <p className="text-sm text-white/60">{label}</p>

@@ -3,11 +3,10 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import {
-  KeyRound, Plus, Loader2, Copy, Trash2, Eye, EyeOff,
-  BarChart3, Clock, Shield,
+  KeyRound, Plus, Loader2, Copy, Trash2, Eye, EyeOff, Clock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -28,7 +27,7 @@ export default function APIKeysPage() {
   const [showKeys, setShowKeys] = useState<Set<string>>(new Set());
 
   const handleCreate = async () => {
-    if (!name.trim()) return;
+    if (!name.trim()) {return;}
     try {
       const result = await createKey.mutateAsync({
         name,
@@ -60,8 +59,8 @@ export default function APIKeysPage() {
   const toggleShow = (id: string) => {
     setShowKeys((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) {next.delete(id);}
+      else {next.add(id);}
       return next;
     });
   };
@@ -78,7 +77,7 @@ export default function APIKeysPage() {
           </h1>
           <p className="text-muted-foreground mt-1">Manage API keys for integrations</p>
         </div>
-        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setNewKey(null); }}>
+        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) {setNewKey(null); }}}>
           <DialogTrigger asChild>
             <Button><Plus className="w-4 h-4 mr-2" /> Create Key</Button>
           </DialogTrigger>

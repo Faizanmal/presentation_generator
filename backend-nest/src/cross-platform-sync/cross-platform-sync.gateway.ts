@@ -81,7 +81,7 @@ export class CrossPlatformSyncGateway
       client.join(`user:${data.userId}`);
 
       client.emit('registered', { device });
-    } catch (error) {
+    } catch {
       client.emit('error', { message: 'Failed to register device' });
     }
   }
@@ -200,7 +200,7 @@ export class CrossPlatformSyncGateway
           applied: result.applied,
         });
       }
-    } catch (error) {
+    } catch {
       client.emit('error', { message: 'Failed to apply operations' });
     }
   }
@@ -228,7 +228,7 @@ export class CrossPlatformSyncGateway
             ? pending[pending.length - 1].version
             : data.sinceVersion,
       });
-    } catch (error) {
+    } catch {
       client.emit('error', { message: 'Failed to get sync updates' });
     }
   }
@@ -260,7 +260,7 @@ export class CrossPlatformSyncGateway
         version: result.version,
         content: data.resolvedContent,
       });
-    } catch (error) {
+    } catch {
       client.emit('error', { message: 'Failed to resolve conflict' });
     }
   }

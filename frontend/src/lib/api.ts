@@ -1,4 +1,4 @@
-import type { AxiosInstance, AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
+  import type { AxiosInstance, AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
 import axios from 'axios';
 import type {
   AuthResponse,
@@ -51,8 +51,21 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 class ApiClient {
   private client: AxiosInstance;
   private token: string | null = null;
+  private storedRefreshToken: string | null = null;
   private csrfToken: string | null = null;
   private csrfPromise: Promise<string> | null = null;
+  // Used to queue concurrent requests that arrive while a token refresh is in-flight
+  private isRefreshing = false;
+  private refreshSubscribers: Array<(newToken: string) => void> = [];
+
+  private subscribeTokenRefresh(cb: (newToken: string) => void) {
+    this.refreshSubscribers.push(cb);
+  }
+
+  private notifyRefreshed(newToken: string) {
+    this.refreshSubscribers.forEach((cb) => cb(newToken));
+    this.refreshSubscribers = [];
+  }
 
   constructor() {
     this.client = axios.create({
@@ -95,7 +108,54 @@ class ApiClient {
     // Response interceptor for error handling
     this.client.interceptors.response.use(
       (response) => response,
-      (error: AxiosError) => {
+      async (error: AxiosError) => {
+        const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
+
+        // Attempt a silent token refresh on the first 401 (access token expired)
+        if (
+          error.response?.status === 401 &&
+          !originalRequest._retry &&
+          this.storedRefreshToken &&
+          !originalRequest.url?.includes('/auth/refresh') &&
+          !originalRequest.url?.includes('/auth/login')
+        ) {
+          if (this.isRefreshing) {
+            // Queue requests that arrive while refresh is in-flight
+            return new Promise<AxiosResponse>((resolve) => {
+              this.subscribeTokenRefresh((newToken: string) => {
+                if (originalRequest.headers) {
+                  originalRequest.headers.Authorization = `Bearer ${newToken}`;
+                }
+                resolve(this.client(originalRequest));
+              });
+            });
+          }
+
+          originalRequest._retry = true;
+          this.isRefreshing = true;
+
+          try {
+            const { data } = await this.client.post<{ accessToken: string }>(
+              '/auth/refresh',
+              { refreshToken: this.storedRefreshToken },
+            );
+            this.setToken(data.accessToken);
+            this.notifyRefreshed(data.accessToken);
+            if (originalRequest.headers) {
+              originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
+            }
+            return this.client(originalRequest);
+          } catch {
+            // Refresh token is invalid — clear state and redirect to login
+            this.clearToken();
+            if (typeof window !== 'undefined') {
+              window.location.href = '/login';
+            }
+          } finally {
+            this.isRefreshing = false;
+          }
+        }
+
         if (error.response?.status === 401) {
           this.clearToken();
           if (typeof window !== 'undefined') {
@@ -109,6 +169,7 @@ class ApiClient {
     // Load token from localStorage on init
     if (typeof window !== 'undefined') {
       this.token = localStorage.getItem('token');
+      this.storedRefreshToken = localStorage.getItem('refreshToken');
     }
   }
 
@@ -123,10 +184,19 @@ class ApiClient {
     }
   }
 
+  setRefreshToken(refreshToken: string) {
+    this.storedRefreshToken = refreshToken;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('refreshToken', refreshToken);
+    }
+  }
+
   clearToken() {
     this.token = null;
+    this.storedRefreshToken = null;
     if (typeof window !== 'undefined') {
       localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
     }
   }
 
@@ -208,12 +278,18 @@ class ApiClient {
   async register(credentials: RegisterCredentials): Promise<AuthResponse> {
     const { data } = await this.client.post<AuthResponse>('/auth/register', credentials);
     this.setToken(data.accessToken);
+    if (data.refreshToken) {
+      this.setRefreshToken(data.refreshToken);
+    }
     return data;
   }
 
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     const { data } = await this.client.post<AuthResponse>('/auth/login', credentials);
     this.setToken(data.accessToken);
+    if (data.refreshToken) {
+      this.setRefreshToken(data.refreshToken);
+    }
     return data;
   }
 
@@ -223,7 +299,9 @@ class ApiClient {
   }
 
   async refreshToken(): Promise<{ accessToken: string }> {
-    const { data } = await this.client.post<{ accessToken: string }>('/auth/refresh');
+    const { data } = await this.client.post<{ accessToken: string }>('/auth/refresh', {
+      refreshToken: this.storedRefreshToken,
+    });
     this.setToken(data.accessToken);
     return data;
   }
@@ -263,6 +341,9 @@ class ApiClient {
     const data = response.data;
     if (data.accessToken) {
       this.setToken(data.accessToken);
+      if (data.refreshToken) {
+        this.setRefreshToken(data.refreshToken);
+      }
     }
     return data;
   }
@@ -282,6 +363,9 @@ class ApiClient {
     const data = response.data;
     if (data.accessToken) {
       this.setToken(data.accessToken);
+      if (data.refreshToken) {
+        this.setRefreshToken(data.refreshToken);
+      }
     }
     return data;
   }
@@ -297,6 +381,12 @@ class ApiClient {
   }
 
   logout() {
+    // Best-effort server-side token blacklisting (non-blocking)
+    if (this.token) {
+      this.client
+        .post('/auth/logout', { accessToken: this.token })
+        .catch(() => { });
+    }
     this.clearToken();
   }
 
@@ -2546,7 +2636,7 @@ class ApiClient {
     const { data } = await this.client.get(`/storyboarding`);
     if (projectId) {
       // server returns user's storyboards; filter client-side by projectId when requested
-      return (data as any[]).filter((s) => s.projectId === projectId);
+      return (data as unknown[]).filter((s: unknown) => (s as Record<string, unknown>).projectId === projectId);
     }
     return data;
   }
@@ -3596,7 +3686,7 @@ class ApiClient {
   };
 
   readonly crossSync = {
-    registerDevice: (input: object) => this.registerSyncDevice(input as any),
+    registerDevice: (input: object) => this.registerSyncDevice(input as { deviceName: string; deviceType: string; platform: string }),
     listDevices: () => this.listSyncDevices(),
     getSyncStatus: () => this.getSyncStatus(''),
     resolveConflict: (conflictId: string) => this.resolveConflict(conflictId, 'accept'),
@@ -3609,13 +3699,13 @@ class ApiClient {
   };
 
   readonly sentiment = {
-    startSession: (projectId: string, options?: object) => this.startSentimentSession(projectId, options as any),
+    startSession: (projectId: string, options?: object) => this.startSentimentSession(projectId, options as Record<string, unknown> | undefined),
     getSession: (id: string) => this.getSentimentSession(id),
     getSummary: (sessionId: string) => this.getSentimentSummary(sessionId),
   };
 
   readonly learningPaths = {
-    create: (input: object) => this.createLearningPath(input as any),
+    create: (input: object) => this.createLearningPath(input as unknown as string),
     get: (id: string) => this.getLearningPath(id),
     list: () => this.listLearningPaths(),
     updateProgress: (pathId: string, moduleId: string, completed: boolean) => this.updateLearningProgress(pathId, moduleId, completed),
@@ -3638,7 +3728,7 @@ class ApiClient {
   };
 
   readonly universalDesign = {
-    check: (projectId: string, options?: object) => this.checkDesign(projectId, options as any),
+    check: (projectId: string, options?: object) => this.checkDesign(projectId, options as Record<string, unknown> | undefined),
     getReport: (projectId: string) => this.getDesignReport(projectId),
     getCulturalGuide: (projectId: string) => this.getCulturalGuide(projectId),
   };
@@ -3652,7 +3742,7 @@ class ApiClient {
   };
 
   readonly sdk = {
-    create: (input: object) => this.createSDKConfig(input as any),
+    create: (input: object) => this.createSDKConfig(input as { name: string; branding?: object; features?: string[] }),
     list: () => this.listSDKConfigs(),
     get: (id: string) => this.getSDKConfig(id),
     update: (id: string, updates: object) => this.updateSDKConfig(id, updates),
@@ -3661,7 +3751,7 @@ class ApiClient {
   };
 
   readonly iot = {
-    register: (input: object) => this.registerIoTDevice(input as any),
+    register: (input: object) => this.registerIoTDevice(input as { name: string; type: string; capabilities: object }),
     list: () => this.listIoTDevices(),
     get: (id: string) => this.getIoTDevice(id),
     sendCommand: (deviceId: string, command: { action: string; payload?: object }) => this.sendIoTCommand(deviceId, command),
@@ -3679,12 +3769,12 @@ class ApiClient {
   };
 
   readonly wellness = {
-    startSession: (input: object) => this.startWellnessSession(input as any),
+    startSession: (input: object) => this.startWellnessSession(input as unknown as string),
     updateMetrics: (sessionId: string, metrics: object) => this.updateWellnessMetrics(sessionId, metrics),
     endSession: (sessionId: string) => this.endWellnessSession(sessionId),
-    recordBreak: (input: object) => this.recordWellnessBreak((input as any).sessionId, (input as any).type || 'short'),
-    analyzePace: (sessionId: string) => this.analyzeSpeakingPace({ sessionId } as any),
-    detectStress: (sessionId: string) => this.detectStress({ sessionId } as any),
+    recordBreak: (input: object) => this.recordWellnessBreak((input as Record<string, unknown>).sessionId as string, ((input as Record<string, unknown>).type as string) || 'short'),
+    analyzePace: (sessionId: string) => this.analyzeSpeakingPace({ sessionId } as Record<string, unknown>),
+    detectStress: (sessionId: string) => this.detectStress({ sessionId } as Record<string, unknown>),
     getHistory: () => this.getWellnessHistory(),
     getTrends: () => this.getWellnessTrends(),
     getBreakReminders: () => this.getBreakReminders(),

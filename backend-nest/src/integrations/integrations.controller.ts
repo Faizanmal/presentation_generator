@@ -33,7 +33,7 @@ export class IntegrationsController {
   constructor(
     private readonly integrationsService: IntegrationsService,
     private readonly configService: ConfigService,
-  ) { }
+  ) {}
 
   // ============================================
   // INTEGRATION MANAGEMENT

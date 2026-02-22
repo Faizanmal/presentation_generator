@@ -19,11 +19,6 @@ import {
   Type,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-// import {
-//   Popover,
-//   PopoverContent,
-//   PopoverTrigger,
-// } from '@/components/ui/popover';
 import {
   Tooltip,
   TooltipContent,
@@ -209,7 +204,7 @@ export function SmartSuggestionsPanel({
           </Tooltip>
         </TooltipProvider>
       ) : (
-        <div className="w-[380px] rounded-xl border bg-background shadow-2xl">
+        <div className="w-95 rounded-xl border bg-background shadow-2xl">
           {/* Header */}
           <div className="flex items-center justify-between border-b p-4">
             <div className="flex items-center gap-2">
@@ -289,7 +284,7 @@ export function SmartSuggestionsPanel({
             </TabsList>
 
             <TabsContent value={activeTab} className="m-0">
-              <ScrollArea className="h-[300px]">
+              <ScrollArea className="h-75">
                 {getSuggestionsMutation.isPending ? (
                   <div className="flex flex-col items-center justify-center py-12">
                     <div className="relative">

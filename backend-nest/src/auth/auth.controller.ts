@@ -8,6 +8,7 @@ import {
   Res,
   HttpCode,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
@@ -171,11 +172,27 @@ export class AuthController {
   async googleAuthCallback(
     @Req()
     req: {
-      user: { email: string; name: string; picture: string; googleId: string };
+      user: { email?: string; name: string; picture: string; googleId: string };
     },
     @Res() res: Response,
   ) {
-    const result = await this.authService.googleAuth(req.user);
+    // defensive check: the Passport strategy may return no email, in which
+    // case we want to bail out before hitting the service and log a useful
+    // message.  This avoids the Prisma column error reported earlier.
+    if (!req.user?.email) {
+      // we cannot proceed without an email address; redirect back to the
+      // frontend with an error query parameter or simply throw.
+      throw new BadRequestException('Google did not return an email address');
+    }
+
+    // at this point `email` is guaranteed to be defined, so cast or destructure
+    const { email, name, picture, googleId } = req.user;
+    const result = await this.authService.googleAuth({
+      email: email,
+      name,
+      picture,
+      googleId,
+    });
 
     // Redirect to frontend with token
     const frontendUrl = this.configService.get<string>('FRONTEND_URL');
@@ -211,11 +228,15 @@ export class AuthController {
   }
 
   /**
-   * Refresh access token
+   * Refresh access token.
+   * Clients must supply the opaque refresh token obtained during login.
    */
   @Post('refresh')
   @UseGuards(JwtAuthGuard)
-  async refreshToken(@CurrentUser() user: { id: string }) {
-    return this.authService.refreshToken(user.id);
+  async refreshToken(
+    @CurrentUser() user: { id: string },
+    @Body('refreshToken') refreshToken: string,
+  ) {
+    return this.authService.refreshToken(user.id, refreshToken);
   }
 }

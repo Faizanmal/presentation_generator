@@ -297,7 +297,11 @@ function StructuredInsightsPanel({ insights }: StructuredInsightsPanelProps) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {insights.map((insight, index) => (
-        <Card key={insight.title || `insight-${index}`} className="relative overflow-hidden">
+        <Card
+           
+          key={insight.title || `insight-${index}`}
+          className="relative overflow-hidden"
+        >
           <div
             className={cn(
               'absolute top-0 left-0 right-0 h-1',

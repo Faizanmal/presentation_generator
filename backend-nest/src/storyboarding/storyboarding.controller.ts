@@ -16,10 +16,7 @@ import { StoryboardingService } from './storyboarding.service';
 import {
   IsString,
   IsOptional,
-  IsIn,
-  IsNumber,
   IsArray,
-  ArrayNotEmpty,
   IsNotEmpty,
   IsInt,
 } from 'class-validator';

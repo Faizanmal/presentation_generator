@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -17,15 +17,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input }
-  from "@/components/ui/input";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -44,32 +36,34 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import dynamic from "next/dynamic";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
-import type { Project } from "@/types";
+import type { Project as _Project } from "@/types";
 
-// New usability components
-import { CommandPalette } from "@/components/ui/command-palette";
-import { KeyboardShortcutsDialog } from "@/components/ui/keyboard-shortcuts";
+// Dynamically import heavy/secondary components for performance
+const CommandPalette = dynamic(() => import("@/components/ui/command-palette").then(mod => mod.CommandPalette), { ssr: false });
+const KeyboardShortcutsDialog = dynamic(() => import("@/components/ui/keyboard-shortcuts").then(mod => mod.KeyboardShortcutsDialog), { ssr: false });
+const FavoritesRecentPanel = dynamic(() => import("@/components/ui/favorites-recent").then(mod => mod.FavoritesRecentPanel), { ssr: false });
+const FeaturesHub = dynamic(() => import("@/components/dashboard/features-hub").then(mod => mod.FeaturesHub), { ssr: false });
+const QuickActionsGrid = dynamic(() => import("@/components/ui/dashboard-widgets").then(mod => mod.QuickActionsGrid), { ssr: false });
+const UsageCard = dynamic(() => import("@/components/ui/dashboard-widgets").then(mod => mod.UsageCard), { ssr: false });
+const ProjectCard = dynamic(() => import("@/components/ui/project-card").then(mod => mod.ProjectCard), { ssr: false });
+
+// Hooks (must stay synchronous — not components)
 import {
   useFavorites,
   useRecentProjects,
-  FavoritesRecentPanel,
 } from "@/components/ui/favorites-recent";
-import { FeaturesHub } from "@/components/dashboard/features-hub";
-import {
-  StatCard,
-  StatsGrid,
-  QuickActionsGrid,
-  UsageCard
-} from "@/components/ui/dashboard-widgets";
-import { ProjectCard } from "@/components/ui/project-card";
-
 
 export default function DashboardPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { user, subscription, isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const user = useAuthStore((state) => state.user);
+  const subscription = useAuthStore((state) => state.subscription);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const authLoading = useAuthStore((state) => state.isLoading);
+  const initialized = useAuthStore((state) => state.initialized);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -77,19 +71,16 @@ export default function DashboardPage() {
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
 
-  // Create Project Modal
-
   // Favorites and recent projects
   const { favorites, toggleFavorite, isFavorite } = useFavorites();
   const { recent, removeFromRecent, clearRecent } = useRecentProjects();
 
   // Redirect if not authenticated
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
+    if (initialized && !authLoading && !isAuthenticated) {
       router.push("/login");
     }
-  }, [authLoading, isAuthenticated, router]);
-
+  }, [authLoading, isAuthenticated, initialized, router]);
 
   // Fetch projects
   const { data: projects, isLoading: projectsLoading } = useQuery({
@@ -115,14 +106,12 @@ export default function DashboardPage() {
     mutationFn: (data: { topic: string; tone: string; audience: string; length: number; type: string; generateImages?: boolean; imageSource?: 'ai' | 'stock' }) =>
       api.projects.generate(data),
     onSuccess: (job) => {
-      // Backend enqueues the generation job. do NOT assume a project object is returned.
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       setIsCreateModalOpen(false);
       setIsGenerating(false);
       toast.success("Presentation generation started — we'll notify you when it's ready.", {
         description: job?.message || `Job id: ${job?.jobId || 'unknown'}`,
       });
-      // Do NOT redirect to `/editor/${undefined}` — user can open the project once generation completes
     },
     onError: () => {
       toast.error("Failed to generate presentation");
@@ -156,16 +145,15 @@ export default function DashboardPage() {
   });
 
   // Filter projects by search
-  const filteredProjects = projects?.filter((p) =>
-    p.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredProjects = useMemo(() =>
+    projects?.filter((p) =>
+      p.title.toLowerCase().includes(searchQuery.toLowerCase())
+    ), [projects, searchQuery]);
 
   // Handle create blank project
-  const handleCreateBlank = () => {
+  const handleCreateBlank = useCallback(() => {
     createProjectMutation.mutate({ title: "Untitled Presentation", type: "PRESENTATION" });
-  };
-
-
+  }, [createProjectMutation]);
 
   if (authLoading) {
     return (
@@ -177,13 +165,11 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-
-
       {/* Main content */}
       <div className="space-y-8">
         {/* V2 Experience Card */}
         <div className="bg-white dark:bg-slate-950 rounded-xl border border-blue-200 dark:border-slate-800 p-6 mb-8 shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+          <div className="absolute top-0 right-0 w-64 h-64 bg-linear-to-br from-blue-500/10 to-purple-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
 
           <div className="relative z-10">
             <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
@@ -196,7 +182,7 @@ export default function DashboardPage() {
 
             <div className="flex flex-wrap gap-4">
               <Link href="/dashboard-v2">
-                <Button size="lg" className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white border-0">
+                <Button size="lg" className="bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white border-0">
                   <LayoutGrid className="mr-2 h-5 w-5" />
                   Go to Dashboard V2
                 </Button>
@@ -232,7 +218,6 @@ export default function DashboardPage() {
             onCreateNew={() => setIsCreateModalOpen(true)}
             onAIGenerate={() => {
               setIsCreateModalOpen(true);
-              // Pre-select AI mode could be implemented here
             }}
             onViewAnalytics={() => router.push("/dashboard/analytics")}
             onInviteTeam={() => toast.info("Team invitation coming soon!")}
@@ -264,7 +249,6 @@ export default function DashboardPage() {
               {filteredProjects?.length || 0} presentation{(filteredProjects?.length || 0) !== 1 ? "s" : ""}
             </p>
           </div>
-
 
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <div className="relative flex-1 sm:w-64">
@@ -607,7 +591,6 @@ function CreateProjectModal({
                 </div>
                 <Switch
                   checked={generateImages}
-
                   onCheckedChange={setGenerateImages}
                 />
               </div>
@@ -637,6 +620,3 @@ function CreateProjectModal({
     </Dialog>
   );
 }
-
-
-

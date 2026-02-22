@@ -94,7 +94,7 @@ export class ThinkingAgentOrchestratorService {
 
     let totalTokens = 0;
     let presentation: EnhancedPresentation | null = null;
-    let plan: PresentationPlan | null = null;
+    let plan: PresentationPlan | null;
     const fallbackUsed = false;
     let lastQualityScore = 0;
     let noImprovementCount = 0;

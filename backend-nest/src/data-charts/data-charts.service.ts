@@ -9,6 +9,11 @@ import { AIService } from '../ai/ai.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
+// Configurable limits
+const MAX_CSV_BYTES = 10 * 1024 * 1024; // 10 MB
+const MAX_JSON_ROWS = 50_000;
+const API_FETCH_TIMEOUT_MS = 15_000; // 15 seconds
+
 export type ChartType =
   | 'bar'
   | 'line'
@@ -113,6 +118,18 @@ export class DataChartsService {
     csvContent: string,
     delimiter: string = ',',
   ): Promise<DataSource> {
+    if (!projectId) {
+      throw new BadRequestException('projectId is required');
+    }
+    if (!name?.trim()) {
+      throw new BadRequestException('Data source name is required');
+    }
+    if (Buffer.byteLength(csvContent, 'utf-8') > MAX_CSV_BYTES) {
+      throw new BadRequestException(
+        `CSV file exceeds the maximum allowed size of ${MAX_CSV_BYTES / 1024 / 1024} MB`,
+      );
+    }
+
     const rows = this.parseCSV(csvContent, delimiter);
 
     if (rows.length === 0) {
@@ -146,12 +163,24 @@ export class DataChartsService {
     userId: string,
     projectId: string,
     name: string,
-    jsonContent: string | any[],
+    jsonContent: string | unknown[],
   ): Promise<DataSource> {
-    let rows: DataRow[] = [];
+    if (!projectId) {
+      throw new BadRequestException('projectId is required');
+    }
+    if (!name?.trim()) {
+      throw new BadRequestException('Data source name is required');
+    }
+
+    let rows: DataRow[];
 
     try {
       if (typeof jsonContent === 'string') {
+        if (Buffer.byteLength(jsonContent, 'utf-8') > MAX_CSV_BYTES) {
+          throw new BadRequestException(
+            `JSON payload exceeds the maximum allowed size of ${MAX_CSV_BYTES / 1024 / 1024} MB`,
+          );
+        }
         const parsed = JSON.parse(jsonContent);
         if (Array.isArray(parsed)) {
           rows = parsed;
@@ -159,21 +188,31 @@ export class DataChartsService {
           throw new Error('JSON format is not an array.');
         }
       } else if (Array.isArray(jsonContent)) {
-        rows = jsonContent;
+        rows = jsonContent as DataRow[];
       } else {
         throw new BadRequestException('Invalid JSON format');
       }
 
       if (rows.length > 0 && typeof rows[0] !== 'object') {
-        throw new BadRequestException('JSON array must contain objects');
+        throw new BadRequestException(
+          'JSON array must contain objects (key-value pairs)',
+        );
       }
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
-      throw new BadRequestException('Invalid JSON data: ' + error.message);
+      throw new BadRequestException(
+        'Invalid JSON data: ' + (error as Error).message,
+      );
     }
 
     if (rows.length === 0) {
       throw new BadRequestException('JSON data is empty');
+    }
+
+    if (rows.length > MAX_JSON_ROWS) {
+      throw new BadRequestException(
+        `JSON data exceeds the maximum allowed row count of ${MAX_JSON_ROWS.toLocaleString()}`,
+      );
     }
 
     const dataSource = await this.prisma.dataSource.create({
@@ -243,6 +282,26 @@ export class DataChartsService {
     refreshInterval?: number,
     dataPath?: string,
   ): Promise<DataSource> {
+    if (!projectId) {
+      throw new BadRequestException('projectId is required');
+    }
+    if (!name?.trim()) {
+      throw new BadRequestException('Data source name is required');
+    }
+    try {
+      new URL(apiEndpoint);
+    } catch {
+      throw new BadRequestException('apiEndpoint must be a valid URL');
+    }
+    if (
+      refreshInterval !== undefined &&
+      (refreshInterval < 1 || refreshInterval > 10080)
+    ) {
+      throw new BadRequestException(
+        'refreshInterval must be between 1 and 10080 minutes (1 week)',
+      );
+    }
+
     // Fetch initial data
     const data = await this.fetchAPIData(apiEndpoint, headers, dataPath);
 
@@ -298,8 +357,10 @@ export class DataChartsService {
         blockId,
         dataSourceId,
         chartType: config.type || 'bar',
-        config: config as unknown as Record<string, any>,
-        cachedData: processedData as unknown as Record<string, any>,
+        config:
+          config as unknown as import('@prisma/client').Prisma.InputJsonValue,
+        cachedData:
+          processedData as unknown as import('@prisma/client').Prisma.InputJsonValue,
       },
     });
 
@@ -411,9 +472,12 @@ Return a JSON object with:
 
     switch (dataSource.type) {
       case 'GOOGLE_SHEETS':
-        // Would need to get fresh access token
+        // Google Sheets requires a fresh OAuth access token.
+        // Clients should call POST /data-charts/datasource/google-sheets/refresh
+        // with a valid accessToken in the request body.
         throw new BadRequestException(
-          'Google Sheets refresh requires re-authentication',
+          'Google Sheets data sources cannot be refreshed automatically. ' +
+            'Please reconnect the data source to supply a fresh access token.',
         );
 
       case 'API':
@@ -527,8 +591,10 @@ Return a JSON object with:
     const updated = await this.prisma.dataChart.update({
       where: { id: chartId },
       data: {
-        config: mergedConfig as unknown as Record<string, any>,
-        cachedData: processedData as unknown as Record<string, any>,
+        config:
+          mergedConfig as unknown as import('@prisma/client').Prisma.InputJsonValue,
+        cachedData:
+          processedData as unknown as import('@prisma/client').Prisma.InputJsonValue,
       },
     });
 
@@ -567,7 +633,11 @@ Return a JSON object with:
         Date.now() - lastFetched.getTime() > refreshInterval * 60 * 1000
       ) {
         try {
-          await this.refreshDataSource(ds.id);
+          await this.prisma.executeWithRetry(
+            () => this.refreshDataSource(ds.id),
+            3,
+            200,
+          );
           this.logger.log(`Refreshed data source: ${ds.id}`);
         } catch (error) {
           this.logger.error(`Failed to refresh data source ${ds.id}:`, error);
@@ -577,28 +647,70 @@ Return a JSON object with:
   }
 
   // Helper methods
+  /**
+   * Parses RFC 4180-compliant CSV content, correctly handling:
+   * - Quoted fields (values that contain the delimiter or newlines)
+   * - Escaped double-quotes inside quoted fields
+   * - Mixed Windows (\r\n) and Unix (\n) line endings
+   */
   private parseCSV(content: string, delimiter: string): DataRow[] {
-    const lines = content.trim().split('\n');
+    // Normalise line endings
+    const normalised = content
+      .trim()
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n');
+    const lines = normalised.split('\n');
     if (lines.length < 2) return [];
 
-    const headers = lines[0]
-      .split(delimiter)
-      .map((h: string) => h.trim().replace(/"/g, ''));
+    const parseFields = (line: string): string[] => {
+      const fields: string[] = [];
+      let current = '';
+      let inQuotes = false;
+
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (inQuotes) {
+          if (ch === '"' && line[i + 1] === '"') {
+            // Escaped double-quote inside a quoted field
+            current += '"';
+            i++;
+          } else if (ch === '"') {
+            inQuotes = false;
+          } else {
+            current += ch;
+          }
+        } else if (ch === '"') {
+          inQuotes = true;
+        } else if (ch === delimiter) {
+          fields.push(current.trim());
+          current = '';
+        } else {
+          current += ch;
+        }
+      }
+      fields.push(current.trim());
+      return fields;
+    };
+
+    const headers = parseFields(lines[0]);
     const rows: DataRow[] = [];
 
     for (let i = 1; i < lines.length; i++) {
-      const values = lines[i]
-        .split(delimiter)
-        .map((v: string) => v.trim().replace(/"/g, ''));
+      const rawLine = lines[i].trim();
+      if (!rawLine) continue; // Skip blank trailing lines
 
+      const values = parseFields(rawLine);
       const row: DataRow = {};
 
       headers.forEach((header, idx) => {
-        const value = values[idx] || '';
-        // Try to parse as number
-        // Try to parse as number
-        const num = parseFloat(value);
-        row[header] = isNaN(num) ? value : num;
+        const value = values[idx] ?? '';
+        // Attempt numeric coercion only when the value is not an empty string
+        if (value === '') {
+          row[header] = null;
+        } else {
+          const num = Number(value);
+          row[header] = isNaN(num) ? value : num;
+        }
       });
 
       rows.push(row);
@@ -648,15 +760,35 @@ Return a JSON object with:
     headers?: Record<string, string>,
     dataPath?: string,
   ): Promise<DataRow[]> {
-    const response = await fetch(endpoint, {
-      headers: headers || {},
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      API_FETCH_TIMEOUT_MS,
+    );
 
-    if (!response.ok) {
-      throw new BadRequestException(`API returned ${response.status}`);
+    let response: Response;
+    try {
+      response = await fetch(endpoint, {
+        headers: headers || {},
+        signal: controller.signal,
+      });
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error && err.name === 'AbortError'
+          ? `API request timed out after ${API_FETCH_TIMEOUT_MS / 1000}s`
+          : `Failed to reach API endpoint: ${(err as Error).message}`;
+      throw new BadRequestException(msg);
+    } finally {
+      clearTimeout(timeoutId);
     }
 
-    let data = (await response.json()) as Record<string, any> | any[];
+    if (!response.ok) {
+      throw new BadRequestException(
+        `API responded with HTTP ${response.status} ${response.statusText}`,
+      );
+    }
+
+    let data = (await response.json()) as Record<string, unknown> | unknown[];
 
     // Navigate to nested path if specified
     if (dataPath) {
@@ -670,7 +802,7 @@ Return a JSON object with:
           break;
         }
       }
-      data = current as Record<string, any> | any[];
+      data = current as Record<string, unknown> | unknown[];
     }
 
     if (!Array.isArray(data)) {
@@ -801,21 +933,34 @@ Return a JSON object with:
   private async updateChartsForDataSource(
     dataSourceId: string,
     newData: DataRow[],
-  ) {
+  ): Promise<void> {
     const charts = await this.prisma.dataChart.findMany({
       where: { dataSourceId },
     });
 
-    for (const chart of charts) {
-      const processedData = this.processDataForChart(
-        newData,
-        chart.config as unknown as ChartConfig,
-      );
+    if (charts.length === 0) return;
 
-      await this.prisma.dataChart.update({
-        where: { id: chart.id },
-        data: { cachedData: processedData as unknown as Record<string, any> },
-      });
-    }
+    // Process and persist all chart updates concurrently
+    await Promise.all(
+      charts.map((chart) => {
+        const processedData = this.processDataForChart(
+          newData,
+          chart.config as unknown as ChartConfig,
+        );
+        return this.prisma.dataChart
+          .update({
+            where: { id: chart.id },
+            data: {
+              cachedData:
+                processedData as unknown as import('@prisma/client').Prisma.InputJsonValue,
+            },
+          })
+          .catch((err: Error) => {
+            this.logger.error(
+              `Failed to update cached data for chart ${chart.id}: ${err.message}`,
+            );
+          });
+      }),
+    );
   }
 }

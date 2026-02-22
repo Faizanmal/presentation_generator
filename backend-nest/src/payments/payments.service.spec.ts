@@ -11,9 +11,9 @@ jest.mock('stripe');
 
 describe('PaymentsService', () => {
   let service: PaymentsService;
-  let prisma: PrismaService;
-  let configService: ConfigService;
-  let usersService: UsersService;
+  let _prisma: PrismaService;
+  let _configService: ConfigService;
+  let _usersService: UsersService;
 
   const mockUser = {
     id: 'user-123',
@@ -112,9 +112,9 @@ describe('PaymentsService', () => {
     }).compile();
 
     service = module.get<PaymentsService>(PaymentsService);
-    prisma = module.get<PrismaService>(PrismaService);
-    configService = module.get<ConfigService>(ConfigService);
-    usersService = module.get<UsersService>(UsersService);
+    _prisma = module.get<PrismaService>(PrismaService);
+    _configService = module.get<ConfigService>(ConfigService);
+    _usersService = module.get<UsersService>(UsersService);
 
     jest.clearAllMocks();
   });
@@ -177,7 +177,10 @@ describe('PaymentsService', () => {
       mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
 
       await expect(
-        service.createCheckoutSession('user-123', 'invalid_plan' as any),
+        service.createCheckoutSession(
+          'user-123',
+          'invalid_plan' as unknown as any,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
   });

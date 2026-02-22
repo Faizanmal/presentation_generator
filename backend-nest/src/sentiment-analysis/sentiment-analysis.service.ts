@@ -165,8 +165,17 @@ export class SentimentAnalysisService {
     });
 
     // Store snapshot
-    const dominantSentiment = metrics.positive > metrics.negative ? 'positive' : metrics.negative > metrics.neutral ? 'negative' : 'neutral';
-    const confidence = Math.max(metrics.positive, metrics.negative, metrics.neutral);
+    const dominantSentiment =
+      metrics.positive > metrics.negative
+        ? 'positive'
+        : metrics.negative > metrics.neutral
+          ? 'negative'
+          : 'neutral';
+    const confidence = Math.max(
+      metrics.positive,
+      metrics.negative,
+      metrics.neutral,
+    );
 
     await this.prisma.sentimentSnapshot.create({
       data: {
@@ -357,7 +366,8 @@ export class SentimentAnalysisService {
       });
 
       return (
-        (lastSnapshot?.metrics as unknown as SentimentMetrics) || this.getDefaultMetrics()
+        (lastSnapshot?.metrics as unknown as SentimentMetrics) ||
+        this.getDefaultMetrics()
       );
     }
 
@@ -433,14 +443,16 @@ export class SentimentAnalysisService {
     // Find peak moments
     const peakPositive = snapshots.reduce((max, s) => {
       const m = s.metrics as unknown as SentimentMetrics;
-      return m.positive > (max?.metrics as unknown as SentimentMetrics)?.positive
+      return m.positive >
+        (max?.metrics as unknown as SentimentMetrics)?.positive
         ? s
         : max;
     }, snapshots[0]);
 
     const peakNegative = snapshots.reduce((max, s) => {
       const m = s.metrics as unknown as SentimentMetrics;
-      return m.negative > (max?.metrics as unknown as SentimentMetrics)?.negative
+      return m.negative >
+        (max?.metrics as unknown as SentimentMetrics)?.negative
         ? s
         : max;
     }, snapshots[0]);

@@ -680,7 +680,7 @@ export class ProjectsService {
     const project = await this.createFromAIContent(
       userId,
       presentation,
-      generateDto as any,
+      generateDto as unknown as any,
     );
 
     // Update project with additional metadata if provided

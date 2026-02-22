@@ -359,13 +359,13 @@ export function NarrationExportPanel({
 
             {/* Stats */}
             <div className="grid grid-cols-2 gap-3">
-                <Card className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20">
+                <Card className="bg-linear-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20">
                     <CardContent className="p-3 text-center">
                         <p className="text-2xl font-bold">{completedSlides}/{slides.length}</p>
                         <p className="text-xs text-slate-500">Slides Ready</p>
                     </CardContent>
                 </Card>
-                <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20">
+                <Card className="bg-linear-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20">
                     <CardContent className="p-3 text-center">
                         <p className="text-2xl font-bold">{formatDuration(totalDuration)}</p>
                         <p className="text-xs text-slate-500">Total Duration</p>
@@ -376,12 +376,12 @@ export function NarrationExportPanel({
             {/* Slide Narrations */}
             <div className="space-y-2">
                 <Label className="text-xs text-slate-500">Slide Narrations</Label>
-                <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                <div className="space-y-2 max-h-75 overflow-y-auto">
                     {displayNarrations.map((narration) => (
                         <Card key={narration.slideId} className="overflow-hidden">
                             <CardContent className="p-3">
                                 <div className="flex items-center gap-3">
-                                    <div className="flex-shrink-0 w-8 h-8 rounded bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-medium text-sm">
+                                    <div className="shrink-0 w-8 h-8 rounded bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-medium text-sm">
                                         {narration.slideNumber}
                                     </div>
                                     <div className="flex-1 min-w-0">

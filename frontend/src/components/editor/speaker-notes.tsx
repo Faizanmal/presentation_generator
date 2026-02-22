@@ -25,7 +25,6 @@ import {
 } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-// import { cn } from "@/lib/utils";
 
 interface SpeakerNotesProps {
     slideId: string;
@@ -172,7 +171,7 @@ export function SpeakerNotesPanel({
                     <span className="hidden sm:inline">Notes</span>
                 </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-96 sm:w-[480px] flex flex-col">
+            <SheetContent side="right" className="w-96 sm:w-120 flex flex-col">
                 <SheetHeader>
                     <SheetTitle className="flex items-center gap-2">
                         <Mic className="h-5 w-5" />
@@ -196,7 +195,7 @@ Tips:
 • Stories or examples to share
 • Transition cues to next slide
 • Timing reminders"
-                            className="flex-1 resize-none min-h-[200px]"
+                            className="flex-1 resize-none min-h-50"
                         />
 
                         {/* Stats */}

@@ -335,7 +335,7 @@ export function AISummarizer({ presentationTitle, slideCount }: AISummarizerProp
               <TabsTrigger value="insights">Insights</TabsTrigger>
             </TabsList>
 
-            <ScrollArea className="h-[500px] mt-4">
+            <ScrollArea className="h-125 mt-4">
               <TabsContent value="summary" className="space-y-6 m-0 pr-4">
                 {/* Quick Stats */}
                 <div className="flex items-center gap-4">

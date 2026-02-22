@@ -27,7 +27,7 @@ export class NarrationExportProcessor extends WorkerHost {
     await this.narrationService.processNarration(
       narrationProjectId,
       slides,
-      voice as any,
+      voice as unknown as any,
       speed,
     );
 

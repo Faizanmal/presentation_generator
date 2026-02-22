@@ -28,13 +28,13 @@ export class AdminMonitoringController {
    */
   @Get('dashboard')
   @HttpCode(HttpStatus.OK)
-  async getDashboard(): Promise<any> {
+  async getDashboard(): Promise<Record<string, unknown>> {
     const [emailStats, otpStats, queueStats, providerHealth] =
       await Promise.all([
-        this.emailTracking.getStats(),
-        this.otpMetrics.getMetrics(),
-        this.emailService.getQueueStats(),
-        this.emailProvider.getProviderHealthStatus(),
+        Promise.resolve(this.emailTracking.getStats()),
+        Promise.resolve(this.otpMetrics.getMetrics()),
+        Promise.resolve(this.emailService.getQueueStats()),
+        Promise.resolve(this.emailProvider.getProviderHealthStatus()),
       ]);
 
     return {

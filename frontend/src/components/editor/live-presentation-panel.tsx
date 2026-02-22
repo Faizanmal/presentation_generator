@@ -211,7 +211,7 @@ export function LivePresentationPanel({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[700px] max-h-[80vh]">
+      <DialogContent className="sm:max-w-175 max-h-[80vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Play className="h-5 w-5 text-red-500" />
@@ -323,7 +323,7 @@ export function LivePresentationPanel({
               </TabsContent>
 
               <TabsContent value="questions" className="mt-4">
-                <ScrollArea className="h-[300px]">
+                <ScrollArea className="h-75">
                   {questions.length === 0 ? (
                     <div className="text-center py-8 text-slate-500">
                       <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -381,7 +381,7 @@ export function LivePresentationPanel({
                     Create Poll
                   </Button>
 
-                  <ScrollArea className="h-[250px]">
+                  <ScrollArea className="h-62.5">
                     {polls.length === 0 ? (
                       <div className="text-center py-8 text-slate-500">
                         <PieChart className="h-8 w-8 mx-auto mb-2 opacity-50" />

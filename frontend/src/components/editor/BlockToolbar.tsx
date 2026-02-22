@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { ComponentType } from "react";
@@ -52,7 +52,7 @@ const BLOCK_TYPES: { type: BlockType; label: string; icon: ComponentType<{ class
 
 export default function BlockToolbar({ projectId, slide }: BlockToolbarProps) {
 
-  const { addBlock } = useEditorStore();
+  const addBlock = useEditorStore((state) => state.addBlock);
   const [isAdding, setIsAdding] = useState(false);
 
   // Add block mutation
@@ -75,12 +75,12 @@ export default function BlockToolbar({ projectId, slide }: BlockToolbarProps) {
   });
 
 
-  const handleAddBlock = (type: BlockType, content: BlockContent) => {
+  const handleAddBlock = useCallback((type: BlockType, content: BlockContent) => {
     if (!slide) { return; }
     setIsAdding(true);
     const order = slide.blocks?.length || 0;
     addBlockMutation.mutate({ projectId, blockType: type, content, order });
-  };
+  }, [slide, projectId, addBlockMutation]);
 
   if (!slide) { return null; }
 

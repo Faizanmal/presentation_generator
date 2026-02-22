@@ -77,7 +77,7 @@ export class AICopilotGateway
       client.join(`session:${session.id}`);
 
       client.emit('sessionStarted', { session });
-    } catch (err) {
+    } catch {
       client.emit('error', { message: 'Failed to start session' });
     }
   }
@@ -101,7 +101,7 @@ export class AICopilotGateway
       client.join(`session:${session.id}`);
 
       client.emit('sessionJoined', { session });
-    } catch (err) {
+    } catch {
       client.emit('error', { message: 'Failed to join session' });
     }
   }
@@ -129,7 +129,7 @@ export class AICopilotGateway
       // Stop typing indicator and send response
       client.emit('assistantTyping', { typing: false });
       client.emit('messageReceived', result);
-    } catch (err) {
+    } catch {
       client.emit('assistantTyping', { typing: false });
       client.emit('error', { message: 'Failed to process message' });
     }
@@ -161,9 +161,9 @@ export class AICopilotGateway
       );
 
       client.emit('actionCompleted', { action: data.action, result });
-    } catch (err) {
+    } catch (error) {
       client.emit('error', {
-        message: `Action failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        message: `Action failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       });
     }
   }
@@ -186,7 +186,7 @@ export class AICopilotGateway
         data.feedback,
       );
       client.emit('feedbackReceived', { success: true });
-    } catch (error) {
+    } catch {
       client.emit('error', { message: 'Failed to save feedback' });
     }
   }

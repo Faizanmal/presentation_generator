@@ -21,7 +21,7 @@ export class PerformanceInterceptor implements NestInterceptor {
     private readonly performanceMonitoring: PerformanceMonitoringService,
   ) {}
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest();
     const startTime = Date.now();
     const method = request.method;

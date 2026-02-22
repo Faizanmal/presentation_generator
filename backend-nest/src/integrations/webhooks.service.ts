@@ -412,7 +412,7 @@ export class WebhooksService {
       };
     } catch (error: unknown) {
       const errMsg = error instanceof Error ? error.message : String(error);
-      throw new Error(`Request failed: ${errMsg}`);
+      throw new Error(`Request failed: ${errMsg}`, { cause: error as Error });
     }
   }
 

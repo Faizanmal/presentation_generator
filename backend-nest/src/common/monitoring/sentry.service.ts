@@ -37,14 +37,16 @@ export class SentryService implements OnModuleInit {
             '0.1',
         ),
         integrations: [],
-        beforeSend(event: any, hint?: any) {
+        beforeSend(
+          event: import('@sentry/node').Event,
+        ): import('@sentry/node').Event | null {
           // Scrub sensitive data
-          const evt = event as Record<string, any>;
+          const evt = event as Record<string, unknown> & {
+            request?: { headers?: Record<string, unknown> };
+          };
           if (evt.request?.headers) {
-            delete (evt.request.headers as Record<string, unknown>)[
-              'authorization'
-            ];
-            delete (evt.request.headers as Record<string, unknown>)['cookie'];
+            delete evt.request.headers['authorization'];
+            delete evt.request.headers['cookie'];
           }
           return event;
         },
@@ -68,8 +70,8 @@ export class SentryService implements OnModuleInit {
       return;
     }
 
-    const S = Sentry as any;
-    S.withScope((scope: any) => {
+    const S = Sentry;
+    S.withScope((scope) => {
       if (context) {
         scope.setExtras(context);
       }
@@ -90,8 +92,8 @@ export class SentryService implements OnModuleInit {
       return;
     }
 
-    const S = Sentry as any;
-    S.withScope((scope: any) => {
+    const S = Sentry;
+    S.withScope((scope) => {
       if (context) {
         scope.setExtras(context);
       }
@@ -104,7 +106,7 @@ export class SentryService implements OnModuleInit {
    */
   setUser(user: { id: string; email?: string; username?: string }): void {
     if (!this.initialized || !Sentry) return;
-    (Sentry as any).setUser(user);
+    Sentry.setUser(user);
   }
 
   /**
@@ -117,7 +119,7 @@ export class SentryService implements OnModuleInit {
     data?: Record<string, unknown>;
   }): void {
     if (!this.initialized || !Sentry) return;
-    (Sentry as any).addBreadcrumb(breadcrumb);
+    Sentry.addBreadcrumb(breadcrumb);
   }
 
   /**
@@ -125,7 +127,10 @@ export class SentryService implements OnModuleInit {
    */
   startTransaction(name: string, op: string): unknown {
     if (!this.initialized || !Sentry) return null;
-    return (Sentry as any).startInactiveSpan({ name, op });
+    return Sentry.startInactiveSpan({
+      name,
+      op,
+    });
   }
 
   get isInitialized(): boolean {

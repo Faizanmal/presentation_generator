@@ -1,40 +1,48 @@
 "use client";
 
-import { useState } from "react";
-
+import { useState, memo } from "react";
 import { motion } from "framer-motion";
 import {
-    MoreHorizontal,
-    Edit,
-    Trash2,
-    Copy,
-    Share2,
     Star,
-    StarOff,
     Clock,
     Eye,
     Play,
+    Share2,
+    MoreHorizontal,
+    Edit,
+    Copy,
     Download,
+    StarOff,
+    Trash2,
 } from "lucide-react";
 import { Button } from "./button";
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuSeparator,
     DropdownMenuTrigger,
+    DropdownMenuSeparator,
 } from "./dropdown-menu";
 
-import type { Project as BaseProject, Collaborator } from "@/types";
-
-interface Project extends BaseProject {
-    collaborators?: Collaborator[];
-    viewCount?: number;
-    description: string | null;
-}
-
 interface ProjectCardProps {
-    project: Project;
+    project: {
+        id: string;
+        title: string;
+        description?: string | null;
+        thumbnail?: string | null;
+        updatedAt: string | Date;
+        slideCount?: number;
+        viewCount?: number;
+        isPublic?: boolean;
+        collaborators?: Array<{
+            id: string;
+            name: string;
+            avatar?: string | null;
+        }>;
+        _count?: {
+            slides: number;
+        };
+    };
     isFavorite?: boolean;
     onOpen?: (id: string) => void;
     onEdit?: (id: string) => void;
@@ -47,7 +55,7 @@ interface ProjectCardProps {
     variant?: "grid" | "list";
 }
 
-export function ProjectCard({
+export const ProjectCard = memo(({
     project,
     isFavorite = false,
     onOpen,
@@ -59,7 +67,7 @@ export function ProjectCard({
     onPresent,
     onExport,
     variant = "grid",
-}: ProjectCardProps) {
+}: ProjectCardProps) => {
     const [isHovered, setIsHovered] = useState(false);
 
     const formatDate = (date: Date | string) => {
@@ -92,7 +100,7 @@ export function ProjectCard({
                             className="h-full w-full object-cover"
                         />
                     ) : (
-                        <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-blue-500/20 to-purple-500/20">
+                        <div className="h-full w-full flex items-center justify-center bg-linear-to-br from-blue-500/20 to-purple-500/20">
                             <span className="text-2xl">📊</span>
                         </div>
                     )}
@@ -217,7 +225,7 @@ export function ProjectCard({
             className="group relative bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-lg transition-all"
         >
             {/* Thumbnail */}
-            <div className="relative aspect-[16/10] bg-slate-100 dark:bg-slate-800 overflow-hidden">
+            <div className="relative aspect-16/10 bg-slate-100 dark:bg-slate-800 overflow-hidden">
                 {project.thumbnail ? (
                     <img
                         src={project.thumbnail}
@@ -225,7 +233,7 @@ export function ProjectCard({
                         className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                     />
                 ) : (
-                    <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-blue-500/10 to-purple-500/10">
+                    <div className="h-full w-full flex items-center justify-center bg-linear-to-br from-blue-500/10 to-purple-500/10">
                         <div className="text-center">
                             <span className="text-4xl">📊</span>
                             <p className="text-sm text-slate-400 mt-2">No preview</p>
@@ -374,7 +382,9 @@ export function ProjectCard({
             </div>
         </motion.div>
     );
-}
+});
+
+ProjectCard.displayName = "ProjectCard";
 
 // Create new project card (placeholder)
 interface CreateProjectCardProps {
@@ -407,7 +417,7 @@ export function CreateProjectCard({ onClick, variant = "grid" }: CreateProjectCa
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={onClick}
-            className="aspect-[16/14] border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/20 transition-colors flex flex-col items-center justify-center gap-4 group"
+            className="aspect-16/14 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/20 transition-colors flex flex-col items-center justify-center gap-4 group w-full"
         >
             <div className="h-16 w-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30 transition-colors">
                 <span className="text-3xl group-hover:scale-110 transition-transform">➕</span>

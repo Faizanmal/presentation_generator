@@ -187,7 +187,7 @@ export function useAICopilot(projectId: string) {
 // ============================================
 
 export function useLiveQA(projectId: string) {
-  const queryClient = useQueryClient();
+  const _queryClient = useQueryClient();
 
   const createSession = useMutation({
     mutationFn: (settings?: object) => api.qa.createSession(projectId, settings),
@@ -229,7 +229,7 @@ export function useCrossPlatformSync() {
 
   const registerDevice = useMutation({
     mutationFn: (input: { name: string; type: string; capabilities: string[] }) =>
-      api.crossSync.registerDevice(input as any),
+      api.crossSync.registerDevice(input as Record<string, unknown>),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sync-devices'] }),
   });
 
@@ -245,25 +245,30 @@ export function useCrossPlatformSync() {
 // ============================================
 
 export function usePredictiveAnalytics(projectId: string) {
-  const { data: insights, isLoading: insightsLoading } = useQuery({
+  const insightsQuery = useQuery({
     queryKey: ['predictive-insights', projectId],
     queryFn: () => api.predictive.getInsights(projectId),
     enabled: !!projectId,
   });
 
-  const { data: recommendations } = useQuery({
+  const recommendationsQuery = useQuery({
     queryKey: ['predictive-recommendations', projectId],
     queryFn: () => api.predictive.getRecommendations(projectId),
     enabled: !!projectId,
   });
 
-  const { data: benchmarks } = useQuery({
+  const benchmarksQuery = useQuery({
     queryKey: ['predictive-benchmarks', projectId],
     queryFn: () => api.predictive.getBenchmarks(projectId),
     enabled: !!projectId,
   });
 
-  return { insights, recommendations, benchmarks, isLoading: insightsLoading };
+  // Return the full query objects so callers can access loading / error state
+  return {
+    insights: insightsQuery,
+    recommendations: recommendationsQuery,
+    benchmarks: benchmarksQuery,
+  };
 }
 
 // ============================================
@@ -273,7 +278,7 @@ export function usePredictiveAnalytics(projectId: string) {
 export function useSentimentAnalysis(projectId: string) {
   const startSession = useMutation({
     mutationFn: (options: { source: string; language: string }) =>
-      api.sentiment.startSession(projectId, options as any),
+      api.sentiment.startSession(projectId, options as Record<string, unknown>),
   });
 
   return { startSession };
@@ -302,7 +307,7 @@ export function useLearningPaths() {
 
   const createPath = useMutation({
     mutationFn: (input: { title: string; description: string; modules: object[] }) =>
-      api.learningPaths.create(input as any),
+      api.learningPaths.create(input as Record<string, unknown>),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['learning-paths'] }),
   });
 
@@ -386,7 +391,7 @@ export function useCognitiveAccessibility() {
 export function useUniversalDesign(projectId: string) {
   const checkDesign = useMutation({
     mutationFn: (options: { guidelines: string[] }) =>
-      api.universalDesign.check(projectId, options as any),
+      api.universalDesign.check(projectId, options as Record<string, unknown>),
   });
 
   const report = useQuery({
@@ -449,7 +454,7 @@ export function useSDKConfigurations() {
 
   const createConfig = useMutation({
     mutationFn: (input: { name: string; domain?: string; branding?: object; features?: string[] }) =>
-      api.sdk.create(input as any),
+      api.sdk.create(input as Record<string, unknown>),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sdk-configs'] }),
   });
 
@@ -489,7 +494,7 @@ export function useIoTDevices() {
 
   const registerDevice = useMutation({
     mutationFn: (input: { name: string; type: string; connectionString?: string }) =>
-      api.iot.register(input as any),
+      api.iot.register(input as Record<string, unknown>),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['iot-devices'] }),
   });
 
@@ -530,11 +535,11 @@ export function useEcoFriendly(projectId?: string) {
 
   const optimize = useMutation({
     mutationFn: (options: { targets: string[]; aggressiveness: string }) =>
-      api.eco.optimize(projectId || '', options as any),
+      api.eco.optimize(projectId || '', options as Record<string, unknown>),
   });
 
   const trackMetrics = useMutation({
-    mutationFn: (data: object) => api.eco.trackMetrics(data as any),
+    mutationFn: (data: object) => api.eco.trackMetrics(data as Record<string, unknown>),
   });
 
   return { settings, tips, updateSettings, optimize, trackMetrics };
@@ -564,7 +569,7 @@ export function usePresenterWellness() {
 
   const startSession = useMutation({
     mutationFn: (input: { type: string; breakInterval: number }) =>
-      api.wellness.startSession(input as any),
+      api.wellness.startSession(input as Record<string, unknown>),
   });
 
   const endSession = useMutation({
@@ -574,7 +579,7 @@ export function usePresenterWellness() {
 
   const recordBreak = useMutation({
     mutationFn: (input: { sessionId: string; duration: number; type: string }) =>
-      api.wellness.recordBreak(input as any),
+      api.wellness.recordBreak(input as Record<string, unknown>),
   });
 
   const analyzePace = useMutation({
@@ -760,7 +765,7 @@ export function useImageAcquisitionJob(jobId: string) {
     enabled: !!jobId,
     refetchInterval: (query) => {
       const state = query.state.data?.job?.state;
-      if (state === 'completed' || state === 'failed') return false;
+      if (state === 'completed' || state === 'failed') { return false; }
       return 2000;
     },
   });
@@ -775,7 +780,7 @@ export function useImageRecognition(projectId?: string) {
 
   const imagesInProject = useQuery({
     queryKey: ['project-images', projectId],
-    queryFn: () => api.imageRecognition.getInPresentation(projectId!),
+    queryFn: () => api.imageRecognition.getInPresentation(projectId ?? ''),
     enabled: !!projectId,
   });
 

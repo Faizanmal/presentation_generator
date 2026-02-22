@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import {
   Layers,
   MousePointerClick,
   Bot,
+  Loader2,
 } from "lucide-react";
 import Image from "next/image";
 import { motion } from "framer-motion";
@@ -35,23 +36,50 @@ import {
 
 export default function Home() {
   const router = useRouter();
-  const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
+  const { isAuthenticated, isLoading: isAuthLoading, initialized } = useAuthStore();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    // Use requestAnimationFrame to avoid synchronous state update during effect commit
+    const frame = requestAnimationFrame(() => {
+      setMounted(true);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   // Redirect authenticated users straight to the dashboard
   useEffect(() => {
-    if (!isAuthLoading && isAuthenticated) {
+    if (mounted && initialized && !isAuthLoading && isAuthenticated) {
       router.push('/dashboard');
     }
-  }, [isAuthenticated, isAuthLoading, router]);
+  }, [isAuthenticated, isAuthLoading, initialized, router, mounted]);
+
+  // If authenticated, show a loading screen while redirecting to avoid flashing the home page
+  if (mounted && isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center">
+        <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-2xl shadow-blue-500/20 mb-6 scale-110">
+          <Sparkles className="h-10 w-10 text-white animate-pulse" />
+        </div>
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500 mb-4" />
+        <p className="text-slate-400 font-medium animate-pulse text-lg">Redirecting to dashboard...</p>
+      </div>
+    );
+  }
+
+  // If not mounted yet, show nothing to avoid hydration mismatch
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-white overflow-hidden">
       {/* Animated background */}
       <div className="fixed inset-0 z-0">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-slate-950 to-slate-950" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-blue-900/20 via-slate-950 to-slate-950" />
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse delay-1000" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-to-r from-blue-500/5 to-purple-500/5 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-200 h-200 bg-linear-to-r from-blue-500/5 to-purple-500/5 rounded-full blur-3xl" />
       </div>
 
       {/* Content */}
@@ -65,7 +93,7 @@ export default function Home() {
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
+              <div className="h-10 w-10 rounded-xl bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
                 <Sparkles className="h-6 w-6 text-white" />
               </div>
               <span className="text-xl font-bold text-white">
@@ -98,7 +126,7 @@ export default function Home() {
                 </Button>
               </Link>
               <Link href="/register">
-                <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg shadow-blue-500/25">
+                <Button className="bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg shadow-blue-500/25">
                   Get Started Free
                 </Button>
               </Link>
@@ -112,7 +140,7 @@ export default function Home() {
             <FadeInUp delay={0.2}>
               <motion.div
                 whileHover={{ scale: 1.05 }}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 text-blue-400 text-sm font-medium mb-8 cursor-default"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-linear-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 text-blue-400 text-sm font-medium mb-8 cursor-default"
               >
                 <Sparkles className="h-4 w-4" />
                 <span>AI-Powered Presentation Creation</span>
@@ -123,7 +151,7 @@ export default function Home() {
             <FadeInUp delay={0.3}>
               <h1 className="text-5xl md:text-7xl font-bold leading-tight mb-8">
                 Turn your ideas into{" "}
-                <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                <span className="bg-linear-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
                   stunning presentations
                 </span>{" "}
                 in seconds
@@ -141,7 +169,7 @@ export default function Home() {
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <Link href="/register">
                   <GlowOnHover glowColor="rgba(59, 130, 246, 0.4)">
-                    <Button size="lg" className="text-lg px-8 h-14 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-xl shadow-blue-500/20">
+                    <Button size="lg" className="text-lg px-8 h-14 bg-linaear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-xl shadow-blue-500/20">
                       Start Creating Free
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
@@ -170,7 +198,7 @@ export default function Home() {
             <div className="mt-20 max-w-6xl mx-auto">
               <div className="relative">
                 {/* Glow effect */}
-                <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl blur-2xl opacity-20" />
+                <div className="absolute -inset-1 bg-linear-to-r from-blue-600 to-purple-600 rounded-2xl blur-2xl opacity-20" />
 
                 {/* Main preview container */}
                 <div className="relative rounded-2xl overflow-hidden border border-slate-800 bg-slate-900/80 backdrop-blur-xl shadow-2xl">
@@ -189,17 +217,18 @@ export default function Home() {
                   </div>
 
                   {/* Preview content */}
-                  <div className="aspect-[16/9] bg-slate-900 border-t border-slate-800 relative group overflow-hidden">
+                  <div className="aspect-video bg-slate-900 border-t border-slate-800 relative group overflow-hidden">
                     <Image
                       src="https://placehold.co/1200x675/1e293b/ffffff?text=Presentation+Designer+Dashboard"
                       alt="Presentation Designer Dashboard"
                       fill
                       className="object-cover opacity-90 transition-opacity group-hover:opacity-100"
                       priority
+                      unoptimized
                     />
 
                     {/* Overlay Grid (simulating slides) */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent opacity-60" />
+                    <div className="absolute inset-0 bg-linear-to-t from-slate-900 via-transparent to-transparent opacity-60" />
                   </div>
                 </div>
 
@@ -207,7 +236,7 @@ export default function Home() {
                 <FloatingElement duration={4} distance={15} className="absolute -right-12 top-20 hidden lg:block">
                   <div className="bg-slate-800/90 backdrop-blur-sm border border-slate-700 rounded-xl p-4 shadow-xl">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-full bg-linear-to-r from-green-500 to-emerald-500 flex items-center justify-center">
                         <Zap className="w-5 h-5 text-white" />
                       </div>
                       <div>
@@ -221,7 +250,7 @@ export default function Home() {
                 <FloatingElement duration={5} distance={10} className="absolute -left-8 bottom-32 hidden lg:block">
                   <div className="bg-slate-800/90 backdrop-blur-sm border border-slate-700 rounded-xl p-4 shadow-xl">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-full bg-linear-to-r from-purple-500 to-pink-500 flex items-center justify-center">
                         <Users className="w-5 h-5 text-white" />
                       </div>
                       <div>
@@ -258,7 +287,7 @@ export default function Home() {
 
         {/* Features Section */}
         <section id="features" className="py-32 relative">
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-950/10 to-transparent" />
+          <div className="absolute inset-0 bg-linear-to-b from-transparent via-blue-950/10 to-transparent" />
 
           <div className="container mx-auto px-6 relative">
             <FadeInUp>
@@ -266,7 +295,7 @@ export default function Home() {
                 <span className="text-blue-400 text-sm font-medium uppercase tracking-wider">Features</span>
                 <h2 className="text-4xl md:text-5xl font-bold mt-4 mb-6">
                   Everything you need to create{" "}
-                  <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                  <span className="bg-linear-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
                     stunning presentations
                   </span>
                 </h2>
@@ -284,6 +313,7 @@ export default function Home() {
                   description="Describe your topic and watch as AI creates complete, structured presentations with compelling content."
                   gradient="from-blue-500 to-cyan-500"
                   image="https://placehold.co/600x400/1e293b/3b82f6?text=AI+Generation"
+                  unoptimized
                 />
               </StaggerItem>
               <StaggerItem>
@@ -301,6 +331,7 @@ export default function Home() {
                   description="Work together with your team in real-time. See cursors, edits, and comments instantly."
                   gradient="from-green-500 to-emerald-500"
                   image="https://placehold.co/600x400/1e293b/10b981?text=Collaboration"
+                  unoptimized
                 />
               </StaggerItem>
               <StaggerItem>
@@ -342,6 +373,7 @@ export default function Home() {
                   description="Browse and use thousands of professional templates, or sell your own to the community."
                   gradient="from-teal-500 to-cyan-500"
                   image="https://placehold.co/600x400/1e293b/0ea5e9?text=Templates"
+                  unoptimized
                 />
               </StaggerItem>
               <StaggerItem>
@@ -435,15 +467,15 @@ export default function Home() {
 
         {/* CTA Section */}
         <section className="py-32 relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-purple-600/20" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-600/10 via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-linear-to-r from-blue-600/20 to-purple-600/20" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,var(--tw-gradient-stops))] from-blue-600/10 via-transparent to-transparent" />
 
           <FadeInUp>
             <div className="container mx-auto px-6 text-center relative">
               <div className="max-w-3xl mx-auto">
                 <h2 className="text-4xl md:text-5xl font-bold mb-6">
                   Ready to create your first{" "}
-                  <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                  <span className="bg-linear-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
                     AI presentation
                   </span>
                   ?
@@ -453,7 +485,7 @@ export default function Home() {
                 </p>
                 <Link href="/register">
                   <GlowOnHover glowColor="rgba(59, 130, 246, 0.5)">
-                    <Button size="lg" className="text-lg px-8 h-14 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-xl">
+                    <Button size="lg" className="text-lg px-8 h-14 bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-xl">
                       Get Started Free
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
@@ -470,7 +502,7 @@ export default function Home() {
             <div className="grid md:grid-cols-4 gap-8 mb-12">
               <div>
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                  <div className="h-10 w-10 rounded-xl bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center">
                     <Sparkles className="h-6 w-6 text-white" />
                   </div>
                   <span className="text-lg font-bold">Presentation Designer</span>
@@ -541,12 +573,14 @@ function FeatureCard({
   description,
   gradient,
   image,
+  unoptimized,
 }: {
   icon: React.ReactNode;
   title: string;
   description: string;
   gradient: string;
   image?: string;
+  unoptimized?: boolean;
 }) {
   return (
     <ScaleOnHover scale={1.02}>
@@ -558,12 +592,13 @@ function FeatureCard({
               alt={title}
               fill
               className="object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+              unoptimized={unoptimized}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 to-transparent" />
+            <div className="absolute inset-0 bg-linear-to-t from-slate-900/90 to-transparent" />
           </div>
         )}
         <div className="p-6">
-          <div className={`h-12 w-12 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white mb-5 group-hover:scale-110 transition-transform`}>
+          <div className={`h-12 w-12 rounded-xl bg-linear-to-br ${gradient} flex items-center justify-center text-white mb-5 group-hover:scale-110 transition-transform`}>
             {icon}
           </div>
           <h3 className="text-xl font-semibold text-white mb-3">{title}</h3>
@@ -597,12 +632,12 @@ function PricingCard({
     <ScaleOnHover scale={1.02}>
       <div
         className={`relative h-full p-8 rounded-2xl border backdrop-blur-sm transition-all ${highlighted
-          ? "bg-gradient-to-b from-blue-950/50 to-purple-950/50 border-blue-500/50 shadow-2xl shadow-blue-500/10"
+          ? "bg-linear-to-b from-blue-950/50 to-purple-950/50 border-blue-500/50 shadow-2xl shadow-blue-500/10"
           : "bg-slate-900/50 border-slate-800 hover:border-slate-700"
           }`}
       >
         {highlighted && (
-          <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full text-sm font-medium">
+          <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-linear-to-r from-blue-600 to-purple-600 rounded-full text-sm font-medium">
             Most Popular
           </div>
         )}
@@ -629,7 +664,7 @@ function PricingCard({
           <Button
             variant={buttonVariant}
             className={`w-full ${highlighted
-              ? "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 border-0"
+              ? "bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 border-0"
               : "border-slate-700 hover:bg-slate-800"
               }`}
           >

@@ -161,7 +161,8 @@ export class ImageAcquisitionProcessor extends WorkerHost {
       data: {
         filename: image.localPath.split('/').pop() || 'unknown',
         originalName: `${image.source}-${image.id}`,
-        mimetype: 'image/jpeg',
+        source: image.source,
+        mimeType: 'image/jpeg',
         size: 0, // Will be updated by file size check
         url: image.localPath,
         userId,
@@ -199,12 +200,12 @@ export class ImageAcquisitionProcessor extends WorkerHost {
     // Create an image block
     await this.prisma.block.create({
       data: {
-        type: 'image',
+        blockType: 'IMAGE',
         content: {
           uploadId,
           alt: 'Acquired image',
         },
-        styles: {
+        style: {
           position: 'relative',
           width: '100%',
           height: 'auto',

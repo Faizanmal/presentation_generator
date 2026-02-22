@@ -23,7 +23,7 @@ export default function ImageAcquisitionPage() {
     const { sources, acquire, smartAcquire, bulkAcquire } = useImageAcquisition(projectId);
 
     const [query, setQuery] = useState('');
-    const [aiPrompt, setAiPrompt] = useState('');
+    const [] = useState('');
     const [orientation, setOrientation] = useState<'landscape' | 'portrait' | 'square'>('landscape');
     const [source, setSource] = useState<'unsplash' | 'pexels' | 'pixabay' | 'ai'>('unsplash');
     const [bulkTopic, setBulkTopic] = useState('');
@@ -267,11 +267,11 @@ export default function ImageAcquisitionPage() {
                         </CardHeader>
                         <CardContent>
                             <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                {results.map((img, i) => (
-                                    <div key={i} className="rounded-lg overflow-hidden border group relative">
+                                {results.map((img) => (
+                                    <div key={img.url} className="rounded-lg overflow-hidden border group relative">
                                         <img
                                             src={img.url}
-                                            alt={`Acquired image ${i + 1}`}
+                                            alt="Acquired image"
                                             className="w-full h-40 object-cover"
                                             loading="lazy"
                                         />

@@ -233,7 +233,7 @@ export default function DesignSystemPage() {
     const displaySystem = (currentSystem as DesignSystem) || mockSystem;
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-pink-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        <div className="min-h-screen bg-linear-to-br from-slate-50 via-white to-pink-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
             {/* Header */}
             <header className="sticky top-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-lg border-b border-slate-200 dark:border-slate-800">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -246,7 +246,7 @@ export default function DesignSystemPage() {
                                 </Button>
                             </Link>
                             <div className="flex items-center gap-2">
-                                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center">
+                                <div className="h-8 w-8 rounded-lg bg-linear-to-br from-pink-500 to-rose-600 flex items-center justify-center">
                                     <Palette className="h-5 w-5 text-white" />
                                 </div>
                                 <span className="text-xl font-bold text-slate-900 dark:text-white">
@@ -260,7 +260,7 @@ export default function DesignSystemPage() {
                                 value={selectedSystem || ""}
                                 onValueChange={setSelectedSystem}
                             >
-                                <SelectTrigger className="w-[200px]">
+                                <SelectTrigger className="w-50">
                                     <SelectValue placeholder="Select design system" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -476,7 +476,7 @@ export default function DesignSystemPage() {
                                         <div key={token.name} className="flex items-center gap-4">
                                             <Badge variant="outline" className="w-16 justify-center">{token.name}</Badge>
                                             <div
-                                                className="bg-gradient-to-r from-pink-500 to-rose-500 rounded"
+                                                className="bg-linear-to-r from-pink-500 to-rose-500 rounded"
                                                 style={{ width: token.value, height: "24px" }}
                                             />
                                             <span className="text-sm text-slate-500 font-mono">{token.value}</span>

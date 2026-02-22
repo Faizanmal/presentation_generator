@@ -24,7 +24,7 @@ export class CacheInterceptor implements NestInterceptor {
     private readonly reflector: Reflector,
   ) {}
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     // Only cache GET requests
     const request = context.switchToHttp().getRequest();
     if (request.method !== 'GET') {
@@ -45,11 +45,13 @@ export class CacheInterceptor implements NestInterceptor {
     const cacheKey = this.generateCacheKey(request);
 
     // Try to get from cache
-    const cachedResponse = this.cacheService.get<any>(cacheKey);
+    const cachedResponse = this.cacheService.get<unknown>(cacheKey);
     if (cachedResponse) {
       this.logger.debug(`Cache HIT: ${cacheKey}`);
       // Add cache header
-      const response = context.switchToHttp().getResponse();
+      const response = context
+        .switchToHttp()
+        .getResponse<import('express').Response>();
       response.setHeader('X-Cache-Status', 'HIT');
       return of(cachedResponse);
     }
@@ -66,7 +68,9 @@ export class CacheInterceptor implements NestInterceptor {
           );
 
           // Add cache header
-          const httpResponse = context.switchToHttp().getResponse();
+          const httpResponse = context
+            .switchToHttp()
+            .getResponse<import('express').Response>();
           httpResponse.setHeader('X-Cache-Status', 'MISS');
           httpResponse.setHeader(
             'Cache-Control',
@@ -80,7 +84,7 @@ export class CacheInterceptor implements NestInterceptor {
   /**
    * Generate a cache key from request details
    */
-  private generateCacheKey(request: any): string {
+  private generateCacheKey(request: import('express').Request): string {
     const url = request.url;
     const userId = request.user?.id || 'anonymous';
 

@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UsersService } from './users.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
+import { SubscriptionPlan } from '@prisma/client';
 import { NotFoundException } from '@nestjs/common';
 
 describe('UsersService', () => {
@@ -85,6 +85,21 @@ describe('UsersService', () => {
         where: { email: 'test@example.com' },
         include: { subscription: true },
       });
+    });
+
+    it('should return null when email is undefined, falsy, or non-string', async () => {
+      // no database call should be made
+      const result = await service.findByEmail(undefined as any);
+      expect(result).toBeNull();
+      expect(mockPrismaService.user.findUnique).not.toHaveBeenCalled();
+
+      const result2 = await service.findByEmail('');
+      expect(result2).toBeNull();
+      expect(mockPrismaService.user.findUnique).not.toHaveBeenCalled();
+
+      const result3 = await service.findByEmail({} as any);
+      expect(result3).toBeNull();
+      expect(mockPrismaService.user.findUnique).not.toHaveBeenCalled();
     });
   });
 

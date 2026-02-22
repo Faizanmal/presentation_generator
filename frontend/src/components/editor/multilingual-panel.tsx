@@ -185,7 +185,7 @@ export function MultilingualPanel({
                         </DialogHeader>
 
                         <div className="py-4">
-                            <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto">
+                            <div className="grid grid-cols-2 gap-2 max-h-75 overflow-y-auto">
                                 {displayLanguages.map((lang) => {
                                     const isSelected = selectedLanguages.includes(lang.code);
                                     const isExisting = displayTranslations.some(t => t.languageCode === lang.code);
@@ -238,7 +238,7 @@ export function MultilingualPanel({
             </div>
 
             {/* Current Language */}
-            <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800">
+            <Card className="bg-linear-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800">
                 <CardContent className="p-3">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">

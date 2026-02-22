@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 
 export type SubscriptionTier = 'FREE' | 'PRO' | 'ENTERPRISE';
 
@@ -344,7 +345,11 @@ export class SubscriptionLimitsService {
       data: {
         userId,
         action,
-        metadata: metadata || {},
+        targetType: 'subscription',
+        targetId: userId,
+        metadata: metadata
+          ? (metadata as unknown as Prisma.InputJsonValue)
+          : undefined,
       },
     });
   }

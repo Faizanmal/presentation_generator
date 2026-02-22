@@ -22,7 +22,7 @@ import { Feature } from '../common/decorators/feature.decorator';
 
 @Controller('projects')
 export class ProjectsController {
-  constructor(private readonly projectsService: ProjectsService) { }
+  constructor(private readonly projectsService: ProjectsService) {}
 
   /**
    * Create a new empty project

@@ -192,8 +192,9 @@ export class AudienceAnalyticsService {
     >();
 
     for (const event of interactionEvents) {
-      const x = Math.round(event.metadata!.x / 10) * 10;
-      const y = Math.round(event.metadata!.y / 10) * 10;
+      const meta = event.metadata as unknown as { x?: number; y?: number };
+      const x = Math.round((meta.x ?? 0) / 10) * 10;
+      const y = Math.round((meta.y ?? 0) / 10) * 10;
       const key = `${x},${y}`;
 
       if (!heatmapData.has(key)) {
@@ -491,8 +492,9 @@ export class AudienceAnalyticsService {
         event.slideId &&
         event.metadata?.x !== undefined
       ) {
-        const x = Math.round(event.metadata.x / 50) * 50;
-        const y = Math.round(event.metadata.y / 50) * 50;
+        const metadata = event.metadata;
+        const x = Math.round((metadata.x as number) / 50) * 50;
+        const y = Math.round((metadata.y as number) / 50) * 50;
         const key = `${event.slideId}:${x},${y}`;
 
         if (!hotspots.has(key)) {

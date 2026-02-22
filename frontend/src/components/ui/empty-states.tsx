@@ -73,7 +73,7 @@ export function EmptyState({
                 className="flex items-center gap-3"
             >
                 {action && (
-                    <Button onClick={action.onClick} className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                    <Button onClick={action.onClick} className="bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
                         {action.icon && <action.icon className="h-4 w-4 mr-2" />}
                         {action.label}
                     </Button>
@@ -202,7 +202,7 @@ export function IllustratedEmptyState({
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.4 }}
                 >
-                    <Button onClick={action.onClick} className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                    <Button onClick={action.onClick} className="bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
                         {action.label}
                     </Button>
                 </motion.div>

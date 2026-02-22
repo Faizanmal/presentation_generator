@@ -4,7 +4,11 @@ const { PrismaPg } = require('@prisma/adapter-pg');
 const { Pool } = require('pg');
 
 // Use the same initialization pattern as the NestJS app
-const connectionString = process.env.DATABASE_URL || '';
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  console.error('DATABASE_URL is not set, cannot seed themes');
+  process.exit(1);
+}
 const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 

@@ -91,7 +91,8 @@ interface Poll {
   adapter: process.env.REDIS_HOST ? undefined : undefined, // Redis adapter configured separately
 })
 export class CollaborationGateway
-  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server: Server;
 
@@ -115,7 +116,7 @@ export class CollaborationGateway
     private readonly collaborationService: CollaborationService,
     private readonly jwtService: JwtService,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
-  ) { }
+  ) {}
 
   afterInit() {
     this.logger.log('Collaboration WebSocket Gateway initialized');
@@ -641,9 +642,7 @@ export class CollaborationGateway
     const questions: QAQuestion[] = rawQuestions.map((q) => JSON.parse(q));
 
     // Find and update
-    const questionIndex = questions.findIndex(
-      (q) => q.id === data.questionId,
-    );
+    const questionIndex = questions.findIndex((q) => q.id === data.questionId);
 
     if (
       questionIndex !== -1 &&
@@ -683,9 +682,7 @@ export class CollaborationGateway
     const questions: QAQuestion[] = rawQuestions.map((q) => JSON.parse(q));
 
     // Find and update
-    const questionIndex = questions.findIndex(
-      (q) => q.id === data.questionId,
-    );
+    const questionIndex = questions.findIndex((q) => q.id === data.questionId);
 
     if (questionIndex !== -1) {
       questions[questionIndex].answered = true;

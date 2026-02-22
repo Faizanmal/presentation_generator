@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import {
     Loader2,
@@ -103,16 +103,21 @@ export function AISuggestionsPanel({
     const [isApplying, setIsApplying] = useState<string | null>(null);
     const [contextualSuggestions, setContextualSuggestions] = useState<AISuggestion[]>(DEFAULT_SUGGESTIONS);
 
+    // Store blocks in a ref so the effect doesn't need it as a dependency
+    const blocksRef = useRef(blocks);
+    blocksRef.current = blocks;
+
     // Generate contextual suggestions based on slide content
     const generateSuggestionsMutation = useMutation({
         mutationFn: async () => {
+            const currentBlocks = blocksRef.current;
             const response = await fetch('/api/ai/suggestions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     projectId,
                     slideId,
-                    blocks: blocks?.map(b => ({ type: b.type, content: b.content })),
+                    blocks: currentBlocks?.map(b => ({ type: b.type, content: b.content })),
                     heading: slideTitle,
                 }),
             });
@@ -125,6 +130,10 @@ export function AISuggestionsPanel({
             }
         },
     });
+
+    // Store mutation in a ref to avoid it as a dependency
+    const generateSuggestionsMutationRef = useRef(generateSuggestionsMutation);
+    generateSuggestionsMutationRef.current = generateSuggestionsMutation;
 
     // Apply AI prompt mutation
     const applyPromptMutation = useMutation({
@@ -148,14 +157,14 @@ export function AISuggestionsPanel({
 
     // Load contextual suggestions when slide changes
     useEffect(() => {
-        if (slideId && blocks && blocks.length > 0) {
+        const currentBlocks = blocksRef.current;
+        if (slideId && currentBlocks && currentBlocks.length > 0) {
             // Only fetch if we have real content
-            const hasContent = blocks.some(b => b.content?.text && b.content.text.length > 10);
+            const hasContent = currentBlocks.some(b => b.content?.text && b.content.text.length > 10);
             if (hasContent) {
-                generateSuggestionsMutation.mutate();
+                generateSuggestionsMutationRef.current.mutate();
             }
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [slideId]);
 
     const handleApplySuggestion = useCallback(async (suggestion: AISuggestion) => {
@@ -192,7 +201,7 @@ export function AISuggestionsPanel({
                 )}
             </div>
 
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-900 rounded-xl p-4 border border-blue-100 dark:border-slate-700">
+            <div className="bg-linear-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-900 rounded-xl p-4 border border-blue-100 dark:border-slate-700">
                 {/* AI Avatar + intro message */}
                 <div className="flex gap-3 mb-3">
                     <div className="size-8 rounded-full bg-white dark:bg-slate-950 flex items-center justify-center shadow-sm text-blue-600 shrink-0">
