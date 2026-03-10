@@ -33,6 +33,7 @@ import {
   AnimatedCounter,
   GlowOnHover,
 } from "@/components/ui/animations";
+import { ThemeToggleButton } from "@/components/ui/enhanced-ui";
 
 export default function Home() {
   const router = useRouter();
@@ -58,7 +59,7 @@ export default function Home() {
   if (mounted && isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center">
-        <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-2xl shadow-blue-500/20 mb-6 scale-110">
+        <div className="h-16 w-16 rounded-2xl bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-2xl shadow-blue-500/20 mb-6 scale-110">
           <Sparkles className="h-10 w-10 text-white animate-pulse" />
         </div>
         <Loader2 className="h-8 w-8 animate-spin text-blue-500 mb-4" />
@@ -120,6 +121,7 @@ export default function Home() {
             </div>
 
             <div className="flex items-center gap-4">
+              <ThemeToggleButton />
               <Link href="/login">
                 <Button variant="ghost" className="text-slate-300 hover:text-white hover:bg-white/10">
                   Log in

@@ -199,38 +199,16 @@ export default function DesignSystemPage() {
         });
     };
 
-    // Default mock data for display
-    const mockSystem: DesignSystem = {
-        id: "mock",
-        name: "Default Design System",
-        colors: [
-            { name: "primary", value: "#3B82F6" },
-            { name: "secondary", value: "#6366F1" },
-            { name: "accent", value: "#8B5CF6" },
-            { name: "success", value: "#10B981" },
-            { name: "warning", value: "#F59E0B" },
-            { name: "error", value: "#EF4444" },
-            { name: "background", value: "#FFFFFF" },
-            { name: "foreground", value: "#1F2937" },
-        ],
-        typography: [
-            { name: "heading-1", fontFamily: "Inter", fontSize: "3rem", fontWeight: "700" },
-            { name: "heading-2", fontFamily: "Inter", fontSize: "2.25rem", fontWeight: "600" },
-            { name: "heading-3", fontFamily: "Inter", fontSize: "1.5rem", fontWeight: "600" },
-            { name: "body", fontFamily: "Inter", fontSize: "1rem", fontWeight: "400" },
-            { name: "small", fontFamily: "Inter", fontSize: "0.875rem", fontWeight: "400" },
-        ],
-        spacing: [
-            { name: "xs", value: "0.25rem" },
-            { name: "sm", value: "0.5rem" },
-            { name: "md", value: "1rem" },
-            { name: "lg", value: "1.5rem" },
-            { name: "xl", value: "2rem" },
-            { name: "2xl", value: "3rem" },
-        ],
+    const emptySystem: DesignSystem = {
+        id: "",
+        name: "",
+        colors: [],
+        typography: [],
+        spacing: [],
     };
 
-    const displaySystem = (currentSystem as DesignSystem) || mockSystem;
+    const displaySystem = (currentSystem as DesignSystem) || emptySystem;
+    const hasSystem = !!selectedSystem && !!currentSystem;
 
     return (
         <div className="min-h-screen bg-linear-to-br from-slate-50 via-white to-pink-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
@@ -341,7 +319,22 @@ export default function DesignSystemPage() {
                         </div>
 
                         {/* Color Grid */}
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {!hasSystem && (
+                            <Card className="p-8 text-center">
+                                <CardContent className="flex flex-col items-center gap-4 pt-6">
+                                    <Palette className="h-12 w-12 text-slate-300 dark:text-slate-600" />
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">No Design System Selected</h3>
+                                        <p className="text-slate-500 mt-1">Select an existing design system or create a new one to get started.</p>
+                                    </div>
+                                    <Button onClick={() => setIsCreateOpen(true)}>
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        Create Design System
+                                    </Button>
+                                </CardContent>
+                            </Card>
+                        )}
+                        {hasSystem && <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                             {displaySystem.colors?.map((color) => (
                                 <Card key={color.name} className="group overflow-hidden">
                                     <div
@@ -422,7 +415,7 @@ export default function DesignSystemPage() {
                                     </div>
                                 </CardContent>
                             </Card>
-                        </div>
+                        </div>}
                     </TabsContent>
 
                     {/* Typography Tab */}

@@ -214,9 +214,12 @@ export class UniversalDesignService {
           });
         }
 
-        // Check color contrast (simplified)
+        // Check color contrast
         if (styles.color && styles.backgroundColor) {
-          const contrast = this.calculateContrast();
+          const contrast = this.calculateContrast(
+            styles.color,
+            styles.backgroundColor,
+          );
           if (contrast < 4.5) {
             issues.push({
               type: 'contrast',
@@ -235,12 +238,70 @@ export class UniversalDesignService {
   }
 
   /**
-   * Calculate color contrast ratio
+   * Calculate color contrast ratio (WCAG 2.0 algorithm)
    */
-  private calculateContrast(): number {
-    // Simplified contrast calculation
-    // Real implementation would parse hex/rgb colors and calculate luminance
-    return 5; // Placeholder
+  private calculateContrast(foreground: string, background: string): number {
+    const fgLum = this.getRelativeLuminance(foreground);
+    const bgLum = this.getRelativeLuminance(background);
+    const lighter = Math.max(fgLum, bgLum);
+    const darker = Math.min(fgLum, bgLum);
+    return (lighter + 0.05) / (darker + 0.05);
+  }
+
+  /**
+   * Calculate relative luminance from a CSS color string
+   */
+  private getRelativeLuminance(color: string): number {
+    const rgb = this.parseColor(color);
+    if (!rgb) return 0;
+    const [r, g, b] = rgb.map((c) => {
+      const sRGB = c / 255;
+      return sRGB <= 0.03928
+        ? sRGB / 12.92
+        : Math.pow((sRGB + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+
+  /**
+   * Parse CSS color string (hex, rgb) into [r, g, b] array
+   */
+  private parseColor(color: string): number[] | null {
+    // Hex: #RGB, #RRGGBB
+    const hexMatch = color.match(/^#([0-9a-f]{3,8})$/i);
+    if (hexMatch) {
+      let hex = hexMatch[1];
+      if (hex.length === 3) {
+        hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+      }
+      return [
+        parseInt(hex.substring(0, 2), 16),
+        parseInt(hex.substring(2, 4), 16),
+        parseInt(hex.substring(4, 6), 16),
+      ];
+    }
+    // rgb(r, g, b) or rgba(r, g, b, a)
+    const rgbMatch = color.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+    if (rgbMatch) {
+      return [
+        parseInt(rgbMatch[1]),
+        parseInt(rgbMatch[2]),
+        parseInt(rgbMatch[3]),
+      ];
+    }
+
+    // Named colors (common ones)
+    const namedColors: Record<string, number[]> = {
+      white: [255, 255, 255],
+      black: [0, 0, 0],
+      red: [255, 0, 0],
+      green: [0, 128, 0],
+      blue: [0, 0, 255],
+      yellow: [255, 255, 0],
+      gray: [128, 128, 128],
+      grey: [128, 128, 128],
+    };
+    return namedColors[color.toLowerCase()] || null;
   }
 
   /**
@@ -463,13 +524,90 @@ export class UniversalDesignService {
   }
 
   /**
-   * Auto-fix issues
+   * Auto-fix issues for a project
    */
-  autoFix(_projectId: string, issueTypes: string[]) {
-    // In production, this would apply automatic fixes
+  async autoFix(projectId: string, issueTypes: string[]) {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: { slides: { include: { blocks: true } } },
+    });
+
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    const fixResults: Array<{ type: string; element: string; action: string }> =
+      [];
+
+    for (const slide of project.slides) {
+      for (const block of slide.blocks) {
+        const styles = (block.style as Record<string, any>) || {};
+        const content = (block.content as Record<string, any>) || {};
+        let updated = false;
+        const updates: { style?: object; content?: object } = {};
+
+        // Fix small font sizes
+        if (
+          issueTypes.includes('typography') &&
+          styles.fontSize &&
+          styles.fontSize < 14
+        ) {
+          updates.style = { ...styles, fontSize: 16 };
+          fixResults.push({
+            type: 'typography',
+            element: `Block ${block.id}`,
+            action: `Increased font size from ${styles.fontSize}px to 16px`,
+          });
+          updated = true;
+        }
+
+        // Fix missing alt text on images
+        if (
+          issueTypes.includes('accessibility') &&
+          block.blockType === 'IMAGE' &&
+          !content.alt
+        ) {
+          const altText = content.src
+            ? `Image: ${
+                (content.src as string)
+                  .split('/')
+                  .pop()
+                  ?.replace(/[-_]/g, ' ')
+                  .replace(/\.\w+$/, '') || 'presentation image'
+              }`
+            : 'Presentation image';
+          updates.content = { ...content, alt: altText };
+          fixResults.push({
+            type: 'accessibility',
+            element: `Image block ${block.id}`,
+            action: `Added auto-generated alt text`,
+          });
+          updated = true;
+        }
+
+        if (updated) {
+          await this.prisma.block.update({
+            where: { id: block.id },
+            data: {
+              ...(updates.style && {
+                style: updates.style as Prisma.InputJsonValue,
+              }),
+              ...(updates.content && {
+                content: updates.content as Prisma.InputJsonValue,
+              }),
+            },
+          });
+        }
+      }
+    }
+
     return {
-      fixed: issueTypes,
-      message: 'Auto-fix suggestions generated. Review before applying.',
+      fixed: fixResults.length,
+      details: fixResults,
+      message:
+        fixResults.length > 0
+          ? `Applied ${fixResults.length} automatic fixes`
+          : 'No auto-fixable issues found',
     };
   }
 }

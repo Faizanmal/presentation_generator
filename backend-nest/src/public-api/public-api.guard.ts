@@ -39,7 +39,8 @@ export class PublicApiGuard implements CanActivate {
     }
 
     // Validate API key
-    const validation = await this.apiService.validateApiKey(apiKey);
+    const keyToValidate = Array.isArray(apiKey) ? apiKey[0] : apiKey;
+    const validation = await this.apiService.validateApiKey(keyToValidate);
 
     if (!validation.valid) {
       throw new UnauthorizedException('Invalid or expired API key');

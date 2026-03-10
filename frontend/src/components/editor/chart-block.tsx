@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
@@ -74,6 +75,16 @@ export function ChartBlock({
   const [showGrid, setShowGrid] = useState(data.showGrid ?? true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Sync internal state if external data prop changes (e.g. real AI data loaded)
+  useEffect(() => {
+    if (!data) { return; }
+    setChartType(data.type || 'bar');
+    setChartData(data.data || DEFAULT_DATA);
+    setTitle(data.title || '');
+    setShowLegend(data.showLegend ?? true);
+    setShowGrid(data.showGrid ?? true);
+  }, [data]);
+
   const drawBarChart = useCallback((
     ctx: CanvasRenderingContext2D,
     width: number,
@@ -82,13 +93,14 @@ export function ChartBlock({
   ) => {
     const chartWidth = width - padding * 2;
     const chartHeight = height - padding * 2 - (showLegend ? 30 : 0);
-    const barWidth = chartWidth / chartData.length - 20;
-    const maxValue = Math.max(...chartData.map((d) => d.value));
+    const barWidth = Math.min((chartWidth / chartData.length) * 0.5, 40); // Max width, proportional
+    const maxValue = Math.max(...chartData.map((d) => d.value), 1) * 1.15; // 15% headroom
 
     // Draw grid
     if (showGrid) {
-      ctx.strokeStyle = '#e5e7eb';
+      ctx.strokeStyle = '#f1f5f9'; // Very subtle slate-100
       ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]); // Dashed grid
       for (let i = 0; i <= 4; i++) {
         const y = padding + (chartHeight / 4) * i;
         ctx.beginPath();
@@ -96,22 +108,57 @@ export function ChartBlock({
         ctx.lineTo(width - padding, y);
         ctx.stroke();
       }
+      ctx.setLineDash([]); // Reset
     }
 
     // Draw bars
     chartData.forEach((point, index) => {
       const barHeight = (point.value / maxValue) * chartHeight;
-      const x = padding + index * (chartWidth / chartData.length) + 10;
+      const xOffset = padding + index * (chartWidth / chartData.length) + (chartWidth / chartData.length - barWidth) / 2;
+      const x = xOffset;
       const y = padding + chartHeight - barHeight;
 
-      ctx.fillStyle = point.color || COLORS[index % COLORS.length];
-      ctx.fillRect(x, y, barWidth, barHeight);
+      const baseColor = point.color || COLORS[index % COLORS.length];
 
-      // Draw label
-      ctx.fillStyle = '#64748b';
-      ctx.font = '12px sans-serif';
+      // Gradient fill
+      const gradient = ctx.createLinearGradient(0, y, 0, y + barHeight);
+      gradient.addColorStop(0, baseColor);
+      gradient.addColorStop(1, `${baseColor}99`); // Adding alpha to the bottom
+
+      ctx.fillStyle = gradient;
+
+      // Rounded top corners
+      const radius = Math.min(6, barWidth / 2);
+      ctx.beginPath();
+      ctx.moveTo(x, y + barHeight);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.lineTo(x + barWidth - radius, y);
+      ctx.quadraticCurveTo(x + barWidth, y, x + barWidth, y + radius);
+      ctx.lineTo(x + barWidth, y + barHeight);
+      ctx.closePath();
+
+      // Add shadow for depth
+      ctx.shadowColor = `${baseColor}40`;
+      ctx.shadowBlur = 8;
+      ctx.shadowOffsetY = 4;
+      ctx.fill();
+
+      // Reset shadow
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetY = 0;
+
+      // Value label on top
+      ctx.fillStyle = '#475569';
+      ctx.font = 'bold 12px Inter, system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(point.label, x + barWidth / 2, height - padding + 15);
+      ctx.fillText(point.value.toString(), x + barWidth / 2, y - 8);
+
+      // Axis label
+      ctx.fillStyle = '#64748b';
+      ctx.font = '500 12px Inter, system-ui, sans-serif';
+      ctx.fillText(point.label, x + barWidth / 2, padding + chartHeight + 20);
     });
   }, [chartData, showGrid, showLegend]);
 
@@ -123,12 +170,13 @@ export function ChartBlock({
   ) => {
     const chartWidth = width - padding * 2;
     const chartHeight = height - padding * 2 - (showLegend ? 30 : 0);
-    const maxValue = Math.max(...chartData.map((d) => d.value));
+    const maxValue = Math.max(...chartData.map((d) => d.value), 1) * 1.15;
 
     // Draw grid
     if (showGrid) {
-      ctx.strokeStyle = '#e5e7eb';
+      ctx.strokeStyle = '#f1f5f9';
       ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
       for (let i = 0; i <= 4; i++) {
         const y = padding + (chartHeight / 4) * i;
         ctx.beginPath();
@@ -136,42 +184,75 @@ export function ChartBlock({
         ctx.lineTo(width - padding, y);
         ctx.stroke();
       }
+      ctx.setLineDash([]);
     }
 
-    // Draw line
-    ctx.strokeStyle = COLORS[0];
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-
-    chartData.forEach((point, index) => {
-      const x = padding + (index / (chartData.length - 1)) * chartWidth;
+    const lineColor = chartData[0]?.color || COLORS[0];
+    const points = chartData.map((point, index) => {
+      const x = padding + (index / Math.max(chartData.length - 1, 1)) * chartWidth;
       const y = padding + chartHeight - (point.value / maxValue) * chartHeight;
-
-      if (index === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
-      }
+      return { x, y };
     });
 
-    ctx.stroke();
+    if (points.length > 0) {
+      // Draw smooth line
+      ctx.strokeStyle = lineColor;
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
 
-    // Draw points
-    chartData.forEach((point, index) => {
-      const x = padding + (index / (chartData.length - 1)) * chartWidth;
-      const y = padding + chartHeight - (point.value / maxValue) * chartHeight;
+      // Shadow for glow effect
+      ctx.shadowColor = `${lineColor}66`;
+      ctx.shadowBlur = 12;
+      ctx.shadowOffsetY = 6;
 
-      ctx.fillStyle = point.color || COLORS[0];
       ctx.beginPath();
-      ctx.arc(x, y, 6, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.moveTo(points[0].x, points[0].y);
 
-      // Draw label
-      ctx.fillStyle = '#64748b';
-      ctx.font = '12px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(point.label, x, height - padding + 15);
-    });
+      // Bezier curve tension
+      for (let i = 0; i < points.length - 1; i++) {
+        const cpX = (points[i].x + points[i + 1].x) / 2;
+        ctx.bezierCurveTo(cpX, points[i].y, cpX, points[i + 1].y, points[i + 1].x, points[i + 1].y);
+      }
+      ctx.stroke();
+
+      // Reset shadow
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetY = 0;
+
+      // Draw points
+      points.forEach((p, index) => {
+        const pointColor = chartData[index].color || lineColor;
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = pointColor;
+        ctx.lineWidth = 3;
+
+        // Subtle drop shadow for points
+        ctx.shadowColor = `${pointColor}40`;
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetY = 2;
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+
+        // Value label
+        ctx.fillStyle = '#475569';
+        ctx.font = 'bold 12px Inter, system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(chartData[index].value.toString(), p.x, p.y - 12);
+
+        // Axis label
+        ctx.fillStyle = '#64748b';
+        ctx.font = '500 12px Inter, system-ui, sans-serif';
+        ctx.fillText(chartData[index].label, p.x, padding + chartHeight + 20);
+      });
+    }
   }, [chartData, showGrid, showLegend]);
 
   const drawPieChart = useCallback((
@@ -180,29 +261,84 @@ export function ChartBlock({
     height: number,
   ) => {
     const centerX = width / 2;
-    const centerY = (height - (showLegend ? 30 : 0)) / 2;
-    const radius = Math.min(centerX, centerY) - 40;
+    const centerY = (height - (showLegend ? 30 : 0)) / 2 + 10;
+    const radius = Math.min(centerX, centerY) - 30;
     const total = chartData.reduce((sum, d) => sum + d.value, 0);
 
     let startAngle = -Math.PI / 2;
+    // Add gap to separate slices nicely
+    const gap = chartData.length > 1 ? 0.04 : 0;
 
     chartData.forEach((point, index) => {
       const sliceAngle = (point.value / total) * Math.PI * 2;
+      const midAngle = startAngle + sliceAngle / 2;
 
-      ctx.fillStyle = point.color || COLORS[index % COLORS.length];
+      // Shift slightly outwards for animation/depth feel
+      const shift = 2;
+      const shiftX = Math.cos(midAngle) * shift;
+      const shiftY = Math.sin(midAngle) * shift;
+
       ctx.beginPath();
-      ctx.moveTo(centerX, centerY);
-      ctx.arc(centerX, centerY, radius, startAngle, startAngle + sliceAngle);
+      ctx.moveTo(centerX + shiftX, centerY + shiftY);
+      ctx.arc(centerX + shiftX, centerY + shiftY, radius, startAngle + gap / 2, startAngle + sliceAngle - gap / 2);
       ctx.closePath();
+
+      const color = point.color || COLORS[index % COLORS.length];
+
+      // Beautiful radial gradient
+      const grad = ctx.createRadialGradient(centerX, centerY, radius * 0.4, centerX, centerY, radius);
+      grad.addColorStop(0, `${color}dd`);
+      grad.addColorStop(1, color);
+
+      ctx.fillStyle = grad;
+
+      // Drop shadow
+      ctx.shadowColor = 'rgba(0,0,0,0.1)';
+      ctx.shadowBlur = 10;
+      ctx.shadowOffsetY = 4;
       ctx.fill();
 
-      // Add slice border
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2;
+      // Reset shadow
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+
+      // Draw label pointer line
+      const lineRadius = radius * 0.8;
+      const endRadius = radius + 20;
+      const startX = centerX + Math.cos(midAngle) * lineRadius;
+      const startY = centerY + Math.sin(midAngle) * lineRadius;
+      const endX = centerX + Math.cos(midAngle) * endRadius;
+      const endY = centerY + Math.sin(midAngle) * endRadius;
+
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(endX, endY);
       ctx.stroke();
+
+      // Draw text label
+      ctx.fillStyle = '#475569';
+      ctx.font = 'bold 12px Inter, system-ui, sans-serif';
+      ctx.textAlign = Math.cos(midAngle) > 0 ? 'left' : 'right';
+      const labelX = endX + (Math.cos(midAngle) > 0 ? 5 : -5);
+
+      const percentage = total > 0 ? Math.round((point.value / total) * 100) : 0;
+      ctx.fillText(`${point.label} (${percentage}%)`, labelX, endY + 4);
 
       startAngle += sliceAngle;
     });
+
+    // Create a Doughnut hole in the center
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius * 0.55, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+
+    // Subtle inner shadow ring
+    ctx.strokeStyle = 'rgba(0,0,0,0.03)';
+    ctx.lineWidth = 4;
+    ctx.stroke();
   }, [chartData, showLegend]);
 
   const drawAreaChart = useCallback((
@@ -213,12 +349,13 @@ export function ChartBlock({
   ) => {
     const chartWidth = width - padding * 2;
     const chartHeight = height - padding * 2 - (showLegend ? 30 : 0);
-    const maxValue = Math.max(...chartData.map((d) => d.value));
+    const maxValue = Math.max(...chartData.map((d) => d.value), 1) * 1.15;
 
     // Draw grid
     if (showGrid) {
-      ctx.strokeStyle = '#e5e7eb';
+      ctx.strokeStyle = '#f1f5f9';
       ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
       for (let i = 0; i <= 4; i++) {
         const y = padding + (chartHeight / 4) * i;
         ctx.beginPath();
@@ -226,48 +363,74 @@ export function ChartBlock({
         ctx.lineTo(width - padding, y);
         ctx.stroke();
       }
+      ctx.setLineDash([]);
     }
 
-    // Draw filled area
-    ctx.fillStyle = `${COLORS[0]}40`; // Add transparency
-    ctx.beginPath();
-    ctx.moveTo(padding, padding + chartHeight);
-
-    chartData.forEach((point, index) => {
-      const x = padding + (index / (chartData.length - 1)) * chartWidth;
+    const points = chartData.map((point, index) => {
+      const x = padding + (index / Math.max(chartData.length - 1, 1)) * chartWidth;
       const y = padding + chartHeight - (point.value / maxValue) * chartHeight;
-      ctx.lineTo(x, y);
+      return { x, y };
     });
 
-    ctx.lineTo(padding + chartWidth, padding + chartHeight);
+    if (points.length === 0) { return; }
+
+    const baseColor = chartData[0]?.color || COLORS[0];
+
+    // Gorgeous fade gradient for area fill
+    const fillGradient = ctx.createLinearGradient(0, padding, 0, padding + chartHeight);
+    fillGradient.addColorStop(0, `${baseColor}60`); // Semi-transparent top
+    fillGradient.addColorStop(1, `${baseColor}05`); // Almost invisible bottom
+
+    ctx.fillStyle = fillGradient;
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, padding + chartHeight); // Bottom left
+    ctx.lineTo(points[0].x, points[0].y); // Top left
+
+    // Smooth bezier interior
+    for (let i = 0; i < points.length - 1; i++) {
+      const cpX = (points[i].x + points[i + 1].x) / 2;
+      ctx.bezierCurveTo(cpX, points[i].y, cpX, points[i + 1].y, points[i + 1].x, points[i + 1].y);
+    }
+
+    ctx.lineTo(points[points.length - 1].x, padding + chartHeight); // Line down to bottom right
     ctx.closePath();
     ctx.fill();
 
-    // Draw line on top
-    ctx.strokeStyle = COLORS[0];
-    ctx.lineWidth = 2;
+    // Draw vibrant top border line
+    ctx.strokeStyle = baseColor;
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    ctx.shadowColor = `${baseColor}66`;
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 4;
+
     ctx.beginPath();
-
-    chartData.forEach((point, index) => {
-      const x = padding + (index / (chartData.length - 1)) * chartWidth;
-      const y = padding + chartHeight - (point.value / maxValue) * chartHeight;
-
-      if (index === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
-      }
-    });
-
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 0; i < points.length - 1; i++) {
+      const cpX = (points[i].x + points[i + 1].x) / 2;
+      ctx.bezierCurveTo(cpX, points[i].y, cpX, points[i + 1].y, points[i + 1].x, points[i + 1].y);
+    }
     ctx.stroke();
 
-    // Draw labels
-    chartData.forEach((point, index) => {
-      const x = padding + (index / (chartData.length - 1)) * chartWidth;
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+
+    // Draw little points and labels
+    points.forEach((p, index) => {
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = baseColor;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
       ctx.fillStyle = '#64748b';
-      ctx.font = '12px sans-serif';
+      ctx.font = '500 12px Inter, system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(point.label, x, height - padding + 15);
+      ctx.fillText(chartData[index].label, p.x, padding + chartHeight + 20);
     });
   }, [chartData, showGrid, showLegend]);
 
@@ -276,21 +439,35 @@ export function ChartBlock({
     width: number,
     height: number,
   ) => {
-    const legendY = height - 20;
-    let legendX = 20;
+    const legendY = height - 12;
+
+    // Center legend logic
+    ctx.font = '500 12px Inter, system-ui, sans-serif';
+    let totalWidth = 0;
+    chartData.forEach(p => {
+      totalWidth += 22 + ctx.measureText(p.label).width + 16;
+    });
+
+    let legendX = (width - totalWidth) / 2;
 
     chartData.forEach((point, index) => {
-      // Color box
-      ctx.fillStyle = point.color || COLORS[index % COLORS.length];
-      ctx.fillRect(legendX, legendY - 8, 12, 12);
+      const color = point.color || COLORS[index % COLORS.length];
+
+      // Cute rounded rectangle trick via line joins
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = 8;
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.strokeRect(legendX + 4, legendY - 6, 2, 2);
+      ctx.fillRect(legendX + 4, legendY - 6, 2, 2);
 
       // Label
-      ctx.fillStyle = '#64748b';
-      ctx.font = '11px sans-serif';
+      ctx.fillStyle = '#475569';
+      ctx.font = '500 12px Inter, system-ui, sans-serif';
       ctx.textAlign = 'left';
       ctx.fillText(point.label, legendX + 16, legendY + 2);
 
-      legendX += ctx.measureText(point.label).width + 36;
+      legendX += 22 + ctx.measureText(point.label).width + 16;
     });
   }, [chartData]);
 
@@ -367,7 +544,7 @@ export function ChartBlock({
   };
 
   return (
-    <div className={cn('relative rounded-lg border bg-white p-4', className)}>
+    <div className={cn('relative rounded-xl border border-slate-200/60 bg-white/70 backdrop-blur-md p-5 shadow-sm transition-all duration-300 hover:shadow-md dark:bg-slate-900/60 dark:border-slate-700/60 w-full h-full min-h-75', className)}>
       {/* Title */}
       {title && (
         <h3 className="text-center text-lg font-semibold text-slate-800 mb-2">

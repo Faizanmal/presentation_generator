@@ -18,7 +18,9 @@ interface NewRelicApi {
   startWebTransaction<T>(url: string, handler: () => Promise<T>): Promise<T>;
 }
 
-const cjsRequire = createRequire(import.meta.url);
+// when compiling to CommonJS we can't use import.meta.url, so use
+// __filename which is available in the emitted module
+const cjsRequire = createRequire(__filename);
 
 function loadNewRelic(): NewRelicApi | null {
   try {
@@ -88,15 +90,16 @@ export function TrackNewRelic(segmentName: string) {
       ...args: unknown[]
     ) => Promise<unknown>;
 
-    descriptor.value = async function (...args: unknown[]) {
+    descriptor.value = async function (...args: unknown[]): Promise<unknown> {
       const nr = loadNewRelic();
       if (nr) {
+        // startWebTransaction returns any; cast to Promise<unknown> to satisfy lint
         return nr.startWebTransaction(segmentName, () => {
           return originalMethod.apply(this, args) as Promise<unknown>;
         });
       }
       // If New Relic is unavailable, still execute the original method
-      return originalMethod.apply(this, args);
+      return originalMethod.apply(this, args) as Promise<unknown>;
     };
 
     return descriptor;

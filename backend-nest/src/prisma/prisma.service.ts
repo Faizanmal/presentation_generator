@@ -46,12 +46,30 @@ export class PrismaService
 
     const adapter = new PrismaPg(pool);
 
+    // Decide which Prisma events to log.  Previously we always enabled
+    // `query` logging in development which produced a flood of
+    // `prisma:query` messages (e.g. pg_stat_activity checks) even when
+    // the rest of the app was running at WARN level.  Those lines don't go
+    // through our Winston logger and are noisy during normal use.
+    //
+    // The new behaviour maps the generic LOG_LEVEL environment variable
+    // (used by Winston) to the Prisma log configuration.  Only when
+    // LOG_LEVEL is `info` or `debug` will we ask Prisma to emit query
+    // events; otherwise only errors are logged.  A separate flag
+    // PRISMA_LOG_QUERIES=true can be used to override if needed.
+    const logLevel = (process.env.LOG_LEVEL || 'warn').toLowerCase();
+    const log: Array<'query' | 'info' | 'warn' | 'error'> = ['error'];
+
+    if (['info', 'debug'].includes(logLevel)) {
+      log.push('info', 'warn');
+      if (process.env.PRISMA_LOG_QUERIES === 'true') {
+        log.push('query');
+      }
+    }
+
     super({
       adapter,
-      log:
-        process.env.NODE_ENV === 'development'
-          ? ['query', 'info', 'warn', 'error']
-          : ['error'],
+      log,
     });
 
     if (!connectionString) {
@@ -60,7 +78,10 @@ export class PrismaService
 
     // log any Prisma‑level errors as well, this hooks the client engine events
     (this as PrismaClient).$on('error' as never, (e: unknown) => {
-      this.logger.error(`Prisma error: ${(e as { message: string }).message}`, e);
+      this.logger.error(
+        `Prisma error: ${(e as { message: string }).message}`,
+        e,
+      );
     });
   }
 

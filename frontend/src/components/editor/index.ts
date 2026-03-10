@@ -125,3 +125,9 @@ export { AIRefineButton } from "./ai-refine-button";
 
 // Slide Design Controls (density, tone, theme, export)
 export { SlideDesignControls } from "./slide-design-controls";
+
+// Native Asset Library (shapes, icons, dividers, connectors)
+export { NativeAssetLibrary } from "./native-asset-library";
+
+// Document Upload → AI Slides
+export { DocumentUploadPanel, DocumentUploadDialog } from "./document-upload-panel";

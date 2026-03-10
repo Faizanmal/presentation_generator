@@ -208,37 +208,8 @@ export function BrandKitManager() {
     toast.success('Brand kit applied to current project');
   };
 
-  // Mock data for initial render
-  const mockBrandKits: BrandKit[] = (brandKits as BrandKit[]) || [
-    {
-      id: 'brand-1',
-      name: 'Corporate Brand',
-      description: 'Official company branding',
-      isDefault: true,
-      colors: {
-        primary: '#2563eb',
-        secondary: '#7c3aed',
-        accent: '#06b6d4',
-        background: '#ffffff',
-        surface: '#f8fafc',
-        text: '#0f172a',
-        textSecondary: '#64748b',
-        success: '#22c55e',
-        warning: '#f59e0b',
-        error: '#ef4444',
-      },
-      typography: {
-        headingFont: 'Inter',
-        bodyFont: 'Inter',
-        headingSizes: { h1: '48px', h2: '36px', h3: '24px', h4: '18px' },
-        bodySize: '16px',
-        lineHeight: 1.6,
-      },
-      logos: [],
-      createdAt: '2025-01-01',
-      updatedAt: '2025-01-15',
-    },
-  ];
+  // Use API data, fallback to empty array
+  const displayBrandKits: BrandKit[] = (brandKits as BrandKit[]) || [];
 
   return (
     <div className="flex h-full">
@@ -253,7 +224,7 @@ export function BrandKitManager() {
 
         <ScrollArea className="flex-1">
           <div className="p-2 space-y-1">
-            {mockBrandKits.map((kit) => (
+            {displayBrandKits.map((kit) => (
               <button
                 key={kit.id}
                 onClick={() => setSelectedKit(kit)}

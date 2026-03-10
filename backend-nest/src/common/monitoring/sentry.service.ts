@@ -37,10 +37,12 @@ export class SentryService implements OnModuleInit {
             '0.1',
         ),
         integrations: [],
-        beforeSend(event: Record<string, unknown>, _hint?: Record<string, unknown>): Record<string, unknown> {
-          // Scrub sensitive data
-          const evt = event as Record<string, unknown> & {
-            request?: { headers?: Record<string, unknown> };
+        // Scrub sensitive headers before sending events to Sentry.
+        // The cast is required because @sentry/node types are loaded
+        // dynamically and the ErrorEvent shape varies across SDK versions.
+        beforeSend(event) {
+          const evt = event as unknown as {
+            request?: { headers?: Record<string, string> };
           };
           if (evt.request?.headers) {
             delete evt.request.headers['authorization'];
@@ -52,9 +54,10 @@ export class SentryService implements OnModuleInit {
 
       this.initialized = true;
       this.logger.log('✓ Sentry initialized successfully');
-    } catch (error) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(
-        `⚠ Sentry not available: ${error.message}. Install @sentry/node for error tracking.`,
+        `⚠ Sentry not available: ${message}. Install @sentry/node for error tracking.`,
       );
     }
   }

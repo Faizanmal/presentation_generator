@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function SettingsRoot() {
-  redirect("/settings/branding");
+  redirect("/settings/profile");
 }

@@ -144,15 +144,15 @@ export function AutoLayoutEngine({
             </button>
 
             {/* Content Analysis */}
-            <div className="p-3 bg-slate-50 rounded-lg">
-                <div className="text-sm font-medium text-slate-700 mb-2">
+            <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                <div className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Current Content
                 </div>
                 <div className="flex flex-wrap gap-1">
                     {blocks.map((block) => (
                         <span
                             key={block.id}
-                            className="px-2 py-1 bg-white border border-slate-200 rounded text-xs text-slate-600"
+                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs text-slate-600 dark:text-slate-400"
                         >
                             {block.type}
                         </span>
@@ -251,7 +251,7 @@ export function AutoLayoutEngine({
                     <div className="text-sm font-medium text-slate-700 mb-3">
                         Layout Preview
                     </div>
-                    <div className="aspect-video bg-slate-100 rounded-lg flex items-center justify-center">
+                    <div className="aspect-video bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center justify-center">
                         <div className="text-center">
                             {(() => {
                                 const IconComponent =

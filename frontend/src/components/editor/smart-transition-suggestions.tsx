@@ -60,6 +60,12 @@ type TransitionType =
     | 'push'
     | 'wipe';
 
+// generic icon component type for transitions
+
+type IconComponent = React.ComponentType<
+  React.SVGProps<SVGSVGElement> & { className?: string }
+>;
+
 interface SmartTransitionSuggestionsProps {
     currentSlideContext: {
         slideNumber: number;
@@ -79,7 +85,7 @@ interface SmartTransitionSuggestionsProps {
 const TRANSITION_TYPES: Array<{
     type: TransitionType;
     label: string;
-    icon: React.ElementType;
+    icon: IconComponent;
     description: string;
     isPremium?: boolean;
 }> = [

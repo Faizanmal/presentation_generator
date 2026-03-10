@@ -1,0 +1,8 @@
+{
+  "build": {
+    "dockerfilePath": "Dockerfile.production"
+  },
+  "deploy": {
+    "startCommand": "npm run start:prod"
+  }
+}

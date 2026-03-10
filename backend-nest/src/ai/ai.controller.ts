@@ -25,17 +25,17 @@ import {
   ThrottleImageGeneration,
 } from '../common/decorators/throttle.decorator';
 
-class EnhanceContentDto {
+interface EnhanceContentDto {
   content: string;
   instruction: string;
 }
 
-class SpeakerNotesDto {
+interface SpeakerNotesDto {
   slideContent: string;
   context?: string;
 }
 
-class TransformTextDto {
+interface TransformTextDto {
   text: string;
   action:
     | 'shorten'
@@ -48,12 +48,12 @@ class TransformTextDto {
     | 'fix-grammar';
 }
 
-class BatchEnhanceDto {
+interface BatchEnhanceDto {
   items: { id: string; content: string }[];
   instruction: string;
 }
 
-class SlideSuggestionsDto {
+interface SlideSuggestionsDto {
   currentContent: string;
   slideType?: string;
 }
@@ -403,7 +403,7 @@ Format as a numbered list with clear structure.`;
 
     await this.usersService.incrementAIGenerations(user.id);
 
-    return chartData;
+    return chartData as Record<string, unknown>;
   }
 
   /**

@@ -6,6 +6,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ThemeToggleSimple } from "@/components/ui/enhanced-ui";
 
 export default function DashboardLayout({
     children,
@@ -22,7 +23,7 @@ export default function DashboardLayout({
             <aside
                 className={cn(
                     "hidden md:flex flex-col border-r h-full transition-all duration-300 ease-in-out",
-                    isCollapsed ? "w-[70px]" : "w-64"
+                    isCollapsed ? "w-17.5" : "w-64"
                 )}
             >
                 <Sidebar
@@ -50,9 +51,12 @@ export default function DashboardLayout({
                     <div className="flex items-center gap-2 font-bold text-lg">
                         <span className="text-xl">Present.AI</span>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={() => setIsMobileOpen(true)}>
-                        <Menu className="h-6 w-6" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <ThemeToggleSimple />
+                        <Button variant="ghost" size="icon" onClick={() => setIsMobileOpen(true)}>
+                            <Menu className="h-6 w-6" />
+                        </Button>
+                    </div>
                 </header>
 
                 {/* Content Area */}

@@ -41,7 +41,8 @@ export default function PasswordResetPage() {
     // If already authenticated, go to dashboard
     useEffect(() => {
         if (initialized && !authLoading && isAuthenticated) {
-            router.push('/dashboard');
+            const redirectUrl = new URLSearchParams(window.location.search).get('redirect');
+            router.push(redirectUrl || '/dashboard');
         }
     }, [authLoading, isAuthenticated, initialized, router]);
 
@@ -123,7 +124,7 @@ export default function PasswordResetPage() {
                             Forgot Password?
                         </h1>
                         <p className="text-slate-600 dark:text-slate-400 mb-8 text-center text-sm">
-                            Enter your email address and we'll send you a code to reset your password.
+                            Enter your email address and we&apos;ll send you a code to reset your password.
                         </p>
 
                         <form onSubmit={handleSubmitRequest(onRequestSubmit)} className="space-y-4">

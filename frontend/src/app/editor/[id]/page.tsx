@@ -33,6 +33,7 @@ import {
   Layout,
   AlignLeft,
   X,
+  FileUp,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -68,6 +69,10 @@ import { UndoHistoryPanel, UndoRedoButtons, useUndoHistory } from "@/components/
 import { QuickActionsToolbar } from "@/components/editor/quick-actions-toolbar";
 import { SlideTemplatesDialog } from "@/components/editor/slide-templates";
 import { useRecentProjects } from "@/components/ui/favorites-recent";
+import { DocumentUploadDialog } from "@/components/editor/document-upload-panel";
+import { MasterSlidePanel } from "@/components/editor/master-slide-panel";
+import type { MasterSlideTemplate } from "@/components/editor/master-slide-panel";
+import { Shield } from "lucide-react";
 
 
 export default function EditorPage() {
@@ -97,6 +102,8 @@ export default function EditorPage() {
   // New usability feature states
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
   const [showTemplatesDialog, setShowTemplatesDialog] = useState(false);
+  const [showDocUpload, setShowDocUpload] = useState(false);
+  const [showMasterSlides, setShowMasterSlides] = useState(false);
 
   // Undo/Redo history
   const {
@@ -203,7 +210,7 @@ export default function EditorPage() {
         reordered.map((s, i) => ({ id: s.id, order: i }))
       );
     }
-  }, [project?.slides, reorderSlides, projectId]);
+  }, [project, reorderSlides, projectId]);
 
   // Handle add slide
   const handleAddSlide = useCallback(async () => {
@@ -218,7 +225,7 @@ export default function EditorPage() {
     } catch {
       toast.error("Failed to add slide");
     }
-  }, [projectId, project?.slides?.length, addSlide, setCurrentSlideIndex]);
+  }, [project, projectId, addSlide, setCurrentSlideIndex]);
 
   // Handle delete slide
   const handleDeleteSlide = useCallback(async (slideId: string) => {
@@ -232,11 +239,11 @@ export default function EditorPage() {
     } catch {
       toast.error("Failed to delete slide");
     }
-  }, [project?.slides?.length, projectId, deleteSlide]);
+  }, [project?.slides?.length, deleteSlide]);
 
   // Handle speaker notes change
   const handleNotesChange = useCallback((notes: string) => {
-    if (!currentSlide) {return;}
+    if (!currentSlide) { return; }
     const updateSlideStore = useEditorStore.getState().updateSlide;
     updateSlideStore(currentSlide.id, { speakerNotes: notes });
 
@@ -273,7 +280,7 @@ export default function EditorPage() {
     } catch {
       toast.error("Failed to duplicate slide");
     }
-  }, [projectId, project?.slides?.length, queryClient]);
+  }, [project, projectId, queryClient]);
 
   // Handle theme change
   const handleThemeChange = useCallback(async (theme: Theme) => {
@@ -312,7 +319,7 @@ export default function EditorPage() {
     } catch {
       toast.error("Failed to export");
     }
-  }, [projectId, project?.title]);
+  }, [project, projectId]);
 
   // Handle present
   const handlePresent = useCallback(() => {
@@ -346,7 +353,7 @@ export default function EditorPage() {
   return (
     <div className="h-screen flex flex-col bg-slate-100 dark:bg-slate-900">
       {/* Header */}
-      <header className="h-14 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 flex-shrink-0 relative">
+      <header className="h-14 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 shrink-0 relative">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-3 py-0.5 rounded-b-md text-xs font-medium z-50">
           <Link href={`/editor-v2/${projectId}`} className="hover:underline flex items-center gap-1">
             Try New Editor <span className="material-symbols-outlined text-[10px]">open_in_new</span>
@@ -433,6 +440,61 @@ export default function EditorPage() {
             Templates
           </Button>
 
+          {/* Import Document */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowDocUpload(true)}
+          >
+            <FileUp className="h-4 w-4 mr-2" />
+            Import
+          </Button>
+
+          {/* Master Slides */}
+          <Sheet open={showMasterSlides} onOpenChange={setShowMasterSlides}>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Shield className="h-4 w-4 mr-2" />
+                Master
+              </Button>
+            </SheetTrigger>
+            <SheetContent className="overflow-y-auto p-0 w-[380px]">
+              <MasterSlidePanel
+                isEnterprise={true}
+                onApplyTemplate={(template: MasterSlideTemplate) => {
+                  // Apply master template regions as blocks on the current slide
+                  if (project?.slides?.[currentSlideIndex]) {
+                    const slide = project.slides[currentSlideIndex];
+                    // Create blocks from template regions
+                    template.regions.forEach(async (region, idx) => {
+                      const blockType = region.allowedBlockTypes[0] || 'PARAGRAPH';
+                      try {
+                        // api.blocks.create expects projectId, slideId, and then the input object
+                        await api.blocks.create(projectId, slide.id, {
+                          projectId,
+                          blockType: blockType as import('@/types').BlockType,
+                          content: { text: region.placeholder },
+                          order: idx,
+                          style: {
+                            x: Math.round((region.x / 100) * 1280),
+                            y: Math.round((region.y / 100) * 720),
+                            width: Math.round((region.width / 100) * 1280),
+                            height: Math.round((region.height / 100) * 720),
+                            locked: region.locked,
+                          } as import('@/types').BlockStyle,
+                        });
+                      } catch {
+                        // Block creation continues for remaining regions
+                      }
+                    });
+                    queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+                    setShowMasterSlides(false);
+                  }
+                }}
+              />
+            </SheetContent>
+          </Sheet>
+
           <Sheet open={isThemePanelOpen} onOpenChange={setIsThemePanelOpen}>
             <SheetTrigger asChild>
               <Button variant="outline" size="sm">
@@ -498,7 +560,7 @@ export default function EditorPage() {
         >
           <div
             className={`${isSidePanelOpen ? "w-64" : "w-0"
-              } bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col transition-all overflow-hidden flex-shrink-0`}
+              } bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col transition-all overflow-hidden shrink-0`}
           >
             <div className="p-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -534,7 +596,7 @@ export default function EditorPage() {
         {/* Toggle side panel */}
         <button
           onClick={() => setIsSidePanelOpen(!isSidePanelOpen)}
-          className="w-4 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-800 flex-shrink-0"
+          className="w-4 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-800 shrink-0"
         >
           {isSidePanelOpen ? (
             <ChevronLeft className="h-4 w-4" />
@@ -580,13 +642,13 @@ export default function EditorPage() {
           )}
 
           {/* Slide navigation */}
-          <div className="h-12 bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 flex-shrink-0">
+          <div className="h-12 bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 shrink-0">
             <div className="flex-1">
               <Button
                 variant={showSpeakerNotes ? "secondary" : "ghost"}
                 size="sm"
                 onClick={() => setShowSpeakerNotes(!showSpeakerNotes)}
-                className="text-xs flex-shrink-0"
+                className="text-xs shrink-0"
               >
                 <AlignLeft className="h-4 w-4 mr-1.5" />
                 Notes
@@ -661,6 +723,38 @@ export default function EditorPage() {
         onExport={() => handleExport("pdf")}
         isSaving={saveMutation.isPending}
         position="bottom"
+      />
+
+      {/* Document Upload Dialog */}
+      <DocumentUploadDialog
+        open={showDocUpload}
+        onOpenChange={setShowDocUpload}
+        onSlidesGenerated={async (result) => {
+          // Create slides from ingestion result
+          try {
+            for (const slide of result.slides) {
+              const newSlide = await api.createSlide({
+                projectId,
+                title: slide.title,
+                order: (project?.slides?.length || 0),
+              });
+              for (const block of slide.blocks) {
+                await api.createBlock({
+                  projectId,
+                  slideId: newSlide.id,
+                  blockType: block.blockType as import('@/types').BlockType,
+                  content: block.content,
+                  order: block.order,
+                });
+              }
+            }
+            queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+            toast.success(`Added ${result.slides.length} slides from document`);
+            setShowDocUpload(false);
+          } catch {
+            toast.error("Failed to insert generated slides");
+          }
+        }}
       />
     </div>
   );

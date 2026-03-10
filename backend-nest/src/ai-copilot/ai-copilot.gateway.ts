@@ -9,6 +9,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { AICopilotService } from './ai-copilot.service';
 
 interface UserSocket extends Socket {
@@ -32,7 +33,10 @@ export class AICopilotGateway
   private readonly logger = new Logger(AICopilotGateway.name);
   private activeConnections = new Map<string, UserSocket>();
 
-  constructor(private readonly copilotService: AICopilotService) {}
+  constructor(
+    private readonly copilotService: AICopilotService,
+    private readonly jwtService: JwtService,
+  ) {}
 
   handleConnection(client: UserSocket) {
     this.logger.log(`Client connected: ${client.id}`);
@@ -46,16 +50,26 @@ export class AICopilotGateway
   }
 
   @SubscribeMessage('authenticate')
-  handleAuthenticate(
+  async handleAuthenticate(
     @ConnectedSocket() client: UserSocket,
     @MessageBody() data: { userId: string; token: string },
   ) {
-    // In production, validate the token
-    client.userId = data.userId;
-    this.activeConnections.set(data.userId, client);
-
-    client.emit('authenticated', { success: true });
-    this.logger.log(`User authenticated: ${data.userId}`);
+    // Validate JWT token
+    try {
+      const payload = await this.jwtService.verifyAsync(data.token);
+      if (payload.sub !== data.userId) {
+        client.emit('error', { message: 'Token does not match userId' });
+        client.disconnect();
+        return;
+      }
+      client.userId = payload.sub;
+      this.activeConnections.set(payload.sub, client);
+      client.emit('authenticated', { success: true });
+      this.logger.log(`User authenticated: ${payload.sub}`);
+    } catch {
+      client.emit('error', { message: 'Invalid or expired token' });
+      client.disconnect();
+    }
   }
 
   @SubscribeMessage('startSession')
@@ -74,7 +88,7 @@ export class AICopilotGateway
         data,
       );
       client.sessionId = session.id;
-      client.join(`session:${session.id}`);
+      await client.join(`session:${session.id}`);
 
       client.emit('sessionStarted', { session });
     } catch {
@@ -98,7 +112,7 @@ export class AICopilotGateway
         client.userId,
       );
       client.sessionId = session.id;
-      client.join(`session:${session.id}`);
+      await client.join(`session:${session.id}`);
 
       client.emit('sessionJoined', { session });
     } catch {

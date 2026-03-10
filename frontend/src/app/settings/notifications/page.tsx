@@ -14,6 +14,13 @@ import {
   Check,
   AlertCircle,
 } from 'lucide-react';
+
+// icons from lucide-react and elsewhere generally accept SVG props including className
+// so we define a reusable type for components that render an SVG icon.
+type IconComponent = React.ComponentType<
+  React.SVGProps<SVGSVGElement> & { className?: string }
+>;
+
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -41,7 +48,7 @@ interface NotificationSetting {
   key: keyof EmailPreferences;
   title: string;
   description: string;
-  icon: React.ElementType;
+  icon: IconComponent;
   category: 'security' | 'activity' | 'marketing';
   required?: boolean;
 }

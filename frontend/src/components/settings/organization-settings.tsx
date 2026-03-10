@@ -154,13 +154,18 @@ export function OrganizationSettings({ orgId }: OrganizationSettingsProps) {
 }
 
 function MembersTab({ orgId }: { orgId: string }) {
+// use same icon type for role icons
+
+type IconComponent = React.ComponentType<
+  React.SVGProps<SVGSVGElement> & { className?: string }
+>;
   const { members, isLoading, updateRole, removeMember } = useOrganizationMembers(orgId);
 
   if (isLoading) {
     return <Loader2 className="w-6 h-6 animate-spin" />;
   }
 
-  const roleIcons: Record<string, React.ElementType> = {
+  const roleIcons: Record<string, IconComponent> = {
     OWNER: Crown,
     ADMIN: Shield,
     MEMBER: Users,

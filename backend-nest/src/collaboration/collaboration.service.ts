@@ -110,10 +110,13 @@ export class CollaborationService {
     const cursors = await this.redis.hgetall(`project:${projectId}:cursors`);
 
     return sessions.map((session) => {
-      let cursorData = {};
+      let cursorData: Record<string, unknown> = {};
       if (cursors && cursors[session.socketId]) {
         try {
-          cursorData = JSON.parse(cursors[session.socketId]);
+          cursorData = JSON.parse(cursors[session.socketId]) as Record<
+            string,
+            unknown
+          >;
         } catch {
           // Ignore parse errors
         }

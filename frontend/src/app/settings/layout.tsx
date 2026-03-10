@@ -12,19 +12,16 @@ import {
   Eye,
   Layers,
   Bell,
-  Hand,
-  BrainCircuit,
   ScanEye,
   KeyRound,
   Boxes,
-  Router,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const settingsNav = [
   {
     title: 'Profile',
-    href: '/settings',
+    href: '/settings/profile',
     icon: User,
   },
   {
@@ -62,16 +59,8 @@ const settingsNav = [
     href: '/settings/notifications',
     icon: Bell,
   },
-  {
-    title: 'Sign Language',
-    href: '/settings/sign-language',
-    icon: Hand,
-  },
-  {
-    title: 'Cognitive Access',
-    href: '/settings/cognitive-accessibility',
-    icon: BrainCircuit,
-  },
+
+
   {
     title: 'Universal Design',
     href: '/settings/universal-design',
@@ -86,11 +75,6 @@ const settingsNav = [
     title: 'White-Label SDK',
     href: '/settings/white-label',
     icon: Boxes,
-  },
-  {
-    title: 'IoT Devices',
-    href: '/settings/iot-devices',
-    icon: Router,
   },
 ];
 

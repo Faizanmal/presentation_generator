@@ -55,7 +55,7 @@ Return only a JSON array of strings.`;
 
       const content =
         response.choices[0]?.message?.content || '{"queries": []}';
-      const parsed = JSON.parse(content);
+      const parsed = JSON.parse(content) as { queries?: string[] };
       return parsed.queries || [topic, `${topic} statistics`, `${topic} facts`];
     } catch {
       return [topic, `${topic} trends`, `${topic} data`];

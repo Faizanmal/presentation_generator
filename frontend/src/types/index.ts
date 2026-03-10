@@ -7,6 +7,7 @@ export interface User {
   email: string;
   name: string | null;
   image: string | null;
+  organizationId?: string;
 }
 
 export interface AuthResponse {
@@ -85,8 +86,10 @@ export interface Slide {
   projectId: string;
   order: number;
   layout: string;
+  transition?: string;
   blocks: Block[];
   speakerNotes?: string;
+  masterTemplateId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -113,7 +116,16 @@ export type BlockType =
   | 'QUOTE'
   | 'DIVIDER'
   | 'TABLE'
-  | 'EMBED';
+  | 'EMBED'
+  | 'OEMBED'
+  | 'CHART'
+  | 'VIDEO'
+  | 'AUDIO'
+  | 'TIMELINE'
+  | 'COMPARISON'
+  | 'STATS_GRID'
+  | 'CALL_TO_ACTION'
+  | 'SHAPE';
 
 export interface BlockContent {
   text?: string;
@@ -124,6 +136,15 @@ export interface BlockContent {
   language?: string;
   author?: string;
   rows?: string[][];
+  // OEmbed fields
+  embedType?: 'youtube' | 'vimeo' | 'figma' | 'miro' | 'twitter' | 'codepen' | 'loom' | 'generic';
+  embedUrl?: string;
+  embedHtml?: string;
+  embedAspectRatio?: string;
+  // SVG shape fields
+  svg?: string;
+  shapeName?: string;
+  shapeColor?: string;
   chartData?: {
     type: 'bar' | 'line' | 'pie' | 'doughnut' | 'area';
     labels: string[];
@@ -137,11 +158,20 @@ export interface BlockContent {
 }
 
 export interface BlockStyle {
+  // Visual styling
   textAlign?: 'left' | 'center' | 'right';
   fontSize?: string;
   color?: string;
   backgroundColor?: string;
-  [key: string]: string | undefined;
+  // Absolute positioning (canvas mode)
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  rotation?: number;
+  zIndex?: number;
+  locked?: boolean;
+  [key: string]: string | number | boolean | undefined;
 }
 
 export interface Block {
@@ -238,6 +268,7 @@ export interface Subscription {
   status: SubscriptionStatus;
   projectsLimit: number;
   projectsUsed: number;
+  presentationLimit?: number;
   aiGenerationsLimit: number;
   aiGenerationsUsed: number;
   currentPeriodStart: string | null;
@@ -868,6 +899,7 @@ export interface ThinkingGenerationResult {
     generationTimeMs: number;
     qualityImprovement: number;
     generateImages?: boolean;
+    modelUsed?: string;
   };
 }
 

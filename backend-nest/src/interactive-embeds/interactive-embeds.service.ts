@@ -388,7 +388,7 @@ export class InteractiveEmbedsService {
       data: {
         embedId,
         responseType: 'form_submission',
-        data: responses,
+        data: responses as unknown as import('@prisma/client').Prisma.InputJsonValue,
         responderId,
       },
     });

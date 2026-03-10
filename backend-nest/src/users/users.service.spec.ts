@@ -1,8 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UsersService } from './users.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { ConfigService } from '@nestjs/config';
 import { SubscriptionPlan } from '@prisma/client';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -22,6 +23,7 @@ describe('UsersService', () => {
     subscription: {
       create: jest.fn(),
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       update: jest.fn(),
     },
     project: {
@@ -29,8 +31,13 @@ describe('UsersService', () => {
     },
     emailPreferences: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       upsert: jest.fn(),
     },
+  };
+
+  const mockConfigService = {
+    get: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -40,6 +47,10 @@ describe('UsersService', () => {
         {
           provide: PrismaService,
           useValue: mockPrismaService,
+        },
+        {
+          provide: ConfigService,
+          useValue: mockConfigService,
         },
       ],
     }).compile();
@@ -101,6 +112,31 @@ describe('UsersService', () => {
       expect(result3).toBeNull();
       expect(mockPrismaService.user.findUnique).not.toHaveBeenCalled();
     });
+
+    it('should wrap and rethrow Prisma errors as BadRequestException', async () => {
+      const badError = new Error('simulated prisma failure');
+      mockPrismaService.user.findUnique.mockRejectedValue(badError);
+
+      await expect(service.findByEmail('test@example.com')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
+        where: { email: 'test@example.com' },
+        include: { subscription: true },
+      });
+    });
+
+    it('should return schema-mismatch message when column missing', async () => {
+      const prismaError = {
+        code: 'P2022',
+        message: 'column users.mfaEnabled does not exist',
+      } as unknown as Error;
+      mockPrismaService.user.findUnique.mockRejectedValue(prismaError);
+
+      await expect(service.findByEmail('test@example.com')).rejects.toThrow(
+        'Database schema mismatch',
+      );
+    });
   });
 
   describe('create', () => {
@@ -122,7 +158,7 @@ describe('UsersService', () => {
   describe('getSubscription', () => {
     it('should return subscription details with project count', async () => {
       const mockSubscription = { userId: 'user1', plan: SubscriptionPlan.FREE };
-      mockPrismaService.subscription.findUnique.mockResolvedValue(
+      mockPrismaService.subscription.findFirst.mockResolvedValue(
         mockSubscription,
       );
       mockPrismaService.project.count.mockResolvedValue(2);
@@ -130,13 +166,13 @@ describe('UsersService', () => {
       const result = await service.getSubscription('user1');
 
       expect(result).toEqual({ ...mockSubscription, projectsUsed: 2 });
-      expect(mockPrismaService.subscription.findUnique).toHaveBeenCalledWith({
+      expect(mockPrismaService.subscription.findFirst).toHaveBeenCalledWith({
         where: { userId: 'user1' },
       });
     });
 
     it('should throw NotFoundException if subscription not found', async () => {
-      mockPrismaService.subscription.findUnique.mockResolvedValue(null);
+      mockPrismaService.subscription.findFirst.mockResolvedValue(null);
 
       await expect(service.getSubscription('user1')).rejects.toThrow(
         NotFoundException,

@@ -6,6 +6,10 @@ import {
 import * as winston from 'winston';
 import { Request } from 'express';
 
+// the daily rotate file package ships no types; we use a runtime import
+// and cast to any to avoid type errors. There’s no need for an ambient
+// declaration since we’ll ignore the missing module at the import site.
+
 // NOTE: ensure 'winston' is installed in package.json (we'll add it if missing)
 
 /**
@@ -19,7 +23,10 @@ export class LoggerService implements NestLoggerService {
   constructor(context?: string) {
     this.context = context;
     this.logger = winston.createLogger({
-      level: process.env.LOG_LEVEL || 'info',
+      // default to warning level so that high-volume info/debug messages are
+      // suppressed unless explicitly requested via LOG_LEVEL. This cuts down on
+      // the 'rush' of logs during development/runtime.
+      level: process.env.LOG_LEVEL || 'warn',
       format: winston.format.combine(
         winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
         winston.format.errors({ stack: true }),
@@ -73,12 +80,17 @@ export class LoggerService implements NestLoggerService {
     // Add daily rotation in production
     if (process.env.NODE_ENV === 'production') {
       // Use dynamic import for optional dependency
-      const initDailyRotation = (): void => {
+      const initDailyRotation = async (): Promise<void> => {
         try {
+          // importing as `any` avoids missing type declarations and
+          // keeps the file compilable when the package is not installed
+
+          // dynamic import; package is optional so silence type errors if it's
+          // not present in node_modules.
+
+          // @ts-expect-error: may not be installed in development environment
           const DailyRotateFile = (await import('winston-daily-rotate-file'))
-            .default as new (
-            opts: Record<string, unknown>,
-          ) => winston.transport;
+            .default as unknown as new (options: unknown) => winston.transport;
 
           this.logger.add(
             new DailyRotateFile({
@@ -99,6 +111,37 @@ export class LoggerService implements NestLoggerService {
 
   setContext(context: string) {
     this.context = context;
+  }
+
+  /**
+   * Determine if the supplied level is enabled for the current logger.
+   * Winston provides a built‑in helper, but its TypeScript definitions
+   * don't expose it, so we wrap it and fall back to a manual check.
+   */
+  isLevelEnabled(level: string): boolean {
+    // use the internal method if available (at runtime it exists on
+    // winston.Logger, even though TS doesn't know about it)
+    const fn = (
+      this.logger as unknown as { isLevelEnabled?: (level: string) => boolean }
+    ).isLevelEnabled;
+    if (typeof fn === 'function') {
+      // the internal method returns boolean at runtime; cast for TypeScript
+      return fn.call(this.logger, level) as boolean;
+    }
+
+    // fallback: compare numeric levels
+    const levels =
+      (this.logger as unknown as { levels?: Record<string, number> }).levels ||
+      winston.config.npm.levels;
+    const current = this.logger.level;
+    if (
+      !levels ||
+      levels[level] === undefined ||
+      levels[current] === undefined
+    ) {
+      return false;
+    }
+    return levels[level] <= levels[current];
   }
 
   log(message: string, context?: string) {

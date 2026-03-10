@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
-import { Toaster } from "sonner";
+import { Toaster } from "@/components/ui/sooner";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
@@ -8,6 +8,7 @@ import { ErrorBoundary } from "@/components/providers/error-boundary";
 import { NotificationProvider } from "@/components/ui/enhanced-ui";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { setupErrorTracking } from "@/lib/sentry";
+import { GoogleAnalytics, GoogleTagManager, GoogleTagManagerNoScript } from "@/components/analytics";
 import "./globals.css";
 
 // Initialize error tracking
@@ -38,12 +39,18 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <GoogleTagManager />
+      </head>
       <body className={`${inter.variable} ${playfair.variable} font-sans antialiased`}>
+        <GoogleTagManagerNoScript />
         <ThemeProvider
           attribute="class"
-          defaultTheme="light"
+          defaultTheme="system"
           enableSystem
-          disableTransitionOnChange
+          enableColorScheme
+          disableTransitionOnChange={false}
+          storageKey="presentation-theme"
         >
           <QueryProvider>
             <AuthProvider>
@@ -58,6 +65,7 @@ export default function RootLayout({
             </AuthProvider>
           </QueryProvider>
         </ThemeProvider>
+        <GoogleAnalytics />
       </body>
     </html>
   );

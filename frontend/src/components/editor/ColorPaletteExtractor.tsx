@@ -9,6 +9,7 @@ import {
     Sparkles,
     Pipette,
 } from 'lucide-react';
+import Image from 'next/image';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
@@ -197,7 +198,7 @@ export function ColorPaletteExtractor({
                         className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-500 transition-colors"
                     >
                         {previewUrl ? (
-                            <img
+                            <Image
                                 src={previewUrl}
                                 alt="Preview"
                                 className="w-full h-32 object-cover rounded"

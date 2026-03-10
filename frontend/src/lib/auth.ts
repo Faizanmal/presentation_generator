@@ -1,67 +1,14 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+/**
+ * @deprecated - Use `@/stores/auth-store` directly instead.
+ * This file re-exports from the canonical auth store for backward compatibility.
+ */
+export { useAuthStore } from '@/stores/auth-store';
 
-interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: 'ADMIN' | 'USER';
-  stripeCustomerId?: string;
-  stripeSubscriptionId?: string;
-  subscriptionStatus?: string;
-  trialEndsAt?: string;
-}
+import type { AuthResponse as _AuthResponse, LoginCredentials as _LoginCredentials, RegisterCredentials as _RegisterCredentials } from '@/types';
 
-interface AuthState {
-  user: User | null;
-  accessToken: string | null;
-  isAuthenticated: boolean;
-  setAuth: (user: User, accessToken: string) => void;
-  clearAuth: () => void;
-  updateUser: (user: Partial<User>) => void;
-}
+export type { _AuthResponse as AuthResponse, _LoginCredentials as LoginCredentials, _RegisterCredentials as RegisterCredentials };
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set) => ({
-      user: null,
-      accessToken: null,
-      isAuthenticated: false,
-      setAuth: (user, accessToken) => 
-        set({ user, accessToken, isAuthenticated: true }),
-      clearAuth: () => 
-        set({ user: null, accessToken: null, isAuthenticated: false }),
-      updateUser: (userData) =>
-        set((state) => ({
-          user: state.user ? { ...state.user, ...userData } : null,
-        })),
-    }),
-    {
-      name: 'auth-storage',
-      partialize: (state) => ({ 
-        user: state.user,
-        isAuthenticated: state.isAuthenticated 
-      }),
-    }
-  )
-);
-
-export interface SignUpData {
-  email: string;
-  password: string;
-  name: string;
-}
-
-export interface SignInData {
-  email: string;
-  password: string;
-}
-
-export interface AuthResponse {
-  user: User;
-  accessToken: string;
-}
-
-export interface RefreshResponse {
-  accessToken: string;
-}
+/** @deprecated Use RegisterCredentials from @/types */
+export type SignUpData = _RegisterCredentials;
+/** @deprecated Use LoginCredentials from @/types */
+export type SignInData = _LoginCredentials;

@@ -1357,7 +1357,17 @@ Provide 5-8 specific, actionable optimization suggestions in JSON format:
         return { suggestions: [] };
       }
 
-      return JSON.parse(content);
+      const parsed = JSON.parse(content);
+      return parsed as {
+        suggestions: Array<{
+          slideNumber: number;
+          type: string;
+          issue: string;
+          suggestion: string;
+          priority: string;
+          expectedImpact: string;
+        }>;
+      };
     } catch (err) {
       this.logger.error('Failed to generate optimization suggestions', err);
       return {

@@ -88,7 +88,7 @@ export class StoryboardingController {
     @Request() req: { user: { id: string } },
     @Body() dto: GenerateStoryboardDto,
   ) {
-    return this.storyboardingService.generateStoryboard(req.user.id, {
+    return await this.storyboardingService.generateStoryboard(req.user.id, {
       ...dto,
       audienceType: dto.audienceType || 'general',
       presentationType: dto.presentationType || 'presentation',
@@ -101,7 +101,7 @@ export class StoryboardingController {
     @Request() req: { user: { id: string } },
     @Query('limit') limit?: string,
   ) {
-    return this.storyboardingService.getUserStoryboards(
+    return await this.storyboardingService.getUserStoryboards(
       req.user.id,
       limit ? parseInt(limit, 10) : 10,
     );
@@ -113,7 +113,7 @@ export class StoryboardingController {
     @Request() req: { user: { id: string } },
     @Param('id') id: string,
   ) {
-    return this.storyboardingService.getStoryboard(id, req.user.id);
+    return await this.storyboardingService.getStoryboard(id, req.user.id);
   }
 
   @Patch('sections/:sectionId')
@@ -123,7 +123,11 @@ export class StoryboardingController {
     @Param('sectionId') sectionId: string,
     @Body() dto: UpdateSectionDto,
   ) {
-    return this.storyboardingService.updateSection(sectionId, req.user.id, dto);
+    return await this.storyboardingService.updateSection(
+      sectionId,
+      req.user.id,
+      dto,
+    );
   }
 
   @Post(':id/apply/:projectId')
@@ -133,7 +137,11 @@ export class StoryboardingController {
     @Param('id') id: string,
     @Param('projectId') projectId: string,
   ) {
-    return this.storyboardingService.applyToProject(id, projectId, req.user.id);
+    return await this.storyboardingService.applyToProject(
+      id,
+      projectId,
+      req.user.id,
+    );
   }
 
   @Delete(':id')
@@ -142,6 +150,6 @@ export class StoryboardingController {
     @Request() req: { user: { id: string } },
     @Param('id') id: string,
   ) {
-    return this.storyboardingService.deleteStoryboard(id, req.user.id);
+    return await this.storyboardingService.deleteStoryboard(id, req.user.id);
   }
 }

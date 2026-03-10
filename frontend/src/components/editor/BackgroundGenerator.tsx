@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Sparkles, Palette, Loader2, Download, Check } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
+import Image from 'next/image';
 import { api } from '@/lib/api';
 
 interface BackgroundGeneratorProps {
@@ -163,7 +164,7 @@ export function BackgroundGenerator({ onApply }: BackgroundGeneratorProps) {
             {generatedImage && (
                 <div className="space-y-4">
                     <div className="relative rounded-lg overflow-hidden border-2 border-slate-200">
-                        <img
+                        <Image
                             src={generatedImage}
                             alt="Generated background"
                             className="w-full h-48 object-cover"

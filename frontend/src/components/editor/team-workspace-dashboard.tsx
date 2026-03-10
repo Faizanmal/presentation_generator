@@ -1,6 +1,9 @@
 'use client';
+/* eslint-disable react-hooks/set-state-in-effect */
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { api } from '@/lib/api';
+import { useAuthStore } from '@/stores/auth-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -110,158 +113,94 @@ interface TeamStats {
   storageLimit: number;
 }
 
-const MOCK_TEAM_MEMBERS: TeamMember[] = [
-  {
-    id: '1',
-    name: 'John Doe',
-    email: 'john@company.com',
-    role: 'owner',
-    status: 'active',
-    joinedAt: '2024-01-15',
-    lastActive: '2 hours ago',
-    presentationsCount: 45,
-  },
-  {
-    id: '2',
-    name: 'Sarah Wilson',
-    email: 'sarah@company.com',
-    role: 'admin',
-    status: 'active',
-    joinedAt: '2024-02-20',
-    lastActive: '1 hour ago',
-    presentationsCount: 32,
-  },
-  {
-    id: '3',
-    name: 'Mike Johnson',
-    email: 'mike@company.com',
-    role: 'editor',
-    status: 'active',
-    joinedAt: '2024-03-10',
-    lastActive: '3 hours ago',
-    presentationsCount: 18,
-  },
-  {
-    id: '4',
-    name: 'Emily Brown',
-    email: 'emily@company.com',
-    role: 'editor',
-    status: 'pending',
-    joinedAt: '2024-06-01',
-    lastActive: 'Never',
-    presentationsCount: 0,
-  },
-  {
-    id: '5',
-    name: 'David Lee',
-    email: 'david@company.com',
-    role: 'viewer',
-    status: 'active',
-    joinedAt: '2024-04-15',
-    lastActive: '1 day ago',
-    presentationsCount: 0,
-  },
-];
-
-const MOCK_PRESENTATIONS: SharedPresentation[] = [
-  {
-    id: '1',
-    title: 'Q4 Sales Strategy',
-    owner: { id: '1', name: 'John Doe' },
-    sharedWith: MOCK_TEAM_MEMBERS.slice(0, 3),
-    permission: 'edit',
-    lastModified: '2 hours ago',
-    status: 'published',
-    views: 234,
-    starred: true,
-  },
-  {
-    id: '2',
-    title: 'Product Roadmap 2025',
-    owner: { id: '2', name: 'Sarah Wilson' },
-    sharedWith: MOCK_TEAM_MEMBERS.slice(1, 4),
-    permission: 'view',
-    lastModified: '1 day ago',
-    status: 'draft',
-    views: 89,
-    starred: false,
-  },
-  {
-    id: '3',
-    title: 'Team Onboarding',
-    owner: { id: '3', name: 'Mike Johnson' },
-    sharedWith: MOCK_TEAM_MEMBERS,
-    permission: 'admin',
-    lastModified: '3 days ago',
-    status: 'published',
-    views: 567,
-    starred: true,
-  },
-];
-
-const MOCK_ACTIVITIES: TeamActivity[] = [
-  {
-    id: '1',
-    type: 'edited',
-    user: { id: '1', name: 'John Doe' },
-    target: 'Q4 Sales Strategy',
-    targetType: 'presentation',
-    timestamp: '2 hours ago',
-  },
-  {
-    id: '2',
-    type: 'shared',
-    user: { id: '2', name: 'Sarah Wilson' },
-    target: 'Product Roadmap 2025',
-    targetType: 'presentation',
-    timestamp: '4 hours ago',
-  },
-  {
-    id: '3',
-    type: 'created',
-    user: { id: '3', name: 'Mike Johnson' },
-    target: 'Marketing Campaign',
-    targetType: 'presentation',
-    timestamp: '1 day ago',
-  },
-  {
-    id: '4',
-    type: 'commented',
-    user: { id: '5', name: 'David Lee' },
-    target: 'Team Onboarding',
-    targetType: 'presentation',
-    timestamp: '2 days ago',
-  },
-  {
-    id: '5',
-    type: 'published',
-    user: { id: '1', name: 'John Doe' },
-    target: 'Annual Report',
-    targetType: 'presentation',
-    timestamp: '3 days ago',
-  },
-];
-
-const MOCK_STATS: TeamStats = {
-  totalMembers: 5,
-  totalPresentations: 95,
-  totalViews: 12890,
-  activeEditors: 3,
-  storageUsed: 2.4,
-  storageLimit: 10,
-};
-
 export function TeamWorkspaceDashboard() {
   const [isOpen, setIsOpen] = useState(false);
-  const [members, setMembers] = useState<TeamMember[]>(MOCK_TEAM_MEMBERS);
-  const [presentations, setPresentations] = useState<SharedPresentation[]>(MOCK_PRESENTATIONS);
-  const [activities] = useState<TeamActivity[]>(MOCK_ACTIVITIES);
-  const [stats] = useState<TeamStats>(MOCK_STATS);
+  const { user } = useAuthStore();
+  const orgId = user?.organizationId ?? '';
+  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [presentations, setPresentations] = useState<SharedPresentation[]>([]);
+  const [activities, setActivities] = useState<TeamActivity[]>([]);
+  const [stats, setStats] = useState<TeamStats>({
+    totalMembers: 0,
+    totalPresentations: 0,
+    totalViews: 0,
+    activeEditors: 0,
+    storageUsed: 0,
+    storageLimit: 10,
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'admin' | 'editor' | 'viewer'>('editor');
+
+  // Fetch data from API when dialog opens
+  const fetchData = useCallback(async () => {
+    if (!orgId) { return; }
+    try {
+      const [dashboardData, activityData, projectsData] = await Promise.allSettled([
+        api.teamAnalytics.getDashboard(orgId),
+        api.teamAnalytics.getActivity(orgId, { limit: 10 }),
+        api.projects.getAll(),
+      ]);
+
+      if (dashboardData.status === 'fulfilled' && dashboardData.value) {
+        const d = dashboardData.value as Record<string, unknown>;
+        const contributors = ((d.topContributors as Array<Record<string, unknown>>) || []);
+        setMembers(contributors.map((c, i) => ({
+          id: (c.userId as string) || String(i),
+          name: (c.userName as string) || 'Unknown',
+          email: '',
+          role: i === 0 ? 'owner' as const : 'editor' as const,
+          status: 'active' as const,
+          joinedAt: '',
+          lastActive: '',
+          presentationsCount: (c.projectsCreated as number) || 0,
+        })));
+        const overview = (d.overview as Record<string, unknown>) || {};
+        setStats(prev => ({
+          ...prev,
+          totalMembers: contributors.length,
+          totalPresentations: (overview.totalProjects as number) || 0,
+          totalViews: (overview.totalViews as number) || 0,
+          activeEditors: contributors.length,
+        }));
+      }
+
+      if (activityData.status === 'fulfilled' && Array.isArray(activityData.value)) {
+        setActivities((activityData.value as Array<{ action?: string; userId?: string; userName?: string; targetType?: string; timestamp?: string }>).map((a, i) => ({
+          id: String(i),
+          type: (a.action as TeamActivity['type']) || 'edited',
+          user: { id: a.userId || '', name: a.userName || 'Unknown' },
+          target: a.targetType || '',
+          targetType: 'presentation' as const,
+          timestamp: a.timestamp || '',
+        })));
+      }
+
+      if (projectsData.status === 'fulfilled' && Array.isArray(projectsData.value)) {
+        setPresentations((projectsData.value as Array<{ id: string; title?: string; userId?: string; updatedAt?: string; status?: string }>).slice(0, 10).map((p) => ({
+          id: p.id,
+          title: p.title || 'Untitled',
+          owner: { id: p.userId || '', name: '' },
+          sharedWith: [],
+          permission: 'edit' as const,
+          lastModified: p.updatedAt || '',
+          status: (p.status as 'draft' | 'published') || 'draft',
+          views: 0,
+          starred: false,
+        })));
+      }
+    } catch {
+      // Fail silently - component will show empty state
+    }
+  }, [orgId]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchData();
+    }
+  }, [isOpen, fetchData]);
 
   const getRoleIcon = (role: TeamMember['role']) => {
     switch (role) {
@@ -323,8 +262,8 @@ export function TeamWorkspaceDashboard() {
   };
 
   const handleInvite = () => {
-    if (!inviteEmail) {return;}
-    
+    if (!inviteEmail) { return; }
+
     const newMember: TeamMember = {
       id: `new_${Date.now()}`,
       name: inviteEmail.split('@')[0],
@@ -335,7 +274,7 @@ export function TeamWorkspaceDashboard() {
       lastActive: 'Never',
       presentationsCount: 0,
     };
-    
+
     setMembers((prev) => [...prev, newMember]);
     setInviteEmail('');
     setShowInviteDialog(false);
@@ -512,13 +451,12 @@ export function TeamWorkspaceDashboard() {
                             </Button>
                           </div>
                           <Badge
-                            className={`absolute bottom-2 left-2 ${
-                              presentation.status === 'published'
+                            className={`absolute bottom-2 left-2 ${presentation.status === 'published'
                                 ? 'bg-green-100 text-green-700'
                                 : presentation.status === 'draft'
-                                ? 'bg-yellow-100 text-yellow-700'
-                                : 'bg-gray-100 text-gray-700'
-                            }`}
+                                  ? 'bg-yellow-100 text-yellow-700'
+                                  : 'bg-gray-100 text-gray-700'
+                              }`}
                           >
                             {presentation.status}
                           </Badge>
@@ -562,13 +500,12 @@ export function TeamWorkspaceDashboard() {
                           <div className="flex items-center gap-2">
                             <h3 className="font-medium">{presentation.title}</h3>
                             <Badge
-                              className={`${
-                                presentation.status === 'published'
+                              className={`${presentation.status === 'published'
                                   ? 'bg-green-100 text-green-700'
                                   : presentation.status === 'draft'
-                                  ? 'bg-yellow-100 text-yellow-700'
-                                  : 'bg-gray-100 text-gray-700'
-                              }`}
+                                    ? 'bg-yellow-100 text-yellow-700'
+                                    : 'bg-gray-100 text-gray-700'
+                                }`}
                             >
                               {presentation.status}
                             </Badge>

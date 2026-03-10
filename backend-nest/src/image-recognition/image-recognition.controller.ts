@@ -204,7 +204,9 @@ export class ImageRecognitionController {
     const limit = dto.limit || 10;
 
     return this.imageRecognitionService.predictImagesForPresentation(
-      req.user.id,
+      // `_req` is the injected request object; avoid referring to the
+      // unused `req` variable which causes a TS error
+      _req.user.id,
       {
         title: dto.title,
         description: dto.description,

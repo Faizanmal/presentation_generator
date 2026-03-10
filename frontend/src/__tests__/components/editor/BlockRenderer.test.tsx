@@ -1,4 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
+import Image from 'next/image';
 import BlockRenderer from '@/components/editor/BlockRenderer';
 import type { Block, BlockType } from '@/types';
 
@@ -24,8 +25,10 @@ jest.mock('@dnd-kit/utilities', () => ({
 
 jest.mock('next/image', () => ({
     __esModule: true,
+    // eslint-disable-next-line @next/next/no-img-element
     default: (props: React.ImgHTMLAttributes<HTMLImageElement>) => <img {...props} alt={props.alt || ''} />,
 }));
+
 
 jest.mock('lucide-react', () => ({
     GripVertical: () => <div data-testid="grip-icon" />,
@@ -50,6 +53,11 @@ jest.mock('@/components/ui/button', () => ({
 
 jest.mock('@/components/editor/chart-block', () => ({
     ChartBlock: () => <div data-testid="chart-block" />,
+}));
+
+jest.mock('@/components/editor/image-ai-controls', () => ({
+    ImageAIControls: ({ imageUrl, imageAlt }: { imageUrl?: string; imageAlt?: string }) =>
+        imageUrl ? <Image src={imageUrl} alt={imageAlt || 'Image'} /> : null,
 }));
 
 describe('BlockRenderer', () => {
@@ -147,8 +155,7 @@ describe('BlockRenderer', () => {
 
         expect(screen.getByText('Item 1')).toBeInTheDocument();
         expect(screen.getByText('Item 2')).toBeInTheDocument();
-        // list-disc class indicates bullet points
-        expect(screen.getByRole('list')).toHaveClass('list-disc');
+        expect(screen.getByRole('list')).toHaveClass('space-y-3');
     });
 
     it('renders an image with URL', () => {
@@ -251,6 +258,6 @@ describe('BlockRenderer', () => {
         // We look for the first div in container which matches our component root
         const rootDiv = container.firstChild as HTMLElement;
         expect(rootDiv).toHaveClass('ring-2');
-        expect(rootDiv).toHaveClass('ring-blue-500');
+        expect(rootDiv).toHaveClass('ring-blue-500/70');
     });
 });

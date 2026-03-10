@@ -70,7 +70,7 @@ Format as JSON array with: type, content, confidence, reason`;
 
     try {
       const response = await this.aiService.chatCompletion({
-        model: 'gpt-4o',
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
@@ -132,7 +132,7 @@ Return as JSON: { "completions": ["completion1", "completion2", "completion3"] }
 
     try {
       const response = await this.aiService.chatCompletion({
-        model: 'gpt-4o',
+        model: 'gpt-4o-mini',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.8,
       });

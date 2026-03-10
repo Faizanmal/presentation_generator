@@ -130,8 +130,12 @@ export class ABTestingController {
 
   @Post(':id/result')
   @ApiOperation({ summary: 'Record a test result' })
-  async recordResult(@Param('id') id: string, @Body() dto: RecordResultDto) {
-    return this.abTestingService.recordResult(id, dto);
+  async recordResult(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body() dto: RecordResultDto,
+  ) {
+    return this.abTestingService.recordResult(id, dto, req.user.id);
   }
 
   @Get(':id/analysis')

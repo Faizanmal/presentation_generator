@@ -3,12 +3,30 @@
 import React, { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Brain, Zap, Sparkles, Eye, Download } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import { ArrowLeft, Brain, Zap, Sparkles, Eye, Download, Loader2 } from 'lucide-react';
+import { ThemeToggleSimple } from '@/components/ui/theme-toggle';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { ThinkingModeGenerator, ThinkingResultPreview } from '@/components/ai';
 import { api } from '@/lib/api';
 import type { ThinkingGenerationResult } from '@/types';
+
+// Dynamically import heavy AI components
+const ThinkingModeGenerator = dynamic(
+    () => import('@/components/ai').then(mod => mod.ThinkingModeGenerator),
+    {
+        loading: () => <div className="flex justify-center items-center h-96"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>,
+        ssr: false
+    }
+);
+
+const ThinkingResultPreview = dynamic(
+    () => import('@/components/ai').then(mod => mod.ThinkingResultPreview),
+    {
+        loading: () => <div className="flex justify-center items-center h-96"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>,
+        ssr: false
+    }
+);
 
 export default function AIThinkingPage() {
     const router = useRouter();
@@ -34,9 +52,23 @@ export default function AIThinkingPage() {
             });
             setSavedProjectId(projectResult.projectId);
             toast.success('Saved to dashboard');
-        } catch (error) {
+        } catch (error: unknown) {
             console.error('Failed to auto-save project:', error);
-            toast.error('Failed to save to dashboard');
+            let errorMessage = 'Failed to save to dashboard';
+            if (error instanceof Error) {
+                errorMessage = error.message;
+            } else if (typeof error === 'object' && error !== null) {
+                const err = error as { response?: { data?: { message?: string } | string } };
+                const data = err?.response?.data;
+                if (typeof data === 'string') {
+                    errorMessage = data;
+                } else if (data && typeof data === 'object' && data.message) {
+                    errorMessage = data.message;
+                }
+            }
+            toast.error('Failed to save to dashboard', {
+                description: errorMessage,
+            });
         } finally {
             setIsCreatingProject(false);
         }
@@ -70,23 +102,37 @@ export default function AIThinkingPage() {
             // Navigate to editor with the generated content
             toast.success(`Project created with ${projectResult.slideCount} slides!`);
             router.push(`/editor/${projectResult.projectId}`);
-        } catch (_error) {
-            toast.error('Failed to create project');
+        } catch (error: unknown) {
+            let errorMessage = 'Failed to create project';
+            if (error instanceof Error) {
+                errorMessage = error.message;
+            } else if (typeof error === 'object' && error !== null) {
+                const err = error as { response?: { data?: { message?: string } | string } };
+                const data = err?.response?.data;
+                if (typeof data === 'string') {
+                    errorMessage = data;
+                } else if (data && typeof data === 'object' && data.message) {
+                    errorMessage = data.message;
+                }
+            }
+            toast.error('Failed to create project', {
+                description: errorMessage,
+            });
         } finally {
             setIsCreatingProject(false);
         }
     }, [result, router, savedProjectId, isCreatingProject]);
 
     return (
-        <div className="min-h-screen bg-linear-to-br from-slate-900 via-purple-900/20 to-slate-900">
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
             {/* Header */}
-            <header className="border-b border-white/10 bg-black/20 backdrop-blur-sm">
+            <header className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 backdrop-blur-sm">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between h-16">
                         <div className="flex items-center gap-4">
                             <Link
                                 href="/dashboard"
-                                className="flex items-center gap-2 text-white/70 hover:text-white transition-colors"
+                                className="flex items-center gap-2 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
                             >
                                 <ArrowLeft className="h-5 w-5" />
                                 <span>Back to Dashboard</span>
@@ -94,10 +140,13 @@ export default function AIThinkingPage() {
                         </div>
 
                         <div className="flex items-center gap-3">
-                            <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-full bg-linear-to-r from-purple-500/20 to-blue-500/20 border border-purple-500/30">
-                                <Brain className="h-5 w-5 text-purple-400" />
-                                <span className="text-sm font-medium text-white">AI Thinking Mode</span>
+                            <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-full bg-linear-to-r from-purple-500/20 to-blue-500/20 dark:from-purple-500/30 dark:to-blue-500/30 border border-purple-500/30 dark:border-purple-500/40">
+                                <Brain className="h-5 w-5 text-purple-600 dark:text-purple-300" />
+                                <span className="text-sm font-medium text-slate-900 dark:text-slate-100">AI Thinking Mode</span>
                             </div>
+
+                            {/* theme toggle */}
+                            <ThemeToggleSimple />
                         </div>
                     </div>
                 </div>
@@ -107,17 +156,17 @@ export default function AIThinkingPage() {
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
                 {/* Hero Section */}
                 <div className="text-center mb-12">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-linear-to-r from-purple-500/20 to-blue-500/20 border border-purple-500/30 mb-6">
-                        <Sparkles className="h-4 w-4 text-yellow-400" />
-                        <span className="text-sm font-medium text-white">Advanced AI Generation</span>
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-linear-to-r from-purple-500/20 to-blue-500/20 dark:from-purple-500/30 dark:to-blue-500/30 border border-purple-500/30 dark:border-purple-500/40 mb-6">
+                        <Sparkles className="h-4 w-4 text-yellow-500 dark:text-yellow-300" />
+                        <span className="text-sm font-medium text-slate-900 dark:text-slate-100">Advanced AI Generation</span>
                     </div>
-                    <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
+                    <h1 className="text-4xl md:text-5xl font-bold text-slate-900 dark:text-slate-100 mb-4">
                         AI{' '}
                         <span className="bg-linear-to-r from-purple-400 via-pink-500 to-red-500 bg-clip-text text-transparent">
                             Thinking Mode
                         </span>
                     </h1>
-                    <p className="text-lg text-white/70 max-w-2xl mx-auto">
+                    <p className="text-lg text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">
                         Generate high-quality presentations using multi-step reasoning. Our AI plans, creates,
                         evaluates, and refines your content through iterative improvement cycles.
                     </p>
@@ -165,11 +214,11 @@ export default function AIThinkingPage() {
                                     <Button
                                         onClick={handleCreateProject}
                                         disabled={isCreatingProject}
-                                        className="flex-1 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                                        className="flex-1 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 dark:from-purple-700 dark:to-blue-700 dark:hover:from-purple-800 dark:hover:to-blue-800"
                                     >
                                         {isCreatingProject ? 'Creating...' : 'Create Project'}
                                     </Button>
-                                    <Button variant="outline" className="border-white/20 text-white hover:bg-white/10">
+                                    <Button variant="outline" className="border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800">
                                         <Download className="h-4 w-4 mr-2" />
                                         Export
                                     </Button>
@@ -177,12 +226,12 @@ export default function AIThinkingPage() {
                             </div>
                         ) : (
                             <div className="h-full flex items-center justify-center">
-                                <div className="text-center p-12 rounded-2xl border border-white/10 bg-white/5">
-                                    <Brain className="h-16 w-16 text-purple-400 mx-auto mb-4 opacity-50" />
-                                    <h3 className="text-xl font-semibold text-white mb-2">
+                                <div className="text-center p-12 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50">
+                                    <Brain className="h-16 w-16 text-purple-600 dark:text-purple-300 mx-auto mb-4 opacity-50" />
+                                    <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2">
                                         Ready to generate
                                     </h3>
-                                    <p className="text-white/60">
+                                    <p className="text-slate-600 dark:text-slate-400">
                                         Enter a topic and click generate to see the AI thinking process in action
                                     </p>
                                 </div>
@@ -207,16 +256,16 @@ function FeatureCard({
     color: 'purple' | 'blue' | 'green';
 }) {
     const colorClasses = {
-        purple: 'from-purple-500/20 to-purple-600/20 border-purple-500/30 text-purple-400',
-        blue: 'from-blue-500/20 to-blue-600/20 border-blue-500/30 text-blue-400',
-        green: 'from-emerald-500/20 to-emerald-600/20 border-emerald-500/30 text-emerald-400',
+        purple: 'from-purple-500/20 to-purple-600/20 dark:from-purple-500/30 dark:to-purple-600/30 border-purple-500/30 dark:border-purple-500/40 text-purple-600 dark:text-purple-300',
+        blue: 'from-blue-500/20 to-blue-600/20 dark:from-blue-500/30 dark:to-blue-600/30 border-blue-500/30 dark:border-blue-500/40 text-blue-600 dark:text-blue-300',
+        green: 'from-emerald-500/20 to-emerald-600/20 dark:from-emerald-500/30 dark:to-emerald-600/30 border-emerald-500/30 dark:border-emerald-500/40 text-emerald-600 dark:text-emerald-300',
     };
 
     return (
         <div className={`p-6 rounded-xl border bg-linear-to-br ${colorClasses[color]}`}>
             <div className="mb-4">{icon}</div>
-            <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
-            <p className="text-sm text-white/60">{description}</p>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">{title}</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400">{description}</p>
         </div>
     );
 }

@@ -1,5 +1,4 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface GeneratedBackground {
@@ -9,19 +8,27 @@ export interface GeneratedBackground {
   prompt: string;
   style: string;
   colorScheme?: string;
+  tags: string[];
   createdAt: Date;
+}
+
+interface BackgroundMetadata {
+  prompt: string;
+  style: string;
+  colorScheme?: string;
+  generatedBy?: string;
 }
 
 @Injectable()
 export class BackgroundLibraryService {
-  private readonly db: PrismaClient;
+  private readonly logger = new Logger(BackgroundLibraryService.name);
 
-  constructor(private prisma: PrismaService) {
-    this.db = this.prisma as unknown as PrismaClient;
-  }
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Save generated background to user's library
+   * Save generated background to user's library.
+   * Uses the Upload model which has a metadata JSON column for storing
+   * prompt, style, and color scheme information.
    */
   async saveBackground(
     userId: string,
@@ -30,62 +37,124 @@ export class BackgroundLibraryService {
     style: string,
     colorScheme?: string,
   ): Promise<GeneratedBackground> {
-    // In a real implementation, you'd save this to a dedicated table
-    // For now, we'll use the Asset table
-    const asset = await this.db.asset.create({
-      data: {
-        userId,
-        url,
-        filename: `background-${Date.now()}.png`,
-        mimeType: 'image/png',
-        size: 0, // Would need to fetch actual size
-      },
-    });
-
-    return {
-      id: asset.id,
-      userId: asset.userId,
-      url: asset.url,
+    const metadata: BackgroundMetadata = {
       prompt,
       style,
       colorScheme,
-      createdAt: asset.createdAt,
+      generatedBy: 'ai-background-generator',
+    };
+
+    const upload = await this.prisma.upload.create({
+      data: {
+        userId,
+        url,
+        source: 'ai',
+        filename: `background-${Date.now()}.png`,
+        mimeType: 'image/png',
+        size: 0,
+        description: prompt,
+        tags: ['background', style, ...(colorScheme ? [colorScheme] : [])],
+        metadata: metadata as object,
+      },
+    });
+
+    this.logger.log(
+      `Saved background for user ${userId}: style=${style}, prompt="${prompt.substring(0, 50)}..."`,
+    );
+
+    return {
+      id: upload.id,
+      userId: upload.userId,
+      url: upload.url,
+      prompt,
+      style,
+      colorScheme,
+      tags: upload.tags,
+      createdAt: upload.createdAt,
     };
   }
 
   /**
-   * Get user's background library
+   * Get user's background library with full metadata
    */
-  async getUserBackgrounds(userId: string): Promise<GeneratedBackground[]> {
-    const assets = await this.db.asset.findMany({
+  async getUserBackgrounds(
+    userId: string,
+    options?: { limit?: number; style?: string },
+  ): Promise<GeneratedBackground[]> {
+    const { limit = 50, style } = options || {};
+
+    const uploads = await this.prisma.upload.findMany({
       where: {
         userId,
-        mimeType: 'image/png',
-        filename: { startsWith: 'background-' },
+        source: 'ai',
+        tags: { has: 'background' },
+        ...(style ? { tags: { hasEvery: ['background', style] } } : {}),
       },
       orderBy: { createdAt: 'desc' },
-      take: 50,
+      take: limit,
     });
 
-    return assets.map((asset) => ({
-      id: asset.id,
-      userId: asset.userId,
-      url: asset.url,
-      prompt: '', // Would need to store this in metadata
-      style: '',
-      createdAt: asset.createdAt,
-    }));
+    return uploads.map((upload) => {
+      const meta = (upload.metadata || {}) as unknown as BackgroundMetadata;
+      return {
+        id: upload.id,
+        userId: upload.userId,
+        url: upload.url,
+        prompt: meta.prompt || upload.description || '',
+        style: meta.style || '',
+        colorScheme: meta.colorScheme,
+        tags: upload.tags,
+        createdAt: upload.createdAt,
+      };
+    });
   }
 
   /**
    * Delete background from library
    */
   async deleteBackground(userId: string, backgroundId: string): Promise<void> {
-    await this.db.asset.deleteMany({
+    await this.prisma.upload.deleteMany({
       where: {
         id: backgroundId,
-        userId, // Ensure user owns this asset
+        userId,
       },
+    });
+  }
+
+  /**
+   * Search backgrounds by keyword in prompt or tags
+   */
+  async searchBackgrounds(
+    userId: string,
+    query: string,
+    limit = 20,
+  ): Promise<GeneratedBackground[]> {
+    const uploads = await this.prisma.upload.findMany({
+      where: {
+        userId,
+        source: 'ai',
+        tags: { has: 'background' },
+        OR: [
+          { description: { contains: query, mode: 'insensitive' } },
+          { tags: { hasSome: query.toLowerCase().split(/\s+/) } },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+
+    return uploads.map((upload) => {
+      const meta = (upload.metadata || {}) as unknown as BackgroundMetadata;
+      return {
+        id: upload.id,
+        userId: upload.userId,
+        url: upload.url,
+        prompt: meta.prompt || upload.description || '',
+        style: meta.style || '',
+        colorScheme: meta.colorScheme,
+        tags: upload.tags,
+        createdAt: upload.createdAt,
+      };
     });
   }
 

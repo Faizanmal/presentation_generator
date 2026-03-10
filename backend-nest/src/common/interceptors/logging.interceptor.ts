@@ -49,18 +49,23 @@ export class LoggingInterceptor implements NestInterceptor {
 
     const startTime = Date.now();
 
-    this.logger.log(
-      `Incoming ${method as string} ${url as string}`,
-      JSON.stringify({
-        requestId,
-        userId,
-        ip,
-        userAgent,
-        query,
-        params,
-        ...(process.env.LOG_LEVEL === 'debug' && { body }),
-      }),
-    );
+    // Determine if info-level logging is enabled (used for requests/responses).
+    const logInfo = this.logger.isLevelEnabled('info');
+
+    if (logInfo) {
+      this.logger.log(
+        `Incoming ${method as string} ${url as string}`,
+        JSON.stringify({
+          requestId,
+          userId,
+          ip,
+          userAgent,
+          query,
+          params,
+          ...(process.env.LOG_LEVEL === 'debug' && { body }),
+        }),
+      );
+    }
 
     return next.handle().pipe(
       tap({
@@ -69,15 +74,17 @@ export class LoggingInterceptor implements NestInterceptor {
             .statusCode as number;
           const responseTime = Date.now() - startTime;
 
-          this.logger.log(
-            `Completed ${method as string} ${url as string} ${statusCode} - ${responseTime}ms`,
-            JSON.stringify({
-              requestId,
-              userId,
-              statusCode,
-              responseTime,
-            }),
-          );
+          if (logInfo) {
+            this.logger.log(
+              `Completed ${method as string} ${url as string} ${statusCode} - ${responseTime}ms`,
+              JSON.stringify({
+                requestId,
+                userId,
+                statusCode,
+                responseTime,
+              }),
+            );
+          }
         },
         error: (error: unknown): void => {
           const responseTime = Date.now() - startTime;
@@ -85,6 +92,9 @@ export class LoggingInterceptor implements NestInterceptor {
             error instanceof Error ? error.message : 'Unknown error';
           const errorStack = error instanceof Error ? error.stack : '';
 
+          // always log errors regardless of level, they will obey the
+          // transport settings (e.g. appear in error.log) if level is
+          // higher than 'info'.
           this.logger.error(
             `Failed ${method as string} ${url as string} - ${responseTime}ms`,
             errorStack,

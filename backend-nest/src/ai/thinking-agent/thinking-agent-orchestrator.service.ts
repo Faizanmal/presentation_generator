@@ -55,7 +55,7 @@ export class ThinkingAgentOrchestratorService {
     private readonly generatorAgent: GeneratorAgentService,
     private readonly criticAgent: CriticAgentService,
     private readonly researchAgent: ResearchAgentService,
-  ) {}
+  ) { }
 
   // Token budget limits per quality level (to prevent runaway costs)
   private readonly TOKEN_BUDGETS = {
@@ -63,6 +63,38 @@ export class ThinkingAgentOrchestratorService {
     high: 35000,
     premium: 60000,
   };
+
+  /** Quality improvement history for adaptive learning */
+  private readonly qualityHistory = new Map<
+    string,
+    Array<{
+      iteration: number;
+      score: number;
+      improvements: string[];
+      timestamp: number;
+    }>
+  >();
+
+  /** Performance metrics for agent selection */
+  private readonly agentPerformance = new Map<
+    string,
+    {
+      successRate: number;
+      avgQuality: number;
+      avgTokens: number;
+      callCount: number;
+    }
+  >();
+
+  /** Adaptive thresholds based on topic complexity */
+  private readonly adaptiveThresholds = new Map<
+    string,
+    {
+      qualityThreshold: number;
+      maxIterations: number;
+      tokenBudget: number;
+    }
+  >();
 
   /**
    * Generate a presentation using the full thinking loop
@@ -95,7 +127,6 @@ export class ThinkingAgentOrchestratorService {
     let totalTokens = 0;
     let presentation: EnhancedPresentation | null = null;
     let plan: PresentationPlan | null;
-    const fallbackUsed = false;
     let lastQualityScore = 0;
     let noImprovementCount = 0;
     let lastReflectionResult: Awaited<
@@ -166,7 +197,7 @@ export class ThinkingAgentOrchestratorService {
           }
         } catch (error) {
           this.logger.warn(
-            `Research phase failed (non-critical): ${error.message}`,
+            `Research phase failed (non-critical): ${(error as Error).message}`,
           );
         }
       }
@@ -197,6 +228,8 @@ export class ThinkingAgentOrchestratorService {
               style: params.style,
               generateImages: params.generateImages,
               rawData: researchData, // Pass the combined research data
+              additionalContext: params.additionalContext,
+              brandGuidelines: params.brandGuidelines,
             });
           presentation = generationResult.presentation;
           state.steps.push(...generationResult.thinkingSteps);
@@ -345,29 +378,29 @@ export class ThinkingAgentOrchestratorService {
       // Use the last reflection result instead of re-reflecting (saves tokens!)
       const qualityReport = lastReflectionResult
         ? this.criticAgent.generateQualityReport(
-            lastReflectionResult.reflection,
-          )
+          lastReflectionResult.reflection,
+        )
         : {
-            overallScore: state.qualityScore * 10,
-            breakdown: {
-              contentQuality: 70,
-              structureQuality: 70,
-              engagementPotential: 70,
-              visualRichness: 70,
-              audienceAlignment: 70,
-              originality: 70,
-            },
-            suggestions: [],
-            comparisonToTarget: (state.qualityScore / 8) * 100,
-            passedThreshold: state.qualityScore >= state.targetQualityScore,
-          };
+          overallScore: state.qualityScore * 10,
+          breakdown: {
+            contentQuality: 70,
+            structureQuality: 70,
+            engagementPotential: 70,
+            visualRichness: 70,
+            audienceAlignment: 70,
+            originality: 70,
+          },
+          suggestions: [],
+          comparisonToTarget: (state.qualityScore / 8) * 100,
+          passedThreshold: state.qualityScore >= state.targetQualityScore,
+        };
 
       const metadata: GenerationMetadata = {
         totalTokensUsed: totalTokens,
         thinkingIterations: state.iterations,
         totalTimeMs,
         modelUsed: 'gpt-4o / llama-3.3-70b-versatile',
-        fallbackUsed,
+        fallbackUsed: false,
         generateImages: params.generateImages,
       };
 
@@ -624,5 +657,309 @@ export class ThinkingAgentOrchestratorService {
     state.endTime = new Date();
     yield { type: 'state', data: state };
     yield { type: 'presentation', data: generationResult.presentation };
+  }
+
+  /**
+   * Analyze topic complexity to determine optimal parameters
+   */
+  private async analyzeTopicComplexity(topic: string): Promise<{
+    complexity: 'low' | 'medium' | 'high';
+    suggestedIterations: number;
+    suggestedQuality: number;
+    suggestedTokenBudget: number;
+  }> {
+    // no asynchronous work yet; keep async for future
+    await Promise.resolve();
+    const topicKey = topic.toLowerCase().trim();
+
+    // Check if we have historical data
+    const cached = this.adaptiveThresholds.get(topicKey);
+    if (cached) {
+      const complexity =
+        cached.qualityThreshold > 8
+          ? 'high'
+          : cached.qualityThreshold > 7
+            ? 'medium'
+            : 'low';
+      return {
+        complexity,
+        suggestedIterations: cached.maxIterations,
+        suggestedQuality: cached.qualityThreshold,
+        suggestedTokenBudget: cached.tokenBudget,
+      };
+    }
+
+    // Analyze topic complexity using heuristics
+    const wordCount = topic.split(/\s+/).length;
+    const hasSpecializedTerms =
+      /\b(quantum|molecular|advanced|complex|strategic|enterprise)\b/i.test(
+        topic,
+      );
+    const hasTechnicalIndicators =
+      /\b(algorithm|system|architecture|framework|methodology)\b/i.test(topic);
+
+    let complexity: 'low' | 'medium' | 'high' = 'medium';
+    let suggestedIterations = 2;
+    let suggestedQuality = 7.5;
+    let suggestedTokenBudget = this.TOKEN_BUDGETS.high;
+
+    if (wordCount > 10 || hasSpecializedTerms || hasTechnicalIndicators) {
+      complexity = 'high';
+      suggestedIterations = 3;
+      suggestedQuality = 8.0;
+      suggestedTokenBudget = this.TOKEN_BUDGETS.premium;
+    } else if (wordCount < 5) {
+      complexity = 'low';
+      suggestedIterations = 1;
+      suggestedQuality = 7.0;
+      suggestedTokenBudget = this.TOKEN_BUDGETS.standard;
+    }
+
+    // Cache for future use
+    this.adaptiveThresholds.set(topicKey, {
+      qualityThreshold: suggestedQuality,
+      maxIterations: suggestedIterations,
+      tokenBudget: suggestedTokenBudget,
+    });
+
+    return {
+      complexity,
+      suggestedIterations,
+      suggestedQuality,
+      suggestedTokenBudget,
+    };
+  }
+
+  /**
+   * Record quality improvement for learning
+   */
+  private recordQualityImprovement(
+    topic: string,
+    iteration: number,
+    score: number,
+    improvements: string[],
+  ): void {
+    const topicKey = topic.toLowerCase().trim();
+    const history = this.qualityHistory.get(topicKey) || [];
+
+    history.push({
+      iteration,
+      score,
+      improvements,
+      timestamp: Date.now(),
+    });
+
+    // Keep only last 10 entries per topic
+    if (history.length > 10) {
+      history.shift();
+    }
+
+    this.qualityHistory.set(topicKey, history);
+
+    // Update adaptive thresholds based on trends
+    if (history.length >= 3) {
+      const avgScore =
+        history.reduce((sum, h) => sum + h.score, 0) / history.length;
+      const avgIterations =
+        history.reduce((sum, h) => sum + h.iteration, 0) / history.length;
+
+      this.adaptiveThresholds.set(topicKey, {
+        qualityThreshold: Math.max(7.0, Math.min(8.5, avgScore)),
+        maxIterations: Math.round(avgIterations),
+        tokenBudget:
+          avgIterations > 2
+            ? this.TOKEN_BUDGETS.premium
+            : this.TOKEN_BUDGETS.high,
+      });
+    }
+  }
+
+  /**
+   * Update agent performance metrics
+   */
+  private updateAgentPerformance(
+    agentName: string,
+    success: boolean,
+    quality: number,
+    tokensUsed: number,
+  ): void {
+    const current = this.agentPerformance.get(agentName) || {
+      successRate: 0,
+      avgQuality: 0,
+      avgTokens: 0,
+      callCount: 0,
+    };
+
+    const newCallCount = current.callCount + 1;
+    const newSuccessRate =
+      (current.successRate * current.callCount + (success ? 1 : 0)) /
+      newCallCount;
+    const newAvgQuality =
+      (current.avgQuality * current.callCount + quality) / newCallCount;
+    const newAvgTokens =
+      (current.avgTokens * current.callCount + tokensUsed) / newCallCount;
+
+    this.agentPerformance.set(agentName, {
+      successRate: newSuccessRate,
+      avgQuality: newAvgQuality,
+      avgTokens: newAvgTokens,
+      callCount: newCallCount,
+    });
+  }
+
+  /**
+   * Generate with adaptive quality targeting
+   */
+  async generateWithAdaptiveQuality(
+    params: EnhancedGenerationParams,
+  ): Promise<EnhancedGenerationResult> {
+    // Analyze topic complexity
+    const analysis = await this.analyzeTopicComplexity(params.topic);
+
+    this.logger.log(`📊 Topic Complexity: ${analysis.complexity}`);
+    this.logger.log(`💡 Suggested Iterations: ${analysis.suggestedIterations}`);
+    this.logger.log(`🎯 Suggested Quality: ${analysis.suggestedQuality}`);
+
+    // Apply adaptive parameters if not explicitly set
+    const adaptiveParams: EnhancedGenerationParams = {
+      ...params,
+      maxThinkingIterations:
+        params.maxThinkingIterations || analysis.suggestedIterations,
+      targetQualityScore:
+        params.targetQualityScore || analysis.suggestedQuality,
+      qualityLevel:
+        params.qualityLevel ||
+        (analysis.complexity === 'high' ? 'premium' : 'high'),
+    };
+
+    // Generate with adaptive parameters
+    const result = await this.generateWithThinking(adaptiveParams);
+
+    // Record performance
+    this.recordQualityImprovement(
+      params.topic,
+      result.thinkingProcess.iterations,
+      result.thinkingProcess.qualityScore,
+      result.qualityReport.suggestions,
+    );
+
+    this.updateAgentPerformance(
+      'thinking-orchestrator',
+      true,
+      result.thinkingProcess.qualityScore,
+      result.metadata.totalTokensUsed,
+    );
+
+    return result;
+  }
+
+  /**
+   * Parallel agent execution for faster generation
+   */
+  async generateWithParallelAgents(
+    params: EnhancedGenerationParams,
+  ): Promise<EnhancedGenerationResult> {
+    const sessionId = uuidv4();
+    const startTime = Date.now();
+
+    this.logger.log(
+      `🚀 Starting Parallel Agent Execution [Session: ${sessionId}]`,
+    );
+
+    // Execute planning and research in parallel
+    const [planningResult, researchData] = await Promise.all([
+      this.plannerAgent.createPlan(params),
+      params.rawData
+        ? Promise.resolve(params.rawData)
+        : this.researchAgent
+          .conductResearch(params.topic, [])
+          .then((r) => r.summary)
+          .catch(() => ''),
+    ]);
+
+    this.logger.log(`✅ Parallel planning + research complete`);
+
+    // Generate presentation
+    const generationResult = await this.generatorAgent.generatePresentation(
+      planningResult.plan,
+      params.topic,
+      {
+        tone: params.tone,
+        style: params.style,
+        generateImages: params.generateImages,
+        rawData: researchData,
+      },
+    );
+
+    // Reflect and generate quality report
+    const reflectionResult = await this.criticAgent.reflect(
+      generationResult.presentation,
+      planningResult.plan,
+      params.topic,
+    );
+
+    const qualityReport = this.criticAgent.generateQualityReport(
+      reflectionResult.reflection,
+    );
+
+    const state: ThinkingState = {
+      sessionId,
+      currentPhase: 'complete',
+      steps: [
+        ...planningResult.thinkingSteps,
+        ...generationResult.thinkingSteps,
+        ...reflectionResult.thinkingSteps,
+      ],
+      iterations: 1,
+      maxIterations: 1,
+      qualityScore: reflectionResult.reflection.overallScore,
+      targetQualityScore: params.targetQualityScore || 7.0,
+      startTime: new Date(startTime),
+      endTime: new Date(),
+    };
+
+    const totalTimeMs = Date.now() - startTime;
+
+    return {
+      presentation: generationResult.presentation,
+      thinkingProcess: state,
+      qualityReport,
+      metadata: {
+        totalTokensUsed:
+          generationResult.tokensUsed + reflectionResult.tokensUsed,
+        thinkingIterations: 1,
+        totalTimeMs,
+        modelUsed: 'gpt-4o / llama-3.3-70b-versatile (parallel)',
+        fallbackUsed: false,
+        generateImages: params.generateImages,
+      },
+    };
+  }
+
+  /**
+   * Get agent performance statistics
+   */
+  getAgentPerformanceStats(): Map<
+    string,
+    {
+      successRate: number;
+      avgQuality: number;
+      avgTokens: number;
+      callCount: number;
+    }
+  > {
+    return new Map(this.agentPerformance);
+  }
+
+  /**
+   * Get quality history for a topic
+   */
+  getQualityHistory(topic: string): Array<{
+    iteration: number;
+    score: number;
+    improvements: string[];
+    timestamp: number;
+  }> {
+    return this.qualityHistory.get(topic.toLowerCase().trim()) || [];
   }
 }

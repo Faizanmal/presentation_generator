@@ -76,7 +76,7 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
 
     // Event handlers
     this.client.on('error', (err) => {
-      this.logger.error(`Redis client error: ${err.message}`);
+      this.logger.error(`Redis client error: ${(err as Error).message}`);
     });
 
     this.client.on('connect', () => {
@@ -117,7 +117,7 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
 
   async getSession(sessionId: string): Promise<Record<string, unknown> | null> {
     const data = await this.client.get(`session:${sessionId}`);
-    return data ? JSON.parse(data) : null;
+    return data ? (JSON.parse(data) as Record<string, unknown>) : null;
   }
 
   async deleteSession(sessionId: string) {
@@ -179,7 +179,7 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
     this.subscriber.on('message', (ch, msg) => {
       if (ch === channel) {
         try {
-          handler(JSON.parse(msg));
+          handler(JSON.parse(msg) as Record<string, unknown>);
         } catch (e) {
           this.logger.error(`Failed to parse message: ${e}`);
         }
@@ -190,7 +190,7 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
   // Cache methods
   async cacheGet<T>(key: string): Promise<T | null> {
     const data = await this.client.get(`cache:${key}`);
-    return data ? JSON.parse(data) : null;
+    return data ? (JSON.parse(data) as T) : null;
   }
 
   async cacheSet<T>(key: string, value: T, ttlSeconds: number = 300) {

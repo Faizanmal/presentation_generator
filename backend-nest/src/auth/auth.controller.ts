@@ -9,6 +9,7 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
@@ -35,6 +36,8 @@ import {
 @Controller('auth')
 @UseGuards(ThrottlerGuard, RecaptchaGuard)
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(
     private readonly authService: AuthService,
     private readonly configService: ConfigService,
@@ -187,12 +190,26 @@ export class AuthController {
 
     // at this point `email` is guaranteed to be defined, so cast or destructure
     const { email, name, picture, googleId } = req.user;
-    const result = await this.authService.googleAuth({
-      email: email,
-      name,
-      picture,
-      googleId,
-    });
+    let result;
+    try {
+      result = await this.authService.googleAuth({
+        email: email,
+        name,
+        picture,
+        googleId,
+      });
+    } catch (err) {
+      this.logger.error('Google auth failed in service', err as Error);
+      // if something goes wrong we redirect back with an error string so the
+      // frontend can display a message instead of showing a generic 500 page.
+      const frontendUrl = this.configService.get<string>('FRONTEND_URL');
+      const message = encodeURIComponent(
+        err instanceof Error ? err.message : 'unknown error',
+      );
+      return res.redirect(
+        `${frontendUrl}/auth/google-callback?error=${message}`,
+      );
+    }
 
     // Redirect to frontend with token
     const frontendUrl = this.configService.get<string>('FRONTEND_URL');
@@ -232,11 +249,10 @@ export class AuthController {
    * Clients must supply the opaque refresh token obtained during login.
    */
   @Post('refresh')
-  @UseGuards(JwtAuthGuard)
   async refreshToken(
-    @CurrentUser() user: { id: string },
     @Body('refreshToken') refreshToken: string,
-  ) {
-    return this.authService.refreshToken(user.id, refreshToken);
+  ): Promise<{ accessToken: string; refreshToken: string; expiresIn: number }> {
+    // The refreshToken method will validate and extract userId from the refresh token
+    return this.authService.refreshToken(refreshToken);
   }
 }

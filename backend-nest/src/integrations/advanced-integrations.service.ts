@@ -330,7 +330,8 @@ export class AdvancedIntegrationsService {
       },
     );
 
-    const items = (itemsResponse.data as { data: Record<string, unknown>[] }).data;
+    const items = (itemsResponse.data as { data: Record<string, unknown>[] })
+      .data;
 
     // Group items by frames or create slides from sticky notes
     const slides = this.convertMiroItemsToSlides(items);
@@ -538,7 +539,7 @@ export class AdvancedIntegrationsService {
 
     const payload: WebhookPayload = {
       event,
-      data,
+      data: data as Record<string, unknown>,
       timestamp: new Date().toISOString(),
     };
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -92,86 +93,28 @@ export function AISummarizer({ presentationTitle, slideCount }: AISummarizerProp
   const generateSummary = async () => {
     setIsLoading(true);
     try {
-      // Mock API call - replace with actual API
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // Mock response
-      setSummary({
-        executive:
-          'This presentation covers key strategies for digital transformation in enterprise organizations. It outlines a phased approach to modernizing legacy systems, emphasizes the importance of change management, and provides concrete ROI metrics from case studies.',
-        keyPoints: [
-          'Digital transformation is essential for competitive advantage',
-          'A phased approach reduces risk and ensures stakeholder buy-in',
-          'Change management is as important as technology selection',
-          'Cloud-native architecture enables scalability and flexibility',
-          'Data-driven decision making accelerates business outcomes',
-        ],
-        slideOverviews: [
-          {
-            slideNumber: 1,
-            title: 'Introduction',
-            summary: 'Sets the stage for why digital transformation matters now.',
-            keyTakeaway: '78% of enterprises prioritize digital transformation',
-          },
-          {
-            slideNumber: 2,
-            title: 'Current Challenges',
-            summary: 'Identifies common pain points in legacy systems.',
-            keyTakeaway: 'Technical debt costs $1.2M annually per enterprise',
-          },
-          {
-            slideNumber: 3,
-            title: 'Solution Framework',
-            summary: 'Presents a 4-phase transformation methodology.',
-            keyTakeaway: 'Assess → Plan → Execute → Optimize',
-          },
-        ],
-        actionItems: [
-          'Schedule discovery workshop with stakeholders',
-          'Conduct technology audit of current systems',
-          'Define success metrics and KPIs',
-          'Identify quick wins for Phase 1',
-          'Establish governance committee',
-        ],
-        audienceNotes:
-          'For a general audience, emphasize business outcomes over technical details. Use analogies to explain complex concepts and focus on the human impact of transformation.',
-        talkingPoints: [
-          'Start with a compelling statistic about market disruption',
-          'Share a relevant case study from a similar industry',
-          'Address the elephant in the room: change resistance',
-          'Highlight quick wins to build momentum',
-          'End with a clear call to action',
-        ],
-        hashtags: ['#DigitalTransformation', '#Innovation', '#CloudFirst', '#AgileEnterprise', '#TechLeadership'],
-        socialPost: {
-          twitter:
-            '🚀 Just shared insights on enterprise digital transformation. Key takeaway: Success = 40% technology + 60% change management. The human element matters! #DigitalTransformation #Leadership',
-          linkedin:
-            "Excited to share our latest presentation on enterprise digital transformation strategies. After working with 50+ organizations, we've identified the critical success factors that separate leaders from laggards. The key insight? Technology is only 40% of the equation - the rest is change management and cultural transformation.",
-        },
-        outline: `# ${presentationTitle}
-1. Introduction
-2. Current Challenges
-3. Solution Framework
-4. Case Studies
-5. Implementation Roadmap
-6. ROI Analysis
-7. Next Steps`,
-        wordCloud: [
-          { word: 'transformation', weight: 100 },
-          { word: 'digital', weight: 90 },
-          { word: 'enterprise', weight: 75 },
-          { word: 'cloud', weight: 70 },
-          { word: 'strategy', weight: 65 },
-          { word: 'innovation', weight: 60 },
-          { word: 'scalability', weight: 55 },
-          { word: 'agile', weight: 50 },
-          { word: 'data', weight: 45 },
-          { word: 'automation', weight: 40 },
-        ],
-        readingTime: 8,
-        complexity: 'intermediate',
-      });
+      const instruction = `Summarize this presentation titled "${presentationTitle}" (${slideCount} slides) in ${options.style} style for a ${options.audience} audience. Length: ${options.length}. Return a JSON object with keys: executive (string), keyPoints (string[]), slideOverviews (array of {slideNumber, title, summary, keyTakeaway}), actionItems (string[]), audienceNotes (string), talkingPoints (string[]), hashtags (string[]), socialPost ({twitter: string, linkedin: string}), outline (string), wordCloud (array of {word, weight}), readingTime (number), complexity (beginner|intermediate|advanced).`;
+      const result = await api.ai.enhance(presentationTitle, instruction);
+      try {
+        const parsed = JSON.parse(result.content);
+        setSummary(parsed as PresentationSummary);
+      } catch {
+        // If AI returns plain text, build a basic summary
+        setSummary({
+          executive: result.content,
+          keyPoints: [],
+          slideOverviews: [],
+          actionItems: [],
+          audienceNotes: '',
+          talkingPoints: [],
+          hashtags: [],
+          socialPost: { twitter: '', linkedin: '' },
+          outline: '',
+          wordCloud: [],
+          readingTime: Math.ceil(slideCount * 1.5),
+          complexity: 'intermediate',
+        });
+      }
     } catch (error) {
       console.error('Failed to generate summary:', error);
     } finally {
@@ -188,13 +131,13 @@ export function AISummarizer({ presentationTitle, slideCount }: AISummarizerProp
   const getComplexityColor = (complexity: string) => {
     switch (complexity) {
       case 'beginner':
-        return 'bg-green-100 text-green-700';
+        return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400';
       case 'intermediate':
-        return 'bg-yellow-100 text-yellow-700';
+        return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400';
       case 'advanced':
-        return 'bg-red-100 text-red-700';
+        return 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400';
       default:
-        return 'bg-gray-100 text-gray-700';
+        return 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300';
     }
   };
 

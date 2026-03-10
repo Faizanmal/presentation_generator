@@ -56,8 +56,9 @@ describe('API Client', () => {
     describe('initialization', () => {
         it('creates axios instance with correct config', () => {
             // Re-import to trigger initialization
-            jest.isolateModules(async () => {
-                await import('@/lib/api');
+            jest.isolateModules(() => {
+                // eslint-disable-next-line @typescript-eslint/no-require-imports
+                require('@/lib/api');
             });
 
             expect(axios.create).toHaveBeenCalledWith(

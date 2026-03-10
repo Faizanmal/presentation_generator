@@ -14,6 +14,7 @@ import {
     Trash2,
 } from 'lucide-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import Image from 'next/image';
 import { api } from '@/lib/api';
 
 interface BackgroundGeneratorProps {
@@ -344,7 +345,7 @@ export function BackgroundGeneratorEnhanced({
                             key={bg.id}
                             className="relative group border border-slate-200 rounded-lg overflow-hidden hover:border-blue-500 transition-all"
                         >
-                            <img
+                            <Image
                                 src={bg.url}
                                 alt={`Background pattern ${bg.id}`}
                                 className="w-full h-32 object-cover"
@@ -381,7 +382,7 @@ export function BackgroundGeneratorEnhanced({
                                     : 'border-slate-200 hover:border-slate-300'
                                     }`}
                             >
-                                <img src={url} alt={`Generated visual variation ${index + 1}`} className="w-full h-32 object-cover" />
+                                <Image src={url} alt={`Generated visual variation ${index + 1}`} className="w-full h-32 object-cover" />
                                 {selectedImage === url && (
                                     <div className="absolute top-2 right-2 bg-blue-500 text-white p-1 rounded-full">
                                         <Check className="w-4 h-4" />

@@ -12,6 +12,7 @@ import { Redis } from 'ioredis';
 import { randomBytes } from 'crypto';
 import type { Response } from 'express';
 import * as bcrypt from 'bcryptjs';
+import * as speakeasy from 'speakeasy';
 import { UsersService } from '../users/users.service';
 import { OtpService } from '../otp/otp.service';
 import { EmailService } from '../email/email.service';
@@ -217,6 +218,34 @@ export class AuthService {
         metadata: { reason: 'invalid_password' },
       });
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // --- ENFORCE MFA ---
+    const mfaUser = user as { mfaEnabled?: boolean; mfaSecret?: string };
+    if (mfaUser.mfaEnabled) {
+      if (!loginDto.mfaToken) {
+        throw new UnauthorizedException('MFA token required');
+      }
+
+      const isMfaValid = speakeasy.totp.verify({
+        secret: mfaUser.mfaSecret!,
+        encoding: 'base32',
+        token: loginDto.mfaToken,
+      });
+
+      if (!isMfaValid) {
+        await this.recordFailedLogin(loginDto.email);
+        await this.auditLog({
+          email: loginDto.email,
+          userId: user.id,
+          action: 'LOGIN',
+          success: false,
+          ip,
+          userAgent,
+          metadata: { reason: 'invalid_mfa' },
+        });
+        throw new UnauthorizedException('Invalid or expired MFA token');
+      }
     }
 
     // Clear failed attempts on successful login
@@ -524,7 +553,19 @@ export class AuthService {
       );
     }
 
-    let user = await this.usersService.findByEmail(email);
+    let user;
+    try {
+      user = await this.usersService.findByEmail(email);
+    } catch (err) {
+      // if the underlying user lookup failed (e.g. because Prisma threw an
+      // error due to a malformed value) we want to propagate a clearer
+      // message so callers of googleAuth can react appropriately.
+      this.logger.error(
+        `Error finding user by email during Google auth`,
+        err as Error,
+      );
+      throw err;
+    }
 
     if (!user) {
       // Create new user
@@ -690,7 +731,7 @@ export class AuthService {
 
     // Generate refresh token (longer-lived, stored in Redis)
     const refreshTokenRaw = randomBytes(40).toString('hex');
-    const refreshKey = `refresh:${user.id}:${refreshTokenRaw}`;
+    const refreshKey = `refresh:${refreshTokenRaw}`;
     this.redis
       .set(refreshKey, user.id, 'EX', this.REFRESH_TOKEN_EXPIRY)
       .catch((err) => this.logger.error('Failed to store refresh token', err));
@@ -774,28 +815,31 @@ export class AuthService {
 
   // ─── Refresh Token ─────────────────────────────────────────
   async refreshToken(
-    userId: string,
     refreshTokenRaw: string,
-  ): Promise<{ accessToken: string; expiresIn: number }> {
+  ): Promise<{ accessToken: string; refreshToken: string; expiresIn: number }> {
+    if (!refreshTokenRaw) {
+      throw new UnauthorizedException('Refresh token is required');
+    }
+
+    // Get userId from refresh token
+    const refreshKey = `refresh:${refreshTokenRaw}`;
+    const userId = await this.redis.get(refreshKey);
+
+    if (!userId) {
+      throw new UnauthorizedException(
+        'Refresh token is invalid or has expired',
+      );
+    }
+
     const user = await this.usersService.findById(userId);
 
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
 
-    // Validate the refresh token against the Redis store before issuing a new access token
-    if (refreshTokenRaw) {
-      const refreshKey = `refresh:${userId}:${refreshTokenRaw}`;
-      const storedUserId = await this.redis.get(refreshKey);
-
-      if (!storedUserId || storedUserId !== userId) {
-        throw new UnauthorizedException(
-          'Refresh token is invalid or has expired',
-        );
-      }
-    } else {
-      throw new UnauthorizedException('Refresh token is required');
-    }
+    // --- REFRESH TOKEN ROTATION ---
+    // Delete the old refresh token so it cannot be reused
+    await this.redis.del(refreshKey);
 
     const payload: JwtPayload = {
       sub: user.id,
@@ -803,10 +847,24 @@ export class AuthService {
       name: user.name || '',
     };
 
+    const accessToken = this.jwtService.sign(payload, {
+      expiresIn: this.ACCESS_TOKEN_EXPIRY,
+    });
+
+    // Generate a new refresh token
+    const newRefreshTokenRaw = randomBytes(40).toString('hex');
+    const newRefreshKey = `refresh:${newRefreshTokenRaw}`;
+
+    // Store the new refresh token in Redis
+    await this.redis
+      .set(newRefreshKey, user.id, 'EX', this.REFRESH_TOKEN_EXPIRY)
+      .catch((err) =>
+        this.logger.error('Failed to store rotated refresh token', err),
+      );
+
     return {
-      accessToken: this.jwtService.sign(payload, {
-        expiresIn: this.ACCESS_TOKEN_EXPIRY,
-      }),
+      accessToken,
+      refreshToken: newRefreshTokenRaw, // Return the newly rotated token
       expiresIn: this.ACCESS_TOKEN_EXPIRY,
     };
   }

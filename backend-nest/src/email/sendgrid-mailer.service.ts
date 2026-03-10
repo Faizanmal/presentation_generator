@@ -67,22 +67,27 @@ export class SendgridMailerService {
       }
     }
 
-    const content = [
+    // Build a simple array of content objects; the actual SendGrid
+    // type is overly strict so we'll cast later.
+    const contentArray: Array<{ type: string; value: string }> = [
       ...(finalHtml ? [{ type: 'text/html', value: finalHtml }] : []),
       ...(finalText ? [{ type: 'text/plain', value: finalText }] : []),
     ];
 
-    // Ensure at least one content item
-    if (content.length === 0) {
-      content.push({ type: 'text/plain', value: '' });
+    if (contentArray.length === 0) {
+      contentArray.push({ type: 'text/plain', value: '' });
     }
 
-    const msg: sendgrid.MailDataRequired = {
+    // build message object and then cast at the end to bypass
+    // the overly-strict `content` requirement in the helper types
+    const msg = {
       to,
       from: { email: this.fromAddress, name: this.fromName },
       subject,
-      content: content as unknown as sendgrid.MailDataRequired['content'],
-    };
+      // content must be a non-empty array; our earlier logic guarantees
+      // it has at least one element, so force the cast here.
+      content: contentArray as unknown as sendgrid.MailDataRequired['content'],
+    } as sendgrid.MailDataRequired;
 
     try {
       // use guarded runtime client

@@ -43,9 +43,9 @@ const eslintConfig = defineConfig([
         { props: "never", children: "never" },
       ],
       "react/jsx-boolean-value": ["warn", "never"],
-      "react/no-unescaped-entities": "off",
+      "react/no-unescaped-entities": "warn",
       "react/jsx-no-useless-fragment": "warn",
-      "react/no-array-index-key": "warn",
+      "react/no-array-index-key": "error",
 
       // Modern JS
       "no-var": "error",
@@ -58,8 +58,8 @@ const eslintConfig = defineConfig([
       "@typescript-eslint/ban-ts-comment": "warn",
 
       // Next.js overrides
-      "@next/next/no-html-link-for-pages": "off",
-      "@next/next/no-img-element": "off",
+      "@next/next/no-html-link-for-pages": "warn",
+      "@next/next/no-img-element": "warn",
     },
   },
 ]);

@@ -5,6 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { AuthenticatedRequest } from '../../common/types/user.types';
 
 export const ROLES_KEY = 'roles';
 
@@ -18,7 +19,7 @@ export const Roles = (...roles: string[]) => {
     descriptor?: PropertyDescriptor,
   ) => {
     if (descriptor) {
-      Reflect.defineMetadata(ROLES_KEY, roles, descriptor.value);
+      Reflect.defineMetadata(ROLES_KEY, roles, descriptor.value as object);
       return descriptor;
     }
     Reflect.defineMetadata(ROLES_KEY, roles, target);
@@ -44,7 +45,7 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const user = request.user;
 
     if (!user) {
@@ -69,7 +70,7 @@ export class RolesGuard implements CanActivate {
 @Injectable()
 export class AdminGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const user = request.user;
 
     if (!user) {

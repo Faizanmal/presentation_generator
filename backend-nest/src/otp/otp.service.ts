@@ -90,7 +90,7 @@ export class OtpService {
     const isLockedOut = await this.redis.get(lockoutKey);
     if (isLockedOut) {
       const ttl = await this.redis.ttl(lockoutKey);
-      this.otpMetrics?.trackRateLimited(
+      void this.otpMetrics?.trackRateLimited(
         normalizedId,
         (channel as string) === 'email' ? 'email' : 'sms',
         purpose,
@@ -118,12 +118,12 @@ export class OtpService {
     }
     if (requestCount > this.MAX_REQUESTS_PER_HOUR) {
       const ttl = await this.redis.ttl(rateLimitKey);
-      this.otpMetrics?.trackRateLimited(
+      void this.otpMetrics?.trackRateLimited(
         normalizedId,
         (channel as string) === 'email' ? 'email' : 'sms',
         purpose,
       );
-      this.monitoring?.trackOtpFailed(
+      void this.monitoring?.trackOtpFailed(
         (channel as string) === 'email' ? 'email' : 'sms',
         purpose,
         'rate_limited',
@@ -178,7 +178,7 @@ export class OtpService {
     );
 
     // Track metrics
-    this.otpMetrics?.trackRequested(
+    void this.otpMetrics?.trackRequested(
       normalizedId,
       (channel as string) === 'email' ? 'email' : 'sms',
       purpose,
@@ -249,12 +249,12 @@ export class OtpService {
       );
 
       // Track lockout
-      this.otpMetrics?.trackLockedOut(
+      void this.otpMetrics?.trackLockedOut(
         normalizedId,
         channel === 'email' ? 'email' : 'sms',
         purpose,
       );
-      this.monitoring?.trackOtpFailed(
+      void this.monitoring?.trackOtpFailed(
         channel === 'email' ? 'email' : 'sms',
         purpose,
         'locked_out',
@@ -280,7 +280,7 @@ export class OtpService {
       this.logger.log(`OTP verified for ${normalizedId} [purpose: ${purpose}]`);
 
       // Track success
-      this.otpMetrics?.trackVerified(
+      void this.otpMetrics?.trackVerified(
         normalizedId,
         channel === 'email' ? 'email' : 'sms',
         purpose,
@@ -303,7 +303,7 @@ export class OtpService {
     );
 
     // Track failure
-    this.otpMetrics?.trackFailed(
+    void this.otpMetrics?.trackFailed(
       normalizedId,
       channel === 'email' ? 'email' : 'sms',
       purpose,

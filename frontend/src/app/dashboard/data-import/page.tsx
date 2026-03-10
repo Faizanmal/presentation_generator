@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { useDataImport } from '@/hooks/use-new-features';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function DataImportPage() {
     const router = useRouter();
@@ -28,6 +29,24 @@ export default function DataImportPage() {
     const [step, setStep] = useState<'upload' | 'preview' | 'generate'>('upload');
 
     const handleFile = useCallback(async (f: File) => {
+        // Validate file
+        const isValidType =
+            f.name.endsWith('.xlsx') ||
+            f.name.endsWith('.xls') ||
+            f.name.endsWith('.csv') ||
+            f.type === 'text/csv' ||
+            f.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+        if (!isValidType) {
+            toast.error('Invalid file type. Please upload a CSV or Excel file.');
+            return;
+        }
+
+        if (f.size > 10 * 1024 * 1024) { // 10MB limit
+            toast.error('File size exceeds 10MB limit.');
+            return;
+        }
+
         setFile(f);
         const formData = new FormData();
         formData.append('file', f);
@@ -51,6 +70,10 @@ export default function DataImportPage() {
         try {
             const analyzeForm = new FormData();
             analyzeForm.append('file', f);
+            // Append sheetname if we have it
+            if (isExcel && selectedSheet) {
+                analyzeForm.append('sheetName', selectedSheet);
+            }
             const result = await analyzeData.mutateAsync({ formData: analyzeForm, sheetName: selectedSheet });
             setAnalysisResult(result.data as typeof analysisResult);
             setStep('preview');
@@ -67,6 +90,8 @@ export default function DataImportPage() {
         }
     }, [handleFile]);
 
+    const queryClient = useQueryClient();
+
     const handleGenerate = async () => {
         if (!file) { return; }
         try {
@@ -77,6 +102,10 @@ export default function DataImportPage() {
             toast.success('Presentation generated from data!');
             const project = result.data.project as { id?: string };
             if (project?.id) {
+                // ensure the dashboard list is kept fresh for when the user
+                // returns; invalidate before navigating so the cache is
+                // re-fetched if the dashboard is visited again
+                queryClient.invalidateQueries({ queryKey: ['projects'] });
                 router.push(`/editor/${project.id}`);
             }
         } catch {
@@ -214,12 +243,10 @@ export default function DataImportPage() {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {analysisResult.preview.sampleRows.map((row, ri) => (
-                                                // eslint-disable-next-line react/no-array-index-key
-                                                <tr key={`row-${ri}`} className="border-t">
-                                                    {(row as unknown[]).map((cell, ci) => (
-                                                        // eslint-disable-next-line react/no-array-index-key
-                                                        <td key={`cell-${ri}-${ci}`} className="px-3 py-2 whitespace-nowrap max-w-50 truncate">
+                                            {analysisResult.preview.sampleRows.map((row, ri) => ({ row, id: String(ri) })).map(({ row, id: rowId }) => (
+                                                <tr key={`row-${rowId}`} className="border-t">
+                                                    {(row as unknown[]).map((cell, ci) => ({ cell, id: String(ci) })).map(({ cell, id: colId }) => (
+                                                        <td key={`cell-${rowId}-${colId}`} className="px-3 py-2 whitespace-nowrap max-w-50 truncate">
                                                             {String(cell ?? '')}
                                                         </td>
                                                     ))}

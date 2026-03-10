@@ -132,53 +132,16 @@ export default function AccessibilitySettingsPage() {
         },
     });
 
-    // Mock data for demonstration
-    const mockIssues: AccessibilityIssue[] = [
-        {
-            id: "1",
-            type: "contrast",
-            severity: "critical",
-            message: "Text color #gray on #lightgray background has insufficient contrast ratio (2.1:1)",
-            slideId: "slide-1",
-            suggestion: "Use darker text color or lighter background",
-        },
-        {
-            id: "2",
-            type: "alt-text",
-            severity: "warning",
-            message: "Image is missing alternative text",
-            slideId: "slide-2",
-            blockId: "block-1",
-            suggestion: "Add descriptive alt text for screen readers",
-        },
-        {
-            id: "3",
-            type: "heading-order",
-            severity: "info",
-            message: "Heading levels should be sequential (H1 -> H3 skips H2)",
-            slideId: "slide-3",
-            suggestion: "Use H2 before H3 for proper document structure",
-        },
-        {
-            id: "4",
-            type: "font-size",
-            severity: "warning",
-            message: "Text size is too small (10px) for comfortable reading",
-            slideId: "slide-1",
-            blockId: "block-3",
-            suggestion: "Use a minimum font size of 14px for body text",
-        },
-    ];
+    const displayGuidelines = guidelines || [];
 
-    const mockGuidelines = guidelines || [
-        { id: "1.1.1", title: "Non-text Content", level: "A", description: "Provide text alternatives for non-text content" },
-        { id: "1.4.3", title: "Contrast (Minimum)", level: "AA", description: "4.5:1 contrast ratio for text" },
-        { id: "1.4.6", title: "Contrast (Enhanced)", level: "AAA", description: "7:1 contrast ratio for text" },
-        { id: "2.4.6", title: "Headings and Labels", level: "AA", description: "Headings and labels describe topic or purpose" },
-    ];
-
-    const accessibilityScore = checkAccessibilityMutation.data?.score || 75;
-    const issues = checkAccessibilityMutation.data?.issues || mockIssues;
+    const accessibilityScore = checkAccessibilityMutation.data?.score ?? null;
+    const issues: AccessibilityIssue[] = (checkAccessibilityMutation.data?.issues || []).map(
+        (issue: { id: string; type: string; severity: string; message: string; slideId?: string; blockId?: string; suggestion?: string }) => ({
+            ...issue,
+            severity: (['critical', 'warning', 'info'].includes(issue.severity) ? issue.severity : 'info') as AccessibilityIssue['severity'],
+        })
+    );
+    const hasRunCheck = checkAccessibilityMutation.isSuccess;
 
     const getSeverityColor = (severity: string) => {
         switch (severity) {
@@ -265,11 +228,11 @@ export default function AccessibilitySettingsPage() {
                                 <CardContent className="space-y-4">
                                     <div className="relative flex items-center justify-center">
                                         <div className="text-5xl font-bold text-slate-900 dark:text-white">
-                                            {accessibilityScore}
+                                            {accessibilityScore ?? "--"}
                                         </div>
                                         <span className="text-2xl text-slate-500 ml-1">/100</span>
                                     </div>
-                                    <Progress value={accessibilityScore} className="h-3" />
+                                    <Progress value={accessibilityScore ?? 0} className="h-3" />
                                     <div className="grid grid-cols-3 gap-2 text-center">
                                         <div className="p-2 bg-red-50 dark:bg-red-900/20 rounded">
                                             <p className="text-2xl font-bold text-red-600">
@@ -340,6 +303,20 @@ export default function AccessibilitySettingsPage() {
                                 </CardHeader>
                                 <CardContent>
                                     <div className="space-y-3">
+                                        {!hasRunCheck && issues.length === 0 && (
+                                            <div className="text-center py-8 text-slate-500">
+                                                <Target className="h-10 w-10 mx-auto mb-3 text-slate-300 dark:text-slate-600" />
+                                                <p className="font-medium">No accessibility check run yet</p>
+                                                <p className="text-sm mt-1">Enter a project ID and click &ldquo;Run Check&rdquo; to scan for issues.</p>
+                                            </div>
+                                        )}
+                                        {hasRunCheck && issues.length === 0 && (
+                                            <div className="text-center py-8 text-green-600 dark:text-green-400">
+                                                <CheckCircle2 className="h-10 w-10 mx-auto mb-3" />
+                                                <p className="font-medium">No accessibility issues found!</p>
+                                                <p className="text-sm mt-1 text-slate-500">Your project passes all accessibility checks.</p>
+                                            </div>
+                                        )}
                                         {issues.map((issue) => (
                                             <div
                                                 key={issue.id}
@@ -607,7 +584,14 @@ export default function AccessibilitySettingsPage() {
                             </CardHeader>
                             <CardContent>
                                 <div className="space-y-4">
-                                    {mockGuidelines.map((guideline) => (
+                                    {displayGuidelines.length === 0 && (
+                                        <div className="text-center py-8 text-slate-500">
+                                            <FileText className="h-10 w-10 mx-auto mb-3 text-slate-300 dark:text-slate-600" />
+                                            <p className="font-medium">Loading guidelines...</p>
+                                            <p className="text-sm mt-1">WCAG guidelines will appear here once loaded.</p>
+                                        </div>
+                                    )}
+                                    {displayGuidelines.map((guideline) => (
                                         <div
                                             key={guideline.id}
                                             className="p-4 border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"

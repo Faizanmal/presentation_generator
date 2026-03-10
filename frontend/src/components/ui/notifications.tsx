@@ -16,6 +16,7 @@ import {
     Clock,
     Trash2,
 } from "lucide-react";
+import Image from 'next/image';
 import { Button } from "./button";
 import {
     DropdownMenu,
@@ -236,7 +237,7 @@ export function NotificationBell() {
                                         <div className="flex gap-3">
                                             <div className="shrink-0 mt-0.5">
                                                 {notification.avatar ? (
-                                                    <img
+                                                    <Image
                                                         src={notification.avatar}
                                                         alt=""
                                                         className="h-10 w-10 rounded-full"

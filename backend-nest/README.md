@@ -112,3 +112,79 @@ Please ensure you follow the project's coding standards and run linting before i
 ```bash
 npm run lint
 ```
+
+## 🚀 Deployment
+
+### Railway Deployment
+
+This backend is configured for easy deployment on [Railway](https://railway.app).
+
+#### Prerequisites
+- Railway account
+- GitHub repository connected to Railway
+
+#### Steps
+
+1. **Create a Railway Project**:
+   - Go to [Railway Dashboard](https://railway.app/dashboard)
+   - Click "New Project" → "Deploy from GitHub repo"
+   - Select your repository
+
+2. **Add Database Service**:
+   - In your Railway project, add a PostgreSQL service
+   - Railway will automatically provide `DATABASE_URL` environment variable
+
+3. **Add Redis Service (Optional)**:
+   - Add a Redis service for caching and queues
+   - Railway will provide `REDIS_URL` environment variable
+
+4. **Configure Environment Variables**:
+   Set the following environment variables in Railway (Project Settings → Variables):
+
+   ```env
+   # Required
+   JWT_SECRET=your-super-secret-jwt-key-change-in-production
+   JWT_EXPIRATION=7d
+
+   # AI Providers (at least one)
+   OPENAI_API_KEY=your-openai-api-key
+   GROQ_API_KEY=your-groq-api-key
+   GOOGLE_AI_API_KEY=your-google-ai-key
+
+   # Image APIs (optional)
+   UNSPLASH_ACCESS_KEY=your-unsplash-access-key
+   PEXELS_API_KEY=your-pexels-api-key
+   PIXABAY_API_KEY=your-pixabay-api-key
+
+   # Payments (if using Stripe)
+   STRIPE_SECRET_KEY=your-stripe-secret-key
+   STRIPE_WEBHOOK_SECRET=your-stripe-webhook-secret
+
+   # AWS S3 (if using file storage)
+   AWS_ACCESS_KEY_ID=your-aws-access-key
+   AWS_SECRET_ACCESS_KEY=your-aws-secret-key
+   AWS_REGION=us-east-1
+   AWS_S3_BUCKET=your-s3-bucket-name
+
+   # Email (if using SendGrid)
+   SENDGRID_API_KEY=your-sendgrid-api-key
+   MAIL_FROM=no-reply@example.com
+
+   # Frontend URL
+   FRONTEND_URL=https://your-frontend-domain.com
+   ```
+
+5. **Deploy**:
+   - Railway will automatically detect the `railway.json` configuration
+   - It will build using `Dockerfile.production`
+   - Run database migrations on deploy
+   - Start the application
+
+6. **Verify Deployment**:
+   - Check the Railway logs for successful build and migration
+   - Visit your Railway domain + `/api/health` to verify the health endpoint
+
+#### Railway Configuration Files
+- `railway.json`: Specifies build and deploy configuration
+- `Dockerfile.production`: Optimized production Docker image
+- Environment variables are automatically injected by Railway services

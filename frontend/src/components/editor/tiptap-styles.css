@@ -1,0 +1,47 @@
+/* TipTap Editor Styles */
+.tiptap {
+  min-height: 100px;
+  outline: none;
+}
+
+.tiptap table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+.tiptap table td,
+.tiptap table th {
+  min-width: 1em;
+  border: 1px solid #e2e8f0;
+  padding: 8px 12px;
+  vertical-align: top;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.dark .tiptap table td,
+.dark .tiptap table th {
+  border-color: #334155;
+}
+
+.tiptap table th {
+  font-weight: bold;
+  text-align: left;
+  background-color: #f8fafc;
+}
+
+.dark .tiptap table th {
+  background-color: #1e293b;
+}
+
+.tiptap table .selectedCell:after {
+  z-index: 2;
+  position: absolute;
+  content: "";
+  inset: 0;
+  background: rgba(59, 130, 246, 0.08); /* Tailwind blue-500 with opacity */
+  pointer-events: none;
+}

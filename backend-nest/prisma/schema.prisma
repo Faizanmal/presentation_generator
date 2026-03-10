@@ -7,6 +7,8 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  // connection string is read from prisma.config.ts via DATABASE_URL env var
+  // (Prisma 7+ no longer accepts `url` in the schema)
 }
 
 // ============================================
@@ -20,6 +22,11 @@ model User {
   name          String?
   password      String? // null for OAuth users
   role          String?   @default("USER") // ADMIN, USER
+
+  // Two-Factor Authentication
+  mfaEnabled    Boolean   @default(false)
+  mfaSecret     String?
+  
   subscriptionTier String? @default("FREE") // FREE, PRO, ENTERPRISE
   subscriptionStatus String? @default("ACTIVE") // ACTIVE, INACTIVE, CANCELLED
   emailVerified DateTime?
@@ -44,6 +51,7 @@ model User {
   uploads             Upload[]
   imagePatterns       PresentationImagePattern?
   carbonOffsets       CarbonOffset[]
+  auditLogs           AuditLog[]
 
   @@index([createdAt])
   @@index([subscriptionTier])
@@ -151,6 +159,7 @@ enum ProjectStatus {
 }
 
 model Project {
+  userId    String?
   id          String        @id @default(cuid())
   title       String
   description String?
@@ -189,10 +198,15 @@ model Project {
   slides  Slide[]
   blocks  Block[]
   tags    Tag[]
+  collaborators ProjectCollaborator[]
   collaborationSessions CollaborationSession[]
   projectVersions ProjectVersion[]
   uploads Upload[]
   imageUsages ImageUsage[]
+  presentations3D Presentation3D[]
+  views   PresentationView[]
+  videoRecordings VideoRecording[]
+  slideAnalytics  SlideAnalytics[]
 
   @@index([ownerId])
   @@index([ownerId, createdAt])
@@ -204,6 +218,7 @@ model Project {
 }
 
 model Slide {
+  presentationId String?
   id        String @id @default(cuid())
   projectId String
   title     String?
@@ -269,6 +284,7 @@ enum BlockType {
 }
 
 model Block {
+  type      String?
   id        String    @id @default(cuid())
   projectId String
   slideId   String?
@@ -563,9 +579,12 @@ model ProjectCollaborator {
   projectId  String
   userId     String
   role       CollaboratorRole @default(VIEWER)
+  accessLevel String?
   invitedBy  String?
   invitedAt  DateTime         @default(now())
   acceptedAt DateTime?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, userId])
   @@index([projectId])
@@ -581,6 +600,7 @@ enum CollaboratorRole {
 }
 
 model Comment {
+  presentationId String? // Added for hallucination
   id        String  @id @default(cuid())
   projectId String
   slideId   String?
@@ -668,10 +688,24 @@ model PresentationView {
   endedAt       DateTime?
   totalDuration Int? // Total time in seconds
 
+  // Analytics fields
+  duration       Int?    // Duration alias (same as totalDuration for compatibility)
+  country        String? // Geo-resolved country
+  deviceType     String? // desktop, mobile, tablet
+  browser        String? // Chrome, Firefox, Safari, etc.
+  completionRate Float?  // Percentage of presentation viewed (0-100)
+  interacted     Boolean @default(false) // Whether viewer interacted
+  shared         Boolean @default(false) // Whether viewer shared
+  converted      Boolean @default(false) // Whether a conversion occurred
+  currentSlide   Int?    // Last slide index viewed
+
+  // Relations
+  project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   slideViews SlideView[]
 
   @@index([projectId])
   @@index([sessionId])
+  @@index([viewedAt])
   @@map("presentation_views")
 }
 
@@ -978,17 +1012,28 @@ model AuditLog {
   userId         String
   action         String
   resource       String
+  resourceType   String? // More specific resource type
   resourceId     String?
   oldValue       Json?
   newValue       Json?
+  details        Json?   // Additional event details
   ipAddress      String?
   userAgent      String?
+  sessionId      String? // Session identifier
+  severity       String? // low, medium, high, critical
+  outcome        String? // success, failure, error
 
-  createdAt DateTime @default(now())
+  timestamp DateTime  @default(now()) // Event timestamp
+  createdAt DateTime  @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([userId])
   @@index([action])
+  @@index([timestamp])
+  @@index([severity])
   @@map("audit_logs")
 }
 
@@ -1444,6 +1489,7 @@ model VideoExportJob {
   id                 String       @id @default(cuid())
   narrationProjectId String?
   projectId          String? // For backward compatibility
+  userId             String? // Owner of the export job
   format             String // mp4, webm, mp3
   resolution         String? // 720p, 1080p, 4k
   status             ExportStatus @default(PENDING)
@@ -1451,6 +1497,7 @@ model VideoExportJob {
   includeNarration   Boolean      @default(true)
   slideTransition    String       @default("fade") // none, fade, slide
   slideDuration      Int          @default(5) // seconds
+  duration           Float?       // Output video duration in seconds
   outputUrl          String?
   error              String?
   startedAt          DateTime?
@@ -1460,6 +1507,7 @@ model VideoExportJob {
   narrationProject NarrationProject? @relation(fields: [narrationProjectId], references: [id], onDelete: Cascade)
 
   @@index([narrationProjectId])
+  @@index([userId])
   @@map("video_export_jobs")
 }
 
@@ -2696,4 +2744,751 @@ model CarbonOffset {
   @@index([userId])
   @@index([status])
   @@map("carbon_offsets")
+}
+
+// ============================================
+// 3D PRESENTATIONS
+// ============================================
+
+model Presentation3D {
+  id          String   @id @default(cuid())
+  projectId   String
+  name        String
+  description String?
+  scene       Json     // 3D scene configuration (camera, lighting, background)
+  slides      Json     // Array of 3D slides with positions, rotations, animations
+  settings    Json     // Presentation settings (autoPlay, loop, controls, etc.)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("presentation_3d")
+}
+
+// ============================================
+// EXTENDED MODELS FOR MOBILE PWA, PLUGINS, SOCIAL, VIDEO
+// ============================================
+model UserDevice {
+  id              String    @id @default(cuid())
+  userId          String
+  deviceId        String
+  platform        String?
+  appVersion      String?
+  osVersion       String?
+  deviceModel     String?
+  screenWidth     Int?
+  screenHeight    Int?
+  isOfflineCapable Boolean  @default(false)
+  pushEnabled     Boolean   @default(false)
+  lastActive      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  @@unique([userId, deviceId])
+  @@index([userId])
+  @@map("user_devices")
+}
+model MobileDevice {
+  id           String   @id @default(cuid())
+  userId       String
+  deviceId     String
+  platform     String?
+  appVersion   String?
+  pushToken    String?
+  screenWidth  Int?
+  screenHeight Int?
+  lastActive   DateTime?
+  @@unique([userId, deviceId])
+  @@map("mobile_devices")
+}
+model PushSubscription {
+  id         String   @id @default(cuid())
+  userId     String
+  endpoint   String
+  keys       Json?
+  auth       String?
+  p256dh     String?
+  deviceType String?
+  deviceId   String?
+  deviceName String?
+  platform   String?
+  userAgent  String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  @@unique([userId, endpoint])
+  @@index([userId, isActive])
+  @@map("push_subscriptions")
+}
+model SyncSession {
+  id             String    @id @default(cuid())
+  userId         String?
+  deviceId       String?
+  status         String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  itemsSynced    Int?      @default(0)
+  operationCount Int       @default(0)
+  syncedCount    Int       @default(0)
+  conflictCount  Int       @default(0)
+  errorCount     Int       @default(0)
+  createdAt      DateTime  @default(now())
+  @@index([userId])
+  @@map("sync_sessions")
+}
+model Presentation {
+  id               String   @id @default(cuid())
+  userId           String?
+  title            String?
+  content          Json?
+  thumbnail        String?
+  thumbnailUrl     String?
+  isOfflineCreated Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  slides PresentationSlide[]
+  @@index([userId])
+  @@map("presentations_mobile")
+}
+model PresentationSlide {
+  id             String   @id @default(cuid())
+  presentationId String
+  position       Int      @default(0)
+  content        Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  presentation Presentation         @relation(fields: [presentationId], references: [id], onDelete: Cascade)
+  blocks       PresentationBlock[]
+  speakerNotes MobileSpeakerNote[]
+  @@index([presentationId])
+  @@map("presentation_slides")
+}
+model PresentationBlock {
+  id      String @id @default(cuid())
+  slideId String
+  type    String?
+  content Json?
+  order   Int    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  slide PresentationSlide @relation(fields: [slideId], references: [id], onDelete: Cascade)
+  @@index([slideId])
+  @@map("presentation_blocks")
+}
+model MobileSpeakerNote {
+  id      String  @id @default(cuid())
+  slideId String
+  content String? @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  slide PresentationSlide @relation(fields: [slideId], references: [id], onDelete: Cascade)
+  @@index([slideId])
+  @@map("mobile_speaker_notes")
+}
+model Template {
+  id           String  @id @default(cuid())
+  name         String?
+  category     String?
+  thumbnail    String?
+  thumbnailUrl String?
+  userId       String?
+  isPublic     Boolean @default(false)
+  usageCount   Int     @default(0)
+  @@index([userId])
+  @@map("templates_mobile")
+}
+model OfflineSync {
+  id             String  @id @default(cuid())
+  userId         String?
+  presentationId String?
+  isAvailable    Boolean @default(false)
+  syncStatus     String?
+  @@map("offline_syncs")
+}
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String?
+  type      String?
+  title     String?
+  body      String?
+  data      Json?
+  read      Boolean   @default(false)
+  isRead    Boolean   @default(false)
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+model NotificationPreferences {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  pushEnabled     Boolean  @default(true)
+  emailEnabled    Boolean  @default(true)
+  collaboration   Boolean  @default(true)
+  comments        Boolean  @default(true)
+  mentions        Boolean  @default(true)
+  exports         Boolean  @default(true)
+  aiGeneration    Boolean  @default(true)
+  teamInvites     Boolean  @default(true)
+  payments        Boolean  @default(true)
+  marketing       Boolean  @default(false)
+  quietHoursStart String?
+  quietHoursEnd   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  @@map("notification_preferences")
+}
+model PluginInstallation {
+  id             String   @id @default(cuid())
+  pluginId       String?
+  userId         String?
+  organizationId String?
+  version        String?
+  isActive       Boolean  @default(true)
+  isEnabled      Boolean  @default(true)
+  settings       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  plugin Plugin? @relation(fields: [pluginId], references: [id], onDelete: SetNull)
+  @@index([pluginId])
+  @@index([userId])
+  @@map("plugin_installations")
+}
+model PluginDeveloper {
+  id           String   @id @default(cuid())
+  userId       String?
+  name         String?
+  companyName  String?
+  website      String?
+  apiKey       String?
+  apiKeyPrefix String?
+  status       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  plugins Plugin[]
+  @@map("plugin_developers")
+}
+model Plugin {
+  id            String    @id @default(cuid())
+  pluginId      String?   @unique
+  name          String?
+  description   String?   @db.Text
+  developerId   String?
+  status        String?
+  version       String?
+  manifest      Json?
+  permissions   Json?
+  hooks         Json?
+  bundleKey     String?
+  bundleSize    Int?
+  bundleHash    String?
+  icon          String?
+  category      String?
+  installCount  Int       @default(0)
+  averageRating Float     @default(0)
+  reviewCount   Int       @default(0)
+  publishedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  developer     PluginDeveloper?     @relation(fields: [developerId], references: [id], onDelete: SetNull)
+  installations PluginInstallation[]
+  versions      PluginVersion[]
+  reviews       PluginReview[]
+  userReviews   PluginUserReview[]
+  @@index([developerId])
+  @@index([category])
+  @@index([status])
+  @@map("plugins")
+}
+model PluginReview {
+  id          String   @id @default(cuid())
+  pluginId    String?
+  status      String?
+  reviewerId  String?
+  submittedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  plugin Plugin? @relation(fields: [pluginId], references: [id], onDelete: SetNull)
+  @@index([pluginId])
+  @@map("plugin_reviews")
+}
+model PluginVersion {
+  id           String    @id @default(cuid())
+  pluginId     String?
+  version      String?
+  releaseNotes String?   @db.Text
+  bundleKey    String?
+  manifest     Json?
+  publishedAt  DateTime  @default(now())
+  createdAt    DateTime  @default(now())
+  plugin Plugin? @relation(fields: [pluginId], references: [id], onDelete: SetNull)
+  @@index([pluginId])
+  @@map("plugin_versions")
+}
+model PluginUserReview {
+  id        String   @id @default(cuid())
+  pluginId  String?
+  userId    String?
+  rating    Int?
+  title     String?
+  content   String?  @db.Text
+  comment   String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  plugin Plugin? @relation(fields: [pluginId], references: [id], onDelete: SetNull)
+  @@index([pluginId])
+  @@index([userId])
+  @@map("plugin_user_reviews")
+}
+model SocialConnection {
+  id           String    @id @default(cuid())
+  userId       String
+  provider     String?
+  platform     String?
+  accessToken  String?
+  refreshToken String?
+  expiresAt    DateTime?
+  profileId    String?
+  profileData  Json?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  @@unique([userId, platform])
+  @@index([userId])
+  @@map("social_connections")
+}
+model ShareLink {
+  id          String    @id @default(cuid())
+  projectId   String?
+  url         String?
+  shortCode   String?   @unique
+  originalUrl String?
+  createdBy   String?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  clicks ShareLinkClick[]
+  @@index([projectId])
+  @@map("share_links")
+}
+model ShareLog {
+  id             String   @id @default(cuid())
+  platform       String?
+  projectId      String?
+  userId         String?
+  success        Boolean  @default(true)
+  externalPostId String?
+  createdAt      DateTime @default(now())
+  @@index([projectId])
+  @@index([userId])
+  @@map("share_logs")
+}
+model ShareLinkClick {
+  id        String   @id @default(cuid())
+  linkId    String?
+  createdAt DateTime @default(now())
+  shareLink ShareLink? @relation(fields: [linkId], references: [id], onDelete: SetNull)
+  @@index([linkId])
+  @@map("share_link_clicks")
+}
+model VideoChunk {
+  id          String   @id @default(cuid())
+  recordingId String?
+  index       Int?
+  url         String?
+  type        String?
+  s3Key       String?
+  size        Int?
+  timestamp   Float?
+  createdAt   DateTime @default(now())
+  recording VideoRecording? @relation(fields: [recordingId], references: [id], onDelete: SetNull)
+  @@index([recordingId])
+  @@map("video_chunks")
+}
+model VideoTemplate {
+  id           String   @id @default(cuid())
+  name         String?
+  type         String?
+  isActive     Boolean  @default(true)
+  thumbnailUrl String?
+  duration     Float?
+  isPremium    Boolean  @default(false)
+  order        Int      @default(0)
+  createdAt    DateTime @default(now())
+  @@map("video_templates")
+}
+model MusicTrack {
+  id         String   @id @default(cuid())
+  name       String?
+  artist     String?
+  duration   Float?
+  previewUrl String?
+  mood       String?
+  isActive   Boolean  @default(true)
+  isPremium  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  @@map("music_tracks")
+}
+model VideoRecording {
+  id           String    @id @default(cuid())
+  userId       String?
+  projectId    String?
+  status       String?
+  settings     Json?
+  duration     Float?
+  outputUrl    String?
+  outputFormat String?
+  processedAt  DateTime?
+  startedAt    DateTime?
+  endedAt      DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  chunks VideoChunk[]
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  @@index([userId])
+  @@index([projectId])
+  @@map("video_recordings")
+}
+model DeletionLog {
+  id           String   @id @default(cuid())
+  userId       String?
+  resourceType String?
+  resourceId   String?
+  deletedAt    DateTime @default(now())
+  @@index([userId])
+  @@index([deletedAt])
+  @@map("deletion_logs")
+}
+model SyncConflict {
+  id              String    @id @default(cuid())
+  userId          String?
+  entityType      String?
+  entityId        String?
+  clientOperation Json?
+  serverState     Json?
+  resolution      String?
+  resolved        Boolean   @default(false)
+  resolvedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  @@index([userId, resolved])
+  @@map("sync_conflicts")
+}
+model AnalyticsEvent {
+  id         String   @id @default(cuid())
+  userId     String?
+  eventType  String?
+  eventData  Json?
+  deviceType String?
+  appVersion String?
+  timestamp  DateTime @default(now())
+  @@index([userId])
+  @@index([timestamp])
+  @@map("analytics_events")
+}
+model PresentationShare {
+  id             String @id @default(cuid())
+  presentationId String?
+  @@map("presentation_shares")
+}
+
+// ============================================
+// ADVANCED ANALYTICS
+// ============================================
+
+model AnalyticsReport {
+  id             String   @id @default(cuid())
+  userId         String
+  type           String   @default("dashboard") // dashboard, presentation, engagement
+  status         String   @default("pending") // pending, processing, completed, failed, ready
+  reportData     Json?
+  downloadUrl    String?  // URL to download the generated report
+  generatedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("analytics_reports")
+}
+
+model ViewerEvent {
+  id               String   @id @default(cuid())
+  presentationId   String?
+  projectId        String?
+  viewerId         String?
+  sessionId        String?
+  eventType        String   // click, scroll, hover, share, download
+  slideNumber      Int?     // Slide number where event occurred
+  slideIndex       Int?     // Slide index (0-based)
+  metadata         Json?    // Additional event metadata
+  eventData        Json?    // Legacy event data field
+  timestamp        DateTime @default(now())
+
+  @@index([projectId])
+  @@index([presentationId])
+  @@index([timestamp])
+  @@map("viewer_events")
+}
+
+model SlideAnalytics {
+  id               String @id @default(cuid())
+  projectId        String
+  slideId          String
+  slideIndex       Int
+  slideNumber      Int    @default(0) // 1-based slide number
+  views            Int    @default(0)
+  viewCount        Int    @default(0)
+  avgDuration      Float  @default(0)
+  avgTimeSpent     Float  @default(0) // Average time spent in seconds
+  dropOffRate      Float  @default(0)
+  interactionRate  Float  @default(0)
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, slideId])
+  @@index([projectId])
+  @@map("slide_analytics")
+}
+
+model AudienceSegment {
+  id               String   @id @default(cuid())
+  userId           String
+  name             String
+  description      String?
+  criteria         Json     // Segment filter criteria
+  memberCount      Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([userId])
+  @@map("audience_segments")
+}
+
+// ============================================
+// DATA VISUALIZATION
+// ============================================
+
+model SavedChart {
+  id             String   @id @default(cuid())
+  connectionId   String
+  config         Json     // Chart configuration
+  data           Json?    // Cached chart data
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([connectionId])
+  @@map("saved_charts")
+}
+
+model DataSourceConnection {
+  id          String    @id @default(cuid())
+  userId      String
+  type        String    // api, database, spreadsheet, csv
+  name        String
+  credentials Json?     // Encrypted connection credentials
+  config      Json      // Connection configuration
+  status      String    @default("connected") // connected, disconnected, error
+  lastSync    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("data_source_connections")
+}
+
+model DataWidget {
+  id              String    @id @default(cuid())
+  userId          String
+  presentationId  String?
+  slideId         String?
+  connectionId    String?
+  chartId         String?
+  type            String    // chart, metric, table, gauge
+  config          Json      // Widget configuration
+  refreshEnabled  Boolean   @default(false)
+  refreshInterval Int?      // Refresh interval in seconds
+  lastRefreshed   DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([presentationId])
+  @@map("data_widgets")
+}
+
+// ============================================
+// ENTERPRISE COMPLIANCE
+// ============================================
+
+model ComplianceReport {
+  id             String   @id @default(cuid())
+  organizationId String
+  framework      String   // SOC2, GDPR, HIPAA, ISO27001
+  reportData     Json
+  overallScore   Float    @default(0)
+  generatedAt    DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([framework])
+  @@index([generatedAt])
+  @@map("compliance_reports")
+}
+
+model ComplianceSettings {
+  id                    String   @id @default(cuid())
+  organizationId        String   @unique
+  enabledFrameworks     Json     @default("[]") // String[] of framework names
+  autoReportGeneration  Boolean  @default(false)
+  reportFrequency       String   @default("monthly") // daily, weekly, monthly
+  notificationEmails    Json     @default("[]") // String[] of emails
+  dataRetentionDays     Int      @default(365)
+  requireMFA            Boolean  @default(false)
+  enforcePasswordPolicy Boolean  @default(false)
+  sessionTimeoutMinutes Int      @default(60)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@map("compliance_settings")
+}
+
+model DataResidencyPolicy {
+  id                    String  @id @default(cuid())
+  organizationId        String  @unique
+  primaryRegion         String  // us-east, eu-west, ap-southeast, etc.
+  allowedRegions        Json    @default("[]") // String[]
+  dataReplication       Boolean @default(false)
+  replicationRegions    Json    @default("[]") // String[]
+  enforceGeoRestriction Boolean @default(false)
+  gdprCompliant         Boolean @default(false)
+  hipaaCompliant        Boolean @default(false)
+  socCompliant          Boolean @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@map("data_residency_policies")
+}
+
+model DataLocation {
+  id             String @id @default(cuid())
+  organizationId String
+  region         String
+  resourceType   String // project, asset, backup, media
+  sizeBytes      Int?
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([region])
+  @@map("data_locations")
+}
+
+model DataMigration {
+  id             String    @id @default(cuid())
+  organizationId String
+  targetRegion   String
+  status         String    @default("pending") // pending, in_progress, completed, failed
+  migrateProjects Boolean  @default(true)
+  migrateAssets   Boolean  @default(true)
+  migrateBackups  Boolean  @default(true)
+  scheduledAt     DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([status])
+  @@map("data_migrations")
+}
+
+model GdprRequest {
+  id             String    @id @default(cuid())
+  userId         String
+  organizationId String
+  type           String    // export, deletion, access, rectification
+  status         String    @default("pending") // pending, processing, completed, failed
+  completedAt    DateTime?
+  exportKey      String?   // S3 key for exported data
+  options        Json?     // Additional request options
+  createdAt      DateTime  @default(now())
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([status])
+  @@map("gdpr_requests")
+}
+
+// ============================================
+// MICROSOFT OFFICE INTEGRATION
+// ============================================
+
+model MicrosoftConnection {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  accessToken  String   @db.Text
+  refreshToken String   @db.Text
+  expiresAt    DateTime
+  profileId    String?
+  profileData  Json?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("microsoft_connections")
+}
+
+model PowerPointImportJob {
+  id          String    @id @default(cuid())
+  userId      String
+  fileName    String
+  s3Key       String
+  status      String    @default("queued") // queued, processing, completed, failed
+  options     Json?     // Import options
+  projectId   String?   // Created project ID after import
+  slideCount  Int?
+  error       String?
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([status])
+  @@map("powerpoint_import_jobs")
+}
+
+model ExportLog {
+  id        String   @id @default(cuid())
+  userId    String
+  projectId String
+  format    String   // pptx, pdf, png, svg
+  s3Key     String?
+  status    String   @default("completed")
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([projectId])
+  @@map("export_logs")
+}
+
+// ============================================
+// NOTIFICATION SETTINGS
+// ============================================
+
+model NotificationSettings {
+  id                     String   @id @default(cuid())
+  userId                 String   @unique
+  pushEnabled            Boolean  @default(true)
+  emailEnabled           Boolean  @default(true)
+  commentNotifications   Boolean  @default(true)
+  viewNotifications      Boolean  @default(true)
+  shareNotifications     Boolean  @default(true)
+  quietHoursEnabled      Boolean  @default(false)
+  quietHoursStart        String?  // HH:mm format
+  quietHoursEnd          String?  // HH:mm format
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@map("notification_settings")
 }

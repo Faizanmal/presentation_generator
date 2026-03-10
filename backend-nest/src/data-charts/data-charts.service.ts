@@ -7,6 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { AIService } from '../ai/ai.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
 // Configurable limits

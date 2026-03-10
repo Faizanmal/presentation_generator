@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import {
 
@@ -19,6 +20,7 @@ import {
 import { Button } from "./button";
 import { Textarea } from "./textarea";
 import { ScrollArea } from "./scroll-area";
+import { api } from "@/lib/api";
 
 interface Message {
     id: string;
@@ -35,7 +37,7 @@ interface AIChatPanelProps {
 }
 
 export function AIChatPanel({
-    projectId: _projectId,
+    projectId,
     onInsertContent,
     suggestions = [
         "Help me improve this slide",
@@ -58,8 +60,30 @@ export function AIChatPanel({
     const [input, setInput] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [copiedId, setCopiedId] = useState<string | null>(null);
+    const [sessionId, setSessionId] = useState<string | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
+
+    // Create chat session on mount when projectId is available
+    const createSessionMutation = useMutation({
+        mutationFn: (pId: string) => api.copilot.createSession(pId),
+        onSuccess: (session) => {
+            setSessionId(session.id);
+        },
+    });
+
+    useEffect(() => {
+        if (projectId && !sessionId && !createSessionMutation.isPending) {
+            createSessionMutation.mutate(projectId);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [projectId]);
+
+    // Send message mutation
+    const sendMessageMutation = useMutation({
+        mutationFn: ({ sid, message }: { sid: string; message: string }) =>
+            api.copilot.sendMessage(sid, message),
+    });
 
     // Auto-scroll to bottom
     useEffect(() => {
@@ -82,23 +106,40 @@ export function AIChatPanel({
         setInput("");
         setIsLoading(true);
 
-        // Simulate AI response (in production, this would call the AI API)
-        setTimeout(() => {
+        try {
+            if (!sessionId) {
+                throw new Error("No active chat session");
+            }
+
+            const response = await sendMessageMutation.mutateAsync({
+                sid: sessionId,
+                message: content.trim(),
+            });
+
             const aiResponse: Message = {
                 id: `assistant-${crypto.randomUUID()}`,
                 role: "assistant",
-                content: generateMockResponse(content),
+                content: response.content || response.message || "I couldn't generate a response. Please try again.",
                 timestamp: new Date(),
-                suggestions: [
+                suggestions: response.suggestions || [
                     "Tell me more",
                     "Can you be more specific?",
                     "Apply this to my slide",
                 ],
             };
             setMessages((prev) => [...prev, aiResponse]);
+        } catch {
+            const errorMessage: Message = {
+                id: `assistant-${crypto.randomUUID()}`,
+                role: "assistant",
+                content: "Sorry, I encountered an error processing your request. Please try again.",
+                timestamp: new Date(),
+            };
+            setMessages((prev) => [...prev, errorMessage]);
+        } finally {
             setIsLoading(false);
-        }, 1000 + Math.random() * 1000);
-    }, [isLoading]);
+        }
+    }, [isLoading, sessionId, sendMessageMutation]);
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === "Enter" && !e.shiftKey) {
@@ -312,18 +353,6 @@ export function AIChatPanel({
             </AnimatePresence>
         </>
     );
-}
-
-// Mock response generator (replace with actual AI API call)
-function generateMockResponse(_prompt: string): string {
-    const responses = [
-        "That's a great question! Here's what I think...\n\nBased on your request, I'd suggest focusing on clarity and visual impact. Consider using bullet points for key information and adding relevant images or charts to support your message.",
-        "I'd be happy to help with that! Here are some ideas:\n\n• Start with a compelling hook\n• Use the rule of three for key points\n• End with a clear call-to-action\n\nWould you like me to elaborate on any of these?",
-        "Great suggestion! Here's an improved version:\n\nYour presentation could benefit from:\n1. Stronger transitions between slides\n2. More visual hierarchy in your text\n3. Interactive elements to engage your audience",
-        "I can definitely help you make this more engaging! Consider:\n\n✨ Adding a relevant story or anecdote\n📊 Including data visualizations\n🎯 Making your key takeaway crystal clear\n\nShall I generate specific content for any of these?",
-    ];
-
-    return responses[Math.floor(Math.random() * responses.length)];
 }
 
 // Compact AI button for toolbars

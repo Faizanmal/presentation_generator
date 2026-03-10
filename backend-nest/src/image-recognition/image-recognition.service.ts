@@ -55,8 +55,14 @@ export class ImageRecognitionService {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
   ) {
+    const features = this.configService.get<{ openAI?: boolean }>('features');
+    const openAIEnabled = features?.openAI ?? true;
+
     const openaiKey = this.configService.get('OPENAI_API_KEY');
-    if (openaiKey) {
+    if (!openAIEnabled) {
+      this.logger.log('OpenAI support disabled via feature flag');
+      this.openai = null;
+    } else if (openaiKey) {
       this.openai = new OpenAI({ apiKey: openaiKey });
     } else {
       this.openai = null;
@@ -74,6 +80,12 @@ export class ImageRecognitionService {
     this.logger.log(`Generating embedding for upload ${uploadId}`);
 
     if (!this.openai) {
+      const openAIEnabled = this.configService.get<{ openAI?: boolean }>(
+        'features',
+      )?.openAI;
+      if (openAIEnabled === false) {
+        throw new BadRequestException('OpenAI support is disabled');
+      }
       throw new BadRequestException('OpenAI API key not configured');
     }
 
@@ -125,6 +137,12 @@ export class ImageRecognitionService {
    */
   async describeImage(imageUrl: string): Promise<string> {
     if (!this.openai) {
+      const openAIEnabled = this.configService.get<{ openAI?: boolean }>(
+        'features',
+      )?.openAI;
+      if (openAIEnabled === false) {
+        throw new BadRequestException('OpenAI support is disabled');
+      }
       throw new BadRequestException('OpenAI API key not configured');
     }
 
@@ -349,7 +367,16 @@ export class ImageRecognitionService {
     });
 
     // Group by project
-    const projectMap = new Map();
+    const projectMap = new Map<
+      string,
+      {
+        projectId: string;
+        projectTitle: string;
+        usageCount: number;
+        firstUsed: Date;
+        lastUsed: Date;
+      }
+    >();
     usages.forEach((usage) => {
       const projId = usage.project.id;
       if (!projectMap.has(projId)) {
@@ -362,7 +389,7 @@ export class ImageRecognitionService {
         });
       }
 
-      const proj = projectMap.get(projId);
+      const proj = projectMap.get(projId)!;
       proj.usageCount++;
       if (usage.addedAt < proj.firstUsed) proj.firstUsed = usage.addedAt;
       if (usage.addedAt > proj.lastUsed) proj.lastUsed = usage.addedAt;

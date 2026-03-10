@@ -39,6 +39,13 @@ import {
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
+// icon component type used across several dashboard cards
+// ensures className prop is recognized by TypeScript
+
+type IconComponent = React.ComponentType<
+  React.SVGProps<SVGSVGElement> & { className?: string }
+>;
+
 interface EnhancedDashboardProps {
   projectId: string;
 }
@@ -224,10 +231,12 @@ export function EnhancedAnalyticsDashboard({ projectId }: EnhancedDashboardProps
   );
 }
 
+// reusable SVG icon type
+
 interface MetricCardProps {
   title: string;
   value: string | number;
-  icon: React.ElementType;
+  icon: IconComponent;
   description: string;
 }
 

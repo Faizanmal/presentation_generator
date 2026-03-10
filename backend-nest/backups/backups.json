@@ -1,0 +1,92 @@
+[
+  {
+    "id": "backup_1772397000161",
+    "timestamp": "2026-03-01T20:30:00.161Z",
+    "type": "full",
+    "size": 28242604,
+    "location": "E:\\SaaS_Tools\\PresentationDesigner\\backend-nest\\backups\\backup_1772397000161.zip",
+    "status": "success",
+    "duration": 12533
+  },
+  {
+    "id": "backup_1772397000240",
+    "timestamp": "2026-03-01T20:30:00.240Z",
+    "type": "full",
+    "size": 28242604,
+    "location": "E:\\SaaS_Tools\\PresentationDesigner\\backend-nest\\backups\\backup_1772397000240.zip",
+    "status": "success",
+    "duration": 12470
+  },
+  {
+    "id": "backup_1772397000218",
+    "timestamp": "2026-03-01T20:30:00.218Z",
+    "type": "full",
+    "size": 28242604,
+    "location": "E:\\SaaS_Tools\\PresentationDesigner\\backend-nest\\backups\\backup_1772397000218.zip",
+    "status": "success",
+    "duration": 12507
+  },
+  {
+    "id": "backup_1772397000277",
+    "timestamp": "2026-03-01T20:30:00.277Z",
+    "type": "full",
+    "size": 28242604,
+    "location": "E:\\SaaS_Tools\\PresentationDesigner\\backend-nest\\backups\\backup_1772397000277.zip",
+    "status": "success",
+    "duration": 12458
+  },
+  {
+    "id": "backup_1772397000130",
+    "timestamp": "2026-03-01T20:30:00.130Z",
+    "type": "full",
+    "size": 28242604,
+    "location": "E:\\SaaS_Tools\\PresentationDesigner\\backend-nest\\backups\\backup_1772397000130.zip",
+    "status": "success",
+    "duration": 12609
+  },
+  {
+    "id": "backup_1772695764515",
+    "timestamp": "2026-03-05T07:29:24.515Z",
+    "type": "full",
+    "size": 32518327,
+    "location": "E:\\SaaS_Tools\\PresentationDesigner\\backend-nest\\backups\\backup_1772695764515.zip",
+    "status": "success",
+    "duration": 29075
+  },
+  {
+    "id": "backup_1772695764509",
+    "timestamp": "2026-03-05T07:29:24.509Z",
+    "type": "full",
+    "size": 32518327,
+    "location": "E:\\SaaS_Tools\\PresentationDesigner\\backend-nest\\backups\\backup_1772695764509.zip",
+    "status": "success",
+    "duration": 29101
+  },
+  {
+    "id": "backup_1772695764506",
+    "timestamp": "2026-03-05T07:29:24.506Z",
+    "type": "full",
+    "size": 32518327,
+    "location": "E:\\SaaS_Tools\\PresentationDesigner\\backend-nest\\backups\\backup_1772695764506.zip",
+    "status": "success",
+    "duration": 29124
+  },
+  {
+    "id": "backup_1772695764518",
+    "timestamp": "2026-03-05T07:29:24.518Z",
+    "type": "full",
+    "size": 32518327,
+    "location": "E:\\SaaS_Tools\\PresentationDesigner\\backend-nest\\backups\\backup_1772695764518.zip",
+    "status": "success",
+    "duration": 29136
+  },
+  {
+    "id": "backup_1772695764428",
+    "timestamp": "2026-03-05T07:29:24.428Z",
+    "type": "full",
+    "size": 32518327,
+    "location": "E:\\SaaS_Tools\\PresentationDesigner\\backend-nest\\backups\\backup_1772695764428.zip",
+    "status": "success",
+    "duration": 29242
+  }
+]

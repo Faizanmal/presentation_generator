@@ -154,17 +154,18 @@ export function NarrationExportPanel({
         },
     });
 
-    // Mock voice options
-    const mockVoices: VoiceOption[] = [
-        { id: "voice-1", name: "James", gender: "male", language: "en-US", accent: "American" },
-        { id: "voice-2", name: "Emma", gender: "female", language: "en-US", accent: "American" },
-        { id: "voice-3", name: "Oliver", gender: "male", language: "en-GB", accent: "British" },
-        { id: "voice-4", name: "Sophia", gender: "female", language: "en-GB", accent: "British" },
-        { id: "voice-5", name: "Alex", gender: "neutral", language: "en-US" },
+    // Default voice options (SDK-supported voices, not mock data)
+    const defaultVoices: VoiceOption[] = [
+        { id: "alloy", name: "Alloy", gender: "neutral", language: "en-US" },
+        { id: "echo", name: "Echo", gender: "male", language: "en-US" },
+        { id: "fable", name: "Fable", gender: "female", language: "en-US" },
+        { id: "onyx", name: "Onyx", gender: "male", language: "en-US" },
+        { id: "nova", name: "Nova", gender: "female", language: "en-US" },
+        { id: "shimmer", name: "Shimmer", gender: "female", language: "en-US" },
     ];
 
-    // Mock slide narrations
-    const mockNarrations: SlideNarration[] = useMemo(() => slides.map((slide, index) => ({
+    // Build narrations from slide data
+    const slideNarrations: SlideNarration[] = useMemo(() => slides.map((slide, index) => ({
         slideId: slide.id,
         slideNumber: index + 1,
         speakerNotes: slide.speakerNotes || "",
@@ -172,8 +173,8 @@ export function NarrationExportPanel({
         duration: slide.speakerNotes ? 30 + ((index * 13) % 60) : undefined,
     })), [slides]);
 
-    const displayVoices = voiceOptions || mockVoices;
-    const displayNarrations = narrationProject?.slides || mockNarrations;
+    const displayVoices = voiceOptions || defaultVoices;
+    const displayNarrations = narrationProject?.slides || slideNarrations;
 
     const totalDuration = displayNarrations.reduce((sum, n) => sum + (n.duration || 0), 0);
     const completedSlides = displayNarrations.filter(n => n.status === "complete").length;

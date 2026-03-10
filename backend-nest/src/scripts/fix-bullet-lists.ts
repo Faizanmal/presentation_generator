@@ -64,9 +64,12 @@ async function fixBulletLists() {
             j < slideBlocks.length &&
             slideBlocks[j].blockType === blockType
           ) {
-            const blockContent = slideBlocks[j].content as Record<string, unknown>;
+            const blockContent = slideBlocks[j].content as Record<
+              string,
+              unknown
+            >;
             if (blockContent?.text) {
-              items.push(blockContent.text);
+              items.push(String(blockContent.text as string));
               if (j > i) {
                 blocksToDelete.push(slideBlocks[j].id);
               }

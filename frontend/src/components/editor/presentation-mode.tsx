@@ -29,6 +29,12 @@ import {
 } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import {
+    injectTransitionKeyframes,
+    getSlideTransitionStyles,
+    TRANSITION_PRESETS,
+    type TransitionConfig,
+} from "@/lib/slide-transition-engine";
 
 interface Slide {
     id: string;
@@ -43,6 +49,8 @@ interface PresentationModeProps {
     startSlide?: number;
     onExit: () => void;
     onSlideChange?: (index: number) => void;
+    transition?: TransitionConfig;
+    transitionPreset?: string;
 }
 
 export function PresentationMode({
@@ -50,8 +58,13 @@ export function PresentationMode({
     startSlide = 0,
     onExit,
     onSlideChange,
+    transition,
+    transitionPreset = "fade-smooth",
 }: PresentationModeProps) {
     const [currentSlide, setCurrentSlide] = useState(startSlide);
+    const [previousSlide, setPreviousSlide] = useState<number | null>(null);
+    const [isTransitioning, setIsTransitioning] = useState(false);
+    const [transitionDirection, setTransitionDirection] = useState<"forward" | "backward">("forward");
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [showControls, setShowControls] = useState(true);
     const [showNotes, setShowNotes] = useState(false);
@@ -60,6 +73,9 @@ export function PresentationMode({
     const [autoPlayInterval,] = useState(5000); // 5 seconds
     const [elapsedTime, setElapsedTime] = useState(0);
     const [pointerMode, setPointerMode] = useState<"pointer" | "laser" | "pen" | "highlighter">("pointer");
+
+    // Resolve transition config: explicit prop > preset > default
+    const activeTransition: TransitionConfig = transition || TRANSITION_PRESETS[transitionPreset] || TRANSITION_PRESETS["fade-smooth"];
 
     interface Drawing {
         path: { x: number; y: number }[];
@@ -74,11 +90,30 @@ export function PresentationMode({
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const autoPlayRef = useRef<NodeJS.Timeout | null>(null);
 
+    // Inject CSS keyframes for all transitions on mount
+    useEffect(() => {
+        injectTransitionKeyframes();
+    }, []);
+
     const goToSlide = useCallback((index: number) => {
         const newIndex = Math.max(0, Math.min(index, slides.length - 1));
+        if (newIndex === currentSlide) return;
+
+        // Determine direction and start transition
+        const direction = newIndex > currentSlide ? "forward" : "backward";
+        setTransitionDirection(direction);
+        setPreviousSlide(currentSlide);
+        setIsTransitioning(true);
         setCurrentSlide(newIndex);
         onSlideChange?.(newIndex);
-    }, [slides.length, onSlideChange]);
+
+        // Clear transitioning state after animation completes
+        const duration = activeTransition.duration || 500;
+        setTimeout(() => {
+            setIsTransitioning(false);
+            setPreviousSlide(null);
+        }, duration);
+    }, [slides.length, onSlideChange, currentSlide, activeTransition.duration]);
 
     const goToNextSlide = useCallback(() => {
         if (currentSlide < slides.length - 1) {
@@ -113,7 +148,7 @@ export function PresentationMode({
         }, 1000);
 
         return () => {
-            if (timerRef.current) {clearInterval(timerRef.current);}
+            if (timerRef.current) { clearInterval(timerRef.current); }
         };
     }, []);
 
@@ -128,7 +163,7 @@ export function PresentationMode({
         }
 
         return () => {
-            if (autoPlayRef.current) {clearInterval(autoPlayRef.current);}
+            if (autoPlayRef.current) { clearInterval(autoPlayRef.current); }
         };
     }, [isPlaying, autoPlayInterval, goToNextSlide]);
 
@@ -198,7 +233,7 @@ export function PresentationMode({
         window.addEventListener("mousemove", handleMouseMove);
         return () => {
             window.removeEventListener("mousemove", handleMouseMove);
-            if (controlsTimeoutRef.current) {clearTimeout(controlsTimeoutRef.current);}
+            if (controlsTimeoutRef.current) { clearTimeout(controlsTimeoutRef.current); }
         };
     }, []);
 
@@ -209,6 +244,10 @@ export function PresentationMode({
     };
 
     const slide = slides[currentSlide];
+    const prevSlide = previousSlide !== null ? slides[previousSlide] : null;
+
+    // Compute transition animations
+    const transitionStyles = getSlideTransitionStyles(activeTransition, transitionDirection);
 
     return (
         <div
@@ -218,33 +257,67 @@ export function PresentationMode({
         >
             {/* Main Slide Area */}
             <div className="flex-1 flex items-center justify-center relative overflow-hidden">
-                {/* Slide Content */}
-                <div
-                    className="w-full h-full max-w-480 max-h-270 bg-white shadow-2xl relative"
-                    style={{ aspectRatio: "16/9" }}
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    {/* Render slide content here */}
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="text-center p-12">
-                            <h1 className="text-5xl font-bold text-slate-900 mb-4">
-                                {slide?.title || `Slide ${currentSlide + 1}`}
-                            </h1>
-                            {/* Slide content would be rendered here */}
+                {/* Exiting Slide (previous — shown during transition) */}
+                {isTransitioning && prevSlide && activeTransition.type !== "none" && (
+                    <div
+                        className="absolute inset-0 flex items-center justify-center"
+                        style={{
+                            ...transitionStyles.exitStyles,
+                            animation: transitionStyles.exitAnimation,
+                        }}
+                    >
+                        <div
+                            className="w-full h-full max-w-480 max-h-270 bg-white shadow-2xl relative"
+                            style={{ aspectRatio: "16/9" }}
+                        >
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="text-center p-12">
+                                    <h1 className="text-5xl font-bold text-slate-900 mb-4">
+                                        {prevSlide?.title || `Slide ${(previousSlide ?? 0) + 1}`}
+                                    </h1>
+                                </div>
+                            </div>
                         </div>
                     </div>
+                )}
 
-                    {/* Drawing overlay */}
-                    {pointerMode !== "pointer" && (
-                        <DrawingCanvas
-                            mode={pointerMode}
-                            drawings={drawings.get(currentSlide) || []}
-                            onDraw={(newDrawing) => {
-                                const slideDrawings = drawings.get(currentSlide) || [];
-                                setDrawings(new Map(drawings.set(currentSlide, [...slideDrawings, newDrawing])));
-                            }}
-                        />
-                    )}
+                {/* Entering Slide (current) */}
+                <div
+                    className="w-full h-full flex items-center justify-center"
+                    style={{
+                        ...transitionStyles.enterStyles,
+                        animation: isTransitioning && activeTransition.type !== "none"
+                            ? transitionStyles.enterAnimation
+                            : undefined,
+                    }}
+                >
+                    <div
+                        className="w-full h-full max-w-480 max-h-270 bg-white shadow-2xl relative"
+                        style={{ aspectRatio: "16/9" }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Render slide content here */}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="text-center p-12">
+                                <h1 className="text-5xl font-bold text-slate-900 mb-4">
+                                    {slide?.title || `Slide ${currentSlide + 1}`}
+                                </h1>
+                                {/* Slide content would be rendered here */}
+                            </div>
+                        </div>
+
+                        {/* Drawing overlay */}
+                        {pointerMode !== "pointer" && (
+                            <DrawingCanvas
+                                mode={pointerMode}
+                                drawings={drawings.get(currentSlide) || []}
+                                onDraw={(newDrawing) => {
+                                    const slideDrawings = drawings.get(currentSlide) || [];
+                                    setDrawings(new Map(drawings.set(currentSlide, [...slideDrawings, newDrawing])));
+                                }}
+                            />
+                        )}
+                    </div>
                 </div>
 
                 {/* Laser pointer effect */}
@@ -549,7 +622,7 @@ function LaserPointer() {
         };
     }, []);
 
-    if (!visible) {return null;}
+    if (!visible) { return null; }
 
     return (
         <div
@@ -587,10 +660,10 @@ function DrawingCanvas({
 
     useEffect(() => {
         const canvas = canvasRef.current;
-        if (!canvas) {return;}
+        if (!canvas) { return; }
 
         const ctx = canvas.getContext("2d");
-        if (!ctx) {return;}
+        if (!ctx) { return; }
 
         // Clear and redraw all drawings
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -629,7 +702,7 @@ function DrawingCanvas({
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
-        if (!isDrawing) {return;}
+        if (!isDrawing) { return; }
         const rect = canvasRef.current?.getBoundingClientRect();
         if (rect) {
             setCurrentPath((prev) => [

@@ -6,7 +6,7 @@ const DEFAULT_THEMES = [
   {
     name: 'Modern Light',
     description: 'Clean and professional light theme',
-    isDefault: true,
+    isDefault: false,
     isPremium: false,
     colors: {
       primary: '#3B82F6',
@@ -141,6 +141,75 @@ const DEFAULT_THEMES = [
       scale: 1.5,
     },
   },
+  {
+    name: 'Ocean Blue',
+    description: 'Refreshing blue ocean theme',
+    isDefault: false,
+    isPremium: false,
+    colors: {
+      primary: '#0369A1',
+      secondary: '#0284C7',
+      background: '#F0F9FF',
+      surface: '#FFFFFF',
+      text: '#0C4A6E',
+      textMuted: '#64748B',
+      accent: '#F59E0B',
+    },
+    fonts: {
+      heading: 'Inter',
+      body: 'Inter',
+    },
+    spacing: {
+      base: 16,
+      scale: 1.5,
+    },
+  },
+  {
+    name: 'Sunset Orange',
+    description: 'Warm sunset colors',
+    isDefault: true,
+    isPremium: false,
+    colors: {
+      primary: '#EA580C',
+      secondary: '#DC2626',
+      background: '#FFF7ED',
+      surface: '#FFFFFF',
+      text: '#9A3412',
+      textMuted: '#A16207',
+      accent: '#16A34A',
+    },
+    fonts: {
+      heading: 'Montserrat',
+      body: 'Lato',
+    },
+    spacing: {
+      base: 18,
+      scale: 1.4,
+    },
+  },
+  {
+    name: 'Forest Green',
+    description: 'Deep forest green theme',
+    isDefault: false,
+    isPremium: false,
+    colors: {
+      primary: '#166534',
+      secondary: '#15803D',
+      background: '#F0FDF4',
+      surface: '#FFFFFF',
+      text: '#14532D',
+      textMuted: '#4B5563',
+      accent: '#DC2626',
+    },
+    fonts: {
+      heading: 'Georgia',
+      body: 'Helvetica',
+    },
+    spacing: {
+      base: 20,
+      scale: 1.6,
+    },
+  },
 ];
 
 @Injectable()
@@ -171,6 +240,18 @@ export class ThemesService {
           },
         });
         this.logger.log(`Theme seeded: ${theme.name}`);
+      } else if (
+        existing.isDefault !== theme.isDefault ||
+        existing.isPremium !== theme.isPremium
+      ) {
+        await this.prisma.theme.update({
+          where: { id: existing.id },
+          data: {
+            isDefault: theme.isDefault,
+            isPremium: theme.isPremium,
+          },
+        });
+        this.logger.log(`Theme updated: ${theme.name}`);
       }
     }
   }

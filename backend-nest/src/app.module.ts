@@ -41,46 +41,50 @@ import { AccessibilityModule } from './accessibility/accessibility.module';
 import { MultilingualModule } from './multilingual/multilingual.module';
 import { NarrationExportModule } from './narration-export/narration-export.module';
 import { ContentGovernanceModule } from './content-governance/content-governance.module';
-import { TeamAnalyticsModule } from './team-analytics/team-analytics.module';
 import { ContentLibraryModule } from './library/content-library.module';
 import { ImageAcquisitionModule } from './image-acquisition/image-acquisition.module';
 import { ImageRecognitionModule } from './image-recognition/image-recognition.module';
+
+// Document Ingestion (upload documents → AI slides)
+import { DocumentIngestionModule } from './document-ingestion/document-ingestion.module';
 
 // New AI-Enhanced Creativity & Immersive Tech modules
 import { AIResearchModule } from './ai-research/ai-research.module';
 import { StoryboardingModule } from './storyboarding/storyboarding.module';
 import { ABTestingModule } from './ab-testing/ab-testing.module';
-import { VRARModule } from './vr-ar/vr-ar.module';
-import { HolographicModule } from './holographic/holographic.module';
-import { BlockchainModule } from './blockchain/blockchain.module';
 
 // Advanced Collaboration & Analytics modules
 import { AICopilotModule } from './ai-copilot/ai-copilot.module';
-import { LiveQAModule } from './live-qa/live-qa.module';
-import { CrossPlatformSyncModule } from './cross-platform-sync/cross-platform-sync.module';
-import { PredictiveAnalyticsModule } from './predictive-analytics/predictive-analytics.module';
-import { SentimentAnalysisModule } from './sentiment-analysis/sentiment-analysis.module';
-import { LearningPathsModule } from './learning-paths/learning-paths.module';
 
 // Accessibility & Enterprise modules
-import { SignLanguageModule } from './sign-language/sign-language.module';
-import { CognitiveAccessibilityModule } from './cognitive-accessibility/cognitive-accessibility.module';
 import { UniversalDesignModule } from './universal-design/universal-design.module';
 import { PublicApiModule } from './public-api/public-api.module';
-import { WhiteLabelSdkModule } from './white-label-sdk/white-label-sdk.module';
 
-// Sustainability & Wellness modules
-import { IoTIntegrationModule } from './iot-integration/iot-integration.module';
-import { EcoFriendlyModule } from './eco-friendly/eco-friendly.module';
-import { PresenterWellnessModule } from './presenter-wellness/presenter-wellness.module';
-import { CarbonFootprintModule } from './carbon-footprint/carbon-footprint.module';
+// Previously orphaned modules — now registered
+import { AdvancedAnalyticsModule } from './advanced-analytics/advanced-analytics.module';
+import { DataVisualizationModule } from './data-visualization/data-visualization.module';
+import { EnterpriseComplianceModule } from './enterprise-compliance/enterprise-compliance.module';
+import { MicrosoftOfficeModule } from './microsoft-office/microsoft-office.module';
+import { MobileApiModule } from './mobile-api/mobile-api.module';
+import { MobilePwaModule } from './mobile-pwa/mobile-pwa.module';
+import { PluginSystemModule } from './plugin-system/plugin-system.module';
+import { SocialSharingModule } from './social-sharing/social-sharing.module';
+import { VideoRecordingModule } from './video-recording/video-recording.module';
 
 // Common modules for production
 import { CacheModule } from './common/cache/cache.module';
-import { SecurityModule } from './common/security/security.module';
 import { MonitoringModule } from './common/monitoring/monitoring.module';
 import { CsrfModule } from './common/csrf/csrf.module';
 import { AdvancedRateLimitModule } from './common/rate-limit/advanced-rate-limit.module';
+
+// Enhanced Security Module (replaces old security module)
+import { SecurityModule } from './security/security.module';
+
+// New Infrastructure modules
+import { CDNModule } from './common/cdn/cdn.module';
+import { ShardingModule } from './common/database/sharding.module';
+import { QueueModule } from './common/queue/queue.module';
+import { RateLimitModule } from './common/rate-limit/rate-limit.module';
 
 import { WorkersModule } from './workers/workers.module';
 
@@ -179,39 +183,35 @@ import featureFlagsConfig from './common/config/feature-flags.config';
     MultilingualModule,
     NarrationExportModule,
     ContentGovernanceModule,
-    TeamAnalyticsModule,
     ContentLibraryModule,
     ImageAcquisitionModule,
     ImageRecognitionModule,
+    DocumentIngestionModule,
 
     // AI-Enhanced Creativity & Immersive Tech
     AIResearchModule,
     StoryboardingModule,
     ABTestingModule,
-    VRARModule,
-    HolographicModule,
-    BlockchainModule,
 
     // Advanced Collaboration & Analytics
     AICopilotModule,
-    LiveQAModule,
-    CrossPlatformSyncModule,
-    PredictiveAnalyticsModule,
-    SentimentAnalysisModule,
-    LearningPathsModule,
 
     // Accessibility & Enterprise
-    SignLanguageModule,
-    CognitiveAccessibilityModule,
     UniversalDesignModule,
     PublicApiModule,
-    WhiteLabelSdkModule,
 
     // Sustainability & Wellness
-    IoTIntegrationModule,
-    EcoFriendlyModule,
-    PresenterWellnessModule,
-    CarbonFootprintModule,
+
+    // Previously orphaned modules — now registered
+    AdvancedAnalyticsModule,
+    DataVisualizationModule,
+    EnterpriseComplianceModule,
+    MicrosoftOfficeModule,
+    MobileApiModule,
+    MobilePwaModule,
+    PluginSystemModule,
+    SocialSharingModule,
+    VideoRecordingModule,
 
     // Production modules
     CacheModule,
@@ -220,6 +220,12 @@ import featureFlagsConfig from './common/config/feature-flags.config';
     CsrfModule,
     AdvancedRateLimitModule,
     WorkersModule,
+
+    // New Infrastructure modules
+    CDNModule,
+    ShardingModule,
+    QueueModule,
+    RateLimitModule,
   ],
   providers: [
     // Global rate limiting

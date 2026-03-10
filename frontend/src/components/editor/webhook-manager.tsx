@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -31,7 +33,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-// import { Textarea } from '@/components/ui/textarea';
 import {
   Webhook,
   Plus,
@@ -89,6 +90,7 @@ interface WebhookDelivery {
   retryCount: number;
 }
 
+// Webhook events reference (static configuration, not mock data)
 const WEBHOOK_EVENTS: WebhookEvent[] = [
   { id: 'presentation.created', name: 'Presentation Created', description: 'When a new presentation is created', category: 'presentation' },
   { id: 'presentation.updated', name: 'Presentation Updated', description: 'When a presentation is modified', category: 'presentation' },
@@ -105,102 +107,10 @@ const WEBHOOK_EVENTS: WebhookEvent[] = [
   { id: 'export.failed', name: 'Export Failed', description: 'When an export fails', category: 'export' },
 ];
 
-const MOCK_WEBHOOKS: WebhookConfig[] = [
-  {
-    id: '1',
-    name: 'Slack Notifications',
-    url: 'https://example.com/webhook-placeholder',
-    secret: 'your-webhook-secret-here',
-    events: ['presentation.published', 'collaboration.comment_added'],
-    enabled: true,
-    createdAt: '2024-05-15',
-    lastTriggered: '2 hours ago',
-    successCount: 156,
-    failureCount: 3,
-    headers: { 'Content-Type': 'application/json' },
-    retryConfig: { maxRetries: 3, retryDelay: 5000 },
-  },
-  {
-    id: '2',
-    name: 'Analytics Backend',
-    url: 'https://api.analytics.example.com/webhook',
-    events: ['presentation.created', 'presentation.updated', 'slide.created'],
-    enabled: true,
-    createdAt: '2024-06-01',
-    lastTriggered: '30 minutes ago',
-    successCount: 423,
-    failureCount: 12,
-    headers: { 'Content-Type': 'application/json', 'X-API-Key': 'ak_123456' },
-    retryConfig: { maxRetries: 5, retryDelay: 10000 },
-  },
-  {
-    id: '3',
-    name: 'CRM Integration',
-    url: 'https://crm.example.com/api/webhooks/presentations',
-    secret: 'whsec_def456uvw',
-    events: ['presentation.published'],
-    enabled: false,
-    createdAt: '2024-04-20',
-    successCount: 89,
-    failureCount: 45,
-    headers: { 'Content-Type': 'application/json' },
-    retryConfig: { maxRetries: 2, retryDelay: 3000 },
-  },
-];
-
-const MOCK_DELIVERIES: WebhookDelivery[] = [
-  {
-    id: '1',
-    webhookId: '1',
-    event: 'presentation.published',
-    status: 'success',
-    statusCode: 200,
-    requestBody: JSON.stringify({ event: 'presentation.published', presentation_id: 'pres_123' }, null, 2),
-    responseBody: '{"ok": true}',
-    duration: 234,
-    timestamp: '2 hours ago',
-    retryCount: 0,
-  },
-  {
-    id: '2',
-    webhookId: '2',
-    event: 'slide.created',
-    status: 'success',
-    statusCode: 201,
-    requestBody: JSON.stringify({ event: 'slide.created', slide_id: 'slide_456' }, null, 2),
-    responseBody: '{"received": true}',
-    duration: 156,
-    timestamp: '30 minutes ago',
-    retryCount: 0,
-  },
-  {
-    id: '3',
-    webhookId: '3',
-    event: 'presentation.published',
-    status: 'failed',
-    statusCode: 500,
-    requestBody: JSON.stringify({ event: 'presentation.published', presentation_id: 'pres_789' }, null, 2),
-    responseBody: '{"error": "Internal server error"}',
-    duration: 5023,
-    timestamp: '1 day ago',
-    retryCount: 2,
-  },
-  {
-    id: '4',
-    webhookId: '1',
-    event: 'collaboration.comment_added',
-    status: 'retrying',
-    requestBody: JSON.stringify({ event: 'collaboration.comment_added', comment_id: 'com_101' }, null, 2),
-    duration: 0,
-    timestamp: '5 minutes ago',
-    retryCount: 1,
-  },
-];
-
 export function WebhookManager() {
   const [isOpen, setIsOpen] = useState(false);
-  const [webhooks, setWebhooks] = useState<WebhookConfig[]>(MOCK_WEBHOOKS);
-  const [deliveries] = useState<WebhookDelivery[]>(MOCK_DELIVERIES);
+  const [webhooks, setWebhooks] = useState<WebhookConfig[]>([]);
+  const [deliveries] = useState<WebhookDelivery[]>([]);
   const [selectedWebhook, setSelectedWebhook] = useState<WebhookConfig | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
@@ -209,6 +119,39 @@ export function WebhookManager() {
     status: 'idle' | 'loading' | 'success' | 'error';
     message?: string;
   }>({ status: 'idle' });
+  const [ , setIsLoadingWebhooks] = useState(false);
+
+  // Fetch webhooks from API
+  const fetchWebhooks = useCallback(async () => {
+    setIsLoadingWebhooks(true);
+    try {
+      const data = await api.webhooks.getAll();
+      setWebhooks((data || []).map((w) => ({
+        id: w.id,
+        name: w.url.replace(/^https?:\/\//, '').split('/')[0] || 'Webhook',
+        url: w.url,
+        secret: w.secret || undefined,
+        events: w.events || [],
+        enabled: w.active !== false,
+        createdAt: w.createdAt ? new Date(w.createdAt).toISOString() : '',
+        lastTriggered: w.lastTriggeredAt ? new Date(w.lastTriggeredAt).toISOString() : undefined,
+        successCount: 0,
+        failureCount: w.failureCount || 0,
+        headers: { 'Content-Type': 'application/json' },
+        retryConfig: { maxRetries: 3, retryDelay: 5000 },
+      })));
+    } catch {
+      // API may return empty, that's fine
+    } finally {
+      setIsLoadingWebhooks(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchWebhooks();
+    }
+  }, [isOpen, fetchWebhooks]);
 
   // Create webhook form state
   const [newWebhook, setNewWebhook] = useState({
@@ -234,16 +177,29 @@ export function WebhookManager() {
     }
   };
 
-  const toggleWebhook = (id: string) => {
-    setWebhooks((prev) =>
-      prev.map((w) => (w.id === id ? { ...w, enabled: !w.enabled } : w))
-    );
+  const toggleWebhook = async (id: string) => {
+    const webhook = webhooks.find((w) => w.id === id);
+    if (!webhook) {return;}
+    try {
+      await api.webhooks.update(id, { active: !webhook.enabled });
+      setWebhooks((prev) =>
+        prev.map((w) => (w.id === id ? { ...w, enabled: !w.enabled } : w))
+      );
+    } catch {
+      toast.error('Failed to toggle webhook');
+    }
   };
 
-  const deleteWebhook = (id: string) => {
-    setWebhooks((prev) => prev.filter((w) => w.id !== id));
-    if (selectedWebhook?.id === id) {
-      setSelectedWebhook(null);
+  const deleteWebhook = async (id: string) => {
+    try {
+      await api.webhooks.delete(id);
+      setWebhooks((prev) => prev.filter((w) => w.id !== id));
+      if (selectedWebhook?.id === id) {
+        setSelectedWebhook(null);
+      }
+      toast.success('Webhook deleted');
+    } catch {
+      toast.error('Failed to delete webhook');
     }
   };
 
@@ -262,53 +218,62 @@ export function WebhookManager() {
     }));
   };
 
-  const testWebhook = async (_webhook?: WebhookConfig) => {
+  const testWebhook = async (webhook?: WebhookConfig) => {
+    if (!webhook) {return;}
     setTestResult({ status: 'loading' });
-
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    // Random success/failure for demo
-    const success = Math.random() > 0.3;
-    setTestResult({
-      status: success ? 'success' : 'error',
-      message: success
-        ? 'Webhook test successful! Response received in 234ms'
-        : 'Webhook test failed: Connection timeout',
-    });
-
+    try {
+      await api.webhooks.test(webhook.id);
+      setTestResult({
+        status: 'success',
+        message: 'Webhook test successful!',
+      });
+    } catch {
+      setTestResult({
+        status: 'error',
+        message: 'Webhook test failed',
+      });
+    }
     setTimeout(() => setTestResult({ status: 'idle' }), 5000);
   };
 
-  const createWebhook = () => {
-    const webhook: WebhookConfig = {
-      id: `webhook_${Date.now()}`,
-      name: newWebhook.name,
-      url: newWebhook.url,
-      secret: newWebhook.secret || undefined,
-      events: newWebhook.events,
-      enabled: true,
-      createdAt: new Date().toISOString().split('T')[0],
-      successCount: 0,
-      failureCount: 0,
-      headers: { 'Content-Type': 'application/json', ...newWebhook.headers },
-      retryConfig: {
-        maxRetries: newWebhook.maxRetries,
-        retryDelay: newWebhook.retryDelay,
-      },
-    };
-
-    setWebhooks((prev) => [...prev, webhook]);
-    setNewWebhook({
-      name: '',
-      url: '',
-      events: [],
-      secret: '',
-      headers: {},
-      maxRetries: 3,
-      retryDelay: 5000,
-    });
-    setShowCreateDialog(false);
+  const createWebhook = async () => {
+    try {
+      const created = await api.webhooks.create(
+        newWebhook.url,
+        newWebhook.events,
+        newWebhook.secret || undefined
+      );
+      const webhook: WebhookConfig = {
+        id: (created as Record<string, unknown>).id as string || `webhook_${Date.now()}`,
+        name: newWebhook.name,
+        url: newWebhook.url,
+        secret: newWebhook.secret || undefined,
+        events: newWebhook.events,
+        enabled: true,
+        createdAt: new Date().toISOString().split('T')[0],
+        successCount: 0,
+        failureCount: 0,
+        headers: { 'Content-Type': 'application/json', ...newWebhook.headers },
+        retryConfig: {
+          maxRetries: newWebhook.maxRetries,
+          retryDelay: newWebhook.retryDelay,
+        },
+      };
+      setWebhooks((prev) => [...prev, webhook]);
+      setNewWebhook({
+        name: '',
+        url: '',
+        events: [],
+        secret: '',
+        headers: {},
+        maxRetries: 3,
+        retryDelay: 5000,
+      });
+      setShowCreateDialog(false);
+      toast.success('Webhook created');
+    } catch {
+      toast.error('Failed to create webhook');
+    }
   };
 
   const groupedEvents = WEBHOOK_EVENTS.reduce((acc, event) => {
@@ -358,7 +323,7 @@ export function WebhookManager() {
             <div className="flex gap-4">
               {/* Webhook List */}
               <div className="w-1/2">
-                <ScrollArea className="h-[500px] pr-4">
+                <ScrollArea className="h-125 pr-4">
                   <div className="space-y-3">
                     {webhooks.map((webhook) => (
                       <Card
@@ -380,7 +345,7 @@ export function WebhookManager() {
                                   <Badge variant="secondary">Disabled</Badge>
                                 )}
                               </div>
-                              <p className="text-sm text-muted-foreground mt-1 truncate max-w-[250px]">
+                              <p className="text-sm text-muted-foreground mt-1 truncate max-w-62.5">
                                 {webhook.url}
                               </p>
                               <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
@@ -462,7 +427,7 @@ export function WebhookManager() {
               {/* Webhook Details */}
               <div className="w-1/2">
                 {selectedWebhook ? (
-                  <Card className="h-[500px]">
+                  <Card className="h-125">
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-base">{selectedWebhook.name}</CardTitle>
@@ -492,7 +457,7 @@ export function WebhookManager() {
                       )}
                     </CardHeader>
                     <CardContent>
-                      <ScrollArea className="h-[380px] pr-4">
+                      <ScrollArea className="h-95 pr-4">
                         <div className="space-y-4">
                           {/* URL */}
                           <div className="space-y-1">
@@ -628,7 +593,7 @@ export function WebhookManager() {
                     </CardContent>
                   </Card>
                 ) : (
-                  <Card className="h-[500px] flex items-center justify-center">
+                  <Card className="h-125 flex items-center justify-center">
                     <div className="text-center text-muted-foreground">
                       <Webhook className="h-12 w-12 mx-auto mb-3 opacity-50" />
                       <p>Select a webhook to view details</p>
@@ -640,7 +605,7 @@ export function WebhookManager() {
           </TabsContent>
 
           <TabsContent value="deliveries" className="mt-0">
-            <ScrollArea className="h-[500px]">
+            <ScrollArea className="h-125">
               <div className="space-y-2">
                 {deliveries.map((delivery) => {
                   const webhook = webhooks.find((w) => w.id === delivery.webhookId);
@@ -703,7 +668,7 @@ export function WebhookManager() {
           </TabsContent>
 
           <TabsContent value="events" className="mt-0">
-            <ScrollArea className="h-[500px]">
+            <ScrollArea className="h-125">
               <div className="space-y-6">
                 {Object.entries(groupedEvents).map(([category, events]) => (
                   <div key={category}>

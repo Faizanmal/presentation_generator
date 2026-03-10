@@ -151,7 +151,7 @@ export class ExportService {
 
     const exportData = project as unknown as ExportProject;
     const result = this.exportToJson(exportData);
-    return JSON.parse(result.data as string);
+    return JSON.parse(result.data as string) as Record<string, unknown>;
   }
 
   async exportToHTML(projectId: string): Promise<string> {
@@ -471,7 +471,10 @@ export class ExportService {
 
   /**
    * Export to PDF format using pdf-lib
-   * Creates a proper multi-page PDF with slides
+   * Creates a proper multi-page PDF with slides.
+   * Supports ABSOLUTE positioning when blocks have style.x/y/width/height
+   * (from the drag-and-drop canvas), and falls back to linear flow mode
+   * for legacy blocks.
    */
   private async exportToPdf(project: ExportProject): Promise<ExportResult> {
     const pdfDoc = await PDFDocument.create();
@@ -482,136 +485,223 @@ export class ExportService {
     const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
+    // Canvas dimensions (16:9 at 1280x720 pdf points)
+    const SLIDE_W = 1280;
+    const SLIDE_H = 720;
+
     // Process each slide
     for (const slide of project.slides || []) {
-      // Create a 16:9 aspect ratio page (landscape)
-      const page = pdfDoc.addPage([1280, 720]);
-      const { width, height } = page.getSize();
+      const page = pdfDoc.addPage([SLIDE_W, SLIDE_H]);
 
       // Draw background
       const bgColor = this.hexToRgb(themeColors.background || '#ffffff');
       page.drawRectangle({
         x: 0,
         y: 0,
-        width,
-        height,
+        width: SLIDE_W,
+        height: SLIDE_H,
         color: rgb(bgColor.r / 255, bgColor.g / 255, bgColor.b / 255),
       });
 
-      // Draw blocks
-      let yOffset = height - 60; // Start from top with margin
+      // Determine if any blocks have absolute position data
+      const blocks = slide.blocks || [];
+      const hasPositionedBlocks = blocks.some(
+        (b) => b.style && b.style.x !== undefined && b.style.y !== undefined,
+      );
 
-      for (const block of slide.blocks || []) {
-        const content = this.getBlockTextContent(block);
-        const textColor = this.hexToRgb(themeColors.text || '#000000');
+      if (hasPositionedBlocks) {
+        // === ABSOLUTE POSITION MODE ===
+        // Each block has x, y (from top-left of canvas), width, height in px
+        // PDF coordinate system: origin at bottom-left, y increases upward
+        for (const block of blocks) {
+          const content = this.getBlockTextContent(block);
+          if (!content) continue;
 
-        switch (block.blockType) {
-          case 'heading':
-          case 'HEADING':
-            page.drawText(content, {
-              x: 60,
-              y: yOffset,
-              size: 36,
-              font: helveticaBold,
-              color: rgb(
-                textColor.r / 255,
-                textColor.g / 255,
-                textColor.b / 255,
-              ),
-              maxWidth: width - 120,
-            });
-            yOffset -= 60;
-            break;
+          const style = (block.style || {}) as Record<string, number>;
+          const textColor = this.hexToRgb(themeColors.text || '#000000');
 
-          case 'subheading':
-          case 'SUBHEADING':
-            page.drawText(content, {
-              x: 60,
-              y: yOffset,
-              size: 24,
-              font: helveticaBold,
-              color: rgb(
-                textColor.r / 255,
-                textColor.g / 255,
-                textColor.b / 255,
-              ),
-              maxWidth: width - 120,
-            });
-            yOffset -= 45;
-            break;
+          // Convert canvas coords (top-left origin) to PDF coords (bottom-left origin)
+          const bx = style.x ?? 60;
+          const by = style.y ?? 0;
+          const bw = style.width ?? SLIDE_W - 120;
+          // PDF y: bottom-left origin → flip y axis
+          const pdfY = SLIDE_H - by;
 
-          case 'paragraph':
-          case 'PARAGRAPH':
-          case 'text':
-          case 'TEXT': {
-            // Word wrap for paragraphs
-            const lines = this.wrapText(content, 100);
-            for (const line of lines) {
-              if (yOffset < 60) break;
-              page.drawText(line, {
-                x: 60,
-                y: yOffset,
-                size: 16,
-                font: helveticaFont,
-                color: rgb(
-                  textColor.r / 255,
-                  textColor.g / 255,
-                  textColor.b / 255,
-                ),
-              });
-              yOffset -= 24;
-            }
-            yOffset -= 10;
-            break;
-          }
+          const font =
+            block.blockType === 'HEADING' ||
+            block.blockType === 'heading' ||
+            block.blockType === 'SUBHEADING' ||
+            block.blockType === 'subheading'
+              ? helveticaBold
+              : helveticaFont;
 
-          case 'bullet_list':
-          case 'BULLET_LIST':
-          case 'list':
-          case 'LIST': {
+          const fontSize = this.getFontSizeForBlockType(
+            block.blockType,
+            style.fontSize as number | undefined,
+          );
+
+          if (
+            block.blockType === 'BULLET_LIST' ||
+            block.blockType === 'bullet_list' ||
+            block.blockType === 'LIST' ||
+            block.blockType === 'list'
+          ) {
             const items = this.getListItems(block);
+            let itemY = pdfY;
             for (const item of items) {
-              if (yOffset < 60) break;
+              if (itemY < 30) break;
               page.drawText(`• ${item}`, {
-                x: 80,
-                y: yOffset,
-                size: 16,
+                x: bx,
+                y: itemY,
+                size: fontSize,
                 font: helveticaFont,
                 color: rgb(
                   textColor.r / 255,
                   textColor.g / 255,
                   textColor.b / 255,
                 ),
-                maxWidth: width - 140,
+                maxWidth: bw,
               });
-              yOffset -= 28;
+              itemY -= fontSize * 1.6;
             }
-            yOffset -= 10;
-            break;
+          } else {
+            const lines = this.wrapText(
+              content,
+              Math.floor(bw / (fontSize * 0.55)),
+            );
+            let lineY = pdfY;
+            for (const line of lines) {
+              if (lineY < 30) break;
+              page.drawText(line, {
+                x: bx,
+                y: lineY,
+                size: fontSize,
+                font,
+                color: rgb(
+                  textColor.r / 255,
+                  textColor.g / 255,
+                  textColor.b / 255,
+                ),
+              });
+              lineY -= fontSize * 1.4;
+            }
           }
+        }
+      } else {
+        // === LINEAR FLOW MODE (legacy) ===
+        let yOffset = SLIDE_H - 60;
 
-          default:
-            if (content) {
+        for (const block of blocks) {
+          const content = this.getBlockTextContent(block);
+          const textColor = this.hexToRgb(themeColors.text || '#000000');
+
+          switch (block.blockType) {
+            case 'heading':
+            case 'HEADING':
               page.drawText(content, {
                 x: 60,
                 y: yOffset,
-                size: 16,
-                font: helveticaFont,
+                size: 36,
+                font: helveticaBold,
                 color: rgb(
                   textColor.r / 255,
                   textColor.g / 255,
                   textColor.b / 255,
                 ),
-                maxWidth: width - 120,
+                maxWidth: SLIDE_W - 120,
               });
-              yOffset -= 30;
+              yOffset -= 60;
+              break;
+
+            case 'subheading':
+            case 'SUBHEADING':
+              page.drawText(content, {
+                x: 60,
+                y: yOffset,
+                size: 24,
+                font: helveticaBold,
+                color: rgb(
+                  textColor.r / 255,
+                  textColor.g / 255,
+                  textColor.b / 255,
+                ),
+                maxWidth: SLIDE_W - 120,
+              });
+              yOffset -= 45;
+              break;
+
+            case 'paragraph':
+            case 'PARAGRAPH':
+            case 'text':
+            case 'TEXT': {
+              const lines = this.wrapText(content, 100);
+              for (const line of lines) {
+                if (yOffset < 60) break;
+                page.drawText(line, {
+                  x: 60,
+                  y: yOffset,
+                  size: 16,
+                  font: helveticaFont,
+                  color: rgb(
+                    textColor.r / 255,
+                    textColor.g / 255,
+                    textColor.b / 255,
+                  ),
+                });
+                yOffset -= 24;
+              }
+              yOffset -= 10;
+              break;
             }
+
+            case 'bullet_list':
+            case 'BULLET_LIST':
+            case 'list':
+            case 'LIST': {
+              const items = this.getListItems(block);
+              for (const item of items) {
+                if (yOffset < 60) break;
+                page.drawText(`• ${item}`, {
+                  x: 80,
+                  y: yOffset,
+                  size: 16,
+                  font: helveticaFont,
+                  color: rgb(
+                    textColor.r / 255,
+                    textColor.g / 255,
+                    textColor.b / 255,
+                  ),
+                  maxWidth: SLIDE_W - 140,
+                });
+                yOffset -= 28;
+              }
+              yOffset -= 10;
+              break;
+            }
+
+            default:
+              if (content) {
+                page.drawText(content, {
+                  x: 60,
+                  y: yOffset,
+                  size: 16,
+                  font: helveticaFont,
+                  color: rgb(
+                    textColor.r / 255,
+                    textColor.g / 255,
+                    textColor.b / 255,
+                  ),
+                  maxWidth: SLIDE_W - 120,
+                });
+                yOffset -= 30;
+              }
+          }
         }
       }
 
       // Add slide number
       page.drawText(`${(slide.order || 0) + 1}`, {
-        x: width - 60,
+        x: SLIDE_W - 60,
         y: 30,
         size: 12,
         font: helveticaFont,
@@ -619,7 +709,6 @@ export class ExportService {
       });
     }
 
-    // Generate PDF bytes
     const pdfBytes = await pdfDoc.save();
 
     return {
@@ -627,6 +716,29 @@ export class ExportService {
       mimeType: 'application/pdf',
       data: Buffer.from(pdfBytes),
     };
+  }
+
+  /**
+   * Get the font size appropriate for a block type, with custom override support
+   */
+  private getFontSizeForBlockType(
+    blockType: string,
+    customSize?: number,
+  ): number {
+    if (customSize) return customSize;
+    switch (blockType) {
+      case 'heading':
+      case 'HEADING':
+        return 36;
+      case 'subheading':
+      case 'SUBHEADING':
+        return 24;
+      case 'quote':
+      case 'QUOTE':
+        return 20;
+      default:
+        return 16;
+    }
   }
 
   /**
@@ -696,13 +808,13 @@ export class ExportService {
 
   /**
    * Export to PowerPoint (PPTX) format
-   * Production-ready implementation using pptxgenjs
+   * Supports ABSOLUTE positioning when blocks have style.x/y/width/height
+   * from the canvas, and falls back to linear flow for legacy blocks.
    */
   private async exportToPptx(project: ExportProject): Promise<ExportResult> {
     const theme = project.theme || this.getDefaultTheme();
     const themeColors = (theme.colors || {}) as Record<string, string>;
 
-    // Create new presentation
     const pptx = new PptxGenJS();
 
     // Set presentation properties
@@ -715,6 +827,9 @@ export class ExportService {
     pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
     pptx.layout = 'WIDE';
 
+    // Conversion factor: canvas 1280px → 13.333in
+    const PX_TO_IN = 13.333 / 1280;
+
     // Process each slide
     for (const slide of project.slides || []) {
       const pptxSlide = pptx.addSlide();
@@ -726,115 +841,192 @@ export class ExportService {
         };
       }
 
-      let yPosition = 0.5; // Start position in inches
+      const blocks = slide.blocks || [];
+      const textColor = (themeColors.text || '#000000').replace('#', '');
 
-      for (const block of slide.blocks || []) {
-        const content = this.getBlockTextContent(block);
-        const textColor = (themeColors.text || '#000000').replace('#', '');
+      // Determine if any blocks have absolute position data
+      const hasPositionedBlocks = blocks.some(
+        (b) => b.style && b.style.x !== undefined && b.style.y !== undefined,
+      );
 
-        switch (block.blockType) {
-          case 'heading':
-          case 'HEADING':
-            pptxSlide.addText(content, {
-              x: 0.5,
-              y: yPosition,
-              w: 12.333,
-              h: 0.8,
-              fontSize: 36,
-              fontFace: 'Arial',
-              color: textColor,
-              bold: true,
-            });
-            yPosition += 1;
-            break;
+      if (hasPositionedBlocks) {
+        // === ABSOLUTE POSITION MODE ===
+        for (const block of blocks) {
+          const content = this.getBlockTextContent(block);
+          if (!content) continue;
 
-          case 'subheading':
-          case 'SUBHEADING':
-            pptxSlide.addText(content, {
-              x: 0.5,
-              y: yPosition,
-              w: 12.333,
-              h: 0.6,
-              fontSize: 24,
-              fontFace: 'Arial',
-              color: textColor,
-              bold: true,
-            });
-            yPosition += 0.8;
-            break;
+          const style = (block.style || {}) as Record<string, number>;
+          const x = (style.x ?? 60) * PX_TO_IN;
+          const y = (style.y ?? 60) * PX_TO_IN;
+          const w = (style.width ?? 1160) * PX_TO_IN;
+          const h = (style.height ?? 100) * PX_TO_IN;
+          const isBold =
+            block.blockType === 'HEADING' ||
+            block.blockType === 'heading' ||
+            block.blockType === 'SUBHEADING' ||
+            block.blockType === 'subheading';
+          const fontSize = this.getFontSizeForBlockType(
+            block.blockType,
+            style.fontSize as number | undefined,
+          );
 
-          case 'paragraph':
-          case 'PARAGRAPH':
-          case 'text':
-          case 'TEXT':
-            pptxSlide.addText(content, {
-              x: 0.5,
-              y: yPosition,
-              w: 12.333,
-              h: 1,
-              fontSize: 16,
-              fontFace: 'Arial',
-              color: textColor,
-              valign: 'top',
-            });
-            yPosition += 1.2;
-            break;
-
-          case 'bullet_list':
-          case 'BULLET_LIST':
-          case 'list':
-          case 'LIST': {
+          if (
+            block.blockType === 'BULLET_LIST' ||
+            block.blockType === 'bullet_list' ||
+            block.blockType === 'LIST' ||
+            block.blockType === 'list'
+          ) {
             const items = this.getListItems(block);
             const textProps = items.map((item) => ({
               text: item,
-              options: { bullet: true, color: textColor, fontSize: 16 },
+              options: { bullet: true, color: textColor, fontSize },
             }));
             pptxSlide.addText(textProps, {
-              x: 0.5,
-              y: yPosition,
-              w: 12.333,
-              h: items.length * 0.4,
+              x,
+              y,
+              w,
+              h: Math.max(h, items.length * 0.4),
               fontFace: 'Arial',
               valign: 'top',
             });
-            yPosition += items.length * 0.4 + 0.3;
-            break;
-          }
-
-          case 'image':
-          case 'IMAGE': {
+          } else if (
+            block.blockType === 'IMAGE' ||
+            block.blockType === 'image'
+          ) {
             const imageContent = block.content as Record<string, unknown>;
             const imageUrl = imageContent?.url || imageContent?.src;
             if (typeof imageUrl === 'string' && imageUrl.startsWith('http')) {
               try {
-                pptxSlide.addImage({
-                  path: imageUrl,
-                  x: 0.5,
-                  y: yPosition,
-                  w: 6,
-                  h: 4,
-                });
-                yPosition += 4.2;
+                pptxSlide.addImage({ path: imageUrl, x, y, w, h });
               } catch {
                 this.logger.warn(`Failed to add image: ${imageUrl}`);
               }
             }
-            break;
+          } else {
+            pptxSlide.addText(content, {
+              x,
+              y,
+              w,
+              h,
+              fontSize,
+              fontFace: 'Arial',
+              color: textColor,
+              bold: isBold,
+              valign: 'top',
+            });
           }
+        }
+      } else {
+        // === LINEAR FLOW MODE (legacy) ===
+        let yPosition = 0.5;
 
-          default:
-            if (content) {
+        for (const block of blocks) {
+          const content = this.getBlockTextContent(block);
+
+          switch (block.blockType) {
+            case 'heading':
+            case 'HEADING':
               pptxSlide.addText(content, {
                 x: 0.5,
                 y: yPosition,
                 w: 12.333,
-                h: 0.5,
-                fontSize: 14,
+                h: 0.8,
+                fontSize: 36,
                 fontFace: 'Arial',
                 color: textColor,
+                bold: true,
               });
-              yPosition += 0.6;
+              yPosition += 1;
+              break;
+
+            case 'subheading':
+            case 'SUBHEADING':
+              pptxSlide.addText(content, {
+                x: 0.5,
+                y: yPosition,
+                w: 12.333,
+                h: 0.6,
+                fontSize: 24,
+                fontFace: 'Arial',
+                color: textColor,
+                bold: true,
+              });
+              yPosition += 0.8;
+              break;
+
+            case 'paragraph':
+            case 'PARAGRAPH':
+            case 'text':
+            case 'TEXT':
+              pptxSlide.addText(content, {
+                x: 0.5,
+                y: yPosition,
+                w: 12.333,
+                h: 1,
+                fontSize: 16,
+                fontFace: 'Arial',
+                color: textColor,
+                valign: 'top',
+              });
+              yPosition += 1.2;
+              break;
+
+            case 'bullet_list':
+            case 'BULLET_LIST':
+            case 'list':
+            case 'LIST': {
+              const items = this.getListItems(block);
+              const textProps = items.map((item) => ({
+                text: item,
+                options: { bullet: true, color: textColor, fontSize: 16 },
+              }));
+              pptxSlide.addText(textProps, {
+                x: 0.5,
+                y: yPosition,
+                w: 12.333,
+                h: items.length * 0.4,
+                fontFace: 'Arial',
+                valign: 'top',
+              });
+              yPosition += items.length * 0.4 + 0.3;
+              break;
             }
+
+            case 'image':
+            case 'IMAGE': {
+              const imageContent = block.content as Record<string, unknown>;
+              const imageUrl = imageContent?.url || imageContent?.src;
+              if (typeof imageUrl === 'string' && imageUrl.startsWith('http')) {
+                try {
+                  pptxSlide.addImage({
+                    path: imageUrl,
+                    x: 0.5,
+                    y: yPosition,
+                    w: 6,
+                    h: 4,
+                  });
+                  yPosition += 4.2;
+                } catch {
+                  this.logger.warn(`Failed to add image: ${imageUrl}`);
+                }
+              }
+              break;
+            }
+
+            default:
+              if (content) {
+                pptxSlide.addText(content, {
+                  x: 0.5,
+                  y: yPosition,
+                  w: 12.333,
+                  h: 0.5,
+                  fontSize: 14,
+                  fontFace: 'Arial',
+                  color: textColor,
+                });
+                yPosition += 0.6;
+              }
+          }
         }
       }
 

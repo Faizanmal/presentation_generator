@@ -39,12 +39,23 @@ const mockGoogleGenerativeAI = {
   }),
 };
 
+// Mock Ollama
+const mockOllama = {
+  generate: jest
+    .fn()
+    .mockRejectedValue(new Error('Ollama not available in tests')),
+};
+
 jest.mock('@google/generative-ai', () => {
   return {
     GoogleGenerativeAI: jest
       .fn()
       .mockImplementation(() => mockGoogleGenerativeAI),
   };
+});
+
+jest.mock('ollama', () => {
+  return jest.fn().mockImplementation(() => mockOllama);
 });
 
 jest.mock('openai', () => {
@@ -72,6 +83,8 @@ describe('AIService', () => {
       const config: Record<string, string> = {
         OPENAI_API_KEY: 'test-api-key',
         GOOGLE_GENERATIVE_AI_API_KEY: 'test-google-key',
+        // OLLAMA_BASE_URL: 'http://localhost:11434', // Disabled for tests
+        // OLLAMA_MODEL: 'llama2',
       };
       return config[key];
     }),

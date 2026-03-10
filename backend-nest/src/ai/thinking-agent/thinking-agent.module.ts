@@ -50,7 +50,6 @@ import { ImageGenerationProcessor } from './image-generation.processor';
     CriticAgentService,
     ThinkingAgentOrchestratorService,
     ThinkingProjectService,
-    ThinkingProjectService,
     ThinkingGenerationProcessor,
     ImageGenerationProcessor,
   ],

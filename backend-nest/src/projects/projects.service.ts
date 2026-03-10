@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { AIService, GeneratedPresentation } from '../ai/ai.service';
+import { SlidesService } from '../slides/slides.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { GenerateProjectDto, GenerationType } from './dto/generate-project.dto';
@@ -24,6 +25,7 @@ export class ProjectsService {
     private readonly prisma: PrismaService,
     private readonly usersService: UsersService,
     private readonly aiService: AIService,
+    private readonly slidesService: SlidesService,
     @InjectQueue('generation') private readonly generationQueue: Queue,
   ) {}
 
@@ -57,13 +59,38 @@ export class ProjectsService {
       },
     });
 
-    // Create first empty slide for presentations
+    // Create first slide with default content for presentations
     if (project.type === ProjectType.PRESENTATION) {
-      await this.prisma.slide.create({
+      const slide = await this.prisma.slide.create({
         data: {
           projectId: project.id,
           order: 0,
           layout: 'title',
+        },
+      });
+
+      // Add default blocks for title slide
+      await this.prisma.block.create({
+        data: {
+          projectId: project.id,
+          slideId: slide.id,
+          blockType: 'HEADING',
+          order: 0,
+          content: {
+            text: project.title || 'Your Presentation Title',
+          },
+        },
+      });
+
+      await this.prisma.block.create({
+        data: {
+          projectId: project.id,
+          slideId: slide.id,
+          blockType: 'SUBHEADING',
+          order: 1,
+          content: {
+            text: 'Add your subtitle here',
+          },
         },
       });
     }
@@ -155,11 +182,21 @@ export class ProjectsService {
     });
 
     // If requested, generate images for the presentation
-    if (generateDto.generateImages && generateDto.imageSource === 'ai') {
+    if (generateDto.generateImages) {
       this.logger.log(`Generating images for project ${generateDto.topic}...`);
-      const images = await this.aiService.generatePresentationImages(
-        generatedContent.sections,
-      );
+
+      const source = generateDto.imageSource || 'ai';
+      let images = new Map<number, { imageUrl: string }>();
+
+      if (source === 'ai') {
+        images = await this.aiService.generatePresentationImages(
+          generatedContent.sections,
+        );
+      } else if (source === 'stock') {
+        images = await this.aiService.generateStockImages(
+          generatedContent.sections,
+        );
+      }
 
       // Add image blocks to sections where images were generated
       generatedContent.sections.forEach((section, index) => {
@@ -231,11 +268,16 @@ export class ProjectsService {
     ) {
       const section = content.sections[slideIndex];
 
+      // Use the AI-recommended layout, falling back to sensible defaults
+      const slideLayout =
+        slideIndex === 0 ? 'title' : section.layout || 'title-content';
+
       const slide = await this.prisma.slide.create({
         data: {
           projectId: project.id,
           order: slideIndex,
-          layout: slideIndex === 0 ? 'title' : 'content',
+          layout: slideLayout,
+          speakerNotes: section.speakerNotes || null,
         },
       });
 
@@ -257,7 +299,8 @@ export class ProjectsService {
 
       while (i < section.blocks.length) {
         const block = section.blocks[i];
-        const blockType = this.mapBlockType(block.type);
+        const aiType = block.type?.toLowerCase() || 'paragraph';
+        const blockType = this.mapBlockType(aiType);
 
         // Check if this is a bullet or numbered list item
         if (
@@ -287,18 +330,53 @@ export class ProjectsService {
             },
           });
         } else {
-          // Create regular block
-          const content =
-            blockType === BlockType.IMAGE
-              ? { url: block.content, alt: 'AI Generated Image' }
-              : { text: block.content };
+          // Determine content and formatting based on original AI type
+          let blockContent: Record<string, unknown>;
+          let blockStyle: Record<string, unknown> | undefined;
+
+          if (blockType === BlockType.IMAGE) {
+            blockContent = { url: block.content, alt: 'AI Generated Image' };
+          } else if (aiType === 'chart' && block.chartData) {
+            // Chart block with embedded data
+            blockContent = {
+              text: block.content,
+              chartData: block.chartData,
+            };
+          } else if (aiType === 'card') {
+            // Card-style paragraph with special formatting
+            blockContent = { text: block.content };
+            blockStyle = { variant: 'card' };
+          } else if (aiType === 'icon-text') {
+            // Icon-text style paragraph
+            blockContent = { text: block.content };
+            blockStyle = { variant: 'icon-text' };
+          } else if (
+            aiType === 'timeline' ||
+            aiType === 'comparison' ||
+            aiType === 'stats-grid'
+          ) {
+            // These types use pipe-separated content as list items
+            const items = block.content
+              .split('|')
+              .map((s: string) => s.trim())
+              .filter((s: string) => s.length > 0);
+            blockContent = { items };
+          } else if (aiType === 'call-to-action') {
+            // CTA block - just text
+            blockContent = { text: block.content };
+          } else {
+            blockContent = { text: block.content };
+          }
 
           await this.prisma.block.create({
             data: {
               projectId: project.id,
               slideId: slide.id,
               blockType,
-              content,
+              content: blockContent as Prisma.InputJsonValue,
+              ...(blockStyle
+                ? { style: blockStyle as Prisma.InputJsonValue }
+                : {}),
               order: blockOrder++,
             },
           });
@@ -312,6 +390,7 @@ export class ProjectsService {
 
   /**
    * Map AI block type to Prisma BlockType
+   * Rich AI types (card, icon-text) are mapped to PARAGRAPH with formatting set upstream
    */
   private mapBlockType(type: string): BlockType {
     const typeMap: Record<string, BlockType> = {
@@ -323,8 +402,20 @@ export class ProjectsService {
       numbered: BlockType.NUMBERED_LIST,
       'numbered-list': BlockType.NUMBERED_LIST,
       image: BlockType.IMAGE,
+      'image-placeholder': BlockType.IMAGE,
       code: BlockType.CODE,
       quote: BlockType.QUOTE,
+      divider: BlockType.DIVIDER,
+      table: BlockType.TABLE,
+      chart: BlockType.CHART,
+      // Advanced visual block types
+      timeline: BlockType.TIMELINE,
+      comparison: BlockType.COMPARISON,
+      'stats-grid': BlockType.STATS_GRID,
+      'call-to-action': BlockType.CALL_TO_ACTION,
+      // Rich visual types mapped to PARAGRAPH - formatting variant is set in createFromAIContent
+      card: BlockType.PARAGRAPH,
+      'icon-text': BlockType.PARAGRAPH,
     };
 
     return typeMap[type.toLowerCase()] || BlockType.PARAGRAPH;

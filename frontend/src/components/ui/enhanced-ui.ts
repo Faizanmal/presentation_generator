@@ -86,6 +86,8 @@ export {
     ThemeSwitch,
 } from "./theme-toggle";
 
+export { ThemeToggleButton } from "./theme-toggle-button";
+
 // AI Chat panel
 export {
     AIChatPanel,

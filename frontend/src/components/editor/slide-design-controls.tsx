@@ -78,8 +78,8 @@ export function SlideDesignControls({
                 </h3>
 
                 {themes.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-2">
-                        {themes.slice(0, 4).map((theme) => (
+                    <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+                        {themes.map((theme) => (
                             <button
                                 key={theme.id}
                                 onClick={() => onThemeChange?.(theme.id)}

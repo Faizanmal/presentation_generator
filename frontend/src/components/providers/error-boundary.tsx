@@ -92,7 +92,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 <div>
                   <CardTitle className="text-2xl">Oops! Something went wrong</CardTitle>
                   <CardDescription>
-                    We encountered an unexpected error. Don't worry, our team has been notified.
+                    We encountered an unexpected error. Don&apos;t worry, our team has been notified.
                   </CardDescription>
                 </div>
               </div>

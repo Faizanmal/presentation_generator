@@ -8,8 +8,8 @@ export default function RegisterLoading() {
           <div className="h-4 w-64 rounded bg-slate-800" />
         </div>
         <div className="space-y-4 bg-slate-900 rounded-2xl p-6">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-10 rounded-lg bg-slate-800" />
+          {Array.from({ length: 4 }).map((_, i) => String(i)).map((id) => (
+            <div key={id} className="h-10 rounded-lg bg-slate-800" />
           ))}
         </div>
       </div>

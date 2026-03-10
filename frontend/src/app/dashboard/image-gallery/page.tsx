@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { useImageAcquisition } from '@/hooks/use-new-features';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function ImageAcquisitionPage() {
     const searchParams = useSearchParams();
@@ -269,7 +270,7 @@ export default function ImageAcquisitionPage() {
                             <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
                                 {results.map((img) => (
                                     <div key={img.url} className="rounded-lg overflow-hidden border group relative">
-                                        <img
+                                        <Image
                                             src={img.url}
                                             alt="Acquired image"
                                             className="w-full h-40 object-cover"

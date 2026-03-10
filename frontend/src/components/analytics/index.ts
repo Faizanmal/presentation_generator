@@ -18,3 +18,7 @@ export { AnalyticsDashboard } from '../editor/analytics-dashboard';
 export { AdvancedAnalyticsDashboard } from './advanced-analytics-dashboard';
 export { InsightsDashboard } from './insights-dashboard';
 export { AudienceAnalyticsDashboard } from './audience-analytics-dashboard';
+
+// Google Analytics & Tag Manager
+export { GoogleAnalytics } from "./google-analytics";
+export { GoogleTagManager, GoogleTagManagerNoScript } from "./google-tag-manager";

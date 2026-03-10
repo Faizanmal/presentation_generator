@@ -15,6 +15,7 @@ import {
     StarOff,
     Trash2,
 } from "lucide-react";
+import Image from 'next/image';
 import { Button } from "./button";
 import {
     DropdownMenu,
@@ -94,7 +95,7 @@ export const ProjectCard = memo(({
                 {/* Thumbnail */}
                 <div className="relative h-16 w-28 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 shrink-0">
                     {project.thumbnail ? (
-                        <img
+                        <Image
                             src={project.thumbnail}
                             alt={project.title}
                             className="h-full w-full object-cover"
@@ -141,7 +142,7 @@ export const ProjectCard = memo(({
                                 title={collaborator.name}
                             >
                                 {collaborator.avatar ? (
-                                    <img
+                                    <Image
                                         src={collaborator.avatar}
                                         alt={collaborator.name}
                                         className="h-full w-full rounded-full object-cover"
@@ -227,7 +228,7 @@ export const ProjectCard = memo(({
             {/* Thumbnail */}
             <div className="relative aspect-16/10 bg-slate-100 dark:bg-slate-800 overflow-hidden">
                 {project.thumbnail ? (
-                    <img
+                    <Image
                         src={project.thumbnail}
                         alt={project.title}
                         className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
@@ -360,7 +361,7 @@ export const ProjectCard = memo(({
                                         title={collaborator.name}
                                     >
                                         {collaborator.avatar ? (
-                                            <img
+                                            <Image
                                                 src={collaborator.avatar}
                                                 alt={collaborator.name}
                                                 className="h-full w-full rounded-full object-cover"

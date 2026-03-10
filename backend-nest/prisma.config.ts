@@ -3,12 +3,30 @@
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
+// Supabase (and many managed Postgres providers) require SSL and will reject
+// plain connections. Railway environments often supply `DATABASE_URL` but
+// omit the `sslmode=require` query parameter, which leads to a P1001 error
+// when Prisma/pg tries to connect:
+//
+//   Error: P1001: Can't reach database server at `…supabase.co:5432`
+//
+// To guard against that, append the parameter automatically if it isn't
+// already present. This keeps your deployment working even if the var is
+// defined without SSL info.
+
+if (process.env.DATABASE_URL) {
+  const url = process.env.DATABASE_URL;
+  if (!/sslmode=/.test(url)) {
+    process.env.DATABASE_URL = url + (url.includes("?") ? "&" : "?") + "sslmode=require";
+  }
+}
+
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"]!,
+    url: process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/postgres?schema=public",
   },
 });

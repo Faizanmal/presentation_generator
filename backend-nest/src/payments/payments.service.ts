@@ -23,7 +23,8 @@ export class PaymentsService {
     this.stripe = new Stripe(
       this.configService.get<string>('STRIPE_SECRET_KEY')!,
       {
-        apiVersion: '2026-01-28.clover',
+        // upgrade to the version allowed by current Stripe types
+        apiVersion: '2026-02-25.clover',
       },
     );
   }

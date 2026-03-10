@@ -43,7 +43,7 @@ export class SyncController {
     return this.syncService.cacheProject(
       req.user.id,
       projectId,
-      body.data,
+      body.data as unknown as import('@prisma/client').Prisma.InputJsonValue,
       body.version,
     );
   }
@@ -88,7 +88,7 @@ export class SyncController {
       req.user.id,
       body.projectId,
       body.operation,
-      body.data,
+      body.data as unknown as import('@prisma/client').Prisma.InputJsonValue,
     );
   }
 

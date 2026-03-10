@@ -15,7 +15,7 @@ import {
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Job, Queue } from 'bullmq';
-import { Observable, from, map, catchError, of } from 'rxjs';
+import { Observable } from 'rxjs';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { UsersService } from '../../users/users.service';
@@ -228,19 +228,28 @@ export class ThinkingAgentController {
 
     const generator = this.orchestrator.streamThinking(params);
 
-    return from(this.asyncIteratorToArray(generator)).pipe(
-      map((items) => items.flat()),
-      map((items) =>
-        items.map((item) => ({
-          data: JSON.stringify(item),
-          type: item.type,
-        })),
-      ),
-      map((events) => events[events.length - 1] || { data: '{}' }),
-      catchError((error) => {
-        return of({ data: JSON.stringify({ error: error.message }) });
-      }),
-    );
+    // Properly stream each event from the async generator as individual SSE messages
+    return new Observable<MessageEvent>((subscriber) => {
+      void (async () => {
+        try {
+          for await (const item of generator) {
+            subscriber.next({
+              data: JSON.stringify(item),
+              type: item.type,
+            } as MessageEvent);
+          }
+          subscriber.complete();
+        } catch (error) {
+          subscriber.next({
+            data: JSON.stringify({
+              error: (error as Error).message,
+            }),
+            type: 'error',
+          } as MessageEvent);
+          subscriber.complete();
+        }
+      })();
+    });
   }
 
   /**
@@ -341,19 +350,6 @@ export class ThinkingAgentController {
       default:
         return 6;
     }
-  }
-
-  /**
-   * Convert async iterator to array for rxjs
-   */
-  private async asyncIteratorToArray<T>(
-    iterator: AsyncGenerator<T>,
-  ): Promise<T[]> {
-    const result: T[] = [];
-    for await (const item of iterator) {
-      result.push(item);
-    }
-    return result;
   }
 
   /**

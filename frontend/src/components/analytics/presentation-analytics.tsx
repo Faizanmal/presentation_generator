@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 // import { useState, useEffect, useMemo } from "react";
 import {
     BarChart3,
@@ -40,6 +41,12 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+
+// define an SVG icon component type for props like className
+
+type IconComponent = React.ComponentType<
+  React.SVGProps<SVGSVGElement> & { className?: string }
+>;
 
 interface PresentationStats {
     totalViews: number;
@@ -198,7 +205,7 @@ function StatCard({
 }: {
     title: string;
     value: string | number;
-    icon: React.ElementType;
+    icon: IconComponent;
     trend?: number;
     description: string;
 }) {

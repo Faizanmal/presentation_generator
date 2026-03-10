@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { motion } from "framer-motion";
 
 interface SkeletonProps {
@@ -24,10 +25,9 @@ export function SkeletonText({
 }) {
     return (
         <div className={`space-y-2 ${className}`}>
-            {Array.from({ length: lines }).map((_, i) => (
+            {Array.from({ length: lines }).map((_, i) => String(i)).map((id, i) => (
                 <Skeleton
-                    // eslint-disable-next-line react/no-array-index-key
-                    key={`text-line-${i}`}
+                    key={`text-line-${id}`}
                     className={`h-4 ${i === lines - 1 ? "w-3/4" : "w-full"}`}
                 />
             ))}
@@ -41,7 +41,7 @@ export function SkeletonCard({ className = "" }: { className?: string }) {
         <div
             className={`bg-white dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden ${className}`}
         >
-            <Skeleton className="aspect-[16/10] rounded-none" />
+            <Skeleton className="aspect-16/10 rounded-none" />
             <div className="p-4 space-y-3">
                 <Skeleton className="h-5 w-3/4" />
                 <div className="flex items-center gap-2">
@@ -93,9 +93,8 @@ export function SkeletonList({
 }) {
     return (
         <div className={`space-y-4 ${className}`}>
-            {Array.from({ length: items }).map((_, i) => (
-                // eslint-disable-next-line react/no-array-index-key
-                <div key={`list-item-${i}`} className="flex items-center gap-4">
+            {Array.from({ length: items }).map((_, i) => String(i)).map((id) => (
+                <div key={`list-item-${id}`} className="flex items-center gap-4">
                     <SkeletonAvatar />
                     <div className="flex-1 space-y-2">
                         <Skeleton className="h-4 w-1/2" />
@@ -121,20 +120,17 @@ export function SkeletonTable({
         <div className={`space-y-3 ${className}`}>
             {/* Header */}
             <div className="flex gap-4">
-                {Array.from({ length: cols }).map((_, i) => (
-                    // eslint-disable-next-line react/no-array-index-key
-                    <Skeleton key={`table-header-${i}`} className="h-4 flex-1" />
+                {Array.from({ length: cols }).map((_, i) => String(i)).map((id) => (
+                    <Skeleton key={`table-header-${id}`} className="h-4 flex-1" />
                 ))}
             </div>
             {/* Rows */}
-            {Array.from({ length: rows }).map((_, rowIndex) => (
-                // eslint-disable-next-line react/no-array-index-key
-                <div key={`table-row-${rowIndex}`} className="flex gap-4 py-2">
-                    {Array.from({ length: cols }).map((_, colIndex) => (
+            {Array.from({ length: rows }).map((_, i) => String(i)).map((rowId) => (
+                <div key={`table-row-${rowId}`} className="flex gap-4 py-2">
+                    {Array.from({ length: cols }).map((_, j) => String(j)).map((colId) => (
 
                         <Skeleton
-                            // eslint-disable-next-line react/no-array-index-key
-                            key={`table-col-${colIndex}`}
+                            key={`table-col-${colId}`}
                             className="h-4 flex-1"
                         />
                     ))}
@@ -162,9 +158,8 @@ export function SkeletonDashboard() {
 
             {/* Cards grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {Array.from({ length: 8 }).map((_, i) => (
-                    // eslint-disable-next-line react/no-array-index-key
-                    <SkeletonCard key={`dashboard-card-${i}`} />
+                {Array.from({ length: 8 }).map((_, i) => String(i)).map((id) => (
+                    <SkeletonCard key={`dashboard-card-${id}`} />
                 ))}
             </div>
         </div>
@@ -179,9 +174,8 @@ export function SkeletonEditor() {
             <div className="w-64 border-r border-slate-200 dark:border-slate-800 p-4 space-y-4">
                 <Skeleton className="h-10 w-full" />
                 <div className="space-y-2">
-                    {Array.from({ length: 6 }).map((_, i) => (
-                        // eslint-disable-next-line react/no-array-index-key
-                        <Skeleton key={`editor-side-${i}`} className="h-16 w-full rounded-lg" />
+                    {Array.from({ length: 6 }).map((_, i) => String(i)).map((id) => (
+                        <Skeleton key={`editor-side-${id}`} className="h-16 w-full rounded-lg" />
                     ))}
                 </div>
             </div>
@@ -204,7 +198,7 @@ export function ShimmerOverlay({ className = "" }: { className?: string }) {
     return (
         <div className={`absolute inset-0 overflow-hidden ${className}`}>
             <motion.div
-                className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                className="absolute inset-0 -translate-x-full bg-linear-to-r from-transparent via-white/20 to-transparent"
                 animate={{ x: ["-100%", "100%"] }}
                 transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
             />

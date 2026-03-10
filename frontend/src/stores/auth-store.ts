@@ -115,13 +115,22 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
             initialized: true,
           });
-        } catch {
-          set({
-            user: null,
-            isAuthenticated: false,
-            isLoading: false,
-            initialized: true,
-          });
+        } catch (error: unknown) {
+          const axiosError = error as { response?: { status?: number } };
+          const status = axiosError?.response?.status;
+          if (status === 401 || status === 403) {
+            set({
+              user: null,
+              isAuthenticated: false,
+              isLoading: false,
+              initialized: true,
+            });
+          } else {
+            set({
+              isLoading: false,
+              initialized: true,
+            });
+          }
         }
       },
 

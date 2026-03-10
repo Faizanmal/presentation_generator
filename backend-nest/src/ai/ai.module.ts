@@ -19,6 +19,8 @@ import { RealTimeDataService } from './realtime-data.service';
 import { DataImportService } from './data-import.service';
 import { DataImportController } from './data-import.controller';
 import { ImageRecognitionService } from './image-recognition.service';
+import { AICostOptimizerService } from './ai-cost-optimizer.service';
+import { UserTierService } from './user-tier.service';
 
 @Module({
   imports: [
@@ -46,6 +48,8 @@ import { ImageRecognitionService } from './image-recognition.service';
     RealTimeDataService,
     DataImportService,
     ImageRecognitionService,
+    AICostOptimizerService,
+    UserTierService,
   ],
   exports: [
     AIService,
@@ -60,6 +64,8 @@ import { ImageRecognitionService } from './image-recognition.service';
     RealTimeDataService,
     DataImportService,
     ImageRecognitionService,
+    AICostOptimizerService,
+    UserTierService,
   ],
 })
 export class AIModule {}

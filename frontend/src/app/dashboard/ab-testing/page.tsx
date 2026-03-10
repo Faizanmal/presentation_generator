@@ -137,10 +137,13 @@ export default function ABTestingPage() {
               </Card>
             ))
           ) : (
-            <Card className="p-12 text-center">
-              <FlaskConical className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-              <p className="text-muted-foreground">No A/B tests yet.</p>
-            </Card>
+            <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed rounded-xl bg-muted/10">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+                <FlaskConical className="w-8 h-8 text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">No active tests</h3>
+              <p className="text-muted-foreground max-w-sm">Create an A/B test above to experiment with different design layouts and track specific user engagement metrics.</p>
+            </div>
           )}
         </div>
       </div>

@@ -21,6 +21,7 @@ import {
     Sparkles,
     RefreshCw,
 } from 'lucide-react';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -397,7 +398,7 @@ export function BrandKitManager({ onApplyBrandKit }: BrandKitManagerProps) {
                                             onClick={() => handleLogoUpload('light')}
                                         >
                                             {editingKit.logo?.light ? (
-                                                <img src={editingKit.logo.light} alt={`${editingKit.name || "Brand"} Light Logo`} className="max-h-20 max-w-full" />
+                                                <Image src={editingKit.logo.light} alt={`${editingKit.name || "Brand"} Light Logo`} className="max-h-20 max-w-full" />
                                             ) : (
                                                 <div className="text-center">
                                                     <Upload className="mx-auto h-6 w-6 text-muted-foreground" />
@@ -413,7 +414,7 @@ export function BrandKitManager({ onApplyBrandKit }: BrandKitManagerProps) {
                                             onClick={() => handleLogoUpload('dark')}
                                         >
                                             {editingKit.logo?.dark ? (
-                                                <img src={editingKit.logo.dark} alt={`${editingKit.name || "Brand"} Dark Logo`} className="max-h-20 max-w-full" />
+                                                <Image src={editingKit.logo.dark} alt={`${editingKit.name || "Brand"} Dark Logo`} className="max-h-20 max-w-full" />
                                             ) : (
                                                 <div className="text-center">
                                                     <Upload className="mx-auto h-6 w-6 text-gray-500" />

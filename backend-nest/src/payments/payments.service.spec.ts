@@ -84,7 +84,7 @@ describe('PaymentsService', () => {
 
   const mockConfigService = {
     get: jest.fn((key: string) => {
-      const config = {
+      const config: Record<string, string> = {
         STRIPE_SECRET_KEY: 'sk_test_123',
         STRIPE_WEBHOOK_SECRET: 'whsec_test_123',
         FRONTEND_URL: 'http://localhost:3000',
@@ -177,10 +177,7 @@ describe('PaymentsService', () => {
       mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
 
       await expect(
-        service.createCheckoutSession(
-          'user-123',
-          'invalid_plan' as unknown as import('@prisma/client').SubscriptionPlan,
-        ),
+        service.createCheckoutSession('user-123', 'invalid_plan' as never),
       ).rejects.toThrow(BadRequestException);
     });
   });

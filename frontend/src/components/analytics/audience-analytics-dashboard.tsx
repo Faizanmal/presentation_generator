@@ -281,7 +281,7 @@ export function AudienceAnalyticsDashboard({ projectId }: AudienceAnalyticsDashb
                       >
                         {(insights?.deviceBreakdown || []).map((item: { device: string; count: number }, index: number) => (
                           <Cell
-                             
+
                             key={item.device || `cell-${index}`}
                             fill={COLORS[index % COLORS.length]}
                           />
@@ -468,7 +468,7 @@ export function AudienceAnalyticsDashboard({ projectId }: AudienceAnalyticsDashb
                   <div className="space-y-3">
                     {[1, 2, 3, 4, 5].map((i) => (
                       <div
-                         
+
                         key={i}
                         className="flex items-center justify-between rounded-lg border p-3"
                       >
@@ -513,9 +513,8 @@ export function AudienceAnalyticsDashboard({ projectId }: AudienceAnalyticsDashb
                   </div>
                 </div>
                 {/* Hotspots */}
-                {(insights?.interactionHotspots || []).slice(0, 5).map((hotspot: { x: number; y: number; count: number }, _i: number) => (
+                {(insights?.interactionHotspots || []).slice(0, 5).map((hotspot: { x: number; y: number; count: number }, _i: number) => ({ hotspot, i: String(_i) })).map(({ hotspot, i: _i }: { hotspot: { x: number; y: number; count: number }, i: string }) => (
                   <div
-                    // eslint-disable-next-line react/no-array-index-key
                     key={`${hotspot.x}-${hotspot.y}-${_i}`}
                     className="absolute h-8 w-8 -translate-x-1/2 -translate-y-1/2 animate-pulse rounded-full bg-red-500/50"
                     style={{

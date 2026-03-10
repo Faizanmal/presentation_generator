@@ -81,7 +81,7 @@ describe('AuthService', () => {
         JWT_SECRET: 'test-secret',
         JWT_EXPIRATION: '1h',
         BCRYPT_ROUNDS: 10,
-      };
+      } as Record<string, string | number>;
       return config[key];
     }),
   };
@@ -311,7 +311,7 @@ describe('AuthService', () => {
       );
       expect(response).toEqual({
         accessToken: 'mock-jwt-token',
-        refreshToken: undefined,
+        refreshToken: expect.any(String),
         expiresIn: expect.any(Number),
         user: expect.objectContaining({ id: newUser.id }),
       });
@@ -340,7 +340,7 @@ describe('AuthService', () => {
       });
       expect(response).toEqual({
         accessToken: 'mock-jwt-token',
-        refreshToken: undefined,
+        refreshToken: expect.any(String),
         expiresIn: expect.any(Number),
         user: expect.objectContaining({ id: existingUser.id }),
       });
@@ -355,6 +355,25 @@ describe('AuthService', () => {
 
       expect(mockUsersService.createAccount).not.toHaveBeenCalled();
       expect(response.user.id).toEqual(existingUser.id);
+    });
+
+    it('should propagate errors from usersService.findByEmail', async () => {
+      const badError = new Error('database blew up');
+      mockUsersService.findByEmail.mockRejectedValue(badError);
+
+      await expect(service.googleAuth(googleProfile)).rejects.toThrow(badError);
+    });
+
+    it('should propagate schema-mismatch errors with descriptive message', async () => {
+      const schemaError = {
+        code: 'P2022',
+        message: 'column users.mfaEnabled does not exist',
+      } as unknown as Error & { code: string };
+      mockUsersService.findByEmail.mockRejectedValue(schemaError);
+
+      await expect(service.googleAuth(googleProfile)).rejects.toThrow(
+        'Database schema mismatch',
+      );
     });
   });
 
@@ -447,17 +466,15 @@ describe('AuthService', () => {
   });
 
   describe('refreshToken', () => {
-    it('should return new access token for valid refresh token', async () => {
+    it('should return new access and refresh token for valid refresh token', async () => {
       const payload = { sub: mockUser.id, email: mockUser.email };
       mockJwtService.verify.mockReturnValue(payload);
       mockRedis.get.mockResolvedValue(mockUser.id);
-      const result = await service.refreshToken(
-        mockUser.id,
-        'valid-refresh-token',
-      );
+      const result = await service.refreshToken('valid-refresh-token');
 
       expect(result).toEqual({
         accessToken: 'mock-jwt-token',
+        refreshToken: expect.any(String),
         expiresIn: expect.any(Number),
       });
       expect(mockRedis.get).toHaveBeenCalled();

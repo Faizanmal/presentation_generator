@@ -267,38 +267,13 @@ export function PresentationScheduler({
     }
   };
 
-  // Mock data - moved to use useMemo to avoid impure function during render
-  const mockPresentations: ScheduledPresentation[] = useMemo(() => {
-    const tomorrow = new Date();
-    tomorrow.setTime(tomorrow.getTime() + 86400000);
-    
+  // Use API data, fallback to empty array
+  const displayPresentations: ScheduledPresentation[] = useMemo(() => {
     if (Array.isArray(presentations?.data)) {
       return presentations.data as unknown as ScheduledPresentation[];
     }
-
-    return [
-    {
-      id: 'sched-1',
-      projectId,
-      title: 'Q1 Strategy Presentation',
-      scheduledAt: tomorrow.toISOString(),
-      timezone: 'America/New_York',
-      duration: 45,
-      status: 'scheduled' as const,
-      settings: {
-        autoStart: true,
-        enableQA: true,
-        enablePolls: true,
-        enableRecording: true,
-        accessType: 'private' as const,
-      },
-      attendees: [
-        { email: 'john@example.com', name: 'John Doe', status: 'accepted' as const },
-        { email: 'jane@example.com', name: 'Jane Smith', status: 'invited' as const },
-      ],
-    },
-  ];
-  }, [presentations, projectId]);
+    return [];
+  }, [presentations]);
 
   return (
     <div className="space-y-6">
@@ -466,7 +441,7 @@ export function PresentationScheduler({
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
         </div>
-      ) : mockPresentations.length === 0 ? (
+      ) : displayPresentations.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Calendar className="h-12 w-12 text-slate-400 mb-4" />
@@ -479,7 +454,7 @@ export function PresentationScheduler({
         </Card>
       ) : (
         <div className="space-y-4">
-          {mockPresentations.map((presentation) => (
+          {displayPresentations.map((presentation) => (
             <Card key={presentation.id}>
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between">

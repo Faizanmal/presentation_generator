@@ -181,10 +181,13 @@ export default function StoryboardingPage() {
               </Card>
             ))
           ) : (
-            <Card className="p-12 text-center">
-              <BookTemplate className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-              <p className="text-muted-foreground">No storyboards yet. Create one above.</p>
-            </Card>
+            <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed rounded-xl bg-muted/10">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+                <BookTemplate className="w-8 h-8 text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">No storyboards yet</h3>
+              <p className="text-muted-foreground max-w-sm">Create your first AI-powered narrative structure above by entering a topic and selecting your target audience.</p>
+            </div>
           )}
         </div>
       </div>

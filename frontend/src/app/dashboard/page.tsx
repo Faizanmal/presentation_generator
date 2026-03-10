@@ -14,7 +14,6 @@ import {
   Plus,
   Wand2,
   Sparkles,
-  Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,7 +38,8 @@ import { Textarea } from "@/components/ui/textarea";
 import dynamic from "next/dynamic";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
-import type { Project as _Project } from "@/types";
+import { analytics } from "@/lib/analytics";
+import type { Project } from "@/types";
 
 // Dynamically import heavy/secondary components for performance
 const CommandPalette = dynamic(() => import("@/components/ui/command-palette").then(mod => mod.CommandPalette), { ssr: false });
@@ -59,7 +59,7 @@ import {
 export default function DashboardPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const user = useAuthStore((state) => state.user);
+  const _user = useAuthStore((state) => state.user);
   const subscription = useAuthStore((state) => state.subscription);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const authLoading = useAuthStore((state) => state.isLoading);
@@ -94,6 +94,7 @@ export default function DashboardPage() {
     mutationFn: (data: { title: string; type: string }) => api.projects.create(data),
     onSuccess: (project) => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
+      analytics.project.create('blank');
       router.push(`/editor/${project.id}`);
     },
     onError: () => {
@@ -105,13 +106,95 @@ export default function DashboardPage() {
   const generateProjectMutation = useMutation({
     mutationFn: (data: { topic: string; tone: string; audience: string; length: number; type: string; generateImages?: boolean; imageSource?: 'ai' | 'stock' }) =>
       api.projects.generate(data),
-    onSuccess: (job) => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
+    onSuccess: (job, variables) => {
       setIsCreateModalOpen(false);
       setIsGenerating(false);
-      toast.success("Presentation generation started — we'll notify you when it's ready.", {
+      analytics.project.create('ai-generated');
+      analytics.ai.generate({
+        topic: variables.topic,
+        tone: variables.tone,
+        audience: variables.audience,
+        length: variables.length,
+        generateImages: variables.generateImages || false,
+      });
+
+      toast.success("Presentation generation started — it may take a moment to appear.", {
         description: job?.message || `Job id: ${job?.jobId || 'unknown'}`,
       });
+
+      // if there was a search term active clear it so the new project will be visible
+      setSearchQuery("");
+
+      // begin polling for status; we avoid immediately invalidating when the job
+      // completes because a subsequent refetch can overwrite our optimistic merge if
+      // the backend hasn’t yet persisted the new project. instead we merge up front and
+      // then perform one delayed refresh.
+      if (job?.jobId) {
+        const poll = async () => {
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const status = await (api as any).getProjectGenerationStatus(job.jobId);
+
+            if (status.state === 'completed') {
+              if (status.result) {
+                // update cache now so the project appears regardless of later refetches
+                const result = status.result as Project;
+                queryClient.setQueryData<Project[] | undefined>(["projects"], (old) => {
+                  const existing = old as Project[] | undefined;
+                  if (existing) {
+                    return [result, ...existing.filter(p => p.id !== result.id)];
+                  }
+                  return [result];
+                });
+
+                toast.success('Your presentation is ready!', {
+                  description: `"${result.title}" has been added to your list.`,
+                });
+
+                // give the backend a moment to finish storing before refetching. after
+                // the refetch completes we merge the same result again so it can’t be
+                // wiped out if the server response didn’t include it yet.
+                setTimeout(() => {
+                  queryClient
+                    .invalidateQueries({ queryKey: ["projects"] })
+                    .then(() => {
+                      queryClient.setQueryData<Project[] | undefined>(["projects"], (old) => {
+                        const existing = old as Project[] | undefined;
+                        if (existing) {
+                          return [result, ...existing.filter(p => p.id !== result.id)];
+                        }
+                        return [result];
+                      });
+                    });
+                }, 3000);
+
+                // stop polling now that we handled completion
+                return;
+              } else {
+                // job finished but result not attached yet – try again shortly
+                setTimeout(poll, 2000);
+                return;
+              }
+            }
+
+            if (['failed', 'stalled', 'error'].includes(status.state)) {
+              // a failure should still refresh the list so stale jobs don’t linger
+              queryClient.invalidateQueries({ queryKey: ["projects"] });
+              toast.error('Presentation generation failed.');
+              return;
+            }
+
+            // still queued/running, poll again
+            setTimeout(poll, 5000);
+          } catch (_err) {
+            // transient error – retry
+            setTimeout(poll, 5000);
+          }
+        };
+        poll();
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["projects"] });
+      }
     },
     onError: () => {
       toast.error("Failed to generate presentation");
@@ -122,8 +205,9 @@ export default function DashboardPage() {
   // Duplicate project mutation
   const duplicateProjectMutation = useMutation({
     mutationFn: (id: string) => api.projects.duplicate(id),
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
+      analytics.project.duplicate(id);
       toast.success("Project duplicated");
     },
     onError: () => {
@@ -134,9 +218,10 @@ export default function DashboardPage() {
   // Delete project mutation
   const deleteProjectMutation = useMutation({
     mutationFn: (id: string) => api.projects.delete(id),
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       setDeleteProjectId(null);
+      analytics.project.delete(id);
       toast.success("Project deleted");
     },
     onError: () => {
@@ -145,10 +230,36 @@ export default function DashboardPage() {
   });
 
   // Filter projects by search
-  const filteredProjects = useMemo(() =>
-    projects?.filter((p) =>
-      p.title.toLowerCase().includes(searchQuery.toLowerCase())
-    ), [projects, searchQuery]);
+  const filteredProjects = useMemo(() => {
+    const normalizedQuery = (searchQuery || '').toLowerCase();
+    const filtered = projects?.filter((p) => {
+      const title = (p?.title || '').toLowerCase();
+      return title.includes(normalizedQuery);
+    });
+    
+    // Track search if there's a query
+    if (normalizedQuery && filtered) {
+      analytics.project.search(normalizedQuery, filtered.length);
+    }
+    
+    return filtered;
+  }, [projects, searchQuery]);
+
+  // Deduplicate list to avoid React key warnings (shouldn't normally happen but
+  // we occasionally merge the same project twice during background polling).
+  const uniqueProjects = useMemo(() => {
+    if (!filteredProjects) {
+      return [];
+    }
+    const seen = new Set<string>();
+    return filteredProjects.filter((p) => {
+      if (seen.has(p.id)) {
+        return false;
+      }
+      seen.add(p.id);
+      return true;
+    });
+  }, [filteredProjects]);
 
   // Handle create blank project
   const handleCreateBlank = useCallback(() => {
@@ -167,62 +278,36 @@ export default function DashboardPage() {
     <div className="space-y-8">
       {/* Main content */}
       <div className="space-y-8">
-        {/* V2 Experience Card */}
-        <div className="bg-white dark:bg-slate-950 rounded-xl border border-blue-200 dark:border-slate-800 p-6 mb-8 shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-linear-to-br from-blue-500/10 to-purple-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-
-          <div className="relative z-10">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-blue-600" />
-              Try the New V2 Experience
-            </h2>
-            <p className="text-slate-600 dark:text-slate-400 mb-6 max-w-2xl">
-              We've redesigned the interface to be more intuitive, powerful, and beautiful. Switch to the new views to experience the future of presentation design.
-            </p>
-
-            <div className="flex flex-wrap gap-4">
-              <Link href="/dashboard-v2">
-                <Button size="lg" className="bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white border-0">
-                  <LayoutGrid className="mr-2 h-5 w-5" />
-                  Go to Dashboard V2
-                </Button>
-              </Link>
-
-              <Button
-                size="lg"
-                variant="outline"
-                className="border-blue-200 hover:bg-blue-50 dark:border-slate-700 dark:hover:bg-slate-800"
-                onClick={() => {
-                  if (projects && projects.length > 0) {
-                    router.push(`/editor-v2/${projects[0].id}`);
-                  } else {
-                    toast.error("Please create a project first to try the editor");
-                  }
-                }}
-              >
-                <Pencil className="mr-2 h-5 w-5 text-blue-600" />
-                Open Editor V2
-              </Button>
-            </div>
-          </div>
-        </div>
+  
 
         {/* Stats & Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
           <UsageCard
             plan={subscription?.plan || "free"}
-            presentations={{ used: projects?.length || 0, total: 100 }} // Mock limit
+            presentations={{ used: projects?.length || 0, total: subscription?.presentationLimit || (subscription?.plan === 'ENTERPRISE' ? 10000 : subscription?.plan === 'PRO' ? 500 : 10) }}
             aiGenerations={{ used: subscription?.aiGenerationsUsed || 0, total: subscription?.aiGenerationsLimit || 10 }}
           />
           <QuickActionsGrid
-            onCreateNew={() => setIsCreateModalOpen(true)}
-            onAIGenerate={() => {
+            onCreateNew={() => {
+              analytics.engagement.featureClick('quick_action_create_new');
               setIsCreateModalOpen(true);
             }}
-            onViewAnalytics={() => router.push("/dashboard/analytics")}
-            onInviteTeam={() => toast.info("Team invitation coming soon!")}
+            onAIGenerate={() => {
+              analytics.engagement.featureClick('quick_action_ai_generate');
+              setIsCreateModalOpen(true);
+            }}
+            onViewAnalytics={() => {
+              analytics.engagement.featureClick('quick_action_view_analytics');
+              router.push("/dashboard/analytics");
+            }}
+            onInviteTeam={() => {
+              analytics.engagement.featureClick('quick_action_invite_team');
+              toast.info("Team invitation coming soon!");
+            }}
           />
         </div>
+
+        {/* Spline hero section has been removed */}
 
         {/* Features Hub */}
         <FeaturesHub />
@@ -263,13 +348,19 @@ export default function DashboardPage() {
 
             <div className="flex items-center border rounded-lg overflow-hidden">
               <button
-                onClick={() => setViewMode("grid")}
+                onClick={() => {
+                  setViewMode("grid");
+                  analytics.engagement.viewModeChange('grid');
+                }}
                 className={`p-2 ${viewMode === "grid" ? "bg-slate-100 dark:bg-slate-800" : ""}`}
               >
                 <LayoutGrid className="h-4 w-4" />
               </button>
               <button
-                onClick={() => setViewMode("list")}
+                onClick={() => {
+                  setViewMode("list");
+                  analytics.engagement.viewModeChange('list');
+                }}
                 className={`p-2 ${viewMode === "list" ? "bg-slate-100 dark:bg-slate-800" : ""}`}
               >
                 <List className="h-4 w-4" />
@@ -308,32 +399,52 @@ export default function DashboardPage() {
           </div>
         ) : viewMode === "grid" ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredProjects?.map((project) => (
+            {uniqueProjects.map((project) => (
               <ProjectCard
                 key={project.id}
                 project={project}
-                onOpen={(id) => router.push(`/editor/${id}`)}
-                onEdit={(id) => router.push(`/editor/${id}`)}
+                onOpen={(id) => {
+                  analytics.project.open(id);
+                  router.push(`/editor/${id}`);
+                }}
+                onEdit={(id) => {
+                  analytics.project.open(id);
+                  router.push(`/editor/${id}`);
+                }}
                 onDuplicate={(id) => duplicateProjectMutation.mutate(id)}
                 onDelete={(id) => setDeleteProjectId(id)}
                 isFavorite={isFavorite(project.id)}
-                onToggleFavorite={(id) => toggleFavorite(id)}
+                onToggleFavorite={(id) => {
+                  const newState = !isFavorite(id);
+                  toggleFavorite(id);
+                  analytics.engagement.toggleFavorite(id, newState);
+                }}
                 variant="grid"
               />
             ))}
           </div>
         ) : (
           <div className="space-y-2">
-            {filteredProjects?.map((project) => (
+            {uniqueProjects.map((project) => (
               <ProjectCard
                 key={project.id}
                 project={project}
-                onOpen={(id) => router.push(`/editor/${id}`)}
-                onEdit={(id) => router.push(`/editor/${id}`)}
+                onOpen={(id) => {
+                  analytics.project.open(id);
+                  router.push(`/editor/${id}`);
+                }}
+                onEdit={(id) => {
+                  analytics.project.open(id);
+                  router.push(`/editor/${id}`);
+                }}
                 onDuplicate={(id) => duplicateProjectMutation.mutate(id)}
                 onDelete={(id) => setDeleteProjectId(id)}
                 isFavorite={isFavorite(project.id)}
-                onToggleFavorite={(id) => toggleFavorite(id)}
+                onToggleFavorite={(id) => {
+                  const newState = !isFavorite(id);
+                  toggleFavorite(id);
+                  analytics.engagement.toggleFavorite(id, newState);
+                }}
                 variant="list"
               />
             ))}
@@ -456,7 +567,7 @@ function CreateProjectModal({
         }
       }}
     >
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg bg-white dark:bg-gray-900">
         {mode === "select" ? (
           <>
             <DialogHeader>
@@ -464,10 +575,11 @@ function CreateProjectModal({
               <DialogDescription>Choose how you want to start</DialogDescription>
             </DialogHeader>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 py-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 py-4 items-stretch bg-white dark:bg-gray-900 rounded-lg p-2">
+              {/* make cards fully opaque with explicit light/dark backgrounds and stronger hover shadows */}
               <button
                 onClick={onCreateBlank}
-                className="flex flex-col items-center gap-3 p-6 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/20 transition-colors"
+                className="flex flex-col justify-between items-center gap-3 p-6 min-h-45 border-2 border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-gray-900 shadow-md hover:shadow-lg transition-all opacity-100 h-full"
                 type="button"
               >
                 <div className="h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
@@ -481,7 +593,7 @@ function CreateProjectModal({
 
               <button
                 onClick={() => setMode("generate")}
-                className="flex flex-col items-center gap-3 p-6 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-950/20 transition-colors"
+                className="flex flex-col justify-between items-center gap-3 p-6 min-h-45 border-2 border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-gray-900 shadow-md hover:shadow-lg transition-all opacity-100 h-full"
                 type="button"
               >
                 <div className="h-12 w-12 rounded-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center">
@@ -489,13 +601,13 @@ function CreateProjectModal({
                 </div>
                 <div className="text-center">
                   <p className="font-medium text-slate-900 dark:text-white">Quick AI</p>
-                  <p className="text-sm text-slate-500">Fast generation</p>
+                  <p className="text-sm text-slate-700 dark:text-slate-300">Fast generation</p>
                 </div>
               </button>
 
               <Link
                 href="/dashboard/ai-thinking"
-                className="flex flex-col items-center gap-3 p-6 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 transition-colors relative overflow-hidden"
+                className="flex flex-col justify-between items-center gap-3 p-6 min-h-45 border-2 border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-gray-900 shadow-md hover:shadow-lg transition-all opacity-100 relative overflow-hidden h-full"
               >
                 <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-indigo-500 text-white text-[10px] font-medium">
                   NEW
@@ -519,7 +631,8 @@ function CreateProjectModal({
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4 py-4">
+            {/* wrap generation form in a solid card so the overlay doesn’t show through */}
+            <div className="space-y-4 py-4 bg-white dark:bg-gray-900 rounded-lg">
               <div>
                 <Label htmlFor="topic">Topic / Idea</Label>
                 <Textarea
@@ -582,7 +695,7 @@ function CreateProjectModal({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+              <div className="flex items-center justify-between rounded-lg border border-slate-200 p-4 bg-white dark:bg-gray-800 dark:border-slate-800">
                 <div className="space-y-0.5">
                   <Label className="text-base">Generate Images</Label>
                   <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -594,26 +707,26 @@ function CreateProjectModal({
                   onCheckedChange={setGenerateImages}
                 />
               </div>
-            </div>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setMode("select")} disabled={isGenerating}>
-                Back
-              </Button>
-              <Button onClick={handleGenerate} disabled={isGenerating || !topic.trim()}>
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Wand2 className="mr-2 h-4 w-4" />
-                    Generate
-                  </>
-                )}
-              </Button>
-            </DialogFooter>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setMode("select")} disabled={isGenerating}>
+                  Back
+                </Button>
+                <Button onClick={handleGenerate} disabled={isGenerating || !topic.trim()}>
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="mr-2 h-4 w-4" />
+                      Generate
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
           </>
         )}
       </DialogContent>

@@ -11,6 +11,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Express } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { DataImportService } from './data-import.service';
 import {
   ImportDataDto,
@@ -18,9 +19,12 @@ import {
   ParsedDataResult,
 } from './dto/data-import.dto';
 import { ProjectsService } from '../projects/projects.service';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 
+@ApiTags('Data Import')
 @Controller('ai/data-import')
 @UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
 export class DataImportController {
   constructor(
     private readonly dataImportService: DataImportService,
@@ -32,6 +36,7 @@ export class DataImportController {
    */
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: 'Upload and parse a CSV or Excel file' })
   async uploadDataFile(
     @UploadedFile() file: Express.Multer.File | undefined,
     @Body() importDto: ImportDataDto,
@@ -105,18 +110,19 @@ export class DataImportController {
    */
   @Post('generate-presentation')
   @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({
+    summary: 'Generate a presentation from uploaded CSV/Excel data',
+  })
   async generatePresentationFromData(
     @UploadedFile() file: Express.Multer.File | undefined,
     @Body() importDto: ImportDataDto,
-    @Body('userId') userId: string,
+    @CurrentUser() user: { id: string },
   ) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
 
-    if (!userId) {
-      throw new BadRequestException('User ID is required');
-    }
+    const userId = user.id;
 
     // Parse file
     const isExcel =
@@ -172,6 +178,7 @@ export class DataImportController {
    */
   @Post('preview-sheets')
   @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: 'Preview available sheets in an Excel file' })
   async previewExcelSheets(
     @UploadedFile() file: Express.Multer.File | undefined,
   ) {
@@ -195,6 +202,9 @@ export class DataImportController {
    */
   @Post('analyze')
   @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({
+    summary: 'Analyze data file without generating a presentation',
+  })
   async analyzeDataFile(
     @UploadedFile() file: Express.Multer.File | undefined,
     @Query('sheetName') sheetName?: string,

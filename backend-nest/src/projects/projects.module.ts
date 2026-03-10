@@ -6,11 +6,13 @@ import { VersionControlService } from './version-control.service';
 import { VersionControlController } from './version-control.controller';
 import { AIModule } from '../ai/ai.module';
 import { UsersModule } from '../users/users.module';
+import { SlidesModule } from '../slides/slides.module';
 
 @Module({
   imports: [
     AIModule,
     UsersModule,
+    SlidesModule,
     BullModule.registerQueue({
       name: 'generation',
     }),

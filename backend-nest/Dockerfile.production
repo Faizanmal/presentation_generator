@@ -11,8 +11,9 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 COPY prisma ./prisma/
 
-# Install dependencies
+# Install dependencies and generate prisma client
 RUN npm ci --only=production && \
+    npx prisma generate && \
     npm cache clean --force
 
 # ========================================
@@ -22,8 +23,14 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy dependencies from deps stage
-COPY --from=deps /app/node_modules ./node_modules
+# Copy package files and prisma schema first for dependency install
+COPY package.json package-lock.json* ./
+COPY prisma ./prisma/
+
+# Install all dependencies (including dev) for building
+RUN npm ci
+
+# Copy the rest of the source code
 COPY . .
 
 # Generate Prisma Client
@@ -50,6 +57,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/package.json ./
+COPY --from=builder /app/prisma.config.ts ./
 
 # Create logs directory
 RUN mkdir -p /app/logs && chown -R nestjs:nodejs /app/logs
@@ -57,12 +65,14 @@ RUN mkdir -p /app/logs && chown -R nestjs:nodejs /app/logs
 # Switch to non-root user
 USER nestjs
 
-# Expose port
-EXPOSE 3001
+# Expose port (dynamic to match $PORT if overridden at runtime)
+ARG PORT=3001
+ENV PORT=$PORT
+EXPOSE $PORT
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3001/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+      CMD node -e "require('http').get('http://localhost:' + (process.env.PORT || 3001) + '/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]

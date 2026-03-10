@@ -252,7 +252,7 @@ export class BrandKitService {
   async setDefaultBrandKit(_userId: string, brandKitId: string): Promise<void> {
     await Promise.resolve();
     this.logger.log(
-      `Set brand kit ${brandKitId} as default for user ${userId}`,
+      `Set brand kit ${brandKitId} as default for user ${_userId}`,
     );
   }
 

@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Sparkles,
   Play,
   Check,
   Loader2,
+  Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -23,15 +24,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-// import {
-//   Accordion,
-//   AccordionContent,
-//   AccordionItem,
-//   AccordionTrigger,
-// } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import {
+  injectTransitionKeyframes,
+  getSlideTransitionStyles,
+  TRANSITION_PRESETS,
+  type TransitionConfig as EngineTransitionConfig,
+} from '@/lib/slide-transition-engine';
 
 type TransitionType =
   | 'none'
@@ -86,36 +87,36 @@ const transitions: Array<{
   name: string;
   category: 'basic' | 'slide' | 'zoom' | '3d' | 'creative';
 }> = [
-  { type: 'none', name: 'None', category: 'basic' },
-  { type: 'fade', name: 'Fade', category: 'basic' },
-  { type: 'slide-left', name: 'Slide Left', category: 'slide' },
-  { type: 'slide-right', name: 'Slide Right', category: 'slide' },
-  { type: 'slide-up', name: 'Slide Up', category: 'slide' },
-  { type: 'slide-down', name: 'Slide Down', category: 'slide' },
-  { type: 'zoom-in', name: 'Zoom In', category: 'zoom' },
-  { type: 'zoom-out', name: 'Zoom Out', category: 'zoom' },
-  { type: 'flip', name: 'Flip', category: '3d' },
-  { type: 'rotate', name: 'Rotate', category: '3d' },
-  { type: 'cube', name: 'Cube', category: '3d' },
-  { type: 'dissolve', name: 'Dissolve', category: 'creative' },
-  { type: 'morph', name: 'Morph', category: 'creative' },
-];
+    { type: 'none', name: 'None', category: 'basic' },
+    { type: 'fade', name: 'Fade', category: 'basic' },
+    { type: 'slide-left', name: 'Slide Left', category: 'slide' },
+    { type: 'slide-right', name: 'Slide Right', category: 'slide' },
+    { type: 'slide-up', name: 'Slide Up', category: 'slide' },
+    { type: 'slide-down', name: 'Slide Down', category: 'slide' },
+    { type: 'zoom-in', name: 'Zoom In', category: 'zoom' },
+    { type: 'zoom-out', name: 'Zoom Out', category: 'zoom' },
+    { type: 'flip', name: 'Flip', category: '3d' },
+    { type: 'rotate', name: 'Rotate', category: '3d' },
+    { type: 'cube', name: 'Cube', category: '3d' },
+    { type: 'dissolve', name: 'Dissolve', category: 'creative' },
+    { type: 'morph', name: 'Morph', category: 'creative' },
+  ];
 
 const animations: Array<{
   type: AnimationType;
   name: string;
   category: 'fade' | 'zoom' | 'slide' | 'attention' | 'text';
 }> = [
-  { type: 'none', name: 'None', category: 'fade' },
-  { type: 'fade-in', name: 'Fade In', category: 'fade' },
-  { type: 'fade-in-up', name: 'Fade In Up', category: 'fade' },
-  { type: 'fade-in-down', name: 'Fade In Down', category: 'fade' },
-  { type: 'fade-in-left', name: 'Fade In Left', category: 'fade' },
-  { type: 'fade-in-right', name: 'Fade In Right', category: 'fade' },
-  { type: 'zoom-in', name: 'Zoom In', category: 'zoom' },
-  { type: 'bounce', name: 'Bounce', category: 'attention' },
-  { type: 'typewriter', name: 'Typewriter', category: 'text' },
-];
+    { type: 'none', name: 'None', category: 'fade' },
+    { type: 'fade-in', name: 'Fade In', category: 'fade' },
+    { type: 'fade-in-up', name: 'Fade In Up', category: 'fade' },
+    { type: 'fade-in-down', name: 'Fade In Down', category: 'fade' },
+    { type: 'fade-in-left', name: 'Fade In Left', category: 'fade' },
+    { type: 'fade-in-right', name: 'Fade In Right', category: 'fade' },
+    { type: 'zoom-in', name: 'Zoom In', category: 'zoom' },
+    { type: 'bounce', name: 'Bounce', category: 'attention' },
+    { type: 'typewriter', name: 'Typewriter', category: 'text' },
+  ];
 
 const easings: Array<{ value: EasingType; label: string }> = [
   { value: 'linear', label: 'Linear' },
@@ -140,6 +141,12 @@ export function SlideTransitionsPanel({
   const [animationDelay, setAnimationDelay] = useState(0);
   const [animationEasing, setAnimationEasing] = useState<EasingType>('ease-out');
   const [previewPlaying, setPreviewPlaying] = useState(false);
+  const previewRef = useRef<HTMLDivElement>(null);
+
+  // Inject all CSS keyframes on mount
+  useEffect(() => {
+    injectTransitionKeyframes();
+  }, []);
 
   const handleTransitionSelect = (type: TransitionType) => {
     const newConfig = { ...transitionConfig, type };
@@ -161,7 +168,33 @@ export function SlideTransitionsPanel({
 
   const handlePreview = () => {
     setPreviewPlaying(true);
-    setTimeout(() => setPreviewPlaying(false), transitionConfig.duration + 100);
+    // Use the real engine to compute style
+    const engineConfig: EngineTransitionConfig = {
+      type: transitionConfig.type as EngineTransitionConfig['type'],
+      duration: transitionConfig.duration,
+      easing: transitionConfig.easing as EngineTransitionConfig['easing'],
+    };
+    const styles = getSlideTransitionStyles(engineConfig, 'forward');
+    if (previewRef.current) {
+      previewRef.current.style.animation = 'none';
+      // Force reflow
+      void previewRef.current.offsetHeight;
+      previewRef.current.style.animation = styles.enterAnimation || '';
+    }
+    setTimeout(() => setPreviewPlaying(false), transitionConfig.duration + 200);
+  };
+
+  const applyPreset = (presetName: string) => {
+    const preset = TRANSITION_PRESETS[presetName];
+    if (!preset) return;
+    const newConfig: TransitionConfig = {
+      type: preset.type as TransitionType,
+      duration: preset.duration,
+      easing: preset.easing as EasingType,
+    };
+    setTransitionConfig(newConfig);
+    onTransitionChange?.(newConfig);
+    toast.success(`Applied "${presetName}" preset`);
   };
 
   const applyToAll = () => {
@@ -193,13 +226,8 @@ export function SlideTransitionsPanel({
               <CardContent className="pt-4">
                 <div className="relative aspect-video bg-slate-100 rounded-lg overflow-hidden flex items-center justify-center">
                   <div
-                    className={cn(
-                      'w-3/4 h-3/4 bg-white rounded-lg shadow-lg flex items-center justify-center transition-all',
-                      previewPlaying && transitionConfig.type === 'fade' && 'animate-pulse',
-                      previewPlaying && transitionConfig.type === 'zoom-in' && 'scale-110',
-                      previewPlaying && transitionConfig.type === 'slide-left' && 'translate-x-4'
-                    )}
-                    style={{ transitionDuration: `${transitionConfig.duration}ms` }}
+                    ref={previewRef}
+                    className="w-3/4 h-3/4 bg-white rounded-lg shadow-lg flex items-center justify-center"
                   >
                     <span className="text-slate-400 text-sm">Preview</span>
                   </div>
@@ -219,6 +247,33 @@ export function SlideTransitionsPanel({
                 </Button>
               </CardContent>
             </Card>
+
+            {/* Quick Presets */}
+            <div>
+              <Label className="mb-2 block flex items-center gap-1.5">
+                <Zap className="h-3.5 w-3.5" />
+                Quick Presets
+              </Label>
+              <div className="grid grid-cols-2 gap-1.5">
+                {Object.entries(TRANSITION_PRESETS)
+                  .filter(([key]) => key !== 'none')
+                  .map(([key, preset]) => (
+                    <button
+                      key={key}
+                      onClick={() => applyPreset(key)}
+                      className={cn(
+                        'px-2.5 py-1.5 rounded-md border text-xs font-medium transition-all text-left',
+                        transitionConfig.type === preset.type &&
+                          transitionConfig.duration === preset.duration
+                          ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
+                          : 'border-slate-200 hover:border-slate-300',
+                      )}
+                    >
+                      {key.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                    </button>
+                  ))}
+              </div>
+            </div>
 
             {/* Transition Types */}
             <div>

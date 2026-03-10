@@ -48,7 +48,7 @@ export class PerformanceInterceptor implements NestInterceptor {
           error.message,
         );
 
-        return throwError(() => error);
+        return throwError(() => error as Error);
       }),
     );
   }

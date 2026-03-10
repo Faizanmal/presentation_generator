@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuthStore } from "@/stores/auth-store";
 import { api } from "@/lib/api";
+import { ThemeToggleButton } from "@/components/ui/enhanced-ui";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -121,7 +122,7 @@ function OtpInput({
       <div className="flex gap-2 justify-center">
         {[0, 1, 2, 3, 4, 5].map((index) => (
           <input
-             
+
             key={index}
             ref={(el) => { inputRefs.current[index] = el; }}
             type="text"
@@ -241,10 +242,11 @@ export default function LoginPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading: isAuthLoading, initialized, login, loginWithOtp } = useAuthStore();
 
-  // Redirect to dashboard if already authenticated and we've finished the initial profile check
+  // Redirect to dashboard or saved route if already authenticated
   useEffect(() => {
     if (initialized && !isAuthLoading && isAuthenticated) {
-      router.push('/dashboard');
+      const redirectUrl = new URLSearchParams(window.location.search).get('redirect');
+      router.push(redirectUrl || '/dashboard');
     }
   }, [isAuthenticated, isAuthLoading, initialized, router]);
 
@@ -308,7 +310,8 @@ export default function LoginPage() {
     try {
       await login(data.email, data.password);
       toast.success("Welcome back!");
-      router.push("/dashboard");
+      const redirectUrl = new URLSearchParams(window.location.search).get('redirect');
+      router.push(redirectUrl || "/dashboard");
     } catch (error: unknown) {
       const axiosError = error as { response?: { data?: { message?: string } } };
       toast.error(axiosError.response?.data?.message || "Invalid credentials");
@@ -374,7 +377,8 @@ export default function LoginPage() {
     try {
       await loginWithOtp(otpIdentifier, otpValue, rememberDevice);
       toast.success("Logged in successfully!");
-      router.push("/dashboard");
+      const redirectUrl = new URLSearchParams(window.location.search).get('redirect');
+      router.push(redirectUrl || "/dashboard");
     } catch (error: unknown) {
       const axiosError = error as { response?: { data?: { message?: string; remainingAttempts?: number } } };
       const message = axiosError.response?.data?.message || "Invalid code";
@@ -439,11 +443,15 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950">
+      {/* Theme Toggle Button */}
+      <div className="fixed top-4 right-4 z-50">
+        <ThemeToggleButton variant="dark" />
+      </div>
       {/* Left side - Form */}
       <div className="flex-1 flex items-center justify-center p-8 relative z-10">
         <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-8">
           <Link href="/" className="flex items-center gap-2 mb-8">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+            <div className="h-10 w-10 rounded-xl bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
               <Sparkles className="h-6 w-6 text-white" />
             </div>
             <span className="text-xl font-bold text-slate-900 dark:text-white">
@@ -800,7 +808,7 @@ export default function LoginPage() {
           <div className="absolute bottom-0 right-0 translate-x-12 translate-y-12 h-64 w-64 bg-purple-500/30 rounded-full blur-3xl" />
 
           <h2 className="text-5xl font-bold mb-8 relative z-10 leading-tight">
-            Design smarter, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">not harder.</span>
+            Design smarter, <span className="text-transparent bg-clip-text bg-linear-to-r from-blue-400 to-purple-400">not harder.</span>
           </h2>
           <p className="text-xl text-slate-300 relative z-10 leading-relaxed">
             Experience the future of presentation design with our AI-powered platform. Create, collaborate, and captivate.

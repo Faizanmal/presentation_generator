@@ -25,6 +25,12 @@ import {
 } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAnalytics } from '@/hooks/use-analytics';
+
+// reusable icon type for metric/insight cards
+
+type IconComponent = React.ComponentType<
+  React.SVGProps<SVGSVGElement> & { className?: string }
+>;
 import type { SlideAnalytics, ViewerSession } from '@/types';
 
 interface AnalyticsDashboardProps {
@@ -148,7 +154,7 @@ export function AnalyticsDashboard({ projectId }: AnalyticsDashboardProps) {
 interface MetricCardProps {
   title: string;
   value: string | number;
-  icon: React.ElementType;
+  icon: IconComponent;
   description: string;
   trend?: { value: number; positive: boolean };
 }

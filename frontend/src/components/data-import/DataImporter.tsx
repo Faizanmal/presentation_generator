@@ -264,7 +264,7 @@ export function DataImporter({ onSuccess, trigger }: DataImportProps) {
                         Import Excel/CSV Data
                     </DialogTitle>
                     <DialogDescription>
-                        Upload your data file and we'll transform it into a beautiful
+                        Upload your data file and we&apos;ll transform it into a beautiful
                         presentation with charts and insights.
                     </DialogDescription>
                 </DialogHeader>

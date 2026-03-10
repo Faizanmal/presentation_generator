@@ -1023,6 +1023,11 @@ Return only the speaker notes, ready to be read aloud.
     voice: VoiceId = 'alloy',
     speed: number = 1.0,
   ): Promise<{ audioBase64: string; durationEstimate: number }> {
+    const features = this.configService.get<{ openAI?: boolean }>('features');
+    if (features?.openAI === false) {
+      throw new Error('OpenAI support is disabled');
+    }
+
     const openaiKey = this.configService.get<string>('OPENAI_API_KEY');
     if (!openaiKey) throw new Error('OpenAI API key not configured for TTS');
 

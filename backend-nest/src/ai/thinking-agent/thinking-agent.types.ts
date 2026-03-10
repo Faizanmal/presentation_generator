@@ -243,7 +243,8 @@ export interface BlockFormatting {
   color?: string;
   size?: 'small' | 'medium' | 'large' | 'xlarge';
   alignment?: 'left' | 'center' | 'right';
-  variant?: 'default' | 'card' | 'outlined' | 'highlighted';
+  // `full-width` is used when we want an image block to span the entire slide
+  variant?: 'default' | 'card' | 'outlined' | 'highlighted' | 'full-width';
 }
 
 export interface ChartData {
@@ -277,6 +278,9 @@ export interface ImageSuggestion {
   prompt: string;
   style: string;
   placement: string;
+  // allow extra properties (e.g. future metadata) while still being
+  // compatible with loose object types used elsewhere
+  [key: string]: unknown;
 }
 
 export interface PresentationMetadata {

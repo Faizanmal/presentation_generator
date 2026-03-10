@@ -6,7 +6,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Prisma } from '@prisma/client';
+import { Prisma, BlockType } from '@prisma/client';
 import { CollaborationService } from '../collaboration/collaboration.service';
 
 interface CreateSlideDto {
@@ -88,6 +88,14 @@ export class SlidesService {
         },
       },
     });
+
+    // Add default blocks based on layout
+    await this.addDefaultBlocksToSlide(
+      createSlideDto.projectId,
+      slide.id,
+      createSlideDto.layout || 'default',
+      createSlideDto.title,
+    );
 
     // Update project timestamp
     await this.prisma.project.update({
@@ -447,5 +455,100 @@ export class SlidesService {
     this.logger.log(`Slide duplicated: ${slideId} -> ${newSlide.id}`);
 
     return this.findOne(newSlide.id);
+  }
+
+  /**
+   * Add default blocks to a slide based on its layout
+   */
+  private async addDefaultBlocksToSlide(
+    slideId: string,
+    projectId: string,
+    layout: string,
+    title?: string,
+  ) {
+    const blocks: Array<{
+      projectId: string;
+      slideId: string;
+      blockType: BlockType;
+      order: number;
+      content: Prisma.InputJsonValue;
+    }> = [];
+
+    switch (layout) {
+      case 'title':
+        blocks.push({
+          projectId,
+          slideId,
+          blockType: 'HEADING',
+          order: 0,
+          content: { text: title || 'Your Presentation Title' },
+        });
+        blocks.push({
+          projectId,
+          slideId,
+          blockType: 'SUBHEADING',
+          order: 1,
+          content: { text: 'Add your subtitle here' },
+        });
+        break;
+
+      case 'title-content':
+        blocks.push({
+          projectId,
+          slideId,
+          blockType: 'HEADING',
+          order: 0,
+          content: { text: title || 'Slide Title' },
+        });
+        blocks.push({
+          projectId,
+          slideId,
+          blockType: 'PARAGRAPH',
+          order: 1,
+          content: { text: 'Add your content here...' },
+        });
+        break;
+
+      case 'two-column':
+        blocks.push({
+          projectId,
+          slideId,
+          blockType: 'HEADING',
+          order: 0,
+          content: { text: title || 'Two Column Layout' },
+        });
+        blocks.push({
+          projectId,
+          slideId,
+          blockType: 'PARAGRAPH',
+          order: 1,
+          content: { text: 'Left column content...' },
+        });
+        blocks.push({
+          projectId,
+          slideId,
+          blockType: 'PARAGRAPH',
+          order: 2,
+          content: { text: 'Right column content...' },
+        });
+        break;
+
+      default:
+        // For unknown layouts, add a basic heading
+        blocks.push({
+          projectId,
+          slideId,
+          blockType: 'HEADING',
+          order: 0,
+          content: { text: title || 'New Slide' },
+        });
+        break;
+    }
+
+    for (const block of blocks) {
+      await this.prisma.block.create({
+        data: block,
+      });
+    }
   }
 }

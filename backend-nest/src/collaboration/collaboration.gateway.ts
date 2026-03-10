@@ -639,7 +639,9 @@ export class CollaborationGateway
     // Retrieve questions from Redis
     const key = `qa:${projectId}`;
     const rawQuestions = await this.redis.lrange(key, 0, -1);
-    const questions: QAQuestion[] = rawQuestions.map((q) => JSON.parse(q));
+    const questions: QAQuestion[] = rawQuestions.map(
+      (q) => JSON.parse(q) as QAQuestion,
+    );
 
     // Find and update
     const questionIndex = questions.findIndex((q) => q.id === data.questionId);
@@ -679,7 +681,9 @@ export class CollaborationGateway
     // Retrieve questions from Redis
     const key = `qa:${projectId}`;
     const rawQuestions = await this.redis.lrange(key, 0, -1);
-    const questions: QAQuestion[] = rawQuestions.map((q) => JSON.parse(q));
+    const questions: QAQuestion[] = rawQuestions.map(
+      (q) => JSON.parse(q) as QAQuestion,
+    );
 
     // Find and update
     const questionIndex = questions.findIndex((q) => q.id === data.questionId);
@@ -707,14 +711,16 @@ export class CollaborationGateway
   async handleGetQuestions(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { projectId: string },
-  ) {
+  ): Promise<{ success: true; questions: QAQuestion[] }> {
     const projectId = client.data.projectId;
-    if (!projectId || projectId !== data.projectId) return;
+    if (!projectId || projectId !== data.projectId) {
+      return { success: true, questions: [] };
+    }
 
     const key = `qa:${projectId}`;
     const rawQuestions = await this.redis.lrange(key, 0, -1);
     const questions: QAQuestion[] = rawQuestions
-      .map((q) => JSON.parse(q))
+      .map((q) => JSON.parse(q) as QAQuestion)
       .sort((a: QAQuestion, b: QAQuestion) => {
         if (b.upvotes !== a.upvotes) return b.upvotes - a.upvotes;
         return (
@@ -821,7 +827,7 @@ export class CollaborationGateway
     const rawPoll = await this.redis.hget(pollKey, 'data');
     if (!rawPoll) return { success: false, error: 'Poll not found' };
 
-    const poll: Poll = JSON.parse(rawPoll);
+    const poll: Poll = JSON.parse(rawPoll) as Poll;
 
     if (!poll || !poll.isActive) {
       return { success: false, error: 'Poll not found or inactive' };
@@ -875,7 +881,7 @@ export class CollaborationGateway
     const rawPoll = await this.redis.hget(pollKey, 'data');
     if (!rawPoll) return;
 
-    const poll: Poll = JSON.parse(rawPoll);
+    const poll: Poll = JSON.parse(rawPoll) as Poll;
 
     poll.isActive = false;
     await this.redis.hset(pollKey, 'data', JSON.stringify(poll));
@@ -920,7 +926,7 @@ export class CollaborationGateway
     for (const pollId of activePollIds) {
       const rawPoll = await this.redis.hget(`poll:${pollId}`, 'data');
       if (rawPoll) {
-        const poll: Poll = JSON.parse(rawPoll);
+        const poll: Poll = JSON.parse(rawPoll) as Poll;
         if (poll.isActive) {
           activePolls.push({
             id: poll.id,

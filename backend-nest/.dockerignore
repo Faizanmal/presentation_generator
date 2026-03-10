@@ -1,0 +1,19 @@
+# ignore local dependencies and build artifacts
+node_modules
+npm-debug.log
+pnpm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# build output
+dist
+
+# environment files
+.env
+.env.*
+
+# misc
+logs
+coverage
+.DS_Store
+.git

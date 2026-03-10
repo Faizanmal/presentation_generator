@@ -28,7 +28,7 @@ export class GeneratorAgentService {
     private readonly configService: ConfigService,
     private readonly aiService: AIService,
     private readonly realTimeDataService: RealTimeDataService,
-  ) {}
+  ) { }
 
   /**
    * Generate a complete presentation based on the plan
@@ -41,6 +41,13 @@ export class GeneratorAgentService {
       style?: string;
       generateImages?: boolean;
       rawData?: string;
+      additionalContext?: string;
+      brandGuidelines?: {
+        colors?: string[];
+        fonts?: string[];
+        tone?: string;
+        restrictions?: string[];
+      };
     } = {},
   ): Promise<{
     presentation: EnhancedPresentation;
@@ -117,6 +124,8 @@ export class GeneratorAgentService {
         rawData: options.rawData
           ? options.rawData + '\n\n' + sectionSpecificData
           : sectionSpecificData,
+        additionalContext: options.additionalContext,
+        brandGuidelines: options.brandGuidelines,
       });
 
       sections.push(sectionResult.section);
@@ -136,8 +145,47 @@ export class GeneratorAgentService {
     this.logger.log('✍️ Step 3: Generating presentation metadata...');
     const metadata = this.generateMetadata(plan, sections, topic);
 
+    // Step 4: Generate Images if requested
+    if (options.generateImages) {
+      this.logger.log(
+        `🎨 Step 4: Generating images for ${sections.length} sections...`,
+      );
+      try {
+        const images =
+          await this.aiService.generatePresentationImages(sections);
+        sections.forEach((section, index) => {
+          if (images.has(index)) {
+            const imageResult = images.get(index);
+            if (imageResult?.imageUrl) {
+              section.blocks.unshift({
+                id: uuidv4(),
+                type: 'image',
+                content: imageResult.imageUrl,
+                formatting: { variant: 'full-width' },
+              });
+            }
+          }
+        });
+        thinkingSteps.push({
+          stepNumber: 3 + totalSections,
+          phase: 'generation',
+          thought: `Generated ${images.size} AI images for the presentation`,
+          action: 'Image generation',
+          observation: 'Images successfully attached to sections',
+          timestamp: new Date(),
+        });
+      } catch (error) {
+        this.logger.error(
+          'Failed to generate images during thinking loop',
+          error,
+        );
+      }
+    }
+
     thinkingSteps.push({
-      stepNumber: 2 + totalSections,
+      stepNumber: options.generateImages
+        ? 4 + totalSections
+        : 3 + totalSections,
       phase: 'generation',
       thought: `Generated metadata - Duration: ${metadata.estimatedDuration}min, Keywords: ${metadata.keywords.length}`,
       action: 'Metadata generation',
@@ -311,6 +359,13 @@ Return JSON:
       style: string;
       keyMessage: string;
       rawData?: string;
+      additionalContext?: string;
+      brandGuidelines?: {
+        colors?: string[];
+        fonts?: string[];
+        tone?: string;
+        restrictions?: string[];
+      };
     },
   ): Promise<{ section: EnhancedSection; tokens: number }> {
     const layoutForType = this.getLayoutForSectionType(context.type);
@@ -335,6 +390,10 @@ CRITICAL INSTRUCTIONS:
 3. **Card Style:** For key paragraphs, use "paragraph" blocks with 'variant': 'card'.
 4. **Data Accuracy:** EXTRACT NUMBERS from the Real-Time Data provided above. Do not hallucinate numbers if data is available.
 5. **Detail:** Provide comprehensive content (50-75 words/paragraph).
+6. **Transitions:** You MUST select an appropriate transition type from: 'none', 'fade', 'slide-left', 'slide-right', 'slide-up', 'slide-down', 'zoom-in', 'zoom-out', 'flip-x', 'flip-y', 'cube', 'cover-left', 'cover-right', 'reveal', 'dissolve', 'morph', 'swipe', 'push'. E.g. 'zoom-in' for CTAs, 'fade' for data slides.
+
+${context.brandGuidelines ? `BRAND GUIDELINES TO FOLLOW:\n- Colors: ${context.brandGuidelines.colors?.join(', ')}\n- Fonts: ${context.brandGuidelines.fonts?.join(', ')}\n- Tone: ${context.brandGuidelines.tone}` : ''}
+${context.additionalContext ? `USER CUSTOM INSTRUCTIONS & DESIGN SYSTEM CONFIGURATION (CRITICAL! FOLLOW THIS strictly):\n${context.additionalContext}` : ''}
 
 Think step by step:
 1. Does the Real-Time Data contain stats/numbers relevant to this slide?

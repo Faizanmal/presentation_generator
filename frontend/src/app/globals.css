@@ -105,3 +105,195 @@ body {
 @utility bg-brand-gradient {
   background-image: linear-gradient(to right, #2563eb, #9333ea);
 }
+
+/* ============================================
+   PRESENTATION ANIMATIONS
+   ============================================ */
+
+/* Block entrance animation - staggered fade-in-up */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes gradient-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes pulse-glow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+  }
+
+  50% {
+    box-shadow: 0 0 16px 4px rgba(59, 130, 246, 0.15);
+  }
+}
+
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes draw-line {
+  from {
+    width: 0;
+  }
+}
+
+/* utility aliases for legacy linear-to-* classes (formerly mis-typed gradients) */
+@layer utilities {
+  .bg-linear-to-br { @apply bg-gradient-to-br; }
+  .bg-linear-to-r { @apply bg-gradient-to-r; }
+}
+
+@keyframes draw-line {
+  from {
+    width: 0;
+  }
+
+  to {
+    width: 100%;
+  }
+}
+
+/* Utility classes for animations */
+@utility animate-fade-in-up {
+  animation: fade-in-up 0.5s ease-out both;
+}
+
+@utility animate-slide-in-left {
+  animation: slide-in-left 0.4s ease-out both;
+}
+
+@utility animate-slide-in-right {
+  animation: slide-in-right 0.4s ease-out both;
+}
+
+@utility animate-scale-in {
+  animation: scale-in 0.3s ease-out both;
+}
+
+@utility animate-shimmer {
+  background-size: 200% 100%;
+  animation: gradient-shimmer 2s linear infinite;
+}
+
+@utility animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@utility animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Stagger delay utilities for lists */
+@utility stagger-1 {
+  animation-delay: 0.05s;
+}
+
+@utility stagger-2 {
+  animation-delay: 0.1s;
+}
+
+@utility stagger-3 {
+  animation-delay: 0.15s;
+}
+
+@utility stagger-4 {
+  animation-delay: 0.2s;
+}
+
+@utility stagger-5 {
+  animation-delay: 0.25s;
+}
+
+@utility stagger-6 {
+  animation-delay: 0.3s;
+}
+
+@utility stagger-7 {
+  animation-delay: 0.35s;
+}
+
+@utility stagger-8 {
+  animation-delay: 0.4s;
+}
+
+/* Presentation slide canvas styles */
+@utility slide-canvas {
+  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Glassmorphism for card blocks */
+@utility glass-card {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* Premium text rendering */
+@utility text-render-premium {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

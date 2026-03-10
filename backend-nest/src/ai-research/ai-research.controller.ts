@@ -127,8 +127,9 @@ export class AIResearchController {
   async factCheck(
     @Request() req: { user: { id: string } },
     @Param('id') id: string,
-  ) {
-    return this.aiResearchService.factCheck(id, req.user.id);
+  ): Promise<unknown> {
+    // use the research-specific fact-check method which requires user id
+    return this.aiResearchService.factCheckResearch(id, req.user.id);
   }
 
   @Get(':id')

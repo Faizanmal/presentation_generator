@@ -6,6 +6,12 @@ export default registerAs('features', () => ({
   aiImageGeneration: process.env.FEATURE_AI_IMAGE_GENERATION === 'true',
   aiChat: process.env.FEATURE_AI_CHAT === 'true',
 
+  // OpenAI provider support (used by various AI/QC features).
+  // When false, any code paths that rely on the OpenAI SDK will be short-circuited
+  // and throw a friendly error. This is handy in development or when you want to
+  // run the app without an OpenAI key.
+  openAI: process.env.FEATURE_OPENAI !== 'false',
+
   // Advanced Collaboration
   realtimeCollaboration: process.env.FEATURE_REALTIME_COLLABORATION === 'true',
   liveComputers: process.env.FEATURE_LIVE_CURSORS !== 'false', // Default on

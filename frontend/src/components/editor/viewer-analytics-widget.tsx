@@ -122,45 +122,23 @@ export function ViewerAnalyticsWidget({ projectId, variant = 'full' }: ViewerAna
         },
     });
 
-    // Mock data for development
-    const [mockData] = useState<ViewerAnalyticsData>(() => ({
+    // Default empty state for when API returns nothing
+    const emptyData: ViewerAnalyticsData = {
         overview: {
-            totalViews: 1247,
-            uniqueViewers: 892,
-            averageTimeSpent: 145,
-            completionRate: 68,
-            lastViewedAt: new Date().toISOString(),
-            trend: { views: 23, isPositive: true },
+            totalViews: 0,
+            uniqueViewers: 0,
+            averageTimeSpent: 0,
+            completionRate: 0,
+            lastViewedAt: '',
+            trend: { views: 0, isPositive: true },
         },
-        slideEngagement: [
-            { slideNumber: 1, slideTitle: 'Introduction', views: 1247, averageTimeSpent: 12, dropOffRate: 0, interactions: 156 },
-            { slideNumber: 2, slideTitle: 'Problem Statement', views: 1180, averageTimeSpent: 28, dropOffRate: 5, interactions: 89 },
-            { slideNumber: 3, slideTitle: 'Solution Overview', views: 1050, averageTimeSpent: 45, dropOffRate: 11, interactions: 234 },
-            { slideNumber: 4, slideTitle: 'Key Features', views: 920, averageTimeSpent: 38, dropOffRate: 12, interactions: 178 },
-            { slideNumber: 5, slideTitle: 'Pricing', views: 845, averageTimeSpent: 52, dropOffRate: 8, interactions: 312 },
-            { slideNumber: 6, slideTitle: 'Call to Action', views: 780, averageTimeSpent: 18, dropOffRate: 8, interactions: 423 },
-        ],
-        viewers: [
-            { id: '1', email: 'john@company.com', anonymous: false, viewedAt: new Date().toISOString(), timeSpent: 180, slidesViewed: 6, device: 'desktop', location: 'New York, US', completed: true },
-            { id: '2', anonymous: true, viewedAt: new Date(Date.now() - 3600000).toISOString(), timeSpent: 95, slidesViewed: 4, device: 'mobile', location: 'London, UK', completed: false },
-            { id: '3', email: 'sarah@startup.io', anonymous: false, viewedAt: new Date(Date.now() - 7200000).toISOString(), timeSpent: 210, slidesViewed: 6, device: 'desktop', completed: true },
-        ],
-        timeline: Array.from({ length: 7 }, (_, i) => ({
-            date: new Date(Date.now() - (6 - i) * 86400000).toISOString().split('T')[0],
-            views: Math.floor(Math.random() * 200) + 50,
-            uniqueViewers: Math.floor(Math.random() * 150) + 30,
-        })),
-        heatmap: [
-            { slideNumber: 1, engagement: 95 },
-            { slideNumber: 2, engagement: 78 },
-            { slideNumber: 3, engagement: 92 },
-            { slideNumber: 4, engagement: 65 },
-            { slideNumber: 5, engagement: 88 },
-            { slideNumber: 6, engagement: 72 },
-        ],
-    }));
+        slideEngagement: [],
+        viewers: [],
+        timeline: [],
+        heatmap: [],
+    };
 
-    const data = (analytics || mockData) as ViewerAnalyticsData;
+    const data = (analytics || emptyData) as ViewerAnalyticsData;
 
     if (variant === 'mini') {
         return (

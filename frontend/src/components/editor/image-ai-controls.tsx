@@ -11,6 +11,7 @@ import {
     Download,
     Image as ImageIcon,
 } from 'lucide-react';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import {
     Tooltip,
@@ -95,7 +96,7 @@ export function ImageAIControls({
             {/* Image */}
             {imageUrl ? (
                 <div className="w-full h-full rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-800 relative">
-                    <img
+                    <Image
                         src={imageUrl}
                         alt={imageAlt || "Image"}
                         className="object-cover w-full h-full"

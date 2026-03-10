@@ -11,15 +11,12 @@ import { Observable, of } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { CacheService } from '../cache/cache.service';
 import { CACHE_TTL_KEY } from '../decorators/cache.decorator';
+import { AuthenticatedRequest } from '../types/user.types';
 
 /**
  * Interceptor for caching HTTP responses
  * Automatically caches GET requests based on URL and query params
  */
-
-interface AuthenticatedRequest extends Request {
-  user?: { id?: string; [key: string]: unknown };
-}
 
 @Injectable()
 export class CacheInterceptor implements NestInterceptor {

@@ -129,14 +129,7 @@ export function MultilingualPanel({
         onError: () => toast.error("Failed to detect language"),
     });
 
-    // Mock translations for demo
-    const mockTranslations: Translation[] = [
-        { languageCode: "en", languageName: "English", progress: 100, status: "complete" },
-        { languageCode: "es", languageName: "Spanish", progress: 85, status: "partial" },
-        { languageCode: "fr", languageName: "French", progress: 100, status: "complete" },
-    ];
-
-    const displayTranslations = translations || mockTranslations;
+    const displayTranslations = translations || [];
     const displayLanguages = supportedLanguages || POPULAR_LANGUAGES;
 
     const toggleLanguage = (code: string) => {

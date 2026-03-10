@@ -267,20 +267,58 @@ export class VoiceService {
   }
 
   async startLiveTranscription(userId: string) {
-    // This would integrate with a streaming ASR service
-    // For now, we'll use batch processing with Whisper
-    // In production, consider using:
-    // - Azure Speech Services real-time transcription
-    // - Google Cloud Speech-to-Text streaming
-    // - Deepgram real-time API
+    // Create a transcription session record
+    this.logger.log(`Starting live transcription session for user ${userId}`);
 
-    this.logger.log(`Starting live transcription for user ${userId}`);
-    await Promise.resolve(); // Simulate async work
+    const session = await this.prisma.voiceRecording.create({
+      data: {
+        userId,
+        filename: `live-session-${Date.now()}`,
+        url: '',
+        duration: 0,
+        status: 'TRANSCRIBING',
+      },
+    });
 
     return {
-      stop: () => {
-        this.logger.log(`Stopping live transcription for user ${userId}`);
+      sessionId: session.id,
+      status: 'active' as const,
+      createdAt: session.createdAt,
+      // Client should stream audio chunks via WebSocket to the /voice namespace
+      // and listen for transcription events on the same socket
+      wsNamespace: '/voice',
+      wsEvent: 'audio-chunk',
+      wsTranscriptEvent: 'transcription-result',
+    };
+  }
+
+  /**
+   * Stop a live transcription session and finalize results
+   */
+  async stopLiveTranscription(sessionId: string, userId: string) {
+    const session = await this.prisma.voiceRecording.findUnique({
+      where: { id: sessionId },
+    });
+
+    if (!session || session.userId !== userId) {
+      throw new BadRequestException('Session not found');
+    }
+
+    await this.prisma.voiceRecording.update({
+      where: { id: sessionId },
+      data: {
+        status: 'COMPLETED',
+        processedAt: new Date(),
       },
+    });
+
+    this.logger.log(`Stopped live transcription session ${sessionId}`);
+
+    return {
+      sessionId,
+      status: 'completed' as const,
+      transcription: session.transcription || '',
+      duration: session.duration,
     };
   }
 

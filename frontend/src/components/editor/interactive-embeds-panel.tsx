@@ -316,11 +316,10 @@ export function InteractiveEmbedsPanel({
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Options</Label>
-                                    {pollOptions.map((option, index) => (
+                                    {pollOptions.map((option, index) => ({ option, id: String(index), originalIndex: index })).map(({ option, id, originalIndex: index }) => (
 
                                         <div
-                                            // eslint-disable-next-line react/no-array-index-key
-                                            key={`poll-opt-${index}`}
+                                            key={`poll-opt-${id}`}
                                             className="flex gap-2"
                                         >
                                             <Input
@@ -495,11 +494,10 @@ export function InteractiveEmbedsPanel({
                                 </div>
                                 <div className="space-y-4">
                                     <Label>Questions</Label>
-                                    {quizQuestions.map((q, qIndex) => (
+                                    {quizQuestions.map((q, qIndex) => ({ q, id: String(qIndex), originalQIndex: qIndex })).map(({ q, id: qId, originalQIndex: qIndex }) => (
 
                                         <Card
-                                            // eslint-disable-next-line react/no-array-index-key
-                                            key={`quiz-q-${qIndex}`}
+                                            key={`quiz-q-${qId}`}
                                         >
                                             <CardContent className="pt-4 space-y-3">
                                                 <div className="flex items-center justify-between">
@@ -524,11 +522,10 @@ export function InteractiveEmbedsPanel({
                                                     }}
                                                 />
                                                 <div className="space-y-2">
-                                                    {q.options.map((opt, optIndex) => (
+                                                    {q.options.map((opt, optIndex) => ({ opt, id: String(optIndex), originalOptIndex: optIndex })).map(({ opt, id: optId, originalOptIndex: optIndex }) => (
 
                                                         <div
-                                                            // eslint-disable-next-line react/no-array-index-key
-                                                            key={`quiz-q-${qIndex}-opt-${optIndex}`}
+                                                            key={`quiz-q-${qId}-opt-${optId}`}
                                                             className="flex items-center gap-2"
                                                         >
                                                             <button

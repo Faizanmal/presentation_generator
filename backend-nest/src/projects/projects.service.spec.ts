@@ -3,6 +3,7 @@ import { ProjectsService } from './projects.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { AIService } from '../ai/ai.service';
+import { SlidesService } from '../slides/slides.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import { ProjectType } from '@prisma/client';
 import { GenerationTone } from './dto/generate-project.dto';
@@ -49,6 +50,8 @@ describe('ProjectsService', () => {
     generatePresentationImages: jest.fn(),
   };
 
+  const mockSlidesService = {};
+
   const mockQueue = {
     add: jest.fn(),
     getJob: jest.fn(),
@@ -69,6 +72,10 @@ describe('ProjectsService', () => {
         {
           provide: AIService,
           useValue: mockAIService,
+        },
+        {
+          provide: SlidesService,
+          useValue: mockSlidesService,
         },
         {
           provide: getQueueToken('generation'),
@@ -104,6 +111,8 @@ describe('ProjectsService', () => {
       mockUsersService.canCreateProject.mockResolvedValue(true);
       mockPrismaService.project.create.mockResolvedValue(mockProject);
       mockPrismaService.project.findUnique.mockResolvedValue(mockProject); // For findOne call at end of create
+      mockPrismaService.slide.create.mockResolvedValue({ id: 'slide1' });
+      mockPrismaService.block.create.mockResolvedValue({ id: 'block1' });
 
       const result = await service.create(userId, createDto);
 
@@ -209,7 +218,11 @@ describe('ProjectsService', () => {
           },
         ],
       };
-      const mockProject = { id: 'proj1', title: 'AI Presentation' };
+      const mockProject = {
+        id: 'proj1',
+        title: 'AI Presentation',
+        ownerId: 'user1',
+      };
 
       mockAIService.generatePresentation.mockResolvedValue(
         mockGeneratedContent,

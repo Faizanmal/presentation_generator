@@ -1,6 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+
+// define icon component type locally rather than using React.ElementType so
+// that `className` prop is recognized
+
+type IconComponent = React.ComponentType<
+  React.SVGProps<SVGSVGElement> & { className?: string }
+>;
 import {
   Video,
   MessageSquare,
@@ -34,7 +41,7 @@ interface IntegrationConfig {
   provider: IntegrationProvider;
   name: string;
   description: string;
-  icon: React.ElementType;
+  icon: IconComponent;
   iconColor: string;
   features: string[];
 }

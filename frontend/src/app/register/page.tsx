@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuthStore } from "@/stores/auth-store";
+import { ThemeToggleButton } from "@/components/ui/enhanced-ui";
 
 const registerSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -87,6 +88,10 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen flex">
+      {/* Theme Toggle Button */}
+      <div className="fixed top-4 right-4 z-50">
+        <ThemeToggleButton />
+      </div>
       {/* Left side - Gradient */}
       <div className="hidden lg:flex flex-1 items-center justify-center bg-linear-to-br from-blue-500 to-purple-600 p-12">
         <div className="max-w-md text-white">

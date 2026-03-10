@@ -7,7 +7,6 @@ import {
     FileText,
     Sparkles,
     Library,
-    BarChart3,
     Settings,
     LifeBuoy,
     LogOut,
@@ -20,16 +19,10 @@ import {
     Glasses,
     MessageSquareMore,
     MonitorSmartphone,
-    TrendingUp,
-    SmilePlus,
     GraduationCap,
-    Leaf,
-    HeartPulse,
-    TreePine,
     FileSpreadsheet,
     ImageIcon,
     Palette,
-    Boxes,
     BrainCog,
     Layers
 } from "lucide-react";
@@ -51,6 +44,7 @@ import { useState } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { Progress } from "@/components/ui/progress";
+import { ThemeToggleSimple } from "@/components/ui/enhanced-ui";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
     className?: string;
@@ -62,15 +56,7 @@ interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
 export function Sidebar({ className, isCollapsed = false, onCollapse, onLinkClick }: SidebarProps) {
     const pathname = usePathname();
     const { user, logout, subscription } = useAuthStore();
-    const [, setOpenGroups] = useState<string[]>(["creative"]);
-
-    const _toggleGroup = (group: string) => {
-        setOpenGroups(prev =>
-            prev.includes(group)
-                ? prev.filter(g => g !== group)
-                : [...prev, group]
-        );
-    };
+    const [] = useState<string[]>(["creative"]);
 
     const menuItems = [
         {
@@ -94,10 +80,7 @@ export function Sidebar({ className, isCollapsed = false, onCollapse, onLinkClic
             id: "analytics",
             title: "Analytics & Data",
             items: [
-                { title: "Analytics", icon: BarChart3, href: "/dashboard/analytics/team" },
-                { title: "Sentiment", icon: SmilePlus, href: "/dashboard/sentiment" },
                 { title: "A/B Testing", icon: FlaskConical, href: "/dashboard/ab-testing" },
-                { title: "Predictive", icon: TrendingUp, href: "/dashboard/predictive-analytics" },
             ]
         },
         {
@@ -107,7 +90,6 @@ export function Sidebar({ className, isCollapsed = false, onCollapse, onLinkClic
                 { title: "Content Library", icon: Library, href: "/dashboard/content-library" },
                 { title: "Data Import", icon: FileSpreadsheet, href: "/dashboard/data-import" },
                 { title: "Brand Kit", icon: Palette, href: "/settings/branding" },
-                { title: "Blockchain Assets", icon: Boxes, href: "/dashboard/blockchain" },
             ]
         },
         {
@@ -121,16 +103,6 @@ export function Sidebar({ className, isCollapsed = false, onCollapse, onLinkClic
                 { title: "Cross-Sync", icon: MonitorSmartphone, href: "/dashboard/cross-sync" },
             ]
         },
-        {
-            id: "impact",
-            title: "Impact & Wellness",
-            collapsed: true,
-            items: [
-                { title: "Sustainability", icon: Leaf, href: "/dashboard/sustainability" },
-                { title: "Wellness", icon: HeartPulse, href: "/dashboard/wellness" },
-                { title: "Carbon Footprint", icon: TreePine, href: "/dashboard/carbon-footprint" },
-            ]
-        }
     ];
 
     return (
@@ -198,7 +170,8 @@ export function Sidebar({ className, isCollapsed = false, onCollapse, onLinkClic
             </ScrollArea>
 
             {/* Collapse Toggle (Desktop only) */}
-            <div className="hidden md:flex justify-end p-2 border-t border-b">
+            <div className={cn("hidden md:flex p-2 border-t border-b items-center", isCollapsed ? "flex-col justify-center gap-2" : "justify-between")}>
+                <ThemeToggleSimple />
                 <Button
                     variant="ghost"
                     size="icon"

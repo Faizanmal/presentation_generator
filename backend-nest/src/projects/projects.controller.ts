@@ -121,4 +121,16 @@ export class ProjectsController {
   ) {
     return this.projectsService.duplicate(id, user.id);
   }
+
+  /**
+   * Get generation job status
+   */
+  @Get('generate/status/:jobId')
+  @UseGuards(JwtAuthGuard)
+  async getGenerationStatus(
+    @CurrentUser() user: { id: string },
+    @Param('jobId') jobId: string,
+  ) {
+    return this.projectsService.getGenerationStatus(jobId, user.id);
+  }
 }

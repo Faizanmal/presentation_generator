@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/accordion';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { api } from '@/lib/api';
 
 interface AccessibilityIssue {
   id: string;
@@ -93,92 +94,55 @@ const categoryLabels: Record<string, string> = {
   motion: 'Motion & Animation',
 };
 
-export function AccessibilityChecker({ }: AccessibilityCheckerProps) {
+export function AccessibilityChecker({ projectId }: AccessibilityCheckerProps) {
   const [report, setReport] = useState<AccessibilityReport | null>(null);
   const [expandedIssue, setExpandedIssue] = useState<string | null>(null);
 
   const checkMutation = useMutation({
     mutationFn: async () => {
-      // Simulate accessibility check
-      await new Promise((r) => setTimeout(r, 2000));
-
-      // Mock report
-      const mockReport: AccessibilityReport = {
-        score: 78,
-        level: 'AA',
-        passedChecks: 28,
-        totalChecks: 36,
-        issues: [
-          {
-            id: '1',
-            type: 'error',
-            category: 'contrast',
-            title: 'Insufficient color contrast',
-            description: 'Text color #888888 on background #ffffff has a contrast ratio of 3.5:1, which is below the required 4.5:1 for normal text.',
-            slideIndex: 2,
-            wcagLevel: 'AA',
-            wcagCriteria: '1.4.3',
-            autoFixAvailable: true,
-            howToFix: 'Darken the text color to at least #767676 to meet the 4.5:1 contrast ratio.',
-          },
-          {
-            id: '2',
-            type: 'error',
-            category: 'images',
-            title: 'Missing alt text',
-            description: 'Image on slide 3 does not have alternative text, making it inaccessible to screen readers.',
-            slideIndex: 3,
-            wcagLevel: 'A',
-            wcagCriteria: '1.1.1',
-            autoFixAvailable: false,
-            howToFix: 'Add descriptive alt text that conveys the meaning or purpose of the image.',
-          },
-          {
-            id: '3',
-            type: 'warning',
-            category: 'text',
-            title: 'Small font size',
-            description: 'Text is 12px which may be difficult to read. Recommended minimum is 16px for body text.',
-            slideIndex: 4,
-            wcagLevel: 'AAA',
-            wcagCriteria: '1.4.8',
-            autoFixAvailable: true,
-            howToFix: 'Increase font size to at least 16px for better readability.',
-          },
-          {
-            id: '4',
-            type: 'warning',
-            category: 'structure',
-            title: 'Missing heading hierarchy',
-            description: 'Slide jumps from H1 to H3 without an H2, which may confuse screen reader users.',
-            slideIndex: 5,
-            wcagLevel: 'AA',
-            wcagCriteria: '1.3.1',
-            autoFixAvailable: true,
-            howToFix: 'Ensure headings follow a logical hierarchy (H1, H2, H3, etc.).',
-          },
-          {
-            id: '5',
-            type: 'info',
-            category: 'motion',
-            title: 'Animation may cause discomfort',
-            description: 'Consider providing a way to reduce or disable animations for users with vestibular disorders.',
-            wcagLevel: 'AAA',
-            wcagCriteria: '2.3.3',
-            autoFixAvailable: false,
-            howToFix: 'Add a "reduce motion" option or use CSS prefers-reduced-motion media query.',
-          },
-        ],
-        categories: {
-          contrast: { passed: 5, failed: 1 },
-          text: { passed: 7, failed: 1 },
-          images: { passed: 4, failed: 1 },
-          structure: { passed: 8, failed: 1 },
-          motion: { passed: 4, failed: 0 },
-        },
+      const result = await api.checkProjectAccessibility(projectId);
+      // Map API response to component's AccessibilityReport format
+      const issuesByCategory: Record<string, { passed: number; failed: number }> = {
+        contrast: { passed: 0, failed: 0 },
+        text: { passed: 0, failed: 0 },
+        images: { passed: 0, failed: 0 },
+        structure: { passed: 0, failed: 0 },
+        motion: { passed: 0, failed: 0 },
       };
 
-      return mockReport;
+      const mappedIssues: AccessibilityIssue[] = (result.issues || []).map((issue) => {
+        const category = (['contrast', 'text', 'images', 'structure', 'motion'].includes(issue.type) ? issue.type : 'structure') as AccessibilityIssue['category'];
+        if (issuesByCategory[category]) {
+          issuesByCategory[category].failed++;
+        }
+        return {
+          id: issue.id,
+          type: (issue.severity === 'error' ? 'error' : issue.severity === 'warning' ? 'warning' : 'info') as 'error' | 'warning' | 'info',
+          category,
+          title: issue.message,
+          description: issue.message,
+          slideIndex: issue.slideId ? undefined : undefined,
+          blockId: issue.blockId,
+          wcagLevel: 'AA' as const,
+          wcagCriteria: '',
+          autoFixAvailable: !!issue.suggestion,
+          howToFix: issue.suggestion || 'Review and fix manually.',
+        };
+      });
+
+      const totalChecks = Math.max(mappedIssues.length + 10, 20);
+      const passedChecks = totalChecks - mappedIssues.length;
+
+      const report: AccessibilityReport = {
+        score: result.score ?? Math.round((passedChecks / totalChecks) * 100),
+        level: result.score >= 90 ? 'AAA' : result.score >= 70 ? 'AA' : result.score >= 50 ? 'A' : 'Fail',
+        issues: mappedIssues,
+        passedChecks,
+        totalChecks,
+        categories: issuesByCategory as AccessibilityReport['categories'],
+      };
+
+      return report;
     },
     onSuccess: (data) => {
       setReport(data);
@@ -186,10 +150,9 @@ export function AccessibilityChecker({ }: AccessibilityCheckerProps) {
   });
 
   const autoFixMutation = useMutation({
-    mutationFn: async (_issueId: string) => {
-      void _issueId;
-      await new Promise((r) => setTimeout(r, 1000));
-      return { success: true };
+    mutationFn: async (issueId: string) => {
+      const result = await api.autoFixAccessibilityIssues(projectId, [issueId]);
+      return { success: result.fixed > 0 };
     },
     onSuccess: (_, issueId) => {
       if (report) {
@@ -344,7 +307,7 @@ export function AccessibilityChecker({ }: AccessibilityCheckerProps) {
                 <div className="space-y-3">
                   {Object.entries(report.categories).map(([key, value]) => (
                     <div key={key} className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
+                      <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                         {categoryIcons[key]}
                       </div>
                       <div className="flex-1">
@@ -419,7 +382,7 @@ export function AccessibilityChecker({ }: AccessibilityCheckerProps) {
                           <p className="text-sm text-slate-600">
                             {issue.description}
                           </p>
-                          <div className="bg-slate-50 p-3 rounded-lg">
+                          <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded-lg">
                             <p className="text-sm font-medium mb-1">How to fix:</p>
                             <p className="text-sm text-slate-600">{issue.howToFix}</p>
                           </div>

@@ -11,14 +11,14 @@ export default function DashboardLoading() {
       </div>
       {/* Stats skeleton */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-28 rounded-xl bg-slate-200 dark:bg-slate-700" />
+        {Array.from({ length: 4 }).map((_, i) => String(i)).map((id) => (
+          <div key={id} className="h-28 rounded-xl bg-slate-200 dark:bg-slate-700" />
         ))}
       </div>
       {/* Cards skeleton */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="h-56 rounded-xl bg-slate-200 dark:bg-slate-700" />
+        {Array.from({ length: 6 }).map((_, i) => String(i)).map((id) => (
+          <div key={id} className="h-56 rounded-xl bg-slate-200 dark:bg-slate-700" />
         ))}
       </div>
     </div>

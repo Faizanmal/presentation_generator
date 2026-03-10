@@ -145,9 +145,8 @@ export default function AIResearchPage() {
                             <p className="text-sm text-muted-foreground whitespace-pre-wrap">{research.content}</p>
                           ) : Array.isArray(research.content) ? (
                             <div className="space-y-2">
-                              {(research.content as ResearchBlock[]).map((block: ResearchBlock, i: number) => (
-                                // eslint-disable-next-line react/no-array-index-key
-                                <div key={`block-${block.type}-${i}`} className="text-sm border-l-2 border-primary/20 pl-3">
+                              {(research.content as ResearchBlock[]).map((block: ResearchBlock, i: number) => ({ block, id: String(i) })).map(({ block, id }) => (
+                                <div key={`block-${block.type}-${id}`} className="text-sm border-l-2 border-primary/20 pl-3">
                                   <p className="font-medium text-foreground">{block.type}</p>
                                   <p className="text-muted-foreground line-clamp-2">{typeof block.content === 'string' ? block.content : JSON.stringify(block.content)}</p>
                                 </div>
@@ -155,9 +154,8 @@ export default function AIResearchPage() {
                             </div>
                           ) : Array.isArray((research.content as Record<string, unknown>)?.blocks) ? (
                             <div className="space-y-2">
-                              {((research.content as Record<string, ResearchBlock[]>).blocks).map((block: ResearchBlock, i: number) => (
-                                // eslint-disable-next-line react/no-array-index-key
-                                <div key={`nested-block-${block.type}-${i}`} className="text-sm border-l-2 border-primary/20 pl-3">
+                              {((research.content as Record<string, ResearchBlock[]>).blocks).map((block: ResearchBlock, i: number) => ({ block, id: String(i) })).map(({ block, id }) => (
+                                <div key={`nested-block-${block.type}-${id}`} className="text-sm border-l-2 border-primary/20 pl-3">
                                   <p className="font-medium text-foreground">{block.type}</p>
                                   <p className="text-muted-foreground line-clamp-2">{typeof block.content === 'string' ? block.content : JSON.stringify(block.content)}</p>
                                 </div>
@@ -196,10 +194,13 @@ export default function AIResearchPage() {
               ))}
             </div>
           ) : (
-            <Card className="p-12 text-center">
-              <Search className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-              <p className="text-muted-foreground">No research yet. Start by entering a topic above.</p>
-            </Card>
+            <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed rounded-xl bg-muted/10">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+                <Search className="w-8 h-8 text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">No research yet</h3>
+              <p className="text-muted-foreground max-w-sm">Start your first deep dive by entering a topic above. Our AI will analyze documents, extract statistics, and build citations for you.</p>
+            </div>
           )}
         </div>
       </div>

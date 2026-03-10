@@ -85,6 +85,51 @@ export interface ContentBlock {
 
 const MIN_RELEVANCE_SCORE = 0.3; // Filter out low-quality results
 
+// Base credibility ranges per source type (adjusted dynamically)
+const SOURCE_CREDIBILITY: Record<string, number> = {
+  wikipedia: 0.85,
+  web: 0.7,
+  academic: 0.95,
+  news: 0.75,
+  bing: 0.75,
+};
+
+/** Research result cache with TTL */
+const RESEARCH_CACHE = new Map<
+  string,
+  {
+    results: ResearchResult[];
+    timestamp: number;
+  }
+>();
+const CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours
+
+/** Source verification and fact-checking */
+interface FactCheckResult {
+  claim: string;
+  verified: boolean;
+  confidence: number;
+  sources: string[];
+}
+
+/**
+ * Compute a dynamic relevance score between a query and text content.
+ * Uses term-frequency matching to avoid hardcoded scores.
+ */
+function computeRelevanceScore(query: string, text: string): number {
+  if (!text || !query) return 0.3;
+  const queryTerms = query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((t) => t.length > 2);
+  const textLower = text.toLowerCase();
+  const matchedTerms = queryTerms.filter((term) => textLower.includes(term));
+  const termRatio =
+    queryTerms.length > 0 ? matchedTerms.length / queryTerms.length : 0;
+  // Scale from 0.3 (no match) to 0.98 (all terms matched)
+  return Math.min(0.98, 0.3 + termRatio * 0.68);
+}
+
 @Injectable()
 export class AIResearchService {
   private readonly logger = new Logger(AIResearchService.name);
@@ -279,8 +324,11 @@ export class AIResearchService {
           snippet: result.snippet.replace(/<[^>]*>/g, ''), // Strip HTML
           content: page?.extract || result.snippet.replace(/<[^>]*>/g, ''),
           sourceType: 'wikipedia',
-          relevanceScore: 0.9,
-          credibilityScore: 0.85,
+          relevanceScore: computeRelevanceScore(
+            query,
+            `${result.title} ${result.snippet} ${page?.extract || ''}`,
+          ),
+          credibilityScore: SOURCE_CREDIBILITY['wikipedia'],
         });
       }
 
@@ -319,8 +367,11 @@ export class AIResearchService {
           snippet: data.Abstract,
           content: data.Abstract,
           sourceType: 'web',
-          relevanceScore: 0.95,
-          credibilityScore: 0.8,
+          relevanceScore: computeRelevanceScore(
+            query,
+            `${data.Heading || ''} ${data.Abstract}`,
+          ),
+          credibilityScore: SOURCE_CREDIBILITY['web'],
         });
       }
 
@@ -333,8 +384,8 @@ export class AIResearchService {
             url: topic.FirstURL,
             snippet: topic.Text,
             sourceType: 'web',
-            relevanceScore: 0.7,
-            credibilityScore: 0.7,
+            relevanceScore: computeRelevanceScore(query, topic.Text),
+            credibilityScore: SOURCE_CREDIBILITY['web'],
           });
         }
       }
@@ -373,8 +424,11 @@ export class AIResearchService {
         snippet: item.abstract?.substring(0, 500) || 'No abstract available',
         content: item.abstract,
         sourceType: 'academic',
-        relevanceScore: 0.85,
-        credibilityScore: 0.95,
+        relevanceScore: computeRelevanceScore(
+          query,
+          `${item.title?.[0] || ''} ${item.abstract || ''}`,
+        ),
+        credibilityScore: SOURCE_CREDIBILITY['academic'],
         author: item.author
           ?.map((a) => `${a.given || ''} ${a.family || ''}`)
           .join(', '),
@@ -395,14 +449,22 @@ export class AIResearchService {
     query: string,
     limit: number = 5,
   ): Promise<ResearchResult[]> {
-    // Using a free news API alternative (you can replace with NewsAPI if you have a key)
+    // Using GNews API — requires a real API key
     try {
+      const apiKey = this.configService.get('GNEWS_API_KEY');
+      if (!apiKey) {
+        this.logger.warn(
+          'GNews API key not configured. Skipping news search. Set GNEWS_API_KEY in your environment.',
+        );
+        return [];
+      }
+
       const response = await axios.get('https://gnews.io/api/v4/search', {
         params: {
           q: query,
           lang: 'en',
           max: limit,
-          apikey: this.configService.get('GNEWS_API_KEY') || 'demo',
+          apikey: apiKey,
         },
       });
 
@@ -413,8 +475,11 @@ export class AIResearchService {
         snippet: article.description,
         content: article.content,
         sourceType: 'news',
-        relevanceScore: 0.8,
-        credibilityScore: 0.75,
+        relevanceScore: computeRelevanceScore(
+          query,
+          `${article.title} ${article.description} ${article.content}`,
+        ),
+        credibilityScore: SOURCE_CREDIBILITY['news'],
         author: article.source?.name,
         publishedDate: new Date(article.publishedAt),
       }));
@@ -558,7 +623,7 @@ Keywords:`,
   /**
    * Fact-check research sources using the AI service and persist results
    */
-  async factCheck(researchId: string, userId: string) {
+  async factCheckResearch(researchId: string, userId: string) {
     const research = await this.prisma.contentResearch.findUnique({
       where: { id: researchId },
       include: { sources: true },
@@ -845,5 +910,429 @@ Keywords:`,
       successRate: total > 0 ? Math.round((completed / total) * 100) : 0,
       topKeywords,
     };
+  }
+
+  /**
+   * Parallel research with multiple sources
+   */
+  async conductParallelResearch(
+    query: string,
+    options: {
+      sources?: Array<'wikipedia' | 'web' | 'academic' | 'news'>;
+      maxResults?: number;
+      language?: string;
+    } = {},
+  ): Promise<{
+    results: ResearchResult[];
+    summary: string;
+    keywords: string[];
+    totalTime: number;
+  }> {
+    const startTime = Date.now();
+    const {
+      sources = ['wikipedia', 'web', 'academic'],
+      maxResults = 20,
+      language = 'en',
+    } = options;
+
+    // Check cache first
+    const cacheKey = `${query}-${sources.join(',')}-${language}`.toLowerCase();
+    const cached = RESEARCH_CACHE.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      this.logger.log(`Cache hit for research query: ${query}`);
+      return {
+        results: cached.results,
+        summary: await this.generateResearchSummary(query, cached.results),
+        keywords: await this.extractKeywords(query, cached.results),
+        totalTime: Date.now() - startTime,
+      };
+    }
+
+    // Execute all searches in parallel
+    const searchPromises: Promise<ResearchResult[]>[] = [];
+
+    if (sources.includes('wikipedia')) {
+      searchPromises.push(
+        this.searchWikipedia(query, language, 5).catch((err) => {
+          this.logger.warn('Wikipedia search failed', err);
+          return [];
+        }),
+      );
+    }
+
+    if (sources.includes('web')) {
+      searchPromises.push(
+        this.searchWeb(query, 5).catch((err) => {
+          this.logger.warn('Web search failed', err);
+          return [];
+        }),
+      );
+    }
+
+    if (sources.includes('academic')) {
+      searchPromises.push(
+        this.searchAcademic(query, 5).catch((err) => {
+          this.logger.warn('Academic search failed', err);
+          return [];
+        }),
+      );
+    }
+
+    // Wait for all searches to complete
+    const allResults = await Promise.all(searchPromises);
+    const flatResults = allResults.flat();
+
+    // Deduplicate and rank
+    const seenUrls = new Set<string>();
+    const deduplicated = flatResults
+      .filter((r) => {
+        if (r.relevanceScore < MIN_RELEVANCE_SCORE) return false;
+        if (r.url) {
+          if (seenUrls.has(r.url)) return false;
+          seenUrls.add(r.url);
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        // Weighted ranking: relevance + credibility
+        const scoreA = a.relevanceScore * 0.7 + a.credibilityScore * 0.3;
+        const scoreB = b.relevanceScore * 0.7 + b.credibilityScore * 0.3;
+        return scoreB - scoreA;
+      })
+      .slice(0, maxResults);
+
+    // Cache results
+    RESEARCH_CACHE.set(cacheKey, {
+      results: deduplicated,
+      timestamp: Date.now(),
+    });
+
+    // Clean up old cache entries
+    this.cleanupCache();
+
+    const summary = await this.generateResearchSummary(query, deduplicated);
+    const keywords = await this.extractKeywords(query, deduplicated);
+
+    return {
+      results: deduplicated,
+      summary,
+      keywords,
+      totalTime: Date.now() - startTime,
+    };
+  }
+
+  /**
+   * Clean up expired cache entries
+   */
+  private cleanupCache(): void {
+    const now = Date.now();
+    for (const [key, value] of RESEARCH_CACHE.entries()) {
+      if (now - value.timestamp > CACHE_TTL) {
+        RESEARCH_CACHE.delete(key);
+      }
+    }
+  }
+
+  /**
+   * Fact-check a claim using multiple sources
+   */
+  async factCheck(claim: string): Promise<FactCheckResult> {
+    try {
+      const research = await this.conductParallelResearch(claim, {
+        sources: ['wikipedia', 'academic', 'news'],
+        maxResults: 10,
+      });
+
+      // Use AI to analyze if sources support the claim
+      const verificationPrompt = `Analyze if the following claim is supported by the research sources:
+
+Claim: "${claim}"
+
+Sources:
+${research.results.map((r, i) => `${i + 1}. ${r.title}: ${r.snippet}`).join('\n')}
+
+Return JSON:
+{
+  "verified": true/false,
+  "confidence": 0.0-1.0,
+  "explanation": "brief explanation",
+  "supportingSources": [indices of supporting sources]
+}`;
+
+      const response = await this.aiService.chatCompletion({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You are a fact-checking expert. Analyze claims objectively.',
+          },
+          { role: 'user', content: verificationPrompt },
+        ],
+        temperature: 0.3,
+        max_tokens: 500,
+        response_format: { type: 'json_object' },
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        throw new Error('No verification result');
+      }
+
+      const result = JSON.parse(content);
+
+      const sourcesArr: number[] = Array.isArray(result.supportingSources)
+        ? (result.supportingSources as number[])
+        : [];
+      const sources = sourcesArr
+        .map((i) => research.results[i]?.url || '')
+        .filter(Boolean);
+
+      return {
+        claim,
+        verified: result.verified || false,
+        confidence: result.confidence || 0.5,
+        sources,
+      };
+    } catch (error) {
+      this.logger.error('Fact checking failed', error);
+      return {
+        claim,
+        verified: false,
+        confidence: 0,
+        sources: [],
+      };
+    }
+  }
+
+  /**
+   * Extract key insights from research results
+   */
+  async extractInsights(
+    topic: string,
+    results: ResearchResult[],
+  ): Promise<{
+    keyPoints: string[];
+    trends: string[];
+    statistics: Array<{ fact: string; source: string }>;
+    recommendations: string[];
+  }> {
+    try {
+      const combinedContent = results
+        .map((r) => `${r.title}: ${r.content || r.snippet}`)
+        .join('\n\n');
+
+      const prompt = `Analyze this research about "${topic}" and extract insights:
+
+${combinedContent}
+
+Return JSON:
+{
+  "keyPoints": ["point 1", "point 2", ...],
+  "trends": ["trend 1", "trend 2", ...],
+  "statistics": [{"fact": "stat", "source": "source name"}, ...],
+  "recommendations": ["recommendation 1", ...]
+}`;
+
+      const response = await this.aiService.chatCompletion({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Extract key insights from research data. Be factual and concise.',
+          },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.5,
+        max_tokens: 1500,
+        response_format: { type: 'json_object' },
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        throw new Error('No insights generated');
+      }
+
+      const parsed = JSON.parse(content);
+      return parsed as {
+        keyPoints: string[];
+        trends: string[];
+        statistics: Array<{ fact: string; source: string }>;
+        recommendations: string[];
+      };
+    } catch (error) {
+      this.logger.error('Insight extraction failed', error);
+      return {
+        keyPoints: [],
+        trends: [],
+        statistics: [],
+        recommendations: [],
+      };
+    }
+  }
+
+  /**
+   * Multi-lingual research support
+   */
+  async researchMultiLingual(
+    query: string,
+    languages: string[] = ['en', 'es', 'fr', 'de'],
+  ): Promise<Map<string, ResearchResult[]>> {
+    const results = new Map<string, ResearchResult[]>();
+
+    // Search in parallel for all languages
+    const searches = languages.map(async (lang) => {
+      try {
+        const langResults = await this.conductParallelResearch(query, {
+          language: lang,
+          maxResults: 5,
+        });
+        return { lang, results: langResults.results };
+      } catch (error) {
+        this.logger.warn(`Research for language ${lang} failed`, error);
+        return { lang, results: [] };
+      }
+    });
+
+    const completed = await Promise.all(searches);
+
+    for (const { lang, results: langResults } of completed) {
+      results.set(lang, langResults);
+    }
+
+    return results;
+  }
+
+  /**
+   * Trend analysis over time
+   */
+  async analyzeTrends(
+    topic: string,
+    timeframe: 'week' | 'month' | 'year' = 'month',
+  ): Promise<{
+    trendScore: number; // -100 to +100
+    direction: 'rising' | 'falling' | 'stable';
+    insights: string[];
+    dataPoints: Array<{ date: string; volume: number }>;
+  }> {
+    try {
+      // Research current and historical data
+      const currentResearch = await this.conductParallelResearch(topic, {
+        sources: ['news', 'web'],
+        maxResults: 20,
+      });
+
+      // Analyze publication dates to determine trend
+      const recentDates = currentResearch.results
+        .filter((r) => r.publishedDate)
+        .map((r) => r.publishedDate!.getTime())
+        .sort((a, b) => b - a);
+
+      const now = Date.now();
+      const timeframes = {
+        week: 7 * 24 * 60 * 60 * 1000,
+        month: 30 * 24 * 60 * 60 * 1000,
+        year: 365 * 24 * 60 * 60 * 1000,
+      };
+
+      const lookback = timeframes[timeframe];
+      const recentCount = recentDates.filter(
+        (d) => now - d < lookback / 2,
+      ).length;
+      const olderCount = recentDates.filter(
+        (d) => now - d >= lookback / 2 && now - d < lookback,
+      ).length;
+
+      const trendScore =
+        olderCount > 0 ? ((recentCount - olderCount) / olderCount) * 100 : 0;
+      const direction =
+        trendScore > 20 ? 'rising' : trendScore < -20 ? 'falling' : 'stable';
+
+      return {
+        trendScore,
+        direction,
+        insights: [
+          `Found ${recentCount} recent mentions in the last ${timeframe}`,
+          `Trend is ${direction} with score ${trendScore.toFixed(1)}`,
+        ],
+        dataPoints: [], // Would need time-series API for real data points
+      };
+    } catch (error) {
+      this.logger.error('Trend analysis failed', error);
+      return {
+        trendScore: 0,
+        direction: 'stable',
+        insights: [],
+        dataPoints: [],
+      };
+    }
+  }
+
+  /**
+   * Generate research report with comprehensive analysis
+   */
+  async generateResearchReport(
+    topic: string,
+    options: {
+      includeFactCheck?: boolean;
+      includeTrends?: boolean;
+      includeInsights?: boolean;
+    } = {},
+  ): Promise<{
+    topic: string;
+    summary: string;
+    results: ResearchResult[];
+    insights?: ReturnType<AIResearchService['extractInsights']> extends Promise<
+      infer U
+    >
+      ? U
+      : never;
+    trends?: ReturnType<AIResearchService['analyzeTrends']> extends Promise<
+      infer U
+    >
+      ? U
+      : never;
+    factChecks?: FactCheckResult[];
+    generatedAt: Date;
+  }> {
+    const research = await this.conductParallelResearch(topic, {
+      sources: ['wikipedia', 'web', 'academic', 'news'],
+      maxResults: 30,
+    });
+
+    const report: {
+      topic: string;
+      summary: string;
+      results: ResearchResult[];
+      insights?: Awaited<ReturnType<AIResearchService['extractInsights']>>;
+      trends?: Awaited<ReturnType<AIResearchService['analyzeTrends']>>;
+      factChecks?: FactCheckResult[];
+      generatedAt: Date;
+    } = {
+      topic,
+      summary: research.summary,
+      results: research.results,
+      generatedAt: new Date(),
+    };
+
+    // Add insights if requested
+    if (options.includeInsights) {
+      report.insights = await this.extractInsights(topic, research.results);
+    }
+
+    // Add trend analysis if requested
+    if (options.includeTrends) {
+      report.trends = await this.analyzeTrends(topic);
+    }
+
+    // Add fact-checking if requested
+    if (options.includeFactCheck && report.insights) {
+      const claims = report.insights.keyPoints.slice(0, 3); // Check top 3 claims
+      const factCheckPromises = claims.map((claim) => this.factCheck(claim));
+      report.factChecks = await Promise.all(factCheckPromises);
+    }
+
+    return report;
   }
 }

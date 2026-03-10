@@ -65,74 +65,63 @@ export class TemplateMarketplaceService {
   constructor(private prisma: PrismaService) {}
 
   async getCategories(): Promise<TemplateCategory[]> {
-    // In production, this would come from the database
-    await Promise.resolve();
-    return [
-      {
-        id: 'business',
-        name: 'Business',
-        slug: 'business',
-        description: 'Professional templates for business presentations',
+    // Query distinct categories from marketplace templates
+    const categoryData = await this.prisma.marketplaceTemplate.groupBy({
+      by: ['category'],
+      where: { status: 'PUBLISHED' },
+      _count: { id: true },
+    });
+
+    const categoryMap: Record<string, { icon: string; description: string }> = {
+      business: {
         icon: 'briefcase',
-        templateCount: 45,
+        description: 'Professional templates for business presentations',
       },
-      {
-        id: 'education',
-        name: 'Education',
-        slug: 'education',
-        description: 'Templates for educators and students',
+      education: {
         icon: 'graduation-cap',
-        templateCount: 38,
+        description: 'Templates for educators and students',
       },
-      {
-        id: 'marketing',
-        name: 'Marketing',
-        slug: 'marketing',
-        description: 'Eye-catching templates for marketing campaigns',
+      marketing: {
         icon: 'megaphone',
-        templateCount: 32,
+        description: 'Eye-catching templates for marketing campaigns',
       },
-      {
-        id: 'startup',
-        name: 'Startup & Pitch',
-        slug: 'startup',
-        description: 'Pitch deck templates for startups',
+      startup: {
         icon: 'rocket',
-        templateCount: 28,
+        description: 'Pitch deck templates for startups',
       },
-      {
-        id: 'creative',
-        name: 'Creative',
-        slug: 'creative',
-        description: 'Artistic and creative presentation templates',
+      creative: {
         icon: 'palette',
-        templateCount: 35,
+        description: 'Artistic and creative presentation templates',
       },
-      {
-        id: 'technology',
-        name: 'Technology',
-        slug: 'technology',
-        description: 'Modern templates for tech presentations',
+      technology: {
         icon: 'cpu',
-        templateCount: 42,
+        description: 'Modern templates for tech presentations',
       },
-      {
-        id: 'minimal',
-        name: 'Minimal',
-        slug: 'minimal',
-        description: 'Clean and minimal design templates',
+      minimal: {
         icon: 'minus-square',
-        templateCount: 25,
+        description: 'Clean and minimal design templates',
       },
-      {
-        id: 'portfolio',
-        name: 'Portfolio',
-        slug: 'portfolio',
-        description: 'Showcase your work with portfolio templates',
+      portfolio: {
         icon: 'image',
-        templateCount: 20,
+        description: 'Showcase your work with portfolio templates',
       },
-    ];
+    };
+
+    return categoryData.map((cat) => {
+      const slug = cat.category.toLowerCase();
+      const meta = categoryMap[slug] || {
+        icon: 'folder',
+        description: `${cat.category} templates`,
+      };
+      return {
+        id: slug,
+        name: cat.category,
+        slug,
+        description: meta.description,
+        icon: meta.icon,
+        templateCount: cat._count.id,
+      };
+    });
   }
 
   async searchTemplates(params: {
@@ -152,196 +141,153 @@ export class TemplateMarketplaceService {
       limit = 20,
     } = params;
 
-    await Promise.resolve();
-
-    // This would be a database query in production
-    // For now, return mock data
-    const mockTemplates: TemplatePreview[] = [
-      {
-        id: 'tpl-1',
-        title: 'Modern Business Pitch',
-        description:
-          'A clean, professional template perfect for business pitches and investor presentations.',
-        thumbnail: '/templates/modern-business.png',
-        category: 'business',
-        author: {
-          id: 'user-1',
-          name: 'Design Studio',
-          avatar: '/avatars/studio.png',
-        },
-        stats: { uses: 12500, likes: 890, rating: 4.8, reviews: 156 },
-        isPremium: false,
-        tags: ['business', 'pitch', 'professional', 'clean'],
-        createdAt: new Date('2025-10-15'),
-      },
-      {
-        id: 'tpl-2',
-        title: 'Startup Pitch Deck',
-        description:
-          'The perfect pitch deck template for startups seeking funding.',
-        thumbnail: '/templates/startup-pitch.png',
-        category: 'startup',
-        author: {
-          id: 'user-2',
-          name: 'Pitch Perfect',
-          avatar: '/avatars/pitch.png',
-        },
-        stats: { uses: 8900, likes: 670, rating: 4.9, reviews: 98 },
-        isPremium: true,
-        price: 29,
-        tags: ['startup', 'pitch', 'funding', 'investors'],
-        createdAt: new Date('2025-11-01'),
-      },
-      {
-        id: 'tpl-3',
-        title: 'Educational Workshop',
-        description:
-          'Engaging template for educational presentations and workshops.',
-        thumbnail: '/templates/education.png',
-        category: 'education',
-        author: { id: 'user-3', name: 'EduDesign', avatar: '/avatars/edu.png' },
-        stats: { uses: 15200, likes: 1100, rating: 4.7, reviews: 234 },
-        isPremium: false,
-        tags: ['education', 'workshop', 'training', 'learning'],
-        createdAt: new Date('2025-09-20'),
-      },
-      {
-        id: 'tpl-4',
-        title: 'Creative Portfolio',
-        description:
-          'Showcase your creative work with this stunning portfolio template.',
-        thumbnail: '/templates/portfolio.png',
-        category: 'portfolio',
-        author: {
-          id: 'user-4',
-          name: 'Creative Co',
-          avatar: '/avatars/creative.png',
-        },
-        stats: { uses: 6700, likes: 520, rating: 4.6, reviews: 87 },
-        isPremium: true,
-        price: 19,
-        tags: ['portfolio', 'creative', 'showcase', 'design'],
-        createdAt: new Date('2025-12-05'),
-      },
-      {
-        id: 'tpl-5',
-        title: 'Tech Product Launch',
-        description:
-          'Modern template for technology product launches and demos.',
-        thumbnail: '/templates/tech-launch.png',
-        category: 'technology',
-        author: {
-          id: 'user-5',
-          name: 'TechDesigns',
-          avatar: '/avatars/tech.png',
-        },
-        stats: { uses: 9400, likes: 780, rating: 4.8, reviews: 145 },
-        isPremium: false,
-        tags: ['technology', 'product', 'launch', 'modern'],
-        createdAt: new Date('2025-11-15'),
-      },
-    ];
-
-    let filtered = [...mockTemplates];
+    const where: Record<string, unknown> = {
+      status: 'PUBLISHED',
+    };
 
     if (query) {
-      const q = query.toLowerCase();
-      filtered = filtered.filter(
-        (t) =>
-          t.title.toLowerCase().includes(q) ||
-          t.description.toLowerCase().includes(q) ||
-          t.tags.some((tag) => tag.includes(q)),
-      );
+      where.OR = [
+        { title: { contains: query, mode: 'insensitive' } },
+        { description: { contains: query, mode: 'insensitive' } },
+        { tags: { hasSome: [query.toLowerCase()] } },
+      ];
     }
 
     if (category) {
-      filtered = filtered.filter((t) => t.category === category);
+      where.category = category;
     }
 
     if (isPremium !== undefined) {
-      filtered = filtered.filter((t) => t.isPremium === isPremium);
+      where.pricing = isPremium ? 'premium' : 'free';
     }
 
-    // Sort
+    // determine order-by selection without creating a union type
+    // that contains undefined values. assign to a mutable variable so
+    // TypeScript can track the narrowed type on each branch.
+    let orderBy: Record<string, string>;
     switch (sortBy) {
       case 'newest':
-        filtered.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        orderBy = { createdAt: 'desc' };
         break;
       case 'rating':
-        filtered.sort((a, b) => b.stats.rating - a.stats.rating);
+        orderBy = { rating: 'desc' };
         break;
       case 'popular':
       default:
-        filtered.sort((a, b) => b.stats.uses - a.stats.uses);
+        orderBy = { downloadCount: 'desc' };
+        break;
     }
 
-    const total = filtered.length;
+    const skip = (page - 1) * limit;
+
+    const [dbTemplates, total] = await Promise.all([
+      this.prisma.marketplaceTemplate.findMany({
+        where,
+        orderBy,
+        skip,
+        take: limit,
+        include: {
+          // only author is required for the preview; additional fields come
+          // via templateData when necessary
+          author: { select: { id: true, name: true, image: true } },
+        },
+      }) as any, // cast to any to work around Prisma inference oddities
+      this.prisma.marketplaceTemplate.count({ where }),
+    ]);
+
+    // the query above is cast to any so we re-type here for clarity
+    const templates: TemplatePreview[] = dbTemplates.map((t: any) => ({
+      id: t.id,
+      title: t.title,
+      description: t.description ?? '',
+      thumbnail: t.thumbnail ?? '',
+      category: t.category,
+      author: {
+        id: t.author.id,
+        name: t.author.name ?? '',
+        avatar: t.author.image ?? undefined,
+      },
+      stats: {
+        uses: t.downloadCount,
+        likes: 0,
+        rating: t.rating ?? 0,
+        reviews: t.reviewCount,
+      },
+      isPremium: t.pricing === 'premium',
+      price: t.price > 0 ? t.price : undefined,
+      tags: t.tags,
+      createdAt: t.createdAt,
+    }));
+
     const pages = Math.ceil(total / limit);
-    const start = (page - 1) * limit;
-    const templates = filtered.slice(start, start + limit);
 
     return { templates, total, pages };
   }
 
   async getTemplateById(templateId: string): Promise<TemplateDetails> {
-    // In production, fetch from database
-    await Promise.resolve();
-    const template: TemplateDetails = {
-      id: templateId,
-      title: 'Modern Business Pitch',
-      description:
-        'A clean, professional template perfect for business pitches and investor presentations. Features modern design elements and easy customization.',
-      thumbnail: '/templates/modern-business.png',
-      category: 'business',
-      author: {
-        id: 'user-1',
-        name: 'Design Studio',
-        avatar: '/avatars/studio.png',
+    const t = (await this.prisma.marketplaceTemplate.findUnique({
+      where: { id: templateId },
+      include: {
+        author: { select: { id: true, name: true, image: true } },
+        reviews: {
+          include: { user: { select: { id: true, name: true } } },
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+        },
       },
-      stats: { uses: 12500, likes: 890, rating: 4.8, reviews: 156 },
-      isPremium: false,
-      tags: ['business', 'pitch', 'professional', 'clean'],
-      createdAt: new Date('2025-10-15'),
-      slides: [
-        { order: 1, layout: 'title', thumbnail: '/templates/slides/1.png' },
-        {
-          order: 2,
-          layout: 'text-image',
-          thumbnail: '/templates/slides/2.png',
-        },
-        {
-          order: 3,
-          layout: 'bullet-points',
-          thumbnail: '/templates/slides/3.png',
-        },
-        { order: 4, layout: 'chart', thumbnail: '/templates/slides/4.png' },
-        { order: 5, layout: 'team', thumbnail: '/templates/slides/5.png' },
-        { order: 6, layout: 'closing', thumbnail: '/templates/slides/6.png' },
-      ],
-      theme: {
-        primaryColor: '#2563eb',
-        secondaryColor: '#1e40af',
-        fontFamily: 'Inter',
-      },
-      reviews: [
-        {
-          userId: 'u1',
-          userName: 'John D.',
-          rating: 5,
-          comment: 'Perfect template for my investor pitch!',
-          createdAt: new Date('2025-12-01'),
-        },
-        {
-          userId: 'u2',
-          userName: 'Sarah M.',
-          rating: 4,
-          comment: 'Great design, easy to customize.',
-          createdAt: new Date('2025-11-28'),
-        },
-      ],
-    };
+    })) as any; // cast to any so that downstream property access works
 
-    return template;
+    if (!t) {
+      throw new NotFoundException(`Template ${templateId} not found`);
+    }
+
+    // Parse slide layouts (and other metadata) from the JSON blob
+    const templateData = t.templateData || t.content || {};
+    const slideLayouts = Array.isArray(templateData?.slides)
+      ? templateData.slides
+      : [];
+
+    return {
+      id: t.id,
+      title: t.title,
+      description: t.description ?? '',
+      thumbnail: t.thumbnail ?? '',
+      category: t.category,
+      author: {
+        id: t.author.id,
+        name: t.author.name ?? '',
+        avatar: t.author.image ?? undefined,
+      },
+      stats: {
+        uses: t.downloadCount,
+        likes: 0,
+        rating: t.rating ?? 0,
+        reviews: t.reviewCount,
+      },
+      isPremium: t.pricing === 'premium',
+      price: t.price > 0 ? t.price : undefined,
+      tags: t.tags,
+      createdAt: t.createdAt,
+      slides: (slideLayouts as Array<any>).map((s: any, i: number) => ({
+        order: s.order ?? i + 1,
+        layout: s.layout ?? s.layout ?? 'default',
+        thumbnail: s.thumbnail ?? '',
+      })),
+      theme: {
+        primaryColor:
+          (templateData?.colorPalette as string[])?.[0] ?? '#2563eb',
+        secondaryColor:
+          (templateData?.colorPalette as string[])?.[1] ?? '#1e40af',
+        fontFamily: (templateData?.fonts as string[])?.[0] ?? 'Inter',
+      },
+      reviews: (t.reviews || []).map((r: any) => ({
+        userId: r.user?.id,
+        userName: r.user?.name ?? 'Anonymous',
+        rating: r.rating,
+        comment: r.comment ?? '',
+        createdAt: r.createdAt,
+      })),
+    };
   }
 
   async useTemplate(
@@ -392,8 +338,18 @@ export class TemplateMarketplaceService {
   }
 
   async likeTemplate(userId: string, templateId: string): Promise<void> {
-    // In production, store in database
-    await Promise.resolve();
+    // Verify template exists
+    const template = await this.prisma.marketplaceTemplate.findUnique({
+      where: { id: templateId },
+    });
+    if (!template) {
+      throw new NotFoundException(`Template ${templateId} not found`);
+    }
+    // Increment the download count as a proxy for engagement
+    await this.prisma.marketplaceTemplate.update({
+      where: { id: templateId },
+      data: { downloadCount: { increment: 1 } },
+    });
     this.logger.log(`User ${userId} liked template ${templateId}`);
   }
 
@@ -406,8 +362,39 @@ export class TemplateMarketplaceService {
       throw new Error('Rating must be between 1 and 5');
     }
 
-    // In production, store in database
-    await Promise.resolve();
+    // Verify template exists
+    const template = await this.prisma.marketplaceTemplate.findUnique({
+      where: { id: templateId },
+    });
+    if (!template) {
+      throw new NotFoundException(`Template ${templateId} not found`);
+    }
+
+    // Create review in database
+    await this.prisma.templateReview.create({
+      data: {
+        templateId,
+        userId,
+        rating: data.rating,
+        comment: data.comment,
+      },
+    });
+
+    // Update template aggregate rating
+    const reviews = await this.prisma.templateReview.aggregate({
+      where: { templateId },
+      _avg: { rating: true },
+      _count: { id: true },
+    });
+
+    await this.prisma.marketplaceTemplate.update({
+      where: { id: templateId },
+      data: {
+        rating: reviews._avg.rating ?? 0,
+        reviewCount: reviews._count.id,
+      },
+    });
+
     this.logger.log(
       `User ${userId} reviewed template ${templateId}: ${data.rating} stars`,
     );
@@ -432,13 +419,36 @@ export class TemplateMarketplaceService {
       );
     }
 
-    // In production, create template in database
-    const templateId = `tpl-${Date.now()}`;
+    // Build minimal JSON payload for templateData
+    const content = {
+      slides: project.slides.map((s) => ({
+        order: s.order,
+        layout: s.layout ?? 'default',
+        thumbnail: '',
+      })),
+    };
+
+    // Create template in database
+    const template = await this.prisma.marketplaceTemplate.create({
+      data: {
+        title: project.title,
+        description: project.description ?? '',
+        category: 'general',
+        authorId: userId,
+        status: 'PENDING_REVIEW',
+        pricing: 'free',
+        price: 0,
+        tags: [],
+        slideCount: project.slides.length,
+        templateData: content as any,
+      },
+    });
+
     this.logger.log(
-      `User ${userId} published template ${templateId} from project ${projectId}`,
+      `User ${userId} published template ${template.id} from project ${projectId}`,
     );
 
-    return { templateId };
+    return { templateId: template.id };
   }
 
   async getFeaturedTemplates(): Promise<TemplatePreview[]> {

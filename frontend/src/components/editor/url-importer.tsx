@@ -17,6 +17,7 @@ import {
     RefreshCw,
     ShieldCheck,
 } from "lucide-react";
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -405,9 +406,8 @@ export function URLImporter({ onImport, onClose }: URLImporterProps) {
                                                     {slide.heading}
                                                 </h4>
                                                 <div className="mt-2 space-y-1">
-                                                    {slide.blocks.slice(0, 3).map((block, bi) => (
+                                                    {slide.blocks.slice(0, 3).map((block, bi) => ({ block, id: String(bi) })).map(({ block, id: bi }) => (
                                                         <p
-                                                            // eslint-disable-next-line react/no-array-index-key
                                                             key={`${bi}-${block.type}`}
                                                             className="text-xs text-muted-foreground line-clamp-1"
                                                         >
@@ -435,7 +435,7 @@ export function URLImporter({ onImport, onClose }: URLImporterProps) {
                                     </Label>
                                     <div className="flex gap-2 overflow-x-auto pb-2">
                                         {importResult.extractedImages.slice(0, 6).map((img, i) => (
-                                            <img
+                                            <Image
                                                 key={img}
                                                 src={img}
                                                 alt={`Extracted visual ${i + 1} from source`}

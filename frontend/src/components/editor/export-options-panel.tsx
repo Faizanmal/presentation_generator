@@ -12,6 +12,7 @@ import {
   Loader2,
   Check,
   Settings,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -48,7 +49,7 @@ interface ExportOptionsPanelProps {
   className?: string;
 }
 
-type ExportFormat = 'pdf' | 'pptx' | 'html' | 'json' | 'video';
+type ExportFormat = 'pdf' | 'pdf-hifi' | 'pptx' | 'html' | 'json' | 'video';
 
 interface ExportOption {
   id: ExportFormat;
@@ -61,9 +62,17 @@ interface ExportOption {
 
 const EXPORT_OPTIONS: ExportOption[] = [
   {
+    id: 'pdf-hifi',
+    name: 'WYSIWYG PDF',
+    description: 'Pixel-perfect PDF matching your editor canvas',
+    icon: <Sparkles className="h-5 w-5" />,
+    isPremium: true,
+    fileExtension: 'pdf',
+  },
+  {
     id: 'pdf',
     name: 'PDF Document',
-    description: 'High-quality PDF for sharing and printing',
+    description: 'Standard PDF for sharing and printing',
     icon: <FileText className="h-5 w-5" />,
     isPremium: false,
     fileExtension: 'pdf',
@@ -132,6 +141,22 @@ export function ExportOptionsPanel({
       let filename = `${projectTitle.replace(/[^a-z0-9]/gi, '_')}.${EXPORT_OPTIONS.find(o => o.id === selectedFormat)?.fileExtension}`;
 
       switch (selectedFormat) {
+        case 'pdf-hifi':
+          setExportProgress(20);
+          toast.info('Generating pixel-perfect WYSIWYG PDF...');
+          try {
+            const hifiBlob = await api.wysiwygExport.downloadPdf(projectId, quality);
+            blob = hifiBlob;
+            filename = `${projectTitle.replace(/[^a-z0-9]/gi, '_')}_hifi.pdf`;
+          } catch {
+            // Fallback to standard PDF if WYSIWYG export fails
+            toast.info('WYSIWYG export unavailable, falling back to standard PDF...');
+            const pdfFallback = await api.exportProject(projectId, 'pdf');
+            if (pdfFallback.filename) { filename = pdfFallback.filename; }
+            blob = pdfFallback.blob;
+          }
+          break;
+
         case 'pdf':
           setExportProgress(30);
           const pdfResponse = await api.exportProject(projectId, 'pdf');
@@ -316,6 +341,11 @@ export function ExportOptionsPanel({
                         Pro
                       </Badge>
                     )}
+                    {option.id === 'pdf-hifi' && (
+                      <Badge variant="secondary" className="bg-linear-to-r from-indigo-100 to-purple-100 text-indigo-700">
+                        New
+                      </Badge>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -344,18 +374,7 @@ export function ExportOptionsPanel({
                 />
               </div>
 
-              {(selectedFormat === 'pptx' || selectedFormat === 'html') && (
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="include-animations" className="text-sm">Include animations</Label>
-                  <Switch
-                    id="include-animations"
-                    checked={includeAnimations}
-                    onCheckedChange={setIncludeAnimations}
-                  />
-                </div>
-              )}
-
-              {selectedFormat === 'pdf' && (
+              {(selectedFormat === 'pdf' || selectedFormat === 'pdf-hifi') && (
                 <div className="flex items-center justify-between">
                   <Label className="text-sm">Quality</Label>
                   <Select value={quality} onValueChange={(v) => setQuality(v as 'standard' | 'high')}>
@@ -364,7 +383,7 @@ export function ExportOptionsPanel({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="standard">Standard</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="high">High (2x)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

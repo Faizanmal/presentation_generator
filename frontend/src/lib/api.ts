@@ -77,7 +77,6 @@ class ApiClient {
     });
 
     // Request interceptor to add auth token
-    // Request interceptor to add auth token
     this.client.interceptors.request.use(async (config) => {
       // Add Auth token
       if (this.token) {
@@ -298,11 +297,27 @@ class ApiClient {
     return data;
   }
 
-  async refreshToken(): Promise<{ accessToken: string }> {
-    const { data } = await this.client.post<{ accessToken: string }>('/auth/refresh', {
+  async patchProfile(payload: Partial<Pick<User, 'name' | 'email' | 'image'>>): Promise<User> {
+    const { data } = await this.client.patch<User>('/auth/me', payload);
+    return data;
+  }
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<{ success: boolean; message: string }> {
+    const { data } = await this.client.post<{ success: boolean; message: string }>('/auth/password/change', {
+      currentPassword,
+      newPassword,
+    });
+    return data;
+  }
+
+  async refreshToken(): Promise<{ accessToken: string; refreshToken?: string }> {
+    const { data } = await this.client.post<{ accessToken: string; refreshToken?: string }>('/auth/refresh', {
       refreshToken: this.storedRefreshToken,
     });
     this.setToken(data.accessToken);
+    if (data.refreshToken) {
+      this.setRefreshToken(data.refreshToken);
+    }
     return data;
   }
 
@@ -419,6 +434,16 @@ class ApiClient {
   async generateProject(input: GenerateProjectInput): Promise<{ status: string; jobId: string; message?: string }> {
     // Backend enqueues generation job and returns a job handle (queued)
     const { data } = await this.client.post<{ status: string; jobId: string; message?: string }>('/projects/generate', input);
+    return data;
+  }
+
+  async getProjectGenerationStatus(jobId: string): Promise<{ id: string; state: string; result?: Project; failedReason?: string }> {
+    const { data } = await this.client.get<{
+      id: string;
+      state: string;
+      result?: Project;
+      failedReason?: string;
+    }>(`/projects/generate/status/${jobId}`);
     return data;
   }
 
@@ -542,7 +567,7 @@ class ApiClient {
     return data;
   }
 
-  async exportProject(projectId: string, format: 'pdf' | 'html' | 'json'): Promise<{ blob: Blob; filename?: string }> {
+  async exportProject(projectId: string, format: 'pdf' | 'html' | 'json' | 'pptx'): Promise<{ blob: Blob; filename?: string }> {
     const response = await this.client.get(`/export/${projectId}`, {
       params: {
         format,
@@ -567,6 +592,7 @@ class ApiClient {
 
     return { blob: response.data, filename };
   }
+
 
   // ============================================
   // UPLOAD ENDPOINTS
@@ -2126,6 +2152,21 @@ class ApiClient {
     return data;
   }
 
+  async getPendingApprovalRequests(orgId: string): Promise<Array<{ id: string; projectId: string; status: string; submittedBy: string; createdAt: string }>> {
+    const { data } = await this.client.get(`/governance/organizations/${orgId}/requests`, { params: { status: 'PENDING' } });
+    return data;
+  }
+
+  async getContentLocks(orgId: string): Promise<Array<{ id: string; projectId: string; lockedBy: string; reason?: string; createdAt: string }>> {
+    const { data } = await this.client.get(`/governance/organizations/${orgId}/locks`);
+    return data;
+  }
+
+  async getPolicies(orgId: string): Promise<Array<{ id: string; name: string; rules: unknown[]; enforcementLevel: string }>> {
+    const { data } = await this.client.get(`/governance/organizations/${orgId}/policies`);
+    return data;
+  }
+
   // ============================================
   // TEAM ANALYTICS ENDPOINTS
   // ============================================
@@ -2198,6 +2239,24 @@ class ApiClient {
 
   async trackTeamActivity(action: string, targetType: string, targetId: string, metadata?: Record<string, unknown>): Promise<{ success: boolean }> {
     const { data } = await this.client.post('/team-analytics/track', { action, targetType, targetId, metadata });
+    return data;
+  }
+
+  async getTeamActivityLogs(options?: { period?: string; action?: string; search?: string }): Promise<{
+    logs: Array<{ id: string; action: string; userId: string; userName: string; timestamp: string; target: string; details?: string }>;
+    total: number;
+  }> {
+    const { data } = await this.client.get('/team-analytics/activity-logs', { params: options });
+    return data;
+  }
+
+  async getTeamAnalyticsStats(period?: string): Promise<{
+    totalActivities: number;
+    activeMembers: number;
+    projectsModified: number;
+    avgDailyActivity: number;
+  }> {
+    const { data } = await this.client.get('/team-analytics/stats', { params: { period } });
     return data;
   }
 
@@ -2681,68 +2740,6 @@ class ApiClient {
   }
 
   // ============================================
-  // VR/AR API
-  // ============================================
-
-  async exportToVR(projectId: string, options?: object) {
-    const { data } = await this.client.post(`/vr-ar/export/${projectId}`, options || {});
-    return data;
-  }
-
-  async getVRExport(id: string) {
-    const { data } = await this.client.get(`/vr-ar/exports/${id}`);
-    return data;
-  }
-
-  async generateARMarker(projectId: string) {
-    const { data } = await this.client.post(`/vr-ar/ar-marker/${projectId}`);
-    return data;
-  }
-
-  // ============================================
-  // HOLOGRAPHIC API
-  // ============================================
-
-  async createHolographicPreview(projectId: string, input: { format: string; settings?: object }) {
-    const { data } = await this.client.post(`/holographic/preview/${projectId}`, input);
-    return data;
-  }
-
-  async getHolographicPreview(id: string) {
-    const { data } = await this.client.get(`/holographic/preview/${id}`);
-    return data;
-  }
-
-  async getHolographicFormats() {
-    const { data } = await this.client.get('/holographic/formats');
-    return data;
-  }
-
-  // ============================================
-  // BLOCKCHAIN/NFT API
-  // ============================================
-
-  async createNFTCollection(input: { name: string; chain: string; description?: string }) {
-    const { data } = await this.client.post('/blockchain/collections', input);
-    return data;
-  }
-
-  async listNFTCollections() {
-    const { data } = await this.client.get('/blockchain/collections');
-    return data;
-  }
-
-  async mintNFT(collectionId: string, input: { presentationId: string; name: string; description?: string }) {
-    const { data } = await this.client.post(`/blockchain/collections/${collectionId}/mint`, input);
-    return data;
-  }
-
-  async verifyNFTOwnership(tokenId: string) {
-    const { data } = await this.client.get(`/blockchain/verify/${tokenId}`);
-    return data;
-  }
-
-  // ============================================
   // AI COPILOT API
   // ============================================
 
@@ -2815,44 +2812,6 @@ class ApiClient {
   }
 
   // ============================================
-  // PREDICTIVE ANALYTICS API
-  // ============================================
-
-  async getPredictiveInsights(projectId: string) {
-    const { data } = await this.client.get(`/predictive-analytics/insights/${projectId}`);
-    return data;
-  }
-
-  async getPredictiveRecommendations(projectId: string) {
-    const { data } = await this.client.get(`/predictive-analytics/recommendations/${projectId}`);
-    return data;
-  }
-
-  async getPredictiveBenchmarks(projectId: string) {
-    const { data } = await this.client.get(`/predictive-analytics/benchmarks/${projectId}`);
-    return data;
-  }
-
-  // ============================================
-  // SENTIMENT ANALYSIS API
-  // ============================================
-
-  async startSentimentSession(projectId: string, options?: object) {
-    const { data } = await this.client.post(`/sentiment-analysis/sessions/${projectId}`, options);
-    return data;
-  }
-
-  async getSentimentSession(id: string) {
-    const { data } = await this.client.get(`/sentiment-analysis/sessions/${id}`);
-    return data;
-  }
-
-  async getSentimentSummary(sessionId: string) {
-    const { data } = await this.client.get(`/sentiment-analysis/sessions/${sessionId}/summary`);
-    return data;
-  }
-
-  // ============================================
   // LEARNING PATHS API
   // ============================================
 
@@ -2878,59 +2837,6 @@ class ApiClient {
 
   async getLearningCertificate(pathId: string) {
     const { data } = await this.client.get(`/learning-paths/paths/${pathId}/certificate`);
-    return data;
-  }
-
-  // ============================================
-  // SIGN LANGUAGE API
-  // ============================================
-
-  async translateToSignLanguage(input: { text: string; language?: string }) {
-    const { data } = await this.client.post('/sign-language/translate', input);
-    return data;
-  }
-
-  async getSignLanguageConfig(projectId: string) {
-    const { data } = await this.client.get(`/sign-language/config/${projectId}`);
-    return data;
-  }
-
-  async updateSignLanguageConfig(projectId: string, config: object) {
-    const { data } = await this.client.put(`/sign-language/config/${projectId}`, config);
-    return data;
-  }
-
-  async getSupportedSignLanguages() {
-    const { data } = await this.client.get('/sign-language/languages');
-    return data;
-  }
-
-  // ============================================
-  // COGNITIVE ACCESSIBILITY API
-  // ============================================
-
-  async getCognitiveProfile() {
-    const { data } = await this.client.get('/cognitive-accessibility/profile');
-    return data;
-  }
-
-  async updateCognitiveProfile(settings: object) {
-    const { data } = await this.client.put('/cognitive-accessibility/profile', settings);
-    return data;
-  }
-
-  async getCognitivePresets() {
-    const { data } = await this.client.get('/cognitive-accessibility/presets');
-    return data;
-  }
-
-  async applyPreset(presetName: string) {
-    const { data } = await this.client.post(`/cognitive-accessibility/presets/${presetName}/apply`);
-    return data;
-  }
-
-  async simplifyText(text: string, level?: string) {
-    const { data } = await this.client.post('/cognitive-accessibility/simplify', { text, level });
     return data;
   }
 
@@ -3013,162 +2919,6 @@ class ApiClient {
 
   async getSDKReactComponent(id: string) {
     const { data } = await this.client.get(`/white-label-sdk/configurations/${id}/react`);
-    return data;
-  }
-
-  // ============================================
-  // IOT INTEGRATION API
-  // ============================================
-
-  async registerIoTDevice(input: { name: string; type: string; capabilities: object }) {
-    const { data } = await this.client.post('/iot/devices', input);
-    return data;
-  }
-
-  async listIoTDevices() {
-    const { data } = await this.client.get('/iot/devices');
-    return data;
-  }
-
-  async getIoTDevice(id: string) {
-    const { data } = await this.client.get(`/iot/devices/${id}`);
-    return data;
-  }
-
-  async sendIoTCommand(deviceId: string, command: { action: string; payload?: object }) {
-    const { data } = await this.client.post(`/iot/devices/${deviceId}/command`, command);
-    return data;
-  }
-
-  async getIoTDeviceTypes() {
-    const { data } = await this.client.get('/iot/device-types');
-    return data;
-  }
-
-  async revokeIoTDevice(id: string) {
-    const { data } = await this.client.delete(`/iot/devices/${id}`);
-    return data;
-  }
-
-  // ============================================
-  // ECO-FRIENDLY API
-  // ============================================
-
-  async getEcoSettings() {
-    const { data } = await this.client.get('/eco/settings');
-    return data;
-  }
-
-  async updateEcoSettings(settings: object) {
-    const { data } = await this.client.put('/eco/settings', settings);
-    return data;
-  }
-
-  async getEcoPreset(preset: string) {
-    const { data } = await this.client.get(`/eco/presets/${preset}`);
-    return data;
-  }
-
-  async optimizePresentation(presentationId: string, options: object) {
-    const { data } = await this.client.post(`/eco/optimize/${presentationId}`, options);
-    return data;
-  }
-
-  async getEcoTips() {
-    const { data } = await this.client.get('/eco/tips');
-    return data;
-  }
-
-  async trackEcoMetrics(metrics: object) {
-    const { data } = await this.client.post('/eco/track', metrics);
-    return data;
-  }
-
-  // ============================================
-  // PRESENTER WELLNESS API
-  // ============================================
-
-  async startWellnessSession(presentationId: string) {
-    const { data } = await this.client.post(`/wellness/sessions/${presentationId}`);
-    return data;
-  }
-
-  async updateWellnessMetrics(sessionId: string, metrics: object) {
-    const { data } = await this.client.put(`/wellness/sessions/${sessionId}/metrics`, metrics);
-    return data;
-  }
-
-  async endWellnessSession(sessionId: string) {
-    const { data } = await this.client.post(`/wellness/sessions/${sessionId}/end`);
-    return data;
-  }
-
-  async recordWellnessBreak(sessionId: string, breakType: string) {
-    const { data } = await this.client.post(`/wellness/sessions/${sessionId}/break`, { breakType });
-    return data;
-  }
-
-  async analyzeSpeakingPace(audioMetrics: object) {
-    const { data } = await this.client.post('/wellness/analyze/pace', audioMetrics);
-    return data;
-  }
-
-  async detectStress(voiceMetrics: object) {
-    const { data } = await this.client.post('/wellness/analyze/stress', voiceMetrics);
-    return data;
-  }
-
-  async getWellnessHistory() {
-    const { data } = await this.client.get('/wellness/history');
-    return data;
-  }
-
-  async getWellnessTrends() {
-    const { data } = await this.client.get('/wellness/trends');
-    return data;
-  }
-
-  async getBreakReminders() {
-    const { data } = await this.client.get('/wellness/break-reminders');
-    return data;
-  }
-
-  // ============================================
-  // CARBON FOOTPRINT API
-  // ============================================
-
-  async getCarbonFootprint(presentationId: string) {
-    const { data } = await this.client.get(`/carbon/presentation/${presentationId}`);
-    return data;
-  }
-
-  async calculateSessionCarbon(sessionData: object) {
-    const { data } = await this.client.post('/carbon/session', sessionData);
-    return data;
-  }
-
-  async getEcoReport(period: string) {
-    const { data } = await this.client.get(`/carbon/report?period=${period}`);
-    return data;
-  }
-
-  async getCarbonOffsetOptions(emissionsKg: number) {
-    const { data } = await this.client.get(`/carbon/offset-options?emissions=${emissionsKg}`);
-    return data;
-  }
-
-  async purchaseCarbonOffset(offsetData: object) {
-    const { data } = await this.client.post('/carbon/offset', offsetData);
-    return data;
-  }
-
-  async getCarbonOffsetHistory() {
-    const { data } = await this.client.get('/carbon/offset-history');
-    return data;
-  }
-
-  async getEcoBadges() {
-    const { data } = await this.client.get('/carbon/badges');
     return data;
   }
 
@@ -3610,6 +3360,13 @@ class ApiClient {
     getAudience: (projectId: string) => this.getAudienceBreakdown(projectId),
   };
 
+  readonly sentiment = {
+    startSession: (projectId: string, options?: object) =>
+      this.startSentimentSession(projectId, options as Record<string, unknown> | undefined),
+    getSession: (id: string) => this.getSentimentSession(id),
+    getSummary: (sessionId: string) => this.getSentimentSummary(sessionId),
+  };
+
   readonly webhooks = {
     getAll: () => this.getWebhooks(),
     create: (url: string, events: string[], secret?: string) => this.createWebhook(url, events, secret),
@@ -3652,25 +3409,6 @@ class ApiClient {
     getResults: (testId: string) => this.getABResults(testId),
   };
 
-  readonly vr = {
-    export: (projectId: string, options?: object) => this.exportToVR(projectId, options),
-    get: (id: string) => this.getVRExport(id),
-    generateMarker: (projectId: string) => this.generateARMarker(projectId),
-  };
-
-  readonly holographic = {
-    create: (projectId: string, input: { format: string; settings?: object }) => this.createHolographicPreview(projectId, input),
-    get: (id: string) => this.getHolographicPreview(id),
-    getFormats: () => this.getHolographicFormats(),
-  };
-
-  readonly blockchain = {
-    createCollection: (input: { name: string; chain: string; description?: string }) => this.createNFTCollection(input),
-    listCollections: () => this.listNFTCollections(),
-    mint: (collectionId: string, input: { presentationId: string; name: string; description?: string }) => this.mintNFT(collectionId, input),
-    verify: (tokenId: string) => this.verifyNFTOwnership(tokenId),
-  };
-
   readonly copilot = {
     createSession: (projectId: string) => this.createChatSession(projectId),
     sendMessage: (sessionId: string, message: string) => this.sendChatMessage(sessionId, message),
@@ -3692,39 +3430,12 @@ class ApiClient {
     resolveConflict: (conflictId: string) => this.resolveConflict(conflictId, 'accept'),
   };
 
-  readonly predictive = {
-    getInsights: (projectId: string) => this.getPredictiveInsights(projectId),
-    getRecommendations: (projectId: string) => this.getPredictiveRecommendations(projectId),
-    getBenchmarks: (projectId: string) => this.getPredictiveBenchmarks(projectId),
-  };
-
-  readonly sentiment = {
-    startSession: (projectId: string, options?: object) => this.startSentimentSession(projectId, options as Record<string, unknown> | undefined),
-    getSession: (id: string) => this.getSentimentSession(id),
-    getSummary: (sessionId: string) => this.getSentimentSummary(sessionId),
-  };
-
   readonly learningPaths = {
     create: (input: object) => this.createLearningPath(input as unknown as string),
     get: (id: string) => this.getLearningPath(id),
     list: () => this.listLearningPaths(),
     updateProgress: (pathId: string, moduleId: string, completed: boolean) => this.updateLearningProgress(pathId, moduleId, completed),
     getCertificate: (pathId: string) => this.getLearningCertificate(pathId),
-  };
-
-  readonly signLanguage = {
-    translate: (input: { text: string; language?: string }) => this.translateToSignLanguage(input),
-    getConfig: (projectId?: string) => this.getSignLanguageConfig(projectId || ''),
-    updateConfig: (projectId: string, config: object) => this.updateSignLanguageConfig(projectId, config),
-    getLanguages: () => this.getSupportedSignLanguages(),
-  };
-
-  readonly cognitiveAccess = {
-    getProfile: () => this.getCognitiveProfile(),
-    updateProfile: (settings: object) => this.updateCognitiveProfile(settings),
-    getPresets: () => this.getCognitivePresets(),
-    applyPreset: (name: string) => this.applyPreset(name),
-    simplifyText: (text: string, level?: string) => this.simplifyText(text, level),
   };
 
   readonly universalDesign = {
@@ -3748,46 +3459,6 @@ class ApiClient {
     update: (id: string, updates: object) => this.updateSDKConfig(id, updates),
     getEmbedCode: (id: string) => this.getSDKEmbedCode(id),
     getReactComponent: (id: string) => this.getSDKReactComponent(id),
-  };
-
-  readonly iot = {
-    register: (input: object) => this.registerIoTDevice(input as { name: string; type: string; capabilities: object }),
-    list: () => this.listIoTDevices(),
-    get: (id: string) => this.getIoTDevice(id),
-    sendCommand: (deviceId: string, command: { action: string; payload?: object }) => this.sendIoTCommand(deviceId, command),
-    getDeviceTypes: () => this.getIoTDeviceTypes(),
-    revoke: (id: string) => this.revokeIoTDevice(id),
-  };
-
-  readonly eco = {
-    getSettings: () => this.getEcoSettings(),
-    updateSettings: (settings: object) => this.updateEcoSettings(settings),
-    getPreset: (preset: string) => this.getEcoPreset(preset),
-    optimize: (presentationId: string, options: object) => this.optimizePresentation(presentationId, options),
-    getTips: () => this.getEcoTips(),
-    trackMetrics: (metrics: object) => this.trackEcoMetrics(metrics),
-  };
-
-  readonly wellness = {
-    startSession: (input: object) => this.startWellnessSession(input as unknown as string),
-    updateMetrics: (sessionId: string, metrics: object) => this.updateWellnessMetrics(sessionId, metrics),
-    endSession: (sessionId: string) => this.endWellnessSession(sessionId),
-    recordBreak: (input: object) => this.recordWellnessBreak((input as Record<string, unknown>).sessionId as string, ((input as Record<string, unknown>).type as string) || 'short'),
-    analyzePace: (sessionId: string) => this.analyzeSpeakingPace({ sessionId } as Record<string, unknown>),
-    detectStress: (sessionId: string) => this.detectStress({ sessionId } as Record<string, unknown>),
-    getHistory: () => this.getWellnessHistory(),
-    getTrends: () => this.getWellnessTrends(),
-    getBreakReminders: () => this.getBreakReminders(),
-  };
-
-  readonly carbon = {
-    getFootprint: (presentationId: string) => this.getCarbonFootprint(presentationId),
-    calculateSession: (sessionData: object) => this.calculateSessionCarbon(sessionData),
-    getReport: (period: string) => this.getEcoReport(period),
-    getOffsetOptions: () => this.getCarbonOffsetOptions(0),
-    purchaseOffset: (offsetData: object) => this.purchaseCarbonOffset(offsetData),
-    getOffsetHistory: () => this.getCarbonOffsetHistory(),
-    getBadges: () => this.getEcoBadges(),
   };
 
   readonly brandKit = {
@@ -3843,6 +3514,685 @@ class ApiClient {
     generatePresentation: (formData: FormData) => this.generatePresentationFromData(formData),
     previewSheets: (formData: FormData) => this.previewExcelSheets(formData),
     analyze: (formData: FormData, sheetName?: string) => this.analyzeDataFile(formData, sheetName),
+  };
+
+  // ============================================
+  // DOCUMENT INGESTION ENDPOINTS
+  // ============================================
+
+  async ingestDocument(formData: FormData): Promise<{
+    success: boolean;
+    originalFilename: string;
+    mimeType: string;
+    extractedTextLength: number;
+    chunkCount: number;
+    slides: Array<{
+      title: string;
+      layout: string;
+      blocks: Array<{
+        blockType: string;
+        content: Record<string, unknown>;
+        order: number;
+      }>;
+    }>;
+    summary: string;
+    suggestedTitle: string;
+  }> {
+    const { data } = await this.client.post('/document-ingestion/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000, // 2 minutes for large docs
+    });
+    return data;
+  }
+
+  async previewDocumentIngestion(formData: FormData): Promise<{
+    success: boolean;
+    filename: string;
+    textLength: number;
+    suggestedTitle: string;
+    summary: string;
+    previewSlideCount: number;
+  }> {
+    const { data } = await this.client.post('/document-ingestion/preview', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60000,
+    });
+    return data;
+  }
+
+  readonly documentIngestion = {
+    upload: (formData: FormData) => this.ingestDocument(formData),
+    preview: (formData: FormData) => this.previewDocumentIngestion(formData),
+  };
+
+  // ============================================
+  // WYSIWYG EXPORT ENDPOINTS
+  // ============================================
+
+  async getWysiwygHtml(projectId: string): Promise<string> {
+    const { data } = await this.client.get(`/export/${projectId}/wysiwyg-html`, {
+      responseType: 'text',
+    });
+    return data as unknown as string;
+  }
+
+  async downloadWysiwygPdf(projectId: string, quality: 'standard' | 'high' = 'high'): Promise<Blob> {
+    const response = await this.client.get(`/export/${projectId}/wysiwyg-pdf`, {
+      params: { quality },
+      responseType: 'blob',
+    });
+    return response.data as unknown as Blob;
+  }
+
+  readonly wysiwygExport = {
+    getHtml: (projectId: string) => this.getWysiwygHtml(projectId),
+    downloadPdf: (projectId: string, quality?: 'standard' | 'high') => this.downloadWysiwygPdf(projectId, quality),
+  };
+
+  // ============================================
+  // VIDEO RECORDING ENDPOINTS
+  // ============================================
+
+  async initializeRecording(projectId: string, settings?: {
+    resolution?: string;
+    frameRate?: number;
+    webcam?: boolean;
+    audio?: boolean;
+  }): Promise<{ sessionId: string }> {
+    const { data } = await this.client.post('/video/recording/initialize', { projectId, settings });
+    return data;
+  }
+
+  async startRecordingSession(sessionId: string): Promise<{ status: string }> {
+    const { data } = await this.client.post(`/video/recording/${sessionId}/start`);
+    return data;
+  }
+
+  async pauseRecordingSession(sessionId: string): Promise<{ status: string }> {
+    const { data } = await this.client.post(`/video/recording/${sessionId}/pause`);
+    return data;
+  }
+
+  async stopRecordingSession(sessionId: string, exportOptions?: {
+    format?: string;
+    quality?: string;
+    watermark?: boolean;
+  }): Promise<{ recordingId: string; status: string }> {
+    const { data } = await this.client.post(`/video/recording/${sessionId}/stop`, { exportOptions });
+    return data;
+  }
+
+  async uploadRecordingChunk(sessionId: string, chunk: {
+    index: number;
+    data: string;
+    timestamp: number;
+    type: 'screen' | 'webcam' | 'audio';
+  }): Promise<{ received: boolean }> {
+    const { data } = await this.client.post(`/video/recording/${sessionId}/chunk`, chunk);
+    return data;
+  }
+
+  async exportPresentationAsVideo(projectId: string, options: {
+    format?: string;
+    quality?: string;
+    slideTimings?: number[];
+    narrationAudioUrl?: string;
+    music?: string;
+  }): Promise<{ exportId: string; status: string }> {
+    const { data } = await this.client.post(`/video/export/${projectId}`, options);
+    return data;
+  }
+
+  async getVideoTemplates(type: 'intro' | 'outro'): Promise<Array<{ id: string; name: string; thumbnailUrl: string }>> {
+    const { data } = await this.client.get(`/video/templates/${type}`);
+    return data;
+  }
+
+  async getBackgroundMusic(): Promise<Array<{ id: string; name: string; duration: number; url: string }>> {
+    const { data } = await this.client.get('/video/music');
+    return data;
+  }
+
+  async getRecordings(projectId?: string, limit?: number, offset?: number): Promise<Array<{
+    id: string;
+    projectTitle?: string;
+    status: string;
+    duration?: number;
+    fileSize?: number;
+    videoUrl?: string;
+    thumbnailUrl?: string;
+    createdAt: string;
+  }>> {
+    const { data } = await this.client.get('/video/recordings', {
+      params: { projectId, limit, offset },
+    });
+    return data;
+  }
+
+  async getRecordingDetails(recordingId: string): Promise<{
+    id: string;
+    projectTitle?: string;
+    status: string;
+    duration?: number;
+    fileSize?: number;
+    videoUrl?: string;
+    thumbnailUrl?: string;
+    createdAt: string;
+  }> {
+    const { data } = await this.client.get(`/video/recordings/${recordingId}`);
+    return data;
+  }
+
+  async deleteRecordingById(recordingId: string): Promise<{ success: boolean }> {
+    const { data } = await this.client.delete(`/video/recordings/${recordingId}`);
+    return data;
+  }
+
+  // ============================================
+  // SOCIAL SHARING ENDPOINTS
+  // ============================================
+
+  async getLinkedInAuthUrl(): Promise<{ url: string }> {
+    const { data } = await this.client.get('/social/linkedin/auth');
+    return data;
+  }
+
+  async shareToLinkedIn(projectId: string, input: { message: string; includePreview?: boolean }): Promise<{ success: boolean; postUrl?: string }> {
+    const { data } = await this.client.post(`/social/linkedin/share/${projectId}`, input);
+    return data;
+  }
+
+  async getTwitterAuthUrl(): Promise<{ url: string }> {
+    const { data } = await this.client.get('/social/twitter/auth');
+    return data;
+  }
+
+  async shareToTwitter(projectId: string, input: { message: string; includeImage?: boolean }): Promise<{ success: boolean; tweetUrl?: string }> {
+    const { data } = await this.client.post(`/social/twitter/share/${projectId}`, input);
+    return data;
+  }
+
+  async getYouTubeAuthUrl(): Promise<{ url: string }> {
+    const { data } = await this.client.get('/social/youtube/auth');
+    return data;
+  }
+
+  async uploadToYouTube(projectId: string, input: {
+    videoBase64: string;
+    title: string;
+    description?: string;
+    tags?: string[];
+    privacy?: 'public' | 'private' | 'unlisted';
+  }): Promise<{ success: boolean; videoUrl?: string }> {
+    const { data } = await this.client.post(`/social/youtube/upload/${projectId}`, input);
+    return data;
+  }
+
+  async getEmbedCode(projectId: string, config?: Record<string, unknown>): Promise<{ html: string; iframeUrl: string }> {
+    const { data } = await this.client.get(`/social/embed/${projectId}`, { params: config });
+    return data;
+  }
+
+  async getSocialPreview(projectId: string): Promise<{ title: string; description: string; image: string }> {
+    const { data } = await this.client.get(`/social/preview/${projectId}`);
+    return data;
+  }
+
+  async getQuickShareLinks(projectId: string): Promise<Record<string, string>> {
+    const { data } = await this.client.get(`/social/quick-links/${projectId}`);
+    return data;
+  }
+
+  async createShortLink(projectId: string): Promise<{ shortUrl: string }> {
+    const { data } = await this.client.post(`/social/short-link/${projectId}`);
+    return data;
+  }
+
+  async getSharingAnalytics(projectId: string): Promise<{
+    totalShares: number;
+    totalViews: number;
+    byPlatform: Record<string, { shares: number; clicks: number }>;
+  }> {
+    const { data } = await this.client.get(`/social/analytics/${projectId}`);
+    return data;
+  }
+
+  async getShareLinksAll(): Promise<Array<{
+    id: string;
+    projectId: string;
+    platform: string;
+    url: string;
+    isPublic: boolean;
+    views: number;
+    createdAt: string;
+    expiresAt?: string;
+  }>> {
+    const { data } = await this.client.get('/social/share-links');
+    return data;
+  }
+
+  async getShareStats(): Promise<{
+    totalLinks: number;
+    totalViews: number;
+    totalShares: number;
+    topPlatform: string;
+  }> {
+    const { data } = await this.client.get('/social/stats');
+    return data;
+  }
+
+  async createShareLinkEntry(input: {
+    projectId: string;
+    platform: string;
+    isPublic: boolean;
+    expiresIn?: string;
+  }): Promise<{ id: string; url: string }> {
+    const { data } = await this.client.post('/social/share-links', input);
+    return data;
+  }
+
+  async deleteShareLinkEntry(linkId: string): Promise<{ success: boolean }> {
+    const { data } = await this.client.delete(`/social/share-links/${linkId}`);
+    return data;
+  }
+
+  // ============================================
+  // SENTIMENT ANALYSIS ENDPOINTS
+  // ============================================
+
+  async startSentimentSession(projectId: string, options?: Record<string, unknown>): Promise<{ sessionId: string }> {
+    const { data } = await this.client.post('/sentiment/sessions', { projectId, ...(options || {}) });
+    return data;
+  }
+
+  async getSentimentSession(id: string): Promise<{
+    id: string;
+    projectId: string;
+    status: string;
+    overallSentiment: number;
+    timeline: Array<{ timestamp: string; sentiment: number; engagement: number }>; // simplified
+  }> {
+    const { data } = await this.client.get(`/sentiment/sessions/${id}`);
+    return data;
+  }
+
+  async getSentimentSummary(sessionId: string): Promise<{
+    overall: number;
+    timeline: Array<{ timestamp: string; sentiment: number }>;
+  }> {
+    const { data } = await this.client.get(`/sentiment/sessions/${sessionId}/summary`);
+    return data;
+  }
+
+  // ============================================
+  // ENTERPRISE COMPLIANCE ENDPOINTS
+  // ============================================
+
+  async getComplianceDashboard(orgId: string): Promise<{
+    overallScore: number;
+    activeFrameworks: number;
+    criticalAlerts: number;
+    lastAuditDate?: string;
+    frameworks: Array<{ name: string; score: number; status: string; lastCheck?: string }>;
+  }> {
+    const { data } = await this.client.get(`/compliance/organizations/${orgId}/dashboard`);
+    return data;
+  }
+
+  async getComplianceSettings(orgId: string): Promise<{
+    enabledFrameworks: string[];
+    policies: Record<string, boolean>;
+  }> {
+    const { data } = await this.client.get(`/compliance/organizations/${orgId}/settings`);
+    return data;
+  }
+
+  async updateComplianceSettings(orgId: string, settings: Record<string, unknown>): Promise<{ success: boolean }> {
+    const { data } = await this.client.put(`/compliance/organizations/${orgId}/settings`, settings);
+    return data;
+  }
+
+  async generateComplianceReport(orgId: string, framework: string): Promise<{ id: string; score: number; status: string }> {
+    const { data } = await this.client.post(`/compliance/organizations/${orgId}/reports/generate`, { framework });
+    return data;
+  }
+
+  async generateAllComplianceReports(orgId: string): Promise<Array<{ framework: string; score: number; status: string }>> {
+    const { data } = await this.client.post(`/compliance/organizations/${orgId}/reports/generate-all`);
+    return data;
+  }
+
+  async getComplianceReports(orgId: string): Promise<Array<{
+    id: string;
+    framework: string;
+    score: number;
+    status: string;
+    createdAt: string;
+  }>> {
+    const { data } = await this.client.get(`/compliance/organizations/${orgId}/reports`);
+    return data;
+  }
+
+  async getComplianceScoreTrend(orgId: string): Promise<Array<{ date: string; score: number }>> {
+    const { data } = await this.client.get(`/compliance/organizations/${orgId}/reports/trend`);
+    return data;
+  }
+
+  async exportAuditPackage(orgId: string, framework: string): Promise<{ url: string }> {
+    const { data } = await this.client.post(`/compliance/organizations/${orgId}/reports/export`, { framework });
+    return data;
+  }
+
+  async getComplianceAuditLogs(orgId: string, options?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    action?: string;
+  }): Promise<{
+    data: Array<{
+      id: string;
+      timestamp: string;
+      userName?: string;
+      action: string;
+      resourceType?: string;
+      ipAddress?: string;
+    }>;
+    total: number;
+  }> {
+    const { data } = await this.client.get(`/compliance/organizations/${orgId}/audit-logs`, { params: options });
+    return data;
+  }
+
+  async getAuditLogSummary(orgId: string): Promise<{ totalLogs: number; byAction: Record<string, number> }> {
+    const { data } = await this.client.get(`/compliance/organizations/${orgId}/audit-logs/summary`);
+    return data;
+  }
+
+  async exportComplianceAuditLogs(orgId: string, format: 'csv' | 'json'): Promise<{ url: string }> {
+    const { data } = await this.client.post(`/compliance/organizations/${orgId}/audit-logs/export`, { format });
+    return data;
+  }
+
+  async getDataResidencyPolicy(orgId: string): Promise<{
+    primaryRegion?: string;
+    allowedRegions?: string[];
+  }> {
+    const { data } = await this.client.get(`/compliance/organizations/${orgId}/data-residency`);
+    return data;
+  }
+
+  async setDataResidencyPolicy(orgId: string, policy: {
+    primaryRegion: string;
+    allowedRegions?: string[];
+  }): Promise<{ success: boolean }> {
+    const { data } = await this.client.put(`/compliance/organizations/${orgId}/data-residency`, policy);
+    return data;
+  }
+
+  async getDataRegions(): Promise<Array<{ id: string; name: string; location: string }>> {
+    const { data } = await this.client.get('/compliance/regions');
+    return data;
+  }
+
+  async requestDataMigration(orgId: string, targetRegion: string): Promise<{ migrationId: string; status: string }> {
+    const { data } = await this.client.post(`/compliance/organizations/${orgId}/data-residency/migrate`, { targetRegion });
+    return data;
+  }
+
+  async requestPersonalDataExport(): Promise<{ requestId: string }> {
+    const { data } = await this.client.post('/compliance/users/data-export');
+    return data;
+  }
+
+  async requestPersonalDataDeletion(): Promise<{ requestId: string }> {
+    const { data } = await this.client.post('/compliance/users/data-deletion');
+    return data;
+  }
+
+  async enforceCompliancePolicy(orgId: string, policy: string): Promise<{ success: boolean }> {
+    const { data } = await this.client.post(`/compliance/organizations/${orgId}/enforce/${policy}`);
+    return data;
+  }
+
+  // ============================================
+  // PLUGIN SYSTEM ENDPOINTS
+  // ============================================
+
+  async registerPluginDeveloper(): Promise<{ developerId: string }> {
+    const { data } = await this.client.post('/plugins/developer/register');
+    return data;
+  }
+
+  async createPlugin(input: {
+    name: string;
+    description: string;
+    version: string;
+    category?: string;
+    permissions?: string[];
+    hooks?: string[];
+  }): Promise<{ id: string; name: string }> {
+    const { data } = await this.client.post('/plugins/developer/plugins', input);
+    return data;
+  }
+
+  async uploadPluginBundle(pluginId: string, formData: FormData): Promise<{ success: boolean }> {
+    const { data } = await this.client.post(`/plugins/developer/plugins/${pluginId}/bundle`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data;
+  }
+
+  async submitPluginForReview(pluginId: string): Promise<{ status: string }> {
+    const { data } = await this.client.post(`/plugins/developer/plugins/${pluginId}/submit`);
+    return data;
+  }
+
+  async publishPlugin(pluginId: string): Promise<{ status: string }> {
+    const { data } = await this.client.post(`/plugins/developer/plugins/${pluginId}/publish`);
+    return data;
+  }
+
+  async searchPluginsMarketplace(options?: {
+    q?: string;
+    category?: string;
+    sort?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{
+    plugins: Array<{
+      id: string;
+      name: string;
+      description: string;
+      version: string;
+      author?: string;
+      category?: string;
+      rating?: number;
+      downloadCount?: number;
+      iconUrl?: string;
+    }>;
+    total: number;
+  }> {
+    const { data } = await this.client.get('/plugins/marketplace', { params: options });
+    return data;
+  }
+
+  async getPluginDetails(pluginId: string): Promise<{
+    id: string;
+    name: string;
+    description: string;
+    version: string;
+    author?: string;
+    permissions?: string[];
+    hooks?: string[];
+    rating?: number;
+    downloadCount?: number;
+    reviews?: Array<{ userId: string; rating: number; comment: string }>;
+  }> {
+    const { data } = await this.client.get(`/plugins/marketplace/${pluginId}`);
+    return data;
+  }
+
+  async getInstalledPlugins(): Promise<Array<{
+    id: string;
+    pluginId: string;
+    pluginName: string;
+    pluginVersion: string;
+    enabled: boolean;
+    installedAt: string;
+  }>> {
+    const { data } = await this.client.get('/plugins/installed');
+    return data;
+  }
+
+  async installPlugin(pluginId: string): Promise<{ installationId: string }> {
+    const { data } = await this.client.post(`/plugins/install/${pluginId}`);
+    return data;
+  }
+
+  async uninstallPlugin(installationId: string): Promise<{ success: boolean }> {
+    const { data } = await this.client.delete(`/plugins/install/${installationId}`);
+    return data;
+  }
+
+  async togglePluginEnabled(installationId: string): Promise<{ enabled: boolean }> {
+    const { data } = await this.client.post(`/plugins/install/${installationId}/toggle`);
+    return data;
+  }
+
+  async updatePluginSettings(installationId: string, settings: Record<string, unknown>): Promise<{ success: boolean }> {
+    const { data } = await this.client.post(`/plugins/install/${installationId}/settings`, settings);
+    return data;
+  }
+
+  async submitPluginReview(pluginId: string, review: { rating: number; comment: string }): Promise<{ reviewId: string }> {
+    const { data } = await this.client.post(`/plugins/${pluginId}/reviews`, review);
+    return data;
+  }
+
+  async getPluginBlocks(): Promise<Array<{ type: string; label: string; pluginId: string }>> {
+    const { data } = await this.client.get('/plugins/registry/blocks');
+    return data;
+  }
+
+  async getPluginThemes(): Promise<Array<{ id: string; name: string; pluginId: string }>> {
+    const { data } = await this.client.get('/plugins/registry/themes');
+    return data;
+  }
+
+  async getPluginActions(): Promise<Array<{ id: string; label: string; pluginId: string }>> {
+    const { data } = await this.client.get('/plugins/registry/actions');
+    return data;
+  }
+
+  // ============================================
+  // CONVENIENCE ACCESSOR OBJECTS
+  // ============================================
+
+  readonly governance = {
+    createWorkflow: (orgId: string, workflow: Parameters<typeof this.createWorkflow>[1]) => this.createWorkflow(orgId, workflow),
+    getWorkflows: (orgId: string) => this.getWorkflows(orgId),
+    submitForApproval: (projectId: string, workflowId: string, message?: string) => this.submitForApproval(projectId, workflowId, message),
+    processApproval: (requestId: string, action: 'approve' | 'reject' | 'request_changes', comment?: string) => this.processApproval(requestId, action, comment),
+    handleRequest: (requestId: string, action: 'approve' | 'reject' | 'request_changes', comment?: string) => this.processApproval(requestId, action, comment),
+    addComment: (requestId: string, content: string) => this.addApprovalComment(requestId, content),
+    getHistory: (projectId: string) => this.getApprovalHistory(projectId),
+    getPendingRequests: (orgId: string) => this.getPendingApprovalRequests(orgId),
+    getContentLocks: (orgId: string) => this.getContentLocks(orgId),
+    getPolicies: (orgId: string) => this.getPolicies(orgId),
+    createDisclaimer: (orgId: string, disclaimer: Parameters<typeof this.createDisclaimer>[1]) => this.createDisclaimer(orgId, disclaimer),
+    getDisclaimers: (projectId: string, orgId: string) => this.getApplicableDisclaimers(projectId, orgId),
+    checkDisclaimers: (projectId: string, orgId: string) => this.checkDisclaimers(projectId, orgId),
+    lockContent: (projectId: string, lock: Parameters<typeof this.lockContent>[1]) => this.lockContent(projectId, lock),
+    unlockContent: (lockId: string) => this.unlockContent(lockId),
+    isLocked: (projectId: string) => this.isContentLocked(projectId),
+    createPolicy: (orgId: string, policy: Parameters<typeof this.createPolicy>[1]) => this.createPolicy(orgId, policy),
+    validateContent: (projectId: string) => this.validateContent(projectId),
+  };
+
+  readonly teamAnalytics = {
+    getPerformance: (orgId: string, startDate?: string, endDate?: string) => this.getTeamPerformance(orgId, startDate, endDate),
+    getContributions: (orgId: string, startDate?: string, endDate?: string) => this.getMemberContributions(orgId, startDate, endDate),
+    getDashboard: (orgId: string, startDate?: string, endDate?: string) => this.getTeamDashboard(orgId, startDate, endDate),
+    getActivity: (orgId: string, options?: Parameters<typeof this.getActivityTimeline>[1]) => this.getActivityTimeline(orgId, options),
+    getActivityLogs: (options?: { period?: string; action?: string; search?: string }) => this.getTeamActivityLogs(options),
+    getStats: (period?: string) => this.getTeamAnalyticsStats(period),
+    getTrends: (orgId: string, startDate?: string, endDate?: string) => this.getProductivityTrends(orgId, startDate, endDate),
+    getHeatmap: (projectId: string) => this.getRevisionHeatmap(projectId),
+    getAttribution: (projectId: string) => this.getProjectAttribution(projectId),
+    track: (action: string, targetType: string, targetId: string, metadata?: Record<string, unknown>) => this.trackTeamActivity(action, targetType, targetId, metadata),
+  };
+
+  readonly videoRecording = {
+    initialize: (projectId: string, settings?: Parameters<typeof this.initializeRecording>[1]) => this.initializeRecording(projectId, settings),
+    startRecording: (projectId: string) => this.initializeRecording(projectId).then(({ sessionId }) => this.startRecordingSession(sessionId).then(() => ({ sessionId }))),
+    start: (sessionId: string) => this.startRecordingSession(sessionId),
+    pause: (sessionId: string) => this.pauseRecordingSession(sessionId),
+    stopRecording: (sessionId: string, exportOptions?: Parameters<typeof this.stopRecordingSession>[1]) => this.stopRecordingSession(sessionId, exportOptions),
+    uploadChunk: (sessionId: string, chunk: Parameters<typeof this.uploadRecordingChunk>[1]) => this.uploadRecordingChunk(sessionId, chunk),
+    exportAsVideo: (projectId: string, options: Parameters<typeof this.exportPresentationAsVideo>[1]) => this.exportPresentationAsVideo(projectId, options),
+    getTemplates: (type: 'intro' | 'outro') => this.getVideoTemplates(type),
+    getMusic: () => this.getBackgroundMusic(),
+    getRecordings: (projectId?: string) => this.getRecordings(projectId),
+    getRecording: (recordingId: string) => this.getRecordingDetails(recordingId),
+    deleteRecording: (recordingId: string) => this.deleteRecordingById(recordingId),
+  };
+
+  readonly socialSharing = {
+    linkedInAuth: () => this.getLinkedInAuthUrl(),
+    shareLinkedIn: (projectId: string, input: Parameters<typeof this.shareToLinkedIn>[1]) => this.shareToLinkedIn(projectId, input),
+    twitterAuth: () => this.getTwitterAuthUrl(),
+    shareTwitter: (projectId: string, input: Parameters<typeof this.shareToTwitter>[1]) => this.shareToTwitter(projectId, input),
+    youtubeAuth: () => this.getYouTubeAuthUrl(),
+    uploadYouTube: (projectId: string, input: Parameters<typeof this.uploadToYouTube>[1]) => this.uploadToYouTube(projectId, input),
+    getEmbed: (projectId: string, config?: Record<string, unknown>) => this.getEmbedCode(projectId, config),
+    getPreview: (projectId: string) => this.getSocialPreview(projectId),
+    getQuickLinks: (projectId: string) => this.getQuickShareLinks(projectId),
+    getShareLinks: () => this.getShareLinksAll(),
+    getStats: () => this.getShareStats(),
+    createShareLink: (input: { projectId: string; platform: string; isPublic: boolean; expiresIn?: string }) => this.createShareLinkEntry(input),
+    deleteShareLink: (linkId: string) => this.deleteShareLinkEntry(linkId),
+    createShortLink: (projectId: string) => this.createShortLink(projectId),
+    getAnalytics: (projectId: string) => this.getSharingAnalytics(projectId),
+  };
+
+  readonly compliance = {
+    getDashboard: (orgId: string) => this.getComplianceDashboard(orgId),
+    getSettings: (orgId: string) => this.getComplianceSettings(orgId),
+    updateSettings: (orgId: string, settings: Record<string, unknown>) => this.updateComplianceSettings(orgId, settings),
+    generateReport: (orgId: string, framework: string) => this.generateComplianceReport(orgId, framework),
+    generateAllReports: (orgId: string) => this.generateAllComplianceReports(orgId),
+    getReports: (orgId: string) => this.getComplianceReports(orgId),
+    getScoreTrend: (orgId: string) => this.getComplianceScoreTrend(orgId),
+    exportAuditPackage: (orgId: string, framework: string) => this.exportAuditPackage(orgId, framework),
+    getAuditLogs: (orgId: string, options?: Parameters<typeof this.getComplianceAuditLogs>[1]) => this.getComplianceAuditLogs(orgId, options),
+    getAuditSummary: (orgId: string) => this.getAuditLogSummary(orgId),
+    exportAuditLogs: (orgId: string, format: 'csv' | 'json') => this.exportComplianceAuditLogs(orgId, format),
+    getDataResidency: (orgId: string) => this.getDataResidencyPolicy(orgId),
+    setDataResidency: (orgId: string, policy: Parameters<typeof this.setDataResidencyPolicy>[1]) => this.setDataResidencyPolicy(orgId, policy),
+    getRegions: () => this.getDataRegions(),
+    requestMigration: (orgId: string, targetRegion: string) => this.requestDataMigration(orgId, targetRegion),
+    requestDataExport: () => this.requestPersonalDataExport(),
+    requestDataDeletion: () => this.requestPersonalDataDeletion(),
+    enforcePolicy: (orgId: string, policy: string) => this.enforceCompliancePolicy(orgId, policy),
+  };
+
+  readonly plugins = {
+    registerDeveloper: () => this.registerPluginDeveloper(),
+    create: (input: Parameters<typeof this.createPlugin>[0]) => this.createPlugin(input),
+    uploadBundle: (pluginId: string, formData: FormData) => this.uploadPluginBundle(pluginId, formData),
+    submitForReview: (pluginId: string) => this.submitPluginForReview(pluginId),
+    publish: (pluginId: string) => this.publishPlugin(pluginId),
+    search: (options?: Parameters<typeof this.searchPluginsMarketplace>[0]) => this.searchPluginsMarketplace(options),
+    getDetails: (pluginId: string) => this.getPluginDetails(pluginId),
+    getInstalled: () => this.getInstalledPlugins(),
+    install: (pluginId: string) => this.installPlugin(pluginId),
+    uninstall: (installationId: string) => this.uninstallPlugin(installationId),
+    toggle: (installationId: string) => this.togglePluginEnabled(installationId),
+    updateSettings: (installationId: string, settings: Record<string, unknown>) => this.updatePluginSettings(installationId, settings),
+    submitReview: (pluginId: string, review: { rating: number; comment: string }) => this.submitPluginReview(pluginId, review),
+    getBlocks: () => this.getPluginBlocks(),
+    getThemes: () => this.getPluginThemes(),
+    getActions: () => this.getPluginActions(),
   };
 }
 

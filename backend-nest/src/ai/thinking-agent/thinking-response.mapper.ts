@@ -75,6 +75,8 @@ export interface ThinkingApiGenerationResult {
     generationTimeMs: number;
     qualityImprovement: number;
     generateImages?: boolean;
+    /** the model that was used for the generation */
+    modelUsed?: string;
   };
 }
 
@@ -94,6 +96,7 @@ export function transformThinkingGenerationResult(
       generationTimeMs: result.metadata.totalTimeMs,
       qualityImprovement: result.qualityReport.overallScore / 10 - 7,
       generateImages: result.metadata.generateImages,
+      modelUsed: result.metadata.modelUsed,
     },
   };
 }
@@ -175,13 +178,30 @@ function transformQualityReport(
   ];
 
   const improvements: ThinkingApiImprovement[] = qualityReport.suggestions.map(
-    (suggestion, index) => ({
-      area: `Area ${index + 1}`,
-      currentState: 'Current implementation',
-      suggestedChange: suggestion,
-      priority: 'medium',
-      affectedSections: [],
-    }),
+    (suggestion, index) => {
+      // Attempt to parse structured suggestions that may include priority/area info
+      const priorityMatch = suggestion.match(/\b(high|medium|low)\b/i);
+      const priority = (
+        priorityMatch ? priorityMatch[1].toLowerCase() : 'medium'
+      ) as 'high' | 'medium' | 'low';
+
+      // Extract section references like "Section 1", "slide 3" etc.
+      const sectionRefs: number[] = [];
+      const sectionRefMatches = suggestion.matchAll(
+        /(?:section|slide)\s*(\d+)/gi,
+      );
+      for (const match of sectionRefMatches) {
+        sectionRefs.push(parseInt(match[1], 10) - 1); // 0-indexed
+      }
+
+      return {
+        area: `Improvement ${index + 1}`,
+        currentState: 'Identified by quality analysis',
+        suggestedChange: suggestion,
+        priority,
+        affectedSections: sectionRefs,
+      };
+    },
   );
 
   return {
@@ -189,6 +209,6 @@ function transformQualityReport(
     categoryScores,
     improvements,
     passedQualityThreshold: qualityReport.passedThreshold,
-    summary: `Overall quality score: ${qualityReport.overallScore}/100`,
+    summary: `Overall quality: ${(qualityReport.overallScore / 10).toFixed(1)}/10. ${qualityReport.passedThreshold ? 'Passed quality threshold.' : 'Below quality threshold — consider applying suggested improvements.'}`,
   };
 }

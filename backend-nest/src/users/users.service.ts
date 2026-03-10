@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  Logger,
+  BadRequestException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
 
@@ -20,7 +26,10 @@ interface CreateAccountDto {
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
+  ) {}
 
   /**
    * Find user by ID
@@ -53,12 +62,49 @@ export class UsersService {
       return null;
     }
 
-    return this.prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-      include: {
-        subscription: true,
-      },
-    });
+    // make sure we catch and log any unexpected Prisma errors so that the
+    // caller can make a more informed decision.  In production we saw
+    // `PrismaClientKnownRequestError` bubbles up when the `where` object was
+    // constructed from a non-string value; the database response was
+    // "column `(not available)` does not exist" which resulted in a 500
+    // and no useful information in our logs.  This wrapper allows us to log
+    // the offending value and rethrow a clearer HTTP exception.
+    try {
+      return await this.prisma.user.findUnique({
+        where: { email: email.toLowerCase() },
+        include: {
+          subscription: true,
+        },
+      });
+    } catch (err: unknown) {
+      // Log full error for debugging (includes Prisma error codes etc.)
+      this.logger.error(
+        `Prisma error in findByEmail with email=${JSON.stringify(email)}`,
+        err as Error,
+      );
+
+      // Special-case missing-column errors which indicate the database schema
+      // is out of sync with the Prisma schema.  This usually happens when new
+      // fields (like `mfaEnabled`) are added but migrations haven't been run.
+      // We throw a clearer message so operators know what to do.
+      //
+      // See https://www.prisma.io/docs/reference/api-reference/error-reference
+      if (
+        typeof err === 'object' &&
+        err !== null &&
+        (err as { code?: string }).code === 'P2022'
+      ) {
+        throw new BadRequestException(
+          'Database schema mismatch; please run pending migrations',
+        );
+      }
+
+      // convert to a BadRequestException so the HTTP layer doesn't respond
+      // with a generic 500.  The caller can still inspect `err` if needed.
+      throw new BadRequestException(
+        'Invalid value when querying user by email',
+      );
+    }
   }
 
   /**
@@ -259,6 +305,11 @@ export class UsersService {
    * PRO/ENTERPRISE users have unlimited generations.
    */
   async canGenerateAI(userId: string): Promise<boolean> {
+    // In development mode, allow unlimited AI generations
+    if (this.configService.get('NODE_ENV') === 'development') {
+      return true;
+    }
+
     const subscription = await this.getSubscription(userId);
 
     if (
@@ -275,6 +326,11 @@ export class UsersService {
    * Check if user can create more projects
    */
   async canCreateProject(userId: string): Promise<boolean> {
+    // In development mode, allow unlimited projects
+    if (this.configService.get('NODE_ENV') === 'development') {
+      return true;
+    }
+
     const subscription = await this.getSubscription(userId);
 
     if (

@@ -23,7 +23,7 @@ export class RedisIoAdapter extends IoAdapter {
   }
 
   createIOServer(port: number, options?: ServerOptions): unknown {
-    const server = super.createIOServer(port, options);
+    const server = super.createIOServer(port, options) as unknown;
     // server.adapter(this.adapterConstructor);
     return server;
   }

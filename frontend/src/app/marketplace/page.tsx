@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -293,7 +294,7 @@ export default function MarketplacePage() {
                                     <div className="aspect-16/10 bg-linear-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 relative overflow-hidden">
                                         <div className="absolute inset-0 flex items-center justify-center">
                                             {template.thumbnail ? (
-                                                <img src={template.thumbnail} alt={template.title} className="w-full h-full object-cover" />
+                                                <Image src={template.thumbnail} alt={template.title} className="w-full h-full object-cover" />
                                             ) : (
                                                 <div className="text-6xl font-bold text-slate-300 dark:text-slate-600">
                                                     {template.title.charAt(0)}
@@ -375,7 +376,7 @@ export default function MarketplacePage() {
                                     <div className="aspect-16/10 bg-linear-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 relative overflow-hidden">
                                         <div className="absolute inset-0 flex items-center justify-center">
                                             {template.thumbnail ? (
-                                                <img src={template.thumbnail} alt={template.title} className="w-full h-full object-cover" />
+                                                <Image src={template.thumbnail} alt={template.title} className="w-full h-full object-cover" width={320} height={240} />
                                             ) : (
                                                 <div className="text-5xl font-bold text-slate-300 dark:text-slate-600">
                                                     {template.title.charAt(0)}
@@ -422,7 +423,7 @@ export default function MarketplacePage() {
                                 <Card key={template.id} className="flex overflow-hidden hover:shadow-lg transition-all">
                                     <div className="w-48 h-32 bg-linear-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 shrink-0">
                                         {template.thumbnail ? (
-                                            <img src={template.thumbnail} alt={template.title} className="w-full h-full object-cover" />
+                                            <Image src={template.thumbnail} alt={template.title} className="w-full h-full object-cover" />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-4xl font-bold text-slate-300 dark:text-slate-600">
                                                 {template.title.charAt(0)}
@@ -478,7 +479,7 @@ export default function MarketplacePage() {
                         <div className="py-4">
                             <div className="aspect-video bg-linear-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 rounded-lg overflow-hidden mb-6">
                                 {selectedTemplate.thumbnail ? (
-                                    <img
+                                    <Image
                                         src={selectedTemplate.thumbnail}
                                         alt={selectedTemplate.title}
                                         className="w-full h-full object-cover"

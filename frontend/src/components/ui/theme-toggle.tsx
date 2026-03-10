@@ -1,6 +1,7 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect */
 
-import { useEffect, useState } from "react";
+import { useTheme as useNextTheme } from "next-themes";
 import { motion, AnimatePresence } from "framer-motion";
 import { Moon, Sun, Monitor } from "lucide-react";
 import { Button } from "./button";
@@ -10,50 +11,31 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "./dropdown-menu";
+import { useEffect, useState } from "react";
 
 type Theme = "light" | "dark" | "system";
 
 export function useTheme() {
-    const [theme, setTheme] = useState<Theme>(() => {
-        if (typeof window === 'undefined') {return "system";}
-        const savedTheme = localStorage.getItem("theme") as Theme | null;
-        return savedTheme || "system";
-    });
-    const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
+    const { theme, setTheme, resolvedTheme, systemTheme } = useNextTheme();
+    const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
-        const root = document.documentElement;
-        const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        setMounted(true);
+    }, []);
 
-        const applyTheme = () => {
-            if (theme === "system") {
-                setResolvedTheme(systemDark ? "dark" : "light");
-                root.classList.toggle("dark", systemDark);
-            } else {
-                setResolvedTheme(theme);
-                root.classList.toggle("dark", theme === "dark");
-            }
-        };
-
-        applyTheme();
-        localStorage.setItem("theme", theme);
-
-        // Listen for system theme changes
-        const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-        const handleChange = () => {
-            if (theme === "system") {
-                applyTheme();
-            }
-        };
-        mediaQuery.addEventListener("change", handleChange);
-        return () => mediaQuery.removeEventListener("change", handleChange);
-    }, [theme]);
-
-    return { theme, setTheme, resolvedTheme };
+    return {
+        theme: (theme || "system") as Theme,
+        setTheme: setTheme || (() => { }),
+        resolvedTheme: (resolvedTheme || "light") as "light" | "dark",
+        systemTheme: (systemTheme || "light") as "light" | "dark",
+        mounted,
+    };
 }
 
 export function ThemeToggle() {
-    const { theme, setTheme, resolvedTheme } = useTheme();
+    const { theme, setTheme, resolvedTheme, mounted } = useTheme();
+
+    if (!mounted) { return <Button variant="ghost" size="icon" disabled />; }
 
     return (
         <DropdownMenu>
@@ -113,7 +95,9 @@ export function ThemeToggle() {
 
 // Simple toggle button (without dropdown)
 export function ThemeToggleSimple() {
-    const { resolvedTheme, setTheme } = useTheme();
+    const { resolvedTheme, setTheme, mounted } = useTheme();
+
+    if (!mounted) { return <Button variant="ghost" size="icon" disabled />; }
 
     const toggleTheme = () => {
         setTheme(resolvedTheme === "light" ? "dark" : "light");
@@ -125,6 +109,7 @@ export function ThemeToggleSimple() {
             size="icon"
             onClick={toggleTheme}
             className="relative overflow-hidden"
+            title={`Switch to ${resolvedTheme === "light" ? "dark" : "light"} mode`}
         >
             <AnimatePresence mode="wait">
                 {resolvedTheme === "light" ? (
@@ -155,7 +140,19 @@ export function ThemeToggleSimple() {
 
 // Animated switch toggle
 export function ThemeSwitch() {
-    const { resolvedTheme, setTheme } = useTheme();
+    const { resolvedTheme, setTheme, mounted } = useTheme();
+
+    if (!mounted) {
+        return (
+            <button
+                className="relative w-16 h-8 rounded-full bg-slate-200 dark:bg-slate-700 transition-colors"
+                role="switch"
+                aria-checked={false}
+                disabled
+            />
+        );
+    }
+
     const isDark = resolvedTheme === "dark";
 
     return (
@@ -164,6 +161,7 @@ export function ThemeSwitch() {
             className="relative w-16 h-8 rounded-full bg-slate-200 dark:bg-slate-700 transition-colors"
             role="switch"
             aria-checked={isDark}
+            title={`Switch to ${isDark ? "light" : "dark"} mode`}
         >
             {/* Track icons */}
             <Sun className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-yellow-500" />

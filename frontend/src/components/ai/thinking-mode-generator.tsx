@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { api } from '@/lib/api';
+import { Card } from '@/components/ui/card';
 import type {
   ThinkingGenerationResult,
   ThinkingStep,
@@ -9,6 +10,23 @@ import type {
   ThinkingPresentation,
   ThinkingPhase,
 } from '@/types';
+import type { SlideTransitionType } from '@/lib/slide-transition-engine';
+import {
+  DESIGN_TEMPLATES,
+  CONTENT_DENSITY_OPTIONS,
+  ASPECT_RATIO_OPTIONS,
+  TRANSITION_OPTIONS,
+  COLOR_PALETTES,
+  FONT_PAIRINGS,
+  getDefaultDesignSettings,
+} from './design-customization-types';
+import type {
+  DesignTemplateName,
+  ContentDensity,
+  AspectRatio,
+  ColorPalette,
+  FontPairing,
+} from './design-customization-types';
 
 // Phase icons and colors
 const phaseConfig: Record<
@@ -76,6 +94,23 @@ export function ThinkingModeGenerator({
   const [inputMode, setInputMode] = useState<'topic' | 'raw'>('topic');
   const [rawContent, setRawContent] = useState('');
 
+  // Design customization state
+  const [showDesignPanel, setShowDesignPanel] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<DesignTemplateName>('modern-minimalist');
+  const [colorPalette, setColorPalette] = useState<ColorPalette>(COLOR_PALETTES['modern-minimalist']);
+  const [fontPairing, setFontPairing] = useState<FontPairing>(FONT_PAIRINGS['modern-minimalist']);
+  const [transition, setTransition] = useState<SlideTransitionType>('fade');
+  const [contentDensity, setContentDensity] = useState<ContentDensity>('balanced');
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('16:9');
+  const [customInstructions, setCustomInstructions] = useState('');
+
+  // Template change handler
+  const handleTemplateChange = useCallback((name: DesignTemplateName) => {
+    setSelectedTemplate(name);
+    setColorPalette(COLOR_PALETTES[name]);
+    setFontPairing(FONT_PAIRINGS[name]);
+  }, []);
+
   // Generation state
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentPhase, setCurrentPhase] = useState<ThinkingPhase | null>(null);
@@ -132,6 +167,20 @@ export function ThinkingModeGenerator({
         generateImages: imageSource !== 'none',
         imageSource: imageSource !== 'none' ? imageSource : undefined,
         rawData: inputMode === 'raw' ? rawContent : undefined,
+        additionalContext: [
+          customInstructions,
+          `Design template: ${selectedTemplate}`,
+          `Content density: ${contentDensity}`,
+          `Aspect ratio: ${aspectRatio}`,
+          `Slide transition: ${transition}`,
+          `Heading font: ${fontPairing.heading}, Body font: ${fontPairing.body}`,
+          `Color palette: primary=${colorPalette.primary}, accent=${colorPalette.accent}, bg=${colorPalette.background}`,
+        ].filter(Boolean).join('. '),
+        brandGuidelines: {
+          colors: [colorPalette.primary, colorPalette.secondary, colorPalette.accent],
+          fonts: [fontPairing.heading, fontPairing.body],
+          tone: tone,
+        },
       });
 
       clearInterval(progressInterval);
@@ -149,7 +198,7 @@ export function ThinkingModeGenerator({
     } finally {
       setIsGenerating(false);
     }
-  }, [topic, rawContent, inputMode, tone, audience, length, qualityLevel, imageSource, onComplete, onError]);
+  }, [topic, rawContent, inputMode, tone, audience, length, qualityLevel, imageSource, selectedTemplate, colorPalette, fontPairing, transition, contentDensity, aspectRatio, customInstructions, onComplete, onError]);
 
   // Handle generation with streaming
   const _handleGenerateStream = useCallback(async () => {
@@ -245,7 +294,7 @@ export function ThinkingModeGenerator({
   return (
     <div className={`thinking-mode-generator ${className}`}>
       {/* Form Section */}
-      <div className="generator-form">
+      <Card className="generator-form">
         <h2 className="form-title">
           <span className="title-icon">🧠</span>
           AI Thinking Mode
@@ -416,6 +465,152 @@ export function ThinkingModeGenerator({
           </div>
         </div>
 
+        {/* --- Design Customization Settings --- */}
+        <div className="design-settings-section">
+          <button
+            type="button"
+            className="design-settings-toggle"
+            onClick={() => setShowDesignPanel(!showDesignPanel)}
+          >
+            <span className="toggle-icon">{showDesignPanel ? '🎨' : '🖌️'}</span>
+            <span className="toggle-label">
+              {showDesignPanel ? 'Hide Design Settings' : 'Show Advanced Design Settings'}
+            </span>
+            <span className={`toggle-chevron ${showDesignPanel ? 'open' : ''}`}>▼</span>
+          </button>
+
+          {showDesignPanel && (
+            <div className="design-panel-content">
+              {/* Custom Instructions */}
+              <div className="form-group">
+                <label htmlFor="customInstructions">Custom Instructions / Prompt Overrides</label>
+                <textarea
+                  id="customInstructions"
+                  value={customInstructions}
+                  onChange={(e) => setCustomInstructions(e.target.value)}
+                  placeholder="e.g., 'Make every slide have a key takeaway footer', 'Use highly academic language'..."
+                  disabled={isGenerating}
+                  className="form-textarea"
+                  rows={2}
+                />
+              </div>
+
+              {/* Advanced Settings Row 1 */}
+              <div className="form-row">
+                {/* Content Density */}
+                <div className="form-group">
+                  <label htmlFor="contentDensity">Content Density</label>
+                  <select
+                    id="contentDensity"
+                    value={contentDensity}
+                    onChange={(e) => setContentDensity(e.target.value as ContentDensity)}
+                    disabled={isGenerating}
+                    className="form-select"
+                  >
+                    {CONTENT_DENSITY_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.icon} {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Aspect Ratio */}
+                <div className="form-group">
+                  <label htmlFor="aspectRatio">Aspect Ratio</label>
+                  <select
+                    id="aspectRatio"
+                    value={aspectRatio}
+                    onChange={(e) => setAspectRatio(e.target.value as AspectRatio)}
+                    disabled={isGenerating}
+                    className="form-select"
+                  >
+                    {ASPECT_RATIO_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.icon} {option.label} ({option.dimensions})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Advanced Settings Row 2 */}
+              <div className="form-row">
+                {/* Slide Transition */}
+                <div className="form-group">
+                  <label htmlFor="transition">Slide Transition</label>
+                  <select
+                    id="transition"
+                    value={transition}
+                    onChange={(e) => setTransition(e.target.value as SlideTransitionType)}
+                    disabled={isGenerating}
+                    className="form-select"
+                  >
+                    {TRANSITION_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.icon} {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Design Template Grid */}
+              <div className="form-group mt-4">
+                <label>Design Template</label>
+                <div className="templates-grid">
+                  {DESIGN_TEMPLATES.map((template) => (
+                    <button
+                      key={template.name}
+                      type="button"
+                      className={`template-card ${selectedTemplate === template.name ? 'active' : ''}`}
+                      onClick={() => handleTemplateChange(template.name)}
+                      disabled={isGenerating}
+                      style={{
+                        borderColor: selectedTemplate === template.name ? template.colors.primary : undefined,
+                        backgroundColor: selectedTemplate === template.name ? `${template.colors.primary}15` : undefined,
+                      }}
+                    >
+                      <div className="template-card-header">
+                        <span className="template-icon">{template.icon}</span>
+                        <span className="template-name">{template.label}</span>
+                      </div>
+
+                      {/* Mini Theme Preview */}
+                      <div className="template-preview" style={{ backgroundColor: template.colors.background }}>
+                        <div className="preview-heading" style={{ color: template.colors.primary, fontFamily: template.fonts.heading }}>
+                          Aa
+                        </div>
+                        <div className="preview-swatches">
+                          <div className="swatch" style={{ backgroundColor: template.colors.primary }} />
+                          <div className="swatch" style={{ backgroundColor: template.colors.secondary }} />
+                          <div className="swatch" style={{ backgroundColor: template.colors.accent }} />
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom Instructions */}
+              <div className="form-group mt-4">
+                <label htmlFor="customInstructions">Custom Instructions (Optional)</label>
+                <textarea
+                  id="customInstructions"
+                  value={customInstructions}
+                  onChange={(e) => setCustomInstructions(e.target.value)}
+                  disabled={isGenerating}
+                  placeholder="e.g. Make every slide have a key takeaway footer, Write it like Steve Jobs, Translate completely to Spanish..."
+                  className="form-textarea"
+                  rows={3}
+                />
+                <p className="text-xs text-slate-400 mt-1">Directly instruct the AI on structure, tone overrides, and strict brand requirements.</p>
+              </div>
+
+            </div>
+          )}
+        </div>
+
         {/* Error Display */}
         {error && (
           <div className="error-message">
@@ -453,11 +648,11 @@ export function ThinkingModeGenerator({
             Quick Generate
           </button>
         </div>
-      </div>
+      </Card>
 
       {/* Thinking Process Visualization */}
       {(isGenerating || thinkingSteps.length > 0) && (
-        <div className="thinking-process">
+        <Card className="thinking-process">
           <h3 className="process-title">
             {currentPhase && phaseConfig[currentPhase] && (
               <>
@@ -519,12 +714,12 @@ export function ThinkingModeGenerator({
               <span className="score-label">Quality Score</span>
             </div>
           )}
-        </div>
+        </Card>
       )}
 
       {/* Result Summary */}
       {result && (
-        <div className="result-summary">
+        <Card className="result-summary">
           <h3>
             <span>🎉</span> Generation Complete!
           </h3>
@@ -549,6 +744,14 @@ export function ThinkingModeGenerator({
               <span className="stat-value">{(result.metadata.totalTokensUsed / 1000).toFixed(1)}k</span>
               <span className="stat-label">Tokens</span>
             </div>
+            {result.metadata.modelUsed && (
+              <div className="stat">
+                <span className="stat-value text-sm truncate max-w-30">
+                  {result.metadata.modelUsed}
+                </span>
+                <span className="stat-label">Model</span>
+              </div>
+            )}
           </div>
 
           {result.metadata.qualityImprovement > 0 && (
@@ -565,7 +768,7 @@ export function ThinkingModeGenerator({
             <button className="btn-primary" onClick={onOpenInEditor}>Open in Editor</button>
             <button className="btn-secondary">Export</button>
           </div>
-        </div>
+        </Card>
       )}
 
       <style jsx>{`
@@ -576,17 +779,18 @@ export function ThinkingModeGenerator({
         }
 
         .generator-form {
-          background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);
+          background: linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--muted)) 100%);
           border-radius: 16px;
           padding: 32px;
           margin-bottom: 24px;
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+          border: 1px solid hsl(var(--border));
         }
 
         .form-title {
           font-size: 28px;
           font-weight: 700;
-          color: #fff;
+          color: hsl(var(--foreground));
           margin: 0 0 8px;
           display: flex;
           align-items: center;
@@ -598,7 +802,7 @@ export function ThinkingModeGenerator({
         }
 
         .form-description {
-          color: #a1a1aa;
+          color: hsl(var(--muted-foreground));
           margin: 0 0 24px;
           font-size: 15px;
         }
@@ -607,14 +811,14 @@ export function ThinkingModeGenerator({
           display: flex;
           gap: 16px;
           margin-bottom: 24px;
-          border-bottom: 1px solid #3f3f46;
+          border-bottom: 1px solid hsl(var(--border));
           padding-bottom: 0;
         }
 
         .tab-btn {
           background: none;
           border: none;
-          color: #a1a1aa;
+          color: hsl(var(--muted-foreground));
           padding: 8px 16px;
           font-size: 15px;
           font-weight: 600;
@@ -624,12 +828,12 @@ export function ThinkingModeGenerator({
         }
 
         .tab-btn:hover {
-          color: #fff;
+          color: hsl(var(--foreground));
         }
 
         .tab-btn.active {
-          color: #6366f1;
-          border-bottom-color: #6366f1;
+          color: hsl(var(--primary));
+          border-bottom-color: hsl(var(--primary));
         }
 
         .form-fields {
@@ -647,7 +851,7 @@ export function ThinkingModeGenerator({
         .form-group label {
           font-size: 14px;
           font-weight: 600;
-          color: #e4e4e7;
+          color: hsl(var(--foreground));
         }
 
         .form-input,
@@ -655,9 +859,9 @@ export function ThinkingModeGenerator({
         .form-textarea {
           padding: 12px 16px;
           border-radius: 8px;
-          border: 1px solid #3f3f46;
-          background: #27272a;
-          color: #fff;
+          border: 1px solid hsl(var(--border));
+          background: hsl(var(--background));
+          color: hsl(var(--foreground));
           font-size: 15px;
           transition: all 0.2s;
         }
@@ -671,8 +875,8 @@ export function ThinkingModeGenerator({
         .form-select:focus,
         .form-textarea:focus {
           outline: none;
-          border-color: #6366f1;
-          box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+          border-color: hsl(var(--primary));
+          box-shadow: 0 0 0 3px hsl(var(--primary) / 0.2);
         }
 
         .form-input:disabled,
@@ -702,7 +906,7 @@ export function ThinkingModeGenerator({
           width: 20px;
           height: 20px;
           border-radius: 50%;
-          background: #6366f1;
+          background: hsl(var(--primary));
           cursor: pointer;
         }
 
@@ -719,22 +923,22 @@ export function ThinkingModeGenerator({
           gap: 4px;
           padding: 16px 12px;
           border-radius: 12px;
-          border: 2px solid #3f3f46;
-          background: transparent;
-          color: #a1a1aa;
+          border: 2px solid hsl(var(--border));
+          background: hsl(var(--background));
+          color: hsl(var(--muted-foreground));
           cursor: pointer;
           transition: all 0.2s;
         }
 
         .quality-option:hover:not(:disabled) {
-          border-color: #6366f1;
-          background: rgba(99, 102, 241, 0.1);
+          border-color: hsl(var(--primary));
+          background: hsl(var(--primary) / 0.1);
         }
 
         .quality-option.active {
-          border-color: #6366f1;
-          background: rgba(99, 102, 241, 0.2);
-          color: #fff;
+          border-color: hsl(var(--primary));
+          background: hsl(var(--primary) / 0.2);
+          color: hsl(var(--foreground));
         }
 
         .quality-option:disabled {
@@ -761,10 +965,10 @@ export function ThinkingModeGenerator({
           align-items: center;
           gap: 8px;
           padding: 12px 16px;
-          background: rgba(239, 68, 68, 0.1);
-          border: 1px solid rgba(239, 68, 68, 0.3);
+          background: hsl(var(--destructive) / 0.1);
+          border: 1px solid hsl(var(--destructive) / 0.3);
           border-radius: 8px;
-          color: #fca5a5;
+          color: hsl(var(--destructive));
           margin-top: 16px;
         }
 
@@ -790,14 +994,14 @@ export function ThinkingModeGenerator({
         }
 
         .btn-primary {
-          background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-          color: #fff;
+          background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary)) 100%);
+          color: hsl(var(--primary-foreground));
           flex: 1;
         }
 
         .btn-primary:hover:not(:disabled) {
           transform: translateY(-2px);
-          box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
+          box-shadow: 0 4px 16px hsl(var(--primary) / 0.4);
         }
 
         .btn-primary:disabled {
@@ -806,12 +1010,12 @@ export function ThinkingModeGenerator({
         }
 
         .btn-secondary {
-          background: #3f3f46;
-          color: #e4e4e7;
+          background: hsl(var(--muted));
+          color: hsl(var(--foreground));
         }
 
         .btn-secondary:hover:not(:disabled) {
-          background: #52525b;
+          background: hsl(var(--muted) / 0.8);
         }
 
         .btn-secondary:disabled {
@@ -822,8 +1026,8 @@ export function ThinkingModeGenerator({
         .spinner {
           width: 18px;
           height: 18px;
-          border: 2px solid rgba(255, 255, 255, 0.3);
-          border-top-color: #fff;
+          border: 2px solid hsl(var(--muted-foreground) / 0.3);
+          border-top-color: hsl(var(--foreground));
           border-radius: 50%;
           animation: spin 0.8s linear infinite;
         }
@@ -835,11 +1039,12 @@ export function ThinkingModeGenerator({
         }
 
         .thinking-process {
-          background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);
+          background: linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--muted)) 100%);
           border-radius: 16px;
           padding: 24px;
           margin-bottom: 24px;
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+          border: 1px solid hsl(var(--border));
         }
 
         .process-title {
@@ -848,7 +1053,7 @@ export function ThinkingModeGenerator({
           gap: 10px;
           font-size: 20px;
           font-weight: 600;
-          color: #fff;
+          color: hsl(var(--foreground));
           margin: 0 0 16px;
         }
 
@@ -859,7 +1064,7 @@ export function ThinkingModeGenerator({
         .progress-container {
           position: relative;
           height: 8px;
-          background: #3f3f46;
+          background: hsl(var(--muted));
           border-radius: 4px;
           overflow: hidden;
           margin-bottom: 8px;
@@ -876,11 +1081,11 @@ export function ThinkingModeGenerator({
           right: 0;
           top: 12px;
           font-size: 12px;
-          color: #a1a1aa;
+          color: hsl(var(--muted-foreground));
         }
 
         .phase-description {
-          color: #a1a1aa;
+          color: hsl(var(--muted-foreground));
           font-size: 14px;
           margin: 12px 0 20px;
         }
@@ -899,20 +1104,20 @@ export function ThinkingModeGenerator({
         }
 
         .thinking-steps::-webkit-scrollbar-track {
-          background: #27272a;
+          background: hsl(var(--muted));
           border-radius: 3px;
         }
 
         .thinking-steps::-webkit-scrollbar-thumb {
-          background: #52525b;
+          background: hsl(var(--muted-foreground) / 0.5);
           border-radius: 3px;
         }
 
         .thinking-step {
-          background: rgba(255, 255, 255, 0.03);
+          background: hsl(var(--muted) / 0.5);
           border-radius: 10px;
           padding: 14px;
-          border-left: 3px solid;
+          border-left: 3px solid hsl(var(--primary));
           animation: fadeIn 0.3s ease;
         }
 
@@ -940,18 +1145,18 @@ export function ThinkingModeGenerator({
 
         .step-action {
           font-weight: 600;
-          color: #e4e4e7;
+          color: hsl(var(--foreground));
           font-size: 14px;
           flex: 1;
         }
 
         .step-number {
           font-size: 12px;
-          color: #71717a;
+          color: hsl(var(--muted-foreground));
         }
 
         .step-thought {
-          color: #a1a1aa;
+          color: hsl(var(--muted-foreground));
           font-size: 13px;
           margin: 0 0 6px;
           line-height: 1.5;
@@ -961,12 +1166,12 @@ export function ThinkingModeGenerator({
           display: flex;
           gap: 6px;
           font-size: 12px;
-          color: #71717a;
+          color: hsl(var(--muted-foreground));
           margin: 0;
         }
 
         .observation-label {
-          color: #6366f1;
+          color: hsl(var(--primary));
         }
 
         .quality-score-display {
@@ -976,7 +1181,7 @@ export function ThinkingModeGenerator({
           gap: 8px;
           margin-top: 20px;
           padding-top: 20px;
-          border-top: 1px solid #3f3f46;
+          border-top: 1px solid hsl(var(--border));
         }
 
         .score-circle {
@@ -988,24 +1193,25 @@ export function ThinkingModeGenerator({
         .score-value {
           font-size: 36px;
           font-weight: 700;
-          color: #22c55e;
+          color: hsl(var(--primary));
         }
 
         .score-max {
           font-size: 16px;
-          color: #71717a;
+          color: hsl(var(--muted-foreground));
         }
 
         .score-label {
           font-size: 14px;
-          color: #a1a1aa;
+          color: hsl(var(--muted-foreground));
         }
 
         .result-summary {
-          background: linear-gradient(135deg, #134e4a 0%, #1e3a3a 100%);
+          background: linear-gradient(135deg, hsl(var(--success) / 0.1) 0%, hsl(var(--muted)) 100%);
           border-radius: 16px;
           padding: 24px;
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+          border: 1px solid hsl(var(--border));
         }
 
         .result-summary h3 {
@@ -1014,7 +1220,7 @@ export function ThinkingModeGenerator({
           gap: 10px;
           font-size: 22px;
           font-weight: 700;
-          color: #fff;
+          color: hsl(var(--foreground));
           margin: 0 0 20px;
         }
 
@@ -1031,19 +1237,20 @@ export function ThinkingModeGenerator({
           align-items: center;
           gap: 4px;
           padding: 16px;
-          background: rgba(255, 255, 255, 0.05);
+          background: hsl(var(--background));
           border-radius: 10px;
+          border: 1px solid hsl(var(--border));
         }
 
         .stat-value {
           font-size: 28px;
           font-weight: 700;
-          color: #fff;
+          color: hsl(var(--foreground));
         }
 
         .stat-label {
           font-size: 12px;
-          color: #a1a1aa;
+          color: hsl(var(--muted-foreground));
           text-transform: uppercase;
           letter-spacing: 0.5px;
         }
@@ -1053,10 +1260,10 @@ export function ThinkingModeGenerator({
           align-items: center;
           gap: 10px;
           padding: 14px 16px;
-          background: rgba(34, 197, 94, 0.1);
-          border: 1px solid rgba(34, 197, 94, 0.3);
+          background: hsl(var(--primary) / 0.1);
+          border: 1px solid hsl(var(--primary) / 0.3);
           border-radius: 10px;
-          color: #86efac;
+          color: hsl(var(--primary));
           font-size: 14px;
           margin-bottom: 20px;
         }
@@ -1068,6 +1275,142 @@ export function ThinkingModeGenerator({
         .result-actions {
           display: flex;
           gap: 12px;
+        }
+
+        /* Design Settings Styling */
+        .design-settings-section {
+          margin-top: 24px;
+          border-top: 1px solid hsl(var(--border) / 0.5);
+          padding-top: 16px;
+        }
+
+        .design-settings-toggle {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          width: 100%;
+          background: none;
+          border: none;
+          text-align: left;
+          padding: 12px;
+          cursor: pointer;
+          border-radius: 8px;
+          transition: background-color 0.2s;
+        }
+
+        .design-settings-toggle:hover {
+          background-color: hsl(var(--muted) / 0.5);
+        }
+
+        .toggle-icon {
+          font-size: 20px;
+        }
+
+        .toggle-label {
+          font-weight: 600;
+          color: hsl(var(--foreground));
+          flex: 1;
+        }
+
+        .toggle-chevron {
+          color: hsl(var(--muted-foreground));
+          font-size: 12px;
+          transition: transform 0.3s;
+        }
+
+        .toggle-chevron.open {
+          transform: rotate(180deg);
+        }
+
+        .design-panel-content {
+          margin-top: 16px;
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+          animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        .templates-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+          gap: 16px;
+        }
+
+        .template-card {
+          display: flex;
+          flex-direction: column;
+          border: 2px solid hsl(var(--border));
+          border-radius: 12px;
+          padding: 12px;
+          background: hsl(var(--background));
+          cursor: pointer;
+          transition: all 0.2s;
+          text-align: left;
+          overflow: hidden;
+        }
+
+        .template-card:hover:not(:disabled) {
+          border-color: hsl(var(--primary) / 0.5);
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        .template-card.active {
+          border-color: hsl(var(--primary));
+          background: hsl(var(--primary) / 0.05);
+        }
+
+        .template-card-header {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 12px;
+        }
+
+        .template-icon {
+          font-size: 18px;
+        }
+
+        .template-name {
+          font-weight: 600;
+          font-size: 13px;
+          color: hsl(var(--foreground));
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .template-preview {
+          height: 60px;
+          border-radius: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0 12px;
+          border: 1px solid hsl(var(--border) / 0.3);
+        }
+
+        .preview-heading {
+          font-size: 24px;
+          font-weight: 700;
+          line-height: 1;
+        }
+
+        .preview-swatches {
+          display: flex;
+          gap: 4px;
+        }
+
+        .swatch {
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          border: 1px solid rgba(0,0,0,0.1);
         }
 
         @media (max-width: 640px) {
