@@ -15,7 +15,7 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
   private client: RedisClient;
   private subscriber: RedisClient;
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(private readonly configService: ConfigService) { }
 
   onModuleInit() {
     const redisUrl = this.configService.get<string>('REDIS_URL');
@@ -58,18 +58,27 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`Connected to Redis Cluster with ${nodes.length} nodes`);
     } else {
       // Single Redis instance mode
-      this.client = new Redis(redisUrl || 'redis://localhost:6379', {
+      const isRediss = redisUrl && redisUrl.startsWith('rediss://');
+      const singleOptions: import('ioredis').RedisOptions = {
         password: this.configService.get<string>('REDIS_PASSWORD'),
         retryStrategy: (times) => Math.min(times * 50, 2000),
         maxRetriesPerRequest: 3,
         enableReadyCheck: true,
         lazyConnect: false,
-      });
+      };
 
-      this.subscriber = new Redis(redisUrl || 'redis://localhost:6379', {
+      const subscriberOptions: import('ioredis').RedisOptions = {
         password: this.configService.get<string>('REDIS_PASSWORD'),
         retryStrategy: (times) => Math.min(times * 50, 2000),
-      });
+      };
+
+      if (isRediss) {
+        singleOptions.tls = { rejectUnauthorized: false };
+        subscriberOptions.tls = { rejectUnauthorized: false };
+      }
+
+      this.client = new Redis(redisUrl || 'redis://localhost:6379', singleOptions);
+      this.subscriber = new Redis(redisUrl || 'redis://localhost:6379', subscriberOptions);
 
       this.logger.log('Connected to Redis single instance');
     }

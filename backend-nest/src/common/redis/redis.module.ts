@@ -10,6 +10,7 @@ import Redis from 'ioredis';
       useFactory: (configService: ConfigService) => {
         const logger = new Logger('RedisModule');
 
+        const redisUrl = configService.get<string>('REDIS_URL');
         const host = configService.get<string>('REDIS_HOST') || 'localhost';
         const port = configService.get<number>('REDIS_PORT') || 6379;
         const password = configService.get<string>('REDIS_PASSWORD');
@@ -19,8 +20,6 @@ import Redis from 'ioredis';
         const keyPrefix = configService.get<string>('REDIS_KEY_PREFIX') || '';
 
         const redisOptions: Record<string, unknown> = {
-          host,
-          port,
           db,
           keyPrefix,
           retryStrategy(times: number) {
@@ -34,20 +33,33 @@ import Redis from 'ioredis';
           lazyConnect: false,
         };
 
-        // Only set password if auth is enabled AND password is provided
-        if (redisAuthEnabled && password) {
-          redisOptions.password = password;
-          logger.log('Redis authentication enabled');
-        } else if (!redisAuthEnabled) {
-          logger.log(
-            'Redis authentication disabled (REDIS_AUTH_ENABLED=false)',
-          );
+        // Add TLS support if we are connecting using rediss:// (common for Upstash/Cloud providers)
+        if (redisUrl && redisUrl.startsWith('rediss://')) {
+          redisOptions.tls = { rejectUnauthorized: false };
         }
 
-        const client = new Redis(redisOptions);
+        let client;
+        if (redisUrl) {
+          logger.log(`Using full Redis URL for connection`);
+          client = new Redis(redisUrl, redisOptions as any);
+        } else {
+          redisOptions.host = host;
+          redisOptions.port = port;
+
+          // Only set password if auth is enabled AND password is provided
+          if (redisAuthEnabled && password) {
+            redisOptions.password = password;
+            logger.log('Redis authentication enabled');
+          } else if (!redisAuthEnabled) {
+            logger.log(
+              'Redis authentication disabled (REDIS_AUTH_ENABLED=false)',
+            );
+          }
+          client = new Redis(redisOptions as any);
+        }
 
         client.on('connect', () => {
-          logger.log(`✓ Redis connected to ${host}:${port} (db: ${db})`);
+          logger.log(`✓ Redis connected successfully`);
         });
 
         client.on('error', (err) => {
@@ -65,4 +77,4 @@ import Redis from 'ioredis';
   ],
   exports: ['REDIS_CLIENT'],
 })
-export class RedisModule {}
+export class RedisModule { }

@@ -111,12 +111,26 @@ import featureFlagsConfig from './common/config/feature-flags.config';
     // BullMQ (Async Jobs)
     BullModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        connection: {
-          host: configService.get('REDIS_HOST') || 'localhost',
-          port: configService.get('REDIS_PORT') || 6379,
-        },
-      }),
+      useFactory: (configService: ConfigService) => {
+        const url = configService.get<string>('REDIS_URL');
+        if (url) {
+          const isRediss = url.startsWith('rediss://');
+          const Redis = require('ioredis');
+          return {
+            connection: new Redis(url, {
+              maxRetriesPerRequest: null,
+              ...(isRediss && { tls: { rejectUnauthorized: false } }),
+            }),
+          };
+        }
+        return {
+          connection: {
+            host: configService.get('REDIS_HOST') || 'localhost',
+            port: configService.get('REDIS_PORT') || 6379,
+            maxRetriesPerRequest: null,
+          },
+        };
+      },
       inject: [ConfigService],
     }),
 
@@ -241,7 +255,7 @@ import featureFlagsConfig from './common/config/feature-flags.config';
   ],
 })
 export class AppModule implements OnModuleInit {
-  constructor(private readonly themesService: ThemesService) {}
+  constructor(private readonly themesService: ThemesService) { }
 
   async onModuleInit() {
     // Seed default themes on startup

@@ -15,7 +15,7 @@ export class SmsService {
       this.twilioClient = new Twilio(accountSid, authToken);
       this.logger.log('Twilio SMS client initialized');
     } else {
-      this.logger.warn(
+      this.logger.debug(
         'Twilio credentials not configured. SMS service will log messages instead of sending.',
       );
     }

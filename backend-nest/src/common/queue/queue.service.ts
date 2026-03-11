@@ -59,10 +59,16 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       'redis://localhost:6379',
     );
 
-    this.redisConnection = new Redis(redisUrl, {
+    const redisOptions: import('ioredis').RedisOptions = {
       maxRetriesPerRequest: null,
       enableReadyCheck: false,
-    });
+    };
+
+    if (redisUrl && redisUrl.startsWith('rediss://')) {
+      redisOptions.tls = { rejectUnauthorized: false };
+    }
+
+    this.redisConnection = new Redis(redisUrl, redisOptions);
 
     this.logger.log('Queue Service initialized');
   }

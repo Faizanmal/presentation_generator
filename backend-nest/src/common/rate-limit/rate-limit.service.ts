@@ -81,7 +81,11 @@ export class RateLimitService {
     );
 
     if (redisUrl) {
-      this.redis = new Redis(redisUrl);
+      const redisOptions: import('ioredis').RedisOptions = {};
+      if (redisUrl.startsWith('rediss://')) {
+        redisOptions.tls = { rejectUnauthorized: false };
+      }
+      this.redis = new Redis(redisUrl, redisOptions);
       this.logger.log('Rate Limit Service initialized with Redis');
     } else {
       this.logger.log('Rate Limit Service initialized with in-memory store');
@@ -520,7 +524,7 @@ export class RateLimitMiddleware implements NestMiddleware {
   constructor(
     private readonly rateLimitService: RateLimitService,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   async use(req: Request, res: Response, next: NextFunction) {
     const config: RateLimitConfig = {

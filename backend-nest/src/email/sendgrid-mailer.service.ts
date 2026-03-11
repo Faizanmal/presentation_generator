@@ -19,15 +19,15 @@ export class SendgridMailerService {
 
     const apiKey = this.config.get<string>('SENDGRID_API_KEY');
     if (!apiKey) {
-      this.logger.warn(
-        'SENDGRID_API_KEY not configured — email sending will fail',
+      this.logger.debug(
+        'SENDGRID_API_KEY not configured — email sending will fail if attempted',
       );
     }
 
     if (this.sg && typeof this.sg.setApiKey === 'function') {
-      this.sg.setApiKey(apiKey || '');
+      if (apiKey) this.sg.setApiKey(apiKey);
     } else {
-      this.logger.warn(
+      this.logger.debug(
         'SendGrid client does not expose setApiKey(); email may fail',
       );
     }

@@ -12,6 +12,6 @@ export class RateLimitModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     // Apply rate limiting to all routes
     // Can be customized per route if needed
-    consumer.apply(RateLimitMiddleware).forRoutes('*');
+    consumer.apply(RateLimitMiddleware).forRoutes('*path');
   }
 }

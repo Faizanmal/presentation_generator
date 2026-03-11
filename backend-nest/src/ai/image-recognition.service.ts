@@ -35,8 +35,8 @@ export class ImageRecognitionService {
     if (keyFile) {
       this.client = new ImageAnnotatorClient({ keyFilename: keyFile });
     } else {
-      // Fallback to constructor without config if env var is set globally or using default credentials
-      this.client = new ImageAnnotatorClient();
+      // Do not instantiate without credentials to prevent MetadataLookupWarning (GCP metadata server polling)
+      this.client = null as any;
     }
 
     this.openai = new OpenAI({

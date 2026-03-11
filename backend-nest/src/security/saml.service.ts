@@ -75,20 +75,31 @@ export class SamlService {
       this.configService.get<string>('SAML_SP_ASSERTION_URL') ||
       'https://yourdomain.com/api/auth/saml/callback';
 
-    this.serviceProvider = saml.ServiceProvider({
-      entityID: spEntityId,
-      authnRequestsSigned: false,
-      wantAssertionsSigned: true,
-      wantMessageSigned: true,
-      wantLogoutResponseSigned: true,
-      wantLogoutRequestSigned: true,
-      assertionConsumerService: [
-        {
-          Binding: saml.Constants.BindingNamespace.Post,
-          Location: spAssertionUrl,
-        },
-      ],
-    });
+    // Suppress samlify missing signatureConfig warning
+    const originalWarn = console.warn;
+    console.warn = (...args: any[]) => {
+      if (typeof args[0] === 'string' && args[0].includes('missing signatureConfig')) return;
+      originalWarn(...args);
+    };
+
+    try {
+      this.serviceProvider = saml.ServiceProvider({
+        entityID: spEntityId,
+        authnRequestsSigned: false,
+        wantAssertionsSigned: true,
+        wantMessageSigned: true,
+        wantLogoutResponseSigned: true,
+        wantLogoutRequestSigned: true,
+        assertionConsumerService: [
+          {
+            Binding: saml.Constants.BindingNamespace.Post,
+            Location: spAssertionUrl,
+          },
+        ],
+      });
+    } finally {
+      console.warn = originalWarn;
+    }
 
     this.logger.log('✓ SAML service initialized');
   }
