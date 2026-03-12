@@ -17,7 +17,15 @@ import { defineConfig } from "prisma/config";
 if (process.env.DATABASE_URL) {
   const url = process.env.DATABASE_URL;
   if (!/sslmode=/.test(url)) {
-    process.env.DATABASE_URL = url + (url.includes("?") ? "&" : "?") + "sslmode=require";
+    // Append uselibpqcompat=true to help with 'self-signed certificate' errors on modern pg drivers
+    process.env.DATABASE_URL = url + (url.includes("?") ? "&" : "?") + "sslmode=require&uselibpqcompat=true";
+  }
+}
+
+if (process.env.DIRECT_DATABASE_URL) {
+  const url = process.env.DIRECT_DATABASE_URL;
+  if (!/sslmode=/.test(url)) {
+    process.env.DIRECT_DATABASE_URL = url + (url.includes("?") ? "&" : "?") + "sslmode=require&uselibpqcompat=true";
   }
 }
 
@@ -27,6 +35,8 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/postgres?schema=public",
+    // For Prisma 7, 'url' in the config is used by Migrate/Introspection commands.
+    // To avoid hanging on Supabase poolers, we use the direct connection (5432) here.
+    url: process.env.DIRECT_DATABASE_URL || process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/postgres?schema=public",
   },
 });

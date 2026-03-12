@@ -222,37 +222,42 @@ export class ThemesService {
    * Seed default themes into database
    */
   async seedThemes() {
-    for (const theme of DEFAULT_THEMES) {
-      const existing = await this.prisma.theme.findFirst({
-        where: { name: theme.name },
-      });
+    try {
+      for (const theme of DEFAULT_THEMES) {
+        const existing = await this.prisma.theme.findFirst({
+          where: { name: theme.name },
+        });
 
-      if (!existing) {
-        await this.prisma.theme.create({
-          data: {
-            name: theme.name,
-            description: theme.description,
-            isDefault: theme.isDefault,
-            isPremium: theme.isPremium,
-            colors: theme.colors,
-            fonts: theme.fonts,
-            spacing: theme.spacing,
-          },
-        });
-        this.logger.log(`Theme seeded: ${theme.name}`);
-      } else if (
-        existing.isDefault !== theme.isDefault ||
-        existing.isPremium !== theme.isPremium
-      ) {
-        await this.prisma.theme.update({
-          where: { id: existing.id },
-          data: {
-            isDefault: theme.isDefault,
-            isPremium: theme.isPremium,
-          },
-        });
-        this.logger.log(`Theme updated: ${theme.name}`);
+        if (!existing) {
+          await this.prisma.theme.create({
+            data: {
+              name: theme.name,
+              description: theme.description,
+              isDefault: theme.isDefault,
+              isPremium: theme.isPremium,
+              colors: theme.colors,
+              fonts: theme.fonts,
+              spacing: theme.spacing,
+            },
+          });
+          this.logger.log(`Theme seeded: ${theme.name}`);
+        } else if (
+          existing.isDefault !== theme.isDefault ||
+          existing.isPremium !== theme.isPremium
+        ) {
+          await this.prisma.theme.update({
+            where: { id: existing.id },
+            data: {
+              isDefault: theme.isDefault,
+              isPremium: theme.isPremium,
+            },
+          });
+          this.logger.log(`Theme updated: ${theme.name}`);
+        }
       }
+    } catch (error) {
+      this.logger.error('Failed to seed themes during startup:', (error as Error).message);
+      // We don't throw here to allow the application to continue starting even if seeding fails
     }
   }
 

@@ -113,21 +113,46 @@ import featureFlagsConfig from './common/config/feature-flags.config';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
         const url = configService.get<string>('REDIS_URL');
-        if (url) {
-          const isRediss = url.startsWith('rediss://');
-          const Redis = require('ioredis');
-          return {
-            connection: new Redis(url, {
-              maxRetriesPerRequest: null,
-              ...(isRediss && { tls: { rejectUnauthorized: false } }),
-            }),
-          };
+        const isProd = process.env.NODE_ENV === 'production';
+
+        const commonOptions = {
+          maxRetriesPerRequest: null,
+          // Production safety: reduce heartbeat chatter
+          // Extension of lock duration and stalled interval reduces periodic checks
+          lockDuration: isProd ? 60000 : 30000,
+          stalledInterval: isProd ? 60000 : 30000,
+          retryStrategy: (times: number) => {
+            if (times > 5) return null;
+            return 5000;
+          },
+        };
+
+        const connection = isProd && url ? new (require('ioredis'))(url, {
+          ...commonOptions,
+          ...(url.startsWith('rediss://') && { tls: { rejectUnauthorized: false } }),
+        }) : {
+          host: configService.get('REDIS_HOST') || 'localhost',
+          port: configService.get('REDIS_PORT') || 6379,
+          ...commonOptions,
+        };
+
+        // If it's a Redis instance, attach error listener immediately
+        if (typeof (connection as any).on === 'function') {
+          (connection as any).on('error', (err: any) => {
+            const bullLogger = new (require('@nestjs/common').Logger)('BullMQ');
+            if (err.code === 'ECONNREFUSED') {
+              bullLogger.error(`BullMQ Redis connection failed: ${err.message}`);
+            } else {
+              bullLogger.error('BullMQ Redis Error:', err);
+            }
+          });
         }
+
         return {
-          connection: {
-            host: configService.get('REDIS_HOST') || 'localhost',
-            port: configService.get('REDIS_PORT') || 6379,
-            maxRetriesPerRequest: null,
+          connection: connection as any,
+          defaultJobOptions: {
+            removeOnComplete: true,
+            removeOnFail: { count: 100 },
           },
         };
       },

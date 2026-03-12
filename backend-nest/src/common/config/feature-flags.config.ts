@@ -28,4 +28,8 @@ export default registerAs('features', () => ({
   // Beta Features
   voiceToSlide: process.env.FEATURE_VOICE_TO_SLIDE === 'true',
   analytics: process.env.FEATURE_ANALYTICS === 'true',
+
+  // Media Restrictions
+  imageUpload: process.env.FEATURE_IMAGE_UPLOAD === 'true', // Default to false
+  imageDownload: process.env.FEATURE_IMAGE_DOWNLOAD === 'true', // Default to false
 }));

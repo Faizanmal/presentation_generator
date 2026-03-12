@@ -81,12 +81,35 @@ export class RateLimitService {
     );
 
     if (redisUrl) {
-      const redisOptions: import('ioredis').RedisOptions = {};
+      const redisOptions: import('ioredis').RedisOptions = {
+        lazyConnect: true,
+        maxRetriesPerRequest: null,
+        retryStrategy(times: number) {
+          if (times > 5) return null;
+          return 5000;
+        },
+      };
+
       if (redisUrl.startsWith('rediss://')) {
         redisOptions.tls = { rejectUnauthorized: false };
       }
-      this.redis = new Redis(redisUrl, redisOptions);
-      this.logger.log('Rate Limit Service initialized with Redis');
+
+      const client = new Redis(redisUrl, redisOptions);
+      this.redis = client;
+
+      // Attach error listener immediately
+      client.on('error', (err: any) => {
+        if (err.code === 'ECONNREFUSED') {
+          this.logger.error(`RateLimit Redis connection failed: ${err.message}`);
+        } else {
+          this.logger.error('RateLimit Redis error:', err);
+        }
+      });
+
+      // Initiate connection
+      void client.connect().catch(() => { });
+
+      this.logger.log('Rate Limit Service initialized with Redis (lazy-load)');
     } else {
       this.logger.log('Rate Limit Service initialized with in-memory store');
     }

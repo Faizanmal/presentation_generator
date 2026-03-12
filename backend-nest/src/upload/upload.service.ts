@@ -66,6 +66,11 @@ export class UploadService {
     userId: string,
     category?: string,
   ): Promise<UploadResult> {
+    // Check if upload is disabled
+    if (!this.configService.get<boolean>('features.imageUpload')) {
+      throw new BadRequestException('Image uploading is currently disabled');
+    }
+
     // Validate file
     this.validateFile(file);
 
@@ -123,6 +128,11 @@ export class UploadService {
     mimeType: string,
     category?: string,
   ): Promise<{ uploadUrl: string; key: string; publicUrl: string }> {
+    // Check if upload is disabled
+    if (!this.configService.get<boolean>('features.imageUpload')) {
+      throw new BadRequestException('Image uploading is currently disabled');
+    }
+
     // Validate mime type
     if (!ALLOWED_MIME_TYPES.includes(mimeType)) {
       throw new BadRequestException('File type not allowed');
@@ -167,6 +177,11 @@ export class UploadService {
     mimeType: string,
     size: number,
   ): Promise<UploadResult> {
+    // Check if upload is disabled
+    if (!this.configService.get<boolean>('features.imageUpload')) {
+      throw new BadRequestException('Image uploading is currently disabled');
+    }
+
     const url = `https://${this.bucketName}.s3.amazonaws.com/${key}`;
 
     const asset = await this.prisma.asset.create({

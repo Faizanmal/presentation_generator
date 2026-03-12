@@ -69,8 +69,13 @@ export class ImageAcquisitionService implements OnModuleDestroy {
   private cacheCleanupTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(private readonly configService: ConfigService) {
-    this.uploadDir =
-      this.configService.get('UPLOAD_DIR') || './uploads/acquired-images';
+    const isProd = process.env.NODE_ENV === 'production';
+    // Use absolute path in production to avoid ambiguity with CWD
+    const defaultDir = isProd ? '/app/uploads/acquired-images' : './uploads/acquired-images';
+    
+    this.uploadDir = this.configService.get('UPLOAD_DIR') || defaultDir;
+    
+    // We don't await this as it's called in a constructor, but we handle errors inside
     void this.ensureUploadDir();
 
     // Initialize OpenAI for AI image generation
@@ -143,6 +148,11 @@ export class ImageAcquisitionService implements OnModuleDestroy {
    * Acquire image from specified source with retry-on-failure
    */
   async acquireImage(options: ImageAcquisitionOptions): Promise<AcquiredImage> {
+    // Check if downloading is disabled
+    if (!this.configService.get<boolean>('features.imageDownload')) {
+      throw new Error('Image downloading from external sources is currently disabled');
+    }
+
     this.logger.log(
       `Acquiring image from ${options.source}: ${options.query || options.prompt || options.url}`,
     );
@@ -612,6 +622,11 @@ export class ImageAcquisitionService implements OnModuleDestroy {
     query: string,
     options?: Partial<ImageAcquisitionOptions>,
   ): Promise<AcquiredImage> {
+    // Short-circuit silently if image downloading is disabled
+    if (!this.configService.get<boolean>('features.imageDownload')) {
+      throw new Error('Image downloading is disabled');
+    }
+
     const sources: ImageSource[] = ['unsplash', 'pexels', 'pixabay'];
 
     for (const source of sources) {
@@ -662,6 +677,14 @@ export class ImageAcquisitionService implements OnModuleDestroy {
     topic: string,
     count: number = 5,
   ): Promise<AcquiredImage[]> {
+    // Short-circuit silently if image downloading is disabled
+    if (!this.configService.get<boolean>('features.imageDownload')) {
+      this.logger.debug(
+        'Image downloading is disabled — skipping image acquisition for topic.',
+      );
+      return [];
+    }
+
     const images: AcquiredImage[] = [];
     const keywords = this.extractKeywords(topic);
 

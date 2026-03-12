@@ -3,6 +3,6 @@
     "dockerfilePath": "Dockerfile.production"
   },
   "deploy": {
-    "startCommand": "npm run start:prod"
+    "startCommand": "sh /app/startup.sh"
   }
 }

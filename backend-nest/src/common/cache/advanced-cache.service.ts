@@ -11,7 +11,7 @@ interface CacheOptions {
 export class AdvancedCacheService {
   private readonly logger = new Logger(AdvancedCacheService.name);
 
-  constructor(@Inject('REDIS_CLIENT') private readonly redis: Redis) {}
+  constructor(@Inject('REDIS_CLIENT') private readonly redis: Redis) { }
 
   /**
    * Get value from cache with automatic deserialization
@@ -206,12 +206,11 @@ export class AdvancedCacheService {
    */
   async increment(key: string, ttl: number = 60): Promise<number> {
     try {
-      const value = await this.redis.incr(key);
-      if (value === 1) {
-        // First increment, set TTL
-        await this.redis.expire(key, ttl);
-      }
-      return value;
+      const pipeline = this.redis.pipeline();
+      pipeline.incr(key);
+      pipeline.expire(key, ttl);
+      const results = await pipeline.exec();
+      return (results?.[0]?.[1] as number) || 0;
     } catch (error) {
       this.logger.error(`Cache increment error for ${key}:`, error);
       return 0;

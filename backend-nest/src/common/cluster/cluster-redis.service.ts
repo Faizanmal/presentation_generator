@@ -59,42 +59,43 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
     } else {
       // Single Redis instance mode
       const isRediss = redisUrl && redisUrl.startsWith('rediss://');
-      const singleOptions: import('ioredis').RedisOptions = {
-        password: this.configService.get<string>('REDIS_PASSWORD'),
-        retryStrategy: (times) => Math.min(times * 50, 2000),
-        maxRetriesPerRequest: 3,
-        enableReadyCheck: true,
-        lazyConnect: false,
+      const retryStrategy = (times: number) => {
+        if (times > 5) return null;
+        return 5000;
       };
 
-      const subscriberOptions: import('ioredis').RedisOptions = {
+      const baseOptions: import('ioredis').RedisOptions = {
         password: this.configService.get<string>('REDIS_PASSWORD'),
-        retryStrategy: (times) => Math.min(times * 50, 2000),
+        retryStrategy,
+        maxRetriesPerRequest: null,
+        enableReadyCheck: true,
+        lazyConnect: true,
       };
 
       if (isRediss) {
-        singleOptions.tls = { rejectUnauthorized: false };
-        subscriberOptions.tls = { rejectUnauthorized: false };
+        baseOptions.tls = { rejectUnauthorized: false };
       }
 
-      this.client = new Redis(redisUrl || 'redis://localhost:6379', singleOptions);
-      this.subscriber = new Redis(redisUrl || 'redis://localhost:6379', subscriberOptions);
+      this.client = new Redis(redisUrl || 'redis://localhost:6379', baseOptions);
+      this.subscriber = new Redis(redisUrl || 'redis://localhost:6379', {
+        ...baseOptions,
+        maxRetriesPerRequest: 0,
+      });
 
-      this.logger.log('Connected to Redis single instance');
+      // Event handlers attached immediately
+      this.client.on('error', (err) => {
+        this.logger.error(`Redis client error: ${(err as Error).message}`);
+      });
+      this.subscriber.on('error', (err) => {
+        this.logger.error(`Redis subscriber error: ${(err as Error).message}`);
+      });
+
+      // Initiation
+      void this.client.connect().catch(() => {});
+      void this.subscriber.connect().catch(() => {});
+
+      this.logger.log('Connected to Redis single instance (lazy-load)');
     }
-
-    // Event handlers
-    this.client.on('error', (err) => {
-      this.logger.error(`Redis client error: ${(err as Error).message}`);
-    });
-
-    this.client.on('connect', () => {
-      this.logger.log('Redis client connected');
-    });
-
-    this.client.on('ready', () => {
-      this.logger.log('Redis client ready');
-    });
   }
 
   async onModuleDestroy() {

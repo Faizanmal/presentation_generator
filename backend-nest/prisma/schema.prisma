@@ -7,8 +7,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  // connection string is read from prisma.config.ts via DATABASE_URL env var
-  // (Prisma 7+ no longer accepts `url` in the schema)
 }
 
 // ============================================

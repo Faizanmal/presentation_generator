@@ -62,6 +62,12 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     const redisOptions: import('ioredis').RedisOptions = {
       maxRetriesPerRequest: null,
       enableReadyCheck: false,
+      lazyConnect: true,
+      retryStrategy(times: number) {
+        const maxRetries = 5;
+        if (times > maxRetries) return null;
+        return 5000;
+      },
     };
 
     if (redisUrl && redisUrl.startsWith('rediss://')) {
@@ -70,7 +76,19 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
 
     this.redisConnection = new Redis(redisUrl, redisOptions);
 
-    this.logger.log('Queue Service initialized');
+    // Immediate error handler to prevent unhandled error event
+    this.redisConnection.on('error', (err: any) => {
+      if (err.code === 'ECONNREFUSED') {
+        this.logger.error(`Queue Redis connection failed: ${err.message}`);
+      } else {
+        this.logger.error('Queue Redis error:', err);
+      }
+    });
+
+    // Manually trigger if not connected
+    void this.redisConnection.connect().catch(() => {});
+
+    this.logger.log('Queue Service initialized (lazy-load)');
   }
 
   async onModuleDestroy() {
@@ -110,12 +128,11 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
             type: 'exponential',
             delay: 1000,
           },
-          removeOnComplete: {
-            age: 24 * 3600, // Keep completed jobs for 24 hours
-            count: 1000, // Keep max 1000 completed jobs
-          },
+          // Production optimization: remove metadata once job finished
+          removeOnComplete: true, // Remove instantly on success
           removeOnFail: {
-            age: 7 * 24 * 3600, // Keep failed jobs for 7 days
+            count: 100, // Keep only last 100 failures
+            age: 3 * 24 * 3600, // Keep for 3 days max
           },
         },
       });
@@ -201,6 +218,8 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
         .redisConnection as unknown as import('bullmq').ConnectionOptions,
       concurrency: options.concurrency || 5,
       limiter: options.limiter,
+      // Production optimization: reduce idle polling
+      drainDelay: 20, // Wait 20 seconds before polling again if queue empty
     });
 
     // Event listeners
@@ -318,20 +337,48 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Get queue statistics
+   * Get queue statistics efficiently using a pipeline
    */
   async getQueueStats(queueName: string): Promise<QueueStats> {
     const queue = this.getQueue(queueName);
+    const pipeline = this.redisConnection!.pipeline();
 
-    const [waiting, active, completed, failed, delayed, paused] =
-      await Promise.all([
-        queue.getWaitingCount(),
-        queue.getActiveCount(),
-        queue.getCompletedCount(),
-        queue.getFailedCount(),
-        queue.getDelayedCount(),
-        queue.isPaused(),
-      ]);
+    pipeline.zcard(`bull:${queueName}:wait`);
+    pipeline.zcard(`bull:${queueName}:active`);
+    pipeline.zcard(`bull:${queueName}:completed`);
+    pipeline.zcard(`bull:${queueName}:failed`);
+    pipeline.zcard(`bull:${queueName}:delayed`);
+    pipeline.get(`bull:${queueName}:meta`); // Contains paused state
+
+    const results = await pipeline.exec();
+    if (!results) {
+      return {
+        waiting: 0,
+        active: 0,
+        completed: 0,
+        failed: 0,
+        delayed: 0,
+        paused: false,
+      };
+    }
+
+    const waiting = (results[0][1] as number) || 0;
+    const active = (results[1][1] as number) || 0;
+    const completed = (results[2][1] as number) || 0;
+    const failed = (results[3][1] as number) || 0;
+    const delayed = (results[4][1] as number) || 0;
+
+    // Check if queue is paused via metadata
+    let paused = false;
+    try {
+      const meta = results[5][1] as string;
+      if (meta) {
+        const parsed = JSON.parse(meta);
+        paused = !!parsed.paused;
+      }
+    } catch {
+      // Fallback
+    }
 
     return { waiting, active, completed, failed, delayed, paused };
   }

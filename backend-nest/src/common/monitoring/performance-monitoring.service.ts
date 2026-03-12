@@ -70,21 +70,28 @@ export class PerformanceMonitoringService {
    * Start collecting metrics every minute
    */
   private startMetricsCollection(): void {
+    // Configurable via METRICS_POLL_INTERVAL_SECONDS
+    // Default: 900s (15 min) in production, 300s (5 min) in development
+    const defaultInterval =
+      process.env.NODE_ENV === 'production' ? 900 : 300;
+    const intervalMs =
+      Number(process.env.METRICS_POLL_INTERVAL_SECONDS || defaultInterval) * 1000;
+
     setInterval((): void => {
       void (async (): Promise<void> => {
         try {
           const metrics = await this.collectMetrics();
           this.logger.log(
             `System Metrics | DB Conn: ${metrics.database.activeConnections}/${metrics.database.poolSize} | ` +
-              `Cache Hit Rate: ${metrics.cache.hitRate.toFixed(2)}% | ` +
-              `Avg Response: ${metrics.performance.avgResponseTimeMs.toFixed(0)}ms | ` +
-              `RPS: ${metrics.performance.requestsPerSecond.toFixed(0)}`,
+            `Cache Hit Rate: ${metrics.cache.hitRate.toFixed(2)}% | ` +
+            `Avg Response: ${metrics.performance.avgResponseTimeMs.toFixed(0)}ms | ` +
+            `RPS: ${metrics.performance.requestsPerSecond.toFixed(0)}`,
           );
         } catch (error) {
           this.logger.error('Failed to collect metrics:', error);
         }
       })();
-    }, 60000); // Every minute
+    }, intervalMs);
   }
 
   /**
@@ -167,13 +174,38 @@ export class PerformanceMonitoringService {
    * Get Redis cache metrics
    */
   private async getCacheMetrics(): Promise<CacheMetrics> {
+    // Skip Redis INFO commands in development — 4 extra commands per cycle
+    if (process.env.NODE_ENV !== 'production') {
+      return {
+        hitRate: 0,
+        missRate: 0,
+        evictionRate: 0,
+        memoryUsedMb: 0,
+        memoryMaxMb: 0,
+        memoryUsagePercent: 0,
+        totalKeys: 0,
+        connectedClients: 0,
+      };
+    }
+
     try {
-      const info = await this.redis.info('stats');
-      const memory = await this.redis.info('memory');
-      const clients = await this.redis.info('clients');
+      const pipeline = this.redis.pipeline();
+      pipeline.info('stats');
+      pipeline.info('memory');
+      pipeline.info('clients');
+      pipeline.dbsize();
+
+      const results = await pipeline.exec();
+      if (!results) return this.getDefaultCacheMetrics();
+
+      const info = results[0][1] as string;
+      const memory = results[1][1] as string;
+      const clients = results[2][1] as string;
+      const totalKeys = (results[3][1] as number) || 0;
 
       // Parse Redis INFO output
       const parseInfo = (infoStr: string): Record<string, string> => {
+        if (!infoStr) return {};
         const lines = infoStr.split('\r\n');
         const data: Record<string, string> = {};
         lines.forEach((line) => {
@@ -211,7 +243,7 @@ export class PerformanceMonitoringService {
         memoryMaxMb: memoryMaxBytes / (1024 * 1024),
         memoryUsagePercent:
           memoryMaxBytes > 0 ? (memoryUsedBytes / memoryMaxBytes) * 100 : 0,
-        totalKeys: await this.redis.dbsize(),
+        totalKeys,
         connectedClients: Number.parseInt(
           clientsData.connected_clients || '0',
           10,
@@ -219,23 +251,33 @@ export class PerformanceMonitoringService {
       };
     } catch (error) {
       this.logger.error('Failed to get cache metrics:', error);
-      return {
-        hitRate: 0,
-        missRate: 0,
-        evictionRate: 0,
-        memoryUsedMb: 0,
-        memoryMaxMb: 0,
-        memoryUsagePercent: 0,
-        totalKeys: 0,
-        connectedClients: 0,
-      };
+      return this.getDefaultCacheMetrics();
     }
+  }
+
+  private getDefaultCacheMetrics(): CacheMetrics {
+    return {
+      hitRate: 0,
+      missRate: 0,
+      evictionRate: 0,
+      memoryUsedMb: 0,
+      memoryMaxMb: 0,
+      memoryUsagePercent: 0,
+      totalKeys: 0,
+      connectedClients: 0,
+    };
   }
 
   /**
    * Get queue metrics from BullMQ
    */
   private async getQueueMetrics(): Promise<QueueMetrics> {
+    // Skip expensive Redis queue polling in development — not useful locally
+    // and each call fires 5 ZCARD commands × 4 queues = 20 Redis commands/cycle
+    if (process.env.NODE_ENV !== 'production') {
+      return {};
+    }
+
     try {
       const queueNames = [
         'generation',
@@ -245,18 +287,26 @@ export class PerformanceMonitoringService {
       ];
 
       const metrics: QueueMetrics = {};
+      const pipeline = this.redis.pipeline();
 
       for (const queueName of queueNames) {
-        // Get queue counts from Redis sorted sets
-        const [waiting, active, completed, failed, delayed] = await Promise.all(
-          [
-            this.redis.zcard(`bull:${queueName}:wait`),
-            this.redis.zcard(`bull:${queueName}:active`),
-            this.redis.zcard(`bull:${queueName}:completed`),
-            this.redis.zcard(`bull:${queueName}:failed`),
-            this.redis.zcard(`bull:${queueName}:delayed`),
-          ],
-        );
+        pipeline.zcard(`bull:${queueName}:wait`);
+        pipeline.zcard(`bull:${queueName}:active`);
+        pipeline.zcard(`bull:${queueName}:completed`);
+        pipeline.zcard(`bull:${queueName}:failed`);
+        pipeline.zcard(`bull:${queueName}:delayed`);
+      }
+
+      const results = await pipeline.exec();
+      if (!results) return {};
+
+      let resultIndex = 0;
+      for (const queueName of queueNames) {
+        const waiting = (results[resultIndex++][1] as number) || 0;
+        const active = (results[resultIndex++][1] as number) || 0;
+        const completed = (results[resultIndex++][1] as number) || 0;
+        const failed = (results[resultIndex++][1] as number) || 0;
+        const delayed = (results[resultIndex++][1] as number) || 0;
 
         metrics[queueName] = {
           waiting,

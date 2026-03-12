@@ -18,25 +18,38 @@ export class PrismaService
   private readonly logger = new Logger(PrismaService.name);
 
   constructor() {
-    const connectionString = process.env.DATABASE_URL;
+    let connectionString = process.env.DATABASE_URL;
     if (!connectionString) {
-      // fail fast so the app doesn't start with an invalid db config
-      // cannot use this.logger before super(), use console.error instead
       console.error('Missing DATABASE_URL environment variable');
       throw new Error('DATABASE_URL must be set');
     }
 
-    // pool configuration can be controlled via environment variables,
-    // giving us a way to tune timeouts in production or under load
+    // Automatically append sslmode=require for production environments if not present
+    // This resolves P1001 errors on Railway/managed Postgres providers
+    if (
+      process.env.NODE_ENV === 'production' &&
+      !connectionString.includes('sslmode=') &&
+      !connectionString.includes('localhost') &&
+      !connectionString.includes('127.0.0.1')
+    ) {
+      connectionString += connectionString.includes('?') ? '&' : '?';
+      connectionString += 'sslmode=require&uselibpqcompat=true';
+    }
+
+    const isProd = process.env.NODE_ENV === 'production';
+    const isSupabase = connectionString.includes('supabase.com') || connectionString.includes('supabase.co');
+
     const pool = new Pool({
       connectionString,
       max: parseInt(process.env.DB_POOL_MAX || '20', 10),
       min: parseInt(process.env.DB_POOL_MIN || '0', 10),
       idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT || '30000', 10),
       connectionTimeoutMillis: parseInt(
-        process.env.DB_CONNECTION_TIMEOUT || '0',
+        process.env.DB_CONNECTION_TIMEOUT || '10000',
         10,
       ),
+      // Fix for 'self-signed certificate in certificate chain' on Supabase/Railway
+      ssl: (isProd || isSupabase) ? { rejectUnauthorized: false } : undefined,
     });
 
     // surface low‑level errors from the pg pool so they show up in our logs

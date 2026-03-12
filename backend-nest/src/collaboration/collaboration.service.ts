@@ -47,7 +47,7 @@ export class CollaborationService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
-  ) {}
+  ) { }
 
   // ============================================
   // SESSION MANAGEMENT
@@ -136,10 +136,8 @@ export class CollaborationService {
     x: number,
     y: number,
     slideIndex: number,
-    projectId: string, // Added projectId parameter
+    projectId: string,
   ) {
-    // Store cursor position in Redis (Hash: project:{id}:cursors Field: {socketId})
-    // We store it as a JSON string to keep x, y, slideIndex together
     const cursorData = JSON.stringify({
       cursorX: x,
       cursorY: y,
@@ -147,12 +145,10 @@ export class CollaborationService {
       updatedAt: Date.now(),
     });
 
-    // Use HSET for O(1) access/update
-    await this.redis.hset(`project:${projectId}:cursors`, socketId, cursorData);
-
-    // Set expiry for the whole hash (optional, e.g. 24h cleanup)
-    // We don't want to expire it too quickly as long as project is active
-    await this.redis.expire(`project:${projectId}:cursors`, 86400);
+    const pipeline = this.redis.pipeline();
+    pipeline.hset(`project:${projectId}:cursors`, socketId, cursorData);
+    pipeline.expire(`project:${projectId}:cursors`, 86400);
+    await pipeline.exec();
 
     return true;
   }

@@ -10,6 +10,7 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import {
   IsString,
@@ -119,8 +120,9 @@ export class ImageAcquisitionController {
 
   constructor(
     private readonly imageAcquisitionService: ImageAcquisitionService,
+    private readonly configService: ConfigService,
     @InjectQueue('image-acquisition') private readonly imageQueue: Queue,
-  ) {}
+  ) { }
 
   /**
    * Acquire single image (synchronous)
@@ -302,41 +304,45 @@ export class ImageAcquisitionController {
    */
   @Get('sources')
   getSources() {
+    const isDownloadEnabled = this.configService.get<boolean>(
+      'features.imageDownload',
+    );
+
     return {
       success: true,
       sources: [
         {
           id: 'ai',
           name: 'AI Generation (DALL-E)',
-          available: !!process.env.OPENAI_API_KEY,
+          available: isDownloadEnabled && !!process.env.OPENAI_API_KEY,
           requiresPrompt: true,
           maxCount: 1,
         },
         {
           id: 'unsplash',
           name: 'Unsplash',
-          available: !!process.env.UNSPLASH_ACCESS_KEY,
+          available: isDownloadEnabled && !!process.env.UNSPLASH_ACCESS_KEY,
           requiresQuery: true,
           license: 'Free to use',
         },
         {
           id: 'pexels',
           name: 'Pexels',
-          available: !!process.env.PEXELS_API_KEY,
+          available: isDownloadEnabled && !!process.env.PEXELS_API_KEY,
           requiresQuery: true,
           license: 'Free to use',
         },
         {
           id: 'pixabay',
           name: 'Pixabay',
-          available: !!process.env.PIXABAY_API_KEY,
+          available: isDownloadEnabled && !!process.env.PIXABAY_API_KEY,
           requiresQuery: true,
           license: 'Free to use',
         },
         {
           id: 'url',
           name: 'Direct URL',
-          available: true,
+          available: isDownloadEnabled,
           requiresUrl: true,
           license: 'Unknown - verify before use',
         },
