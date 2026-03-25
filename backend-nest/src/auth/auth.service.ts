@@ -55,7 +55,7 @@ export class AuthService {
   private readonly DEVICE_TOKEN_EXPIRY = 30 * 24 * 60 * 60; // 30 days in seconds
   private readonly MAX_LOGIN_ATTEMPTS = 5;
   private readonly LOCKOUT_DURATION = 15 * 60; // 15 minutes in seconds
-  private readonly ACCESS_TOKEN_EXPIRY = 900; // 15 minutes in seconds
+  private readonly ACCESS_TOKEN_EXPIRY = 3600; // 60 minutes in seconds
   private readonly REFRESH_TOKEN_EXPIRY = 7 * 24 * 60 * 60; // 7 days in seconds
 
   // Password must be ≥8 chars and contain at least:
@@ -84,11 +84,7 @@ export class AuthService {
   ) {}
 
   // ─── Audit Logging ────────────────────────────────────────
-  private async auditLog(event: AuditEvent): Promise<void> {
-    const logData = {
-      ...event,
-      timestamp: new Date().toISOString(),
-    };
+  private auditLog(event: AuditEvent): void {
     if (event.success) {
       this.logger.log(
         `AUDIT [${event.action}] user=${event.email ?? event.userId} ip=${event.ip ?? 'unknown'}`,
@@ -98,11 +94,13 @@ export class AuthService {
         `AUDIT_FAIL [${event.action}] user=${event.email ?? event.userId} ip=${event.ip ?? 'unknown'}`,
       );
     }
-    // Store audit record in Redis for recent events (24h TTL)
+    // REDIS LOAD SAVER: Disabling Redis-based audit logs to stay within Upstash limits
+    /*
     const auditKey = `audit:${event.userId ?? event.email}:${Date.now()}`;
     await this.redis
       .set(auditKey, JSON.stringify(logData), 'EX', 86400)
       .catch(() => {});
+    */
   }
 
   // ─── Brute-Force Protection ───────────────────────────────
@@ -154,7 +152,7 @@ export class AuthService {
     await this.usersService.createSubscription(user.id);
 
     this.logger.log(`User registered: ${user.email}`);
-    await this.auditLog({
+    this.auditLog({
       email: user.email,
       userId: user.id,
       action: 'REGISTER',
@@ -190,7 +188,7 @@ export class AuthService {
 
     if (!user || !user.password) {
       await this.recordFailedLogin(loginDto.email);
-      await this.auditLog({
+      this.auditLog({
         email: loginDto.email,
         action: 'LOGIN',
         success: false,
@@ -208,7 +206,7 @@ export class AuthService {
 
     if (!isPasswordValid) {
       await this.recordFailedLogin(loginDto.email);
-      await this.auditLog({
+      this.auditLog({
         email: loginDto.email,
         userId: user.id,
         action: 'LOGIN',
@@ -235,7 +233,7 @@ export class AuthService {
 
       if (!isMfaValid) {
         await this.recordFailedLogin(loginDto.email);
-        await this.auditLog({
+        this.auditLog({
           email: loginDto.email,
           userId: user.id,
           action: 'LOGIN',
@@ -252,7 +250,7 @@ export class AuthService {
     await this.clearLoginAttempts(loginDto.email);
 
     this.logger.log(`User logged in: ${user.email}`);
-    await this.auditLog({
+    this.auditLog({
       email: user.email,
       userId: user.id,
       action: 'LOGIN',
@@ -768,7 +766,7 @@ export class AuthService {
         // Ignore decode errors
       }
     }
-    await this.auditLog({ userId, action: 'LOGOUT', success: true });
+    this.auditLog({ userId, action: 'LOGOUT', success: true });
     return { success: true };
   }
 

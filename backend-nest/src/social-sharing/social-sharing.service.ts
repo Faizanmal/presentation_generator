@@ -628,7 +628,7 @@ export class SocialSharingService {
     return connection;
   }
 
-  private async refreshToken(connection: {
+  private refreshToken(connection: {
     id: string;
     platform: string | null;
     refreshToken: string | null;

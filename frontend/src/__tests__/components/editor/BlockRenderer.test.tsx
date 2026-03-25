@@ -23,10 +23,17 @@ jest.mock('@dnd-kit/utilities', () => ({
     },
 }));
 
+import type { ImageProps } from 'next/image';
+
 jest.mock('next/image', () => ({
     __esModule: true,
-    // eslint-disable-next-line @next/next/no-img-element
-    default: (props: React.ImgHTMLAttributes<HTMLImageElement>) => <img {...props} alt={props.alt || ''} />,
+    default: (props: ImageProps) => (
+        <div
+            data-testid="next-image"
+            data-src={props.src}
+            data-alt={props.alt}
+        />
+    ),
 }));
 
 

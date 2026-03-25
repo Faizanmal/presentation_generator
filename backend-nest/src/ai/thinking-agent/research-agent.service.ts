@@ -55,7 +55,9 @@ Return only a JSON array of strings.`;
 
       const content =
         response.choices[0]?.message?.content || '{"queries": []}';
-      const parsed = JSON.parse(content) as { queries?: string[] };
+      const parsed = this.parseJSON(content, { queries: [] }) as {
+        queries?: string[];
+      };
       return parsed.queries || [topic, `${topic} statistics`, `${topic} facts`];
     } catch {
       return [topic, `${topic} trends`, `${topic} data`];
@@ -169,7 +171,11 @@ Return JSON:
       });
 
       const content = response.choices[0]?.message?.content || '{}';
-      const parsed = JSON.parse(content);
+      const parsed = this.parseJSON(content, {}) as {
+        summary?: string;
+        dataPoints?: string[];
+        sources?: string[];
+      };
 
       return {
         summary: parsed.summary || 'Analysis of search results.',
@@ -182,6 +188,34 @@ Return JSON:
         sources: [],
         dataPoints: [],
       };
+    }
+  }
+
+  /**
+   * Parse JSON with fallback and extraction from mixed responses
+   */
+  private parseJSON<T>(content: string, fallback: T): T {
+    try {
+      // First try direct parsing
+      return JSON.parse(content) as T;
+    } catch {
+      // If direct parsing fails, try to extract JSON from mixed response
+      try {
+        // Look for JSON object/array in the response
+        const jsonMatch = content.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+        if (jsonMatch) {
+          const extractedJson = jsonMatch[0];
+          this.logger.log('Extracted JSON from mixed AI response');
+          return JSON.parse(extractedJson) as T;
+        }
+      } catch (extractError) {
+        this.logger.warn(
+          `Failed to extract JSON from mixed response: ${extractError.message}`,
+        );
+      }
+
+      this.logger.warn('Failed to parse AI response, using fallback');
+      return fallback;
     }
   }
 }

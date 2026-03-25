@@ -97,7 +97,7 @@ export function PresentationMode({
 
     const goToSlide = useCallback((index: number) => {
         const newIndex = Math.max(0, Math.min(index, slides.length - 1));
-        if (newIndex === currentSlide) return;
+        if (newIndex === currentSlide) {return;}
 
         // Determine direction and start transition
         const direction = newIndex > currentSlide ? "forward" : "backward";

@@ -55,7 +55,7 @@ import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useEditorStore } from "@/stores/editor-store";
-import type { Project, Theme, Slide } from "@/types";
+import type { Project, Theme, Slide, BlockType, BlockStyle } from "@/types";
 import SlidePanel from "@/components/editor/SlidePanel";
 import SlideCanvas from "@/components/editor/SlideCanvas";
 import ThemeSelector from "@/components/editor/ThemeSelector";
@@ -295,25 +295,38 @@ export default function EditorPage() {
   }, [projectId, setTheme]);
 
   // Handle export
-  const handleExport = useCallback(async (format: "html" | "json" | "pdf") => {
+  const handleExport = useCallback(async (format: "html" | "json" | "pdf" | "pptx") => {
     try {
-      const data = await api.export.export(projectId, format);
-      if (format === "json") {
-        const blobData = typeof data === 'string' ? data : data.blob;
-        const blob = new Blob([JSON.stringify(blobData, null, 2)], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
+      if (format === "pptx") {
+        const data = await api.exportToPptx(projectId, {
+          includeNotes: false,
+          includeAnimations: true,
+        });
+        const url = URL.createObjectURL(data.blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `${project?.title || "presentation"}.json`;
+        a.download = data.filename || `${project?.title || "presentation"}.pptx`;
         a.click();
+        URL.revokeObjectURL(url);
       } else {
-        const blobData = typeof data === 'string' ? data : data.blob;
-        const blob = new Blob([blobData], { type: format === "pdf" ? "application/pdf" : "text/html" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${project?.title || "presentation"}.${format}`;
-        a.click();
+        const data = await api.export.export(projectId, format);
+        if (format === "json") {
+          const blobData = typeof data === 'string' ? data : data.blob;
+          const blob = new Blob([JSON.stringify(blobData, null, 2)], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `${project?.title || "presentation"}.json`;
+          a.click();
+        } else {
+          const blobData = typeof data === 'string' ? data : data.blob;
+          const blob = new Blob([blobData], { type: format === "pdf" ? "application/pdf" : "text/html" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `${project?.title || "presentation"}.${format}`;
+          a.click();
+        }
       }
       toast.success(`Exported as ${format.toUpperCase()}`);
     } catch {
@@ -460,7 +473,7 @@ export default function EditorPage() {
             </SheetTrigger>
             <SheetContent className="overflow-y-auto p-0 w-[380px]">
               <MasterSlidePanel
-                isEnterprise={true}
+                isEnterprise
                 onApplyTemplate={(template: MasterSlideTemplate) => {
                   // Apply master template regions as blocks on the current slide
                   if (project?.slides?.[currentSlideIndex]) {
@@ -472,7 +485,7 @@ export default function EditorPage() {
                         // api.blocks.create expects projectId, slideId, and then the input object
                         await api.blocks.create(projectId, slide.id, {
                           projectId,
-                          blockType: blockType as import('@/types').BlockType,
+                          blockType: blockType as BlockType,
                           content: { text: region.placeholder },
                           order: idx,
                           style: {
@@ -481,7 +494,7 @@ export default function EditorPage() {
                             width: Math.round((region.width / 100) * 1280),
                             height: Math.round((region.height / 100) * 720),
                             locked: region.locked,
-                          } as import('@/types').BlockStyle,
+                          } as BlockStyle,
                         });
                       } catch {
                         // Block creation continues for remaining regions
@@ -533,6 +546,9 @@ export default function EditorPage() {
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleExport("pdf")}>
                 Export as PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport("pptx")}>
+                Export as PowerPoint
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -742,7 +758,7 @@ export default function EditorPage() {
                 await api.createBlock({
                   projectId,
                   slideId: newSlide.id,
-                  blockType: block.blockType as import('@/types').BlockType,
+                  blockType: block.blockType as BlockType,
                   content: block.content,
                   order: block.order,
                 });

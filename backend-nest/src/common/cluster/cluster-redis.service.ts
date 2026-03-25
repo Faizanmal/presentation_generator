@@ -15,7 +15,7 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
   private client: RedisClient;
   private subscriber: RedisClient;
 
-  constructor(private readonly configService: ConfigService) { }
+  constructor(private readonly configService: ConfigService) {}
 
   onModuleInit() {
     const redisUrl = this.configService.get<string>('REDIS_URL');
@@ -76,7 +76,10 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
         baseOptions.tls = { rejectUnauthorized: false };
       }
 
-      this.client = new Redis(redisUrl || 'redis://localhost:6379', baseOptions);
+      this.client = new Redis(
+        redisUrl || 'redis://localhost:6379',
+        baseOptions,
+      );
       this.subscriber = new Redis(redisUrl || 'redis://localhost:6379', {
         ...baseOptions,
         maxRetriesPerRequest: 0,
@@ -84,10 +87,10 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
 
       // Event handlers attached immediately
       this.client.on('error', (err) => {
-        this.logger.error(`Redis client error: ${(err as Error).message}`);
+        this.logger.error(`Redis client error: ${err.message}`);
       });
       this.subscriber.on('error', (err) => {
-        this.logger.error(`Redis subscriber error: ${(err as Error).message}`);
+        this.logger.error(`Redis subscriber error: ${err.message}`);
       });
 
       // Initiation

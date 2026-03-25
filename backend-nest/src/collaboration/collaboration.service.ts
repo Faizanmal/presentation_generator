@@ -47,7 +47,7 @@ export class CollaborationService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
-  ) { }
+  ) {}
 
   // ============================================
   // SESSION MANAGEMENT

@@ -168,7 +168,10 @@ export class WysiwygExportService {
     layout: string,
   ): string {
     const content = block.content || {};
-    const style = block.style || {};
+    const style = (block.style || {}) as Record<
+      string,
+      string | number | undefined
+    >;
     const customStyle = this.buildInlineStyle(style);
 
     switch (block.blockType?.toUpperCase()) {
@@ -252,9 +255,21 @@ export class WysiwygExportService {
         const statsHtml = statItems
           .map((item: unknown) => {
             const stat = item as Record<string, unknown>;
+            const valueText =
+              typeof stat.value === 'string' ||
+              typeof stat.value === 'number' ||
+              typeof stat.value === 'boolean'
+                ? String(stat.value)
+                : '';
+            const labelText =
+              typeof stat.label === 'string' ||
+              typeof stat.label === 'number' ||
+              typeof stat.label === 'boolean'
+                ? String(stat.label)
+                : '';
             return `<div class="stat-item">
-                <div class="stat-value" style="color: ${theme.colors.accent};">${this.escapeHtml(String(stat.value || ''))}</div>
-                <div class="stat-label" style="color: ${theme.colors.textMuted};">${this.escapeHtml(String(stat.label || ''))}</div>
+                <div class="stat-value" style="color: ${theme.colors.accent};">${this.escapeHtml(valueText)}</div>
+                <div class="stat-label" style="color: ${theme.colors.textMuted};">${this.escapeHtml(labelText)}</div>
               </div>`;
           })
           .join('');
@@ -272,26 +287,30 @@ export class WysiwygExportService {
   /**
    * Build inline CSS from a style object saved in the block
    */
-  private buildInlineStyle(style: Record<string, unknown>): string {
+  private buildInlineStyle(
+    style: Record<string, string | number | undefined>,
+  ): string {
     const parts: string[] = [];
-    if (style.fontSize) parts.push(`font-size: ${style.fontSize}`);
-    if (style.fontWeight) parts.push(`font-weight: ${style.fontWeight}`);
-    if (style.textAlign) parts.push(`text-align: ${style.textAlign}`);
-    if (style.color) parts.push(`color: ${style.color}`);
+    if (style.fontSize) parts.push(`font-size: ${String(style.fontSize)}`);
+    if (style.fontWeight)
+      parts.push(`font-weight: ${String(style.fontWeight)}`);
+    if (style.textAlign) parts.push(`text-align: ${String(style.textAlign)}`);
+    if (style.color) parts.push(`color: ${String(style.color)}`);
     if (style.backgroundColor)
-      parts.push(`background-color: ${style.backgroundColor}`);
-    if (style.padding) parts.push(`padding: ${style.padding}`);
-    if (style.margin) parts.push(`margin: ${style.margin}`);
-    if (style.borderRadius) parts.push(`border-radius: ${style.borderRadius}`);
-    if (style.opacity) parts.push(`opacity: ${style.opacity}`);
+      parts.push(`background-color: ${String(style.backgroundColor)}`);
+    if (style.padding) parts.push(`padding: ${String(style.padding)}`);
+    if (style.margin) parts.push(`margin: ${String(style.margin)}`);
+    if (style.borderRadius)
+      parts.push(`border-radius: ${String(style.borderRadius)}`);
+    if (style.opacity) parts.push(`opacity: ${String(style.opacity)}`);
     // Absolute positioning support for canvas-based layouts
     if (style.x !== undefined && style.y !== undefined) {
       parts.push('position: absolute');
-      parts.push(`left: ${style.x}px`);
-      parts.push(`top: ${style.y}px`);
+      parts.push(`left: ${String(style.x)}px`);
+      parts.push(`top: ${String(style.y)}px`);
     }
-    if (style.width) parts.push(`width: ${style.width}px`);
-    if (style.height) parts.push(`height: ${style.height}px`);
+    if (style.width) parts.push(`width: ${String(style.width)}px`);
+    if (style.height) parts.push(`height: ${String(style.height)}px`);
     return parts.join('; ');
   }
 

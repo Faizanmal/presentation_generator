@@ -65,7 +65,7 @@ export class MobilePwaController {
     required: true,
     description: 'Current app version',
   })
-  async checkForUpdates(@Query('version') currentVersion: string) {
+  checkForUpdates(@Query('version') currentVersion: string) {
     return this.mobileService.getAppUpdateInfo(currentVersion);
   }
 
@@ -296,7 +296,7 @@ export class MobilePwaController {
     @Body()
     body: {
       resolution: 'client' | 'server' | 'merge';
-      mergedData?: Record<string, any>;
+      mergedData?: Record<string, unknown>;
     },
     @Request() req,
   ) {

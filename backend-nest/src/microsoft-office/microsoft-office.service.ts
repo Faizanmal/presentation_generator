@@ -9,7 +9,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import axios from 'axios';
-import * as crypto from 'crypto';
 import PptxGenJS from 'pptxgenjs';
 import {
   S3Client,
@@ -181,10 +180,7 @@ export class MicrosoftOfficeService {
   /**
    * List OneDrive files
    */
-  async listOneDriveFiles(
-    userId: string,
-    folderId?: string,
-  ): Promise<OneDriveFile[]> {
+  async listOneDriveFiles(userId: string, folderId?: string): Promise<unknown> {
     const tokens = await this.getTokens(userId);
 
     const url = folderId
@@ -208,7 +204,7 @@ export class MicrosoftOfficeService {
   /**
    * Download file from OneDrive
    */
-  async downloadFromOneDrive(userId: string, fileId: string): Promise<Buffer> {
+  async downloadFromOneDrive(userId: string, fileId: string): Promise<unknown> {
     const tokens = await this.getTokens(userId);
 
     const response = await axios.get(
@@ -245,7 +241,7 @@ export class MicrosoftOfficeService {
       },
     });
 
-    return response.data;
+    return response.data as OneDriveFile;
   }
 
   // ============================================
@@ -266,7 +262,7 @@ export class MicrosoftOfficeService {
       },
     });
 
-    return response.data.value;
+    return response.data.value as SharePointSite[];
   }
 
   /**
@@ -293,7 +289,7 @@ export class MicrosoftOfficeService {
       },
     });
 
-    return response.data.value;
+    return response.data.value as OneDriveFile[];
   }
 
   // ============================================
@@ -375,7 +371,10 @@ export class MicrosoftOfficeService {
     );
 
     // Download file
-    const fileBuffer = await this.downloadFromOneDrive(userId, fileId);
+    const fileBuffer = (await this.downloadFromOneDrive(
+      userId,
+      fileId,
+    )) as Buffer;
 
     return this.importPowerPoint(
       userId,
@@ -390,7 +389,7 @@ export class MicrosoftOfficeService {
    */
   async parsePowerPointFile(
     s3Key: string,
-    options: ImportOptions,
+    _options: ImportOptions,
   ): Promise<PowerPointSlide[]> {
     // Download from S3
     const response = await this.s3Client.send(
@@ -400,7 +399,9 @@ export class MicrosoftOfficeService {
       }),
     );
 
-    const fileBuffer = Buffer.from(await response.Body!.transformToByteArray());
+    const _fileBuffer = Buffer.from(
+      await response.Body!.transformToByteArray(),
+    );
 
     // Parse PPTX file
     // Note: In production, you would use a library like 'pptx-parser' or
@@ -714,10 +715,13 @@ export class MicrosoftOfficeService {
     yPosition: number,
   ): number {
     const content = block.content as Record<string, unknown>;
+    const textContent = typeof content.text === 'string' ? content.text : '';
+    const imageUrl = typeof content.url === 'string' ? content.url : '';
+    const codeContent = typeof content.code === 'string' ? content.code : '';
 
     switch (block.blockType) {
       case 'HEADING':
-        slide.addText(String(content.text || ''), {
+        slide.addText(textContent, {
           x: 0.5,
           y: yPosition,
           w: '90%',
@@ -728,7 +732,7 @@ export class MicrosoftOfficeService {
         return yPosition + 0.8;
 
       case 'PARAGRAPH':
-        slide.addText(String(content.text || ''), {
+        slide.addText(textContent, {
           x: 0.5,
           y: yPosition,
           w: '90%',
@@ -737,7 +741,7 @@ export class MicrosoftOfficeService {
         });
         return yPosition + 0.6;
 
-      case 'BULLET_LIST':
+      case 'BULLET_LIST': {
         const items = (content.items as string[]) || [];
         items.forEach((item, index) => {
           slide.addText(item, {
@@ -749,12 +753,13 @@ export class MicrosoftOfficeService {
             color: '4B5563',
           });
         });
-        return yPosition + items.length * 0.4 + 0.3;
+        return yPosition + items.length * 0.4;
+      }
 
       case 'IMAGE':
-        if (content.url) {
+        if (imageUrl) {
           slide.addImage({
-            path: String(content.url),
+            path: imageUrl,
             x: 0.5,
             y: yPosition,
             w: 4,
@@ -765,7 +770,7 @@ export class MicrosoftOfficeService {
         return yPosition;
 
       case 'CODE':
-        slide.addText(String(content.code || ''), {
+        slide.addText(codeContent, {
           x: 0.5,
           y: yPosition,
           w: '90%',

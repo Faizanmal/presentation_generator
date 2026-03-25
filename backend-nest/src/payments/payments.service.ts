@@ -20,14 +20,13 @@ export class PaymentsService {
     private readonly prisma: PrismaService,
     private readonly usersService: UsersService,
   ) {
-    const stripeKey = this.configService.get<string>('STRIPE_SECRET_KEY') || 'dummy-key-to-prevent-crash';
-    this.stripe = new Stripe(
-      stripeKey,
-      {
-        // upgrade to the version allowed by current Stripe types
-        apiVersion: '2026-02-25.clover',
-      },
-    );
+    const stripeKey =
+      this.configService.get<string>('STRIPE_SECRET_KEY') ||
+      'dummy-key-to-prevent-crash';
+    this.stripe = new Stripe(stripeKey, {
+      // upgrade to the version allowed by current Stripe types
+      apiVersion: '2026-02-25.clover',
+    });
   }
 
   /**

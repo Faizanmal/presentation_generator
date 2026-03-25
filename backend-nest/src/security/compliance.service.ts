@@ -44,9 +44,7 @@ export class ComplianceService {
   /**
    * Generate compliance report
    */
-  async generateComplianceReport(
-    standard: ComplianceStandard,
-  ): Promise<ComplianceReport> {
+  generateComplianceReport(standard: ComplianceStandard): ComplianceReport {
     const findings: ComplianceFinding[] = [];
 
     switch (standard) {

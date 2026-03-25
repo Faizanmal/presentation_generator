@@ -13,6 +13,7 @@ import type {
 import type { SlideTransitionType } from '@/lib/slide-transition-engine';
 import {
   DESIGN_TEMPLATES,
+  DEFAULT_DESIGN_TEMPLATE,
   CONTENT_DENSITY_OPTIONS,
   ASPECT_RATIO_OPTIONS,
   TRANSITION_OPTIONS,
@@ -84,6 +85,8 @@ export function ThinkingModeGenerator({
   onOpenInEditor,
   className = '',
 }: ThinkingModeGeneratorProps) {
+  const defaultDesignSettings = getDefaultDesignSettings(DEFAULT_DESIGN_TEMPLATE);
+
   // Form state
   const [topic, setTopic] = useState('');
   const [audience, setAudience] = useState('');
@@ -96,12 +99,12 @@ export function ThinkingModeGenerator({
 
   // Design customization state
   const [showDesignPanel, setShowDesignPanel] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<DesignTemplateName>('modern-minimalist');
-  const [colorPalette, setColorPalette] = useState<ColorPalette>(COLOR_PALETTES['modern-minimalist']);
-  const [fontPairing, setFontPairing] = useState<FontPairing>(FONT_PAIRINGS['modern-minimalist']);
-  const [transition, setTransition] = useState<SlideTransitionType>('fade');
-  const [contentDensity, setContentDensity] = useState<ContentDensity>('balanced');
-  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('16:9');
+  const [selectedTemplate, setSelectedTemplate] = useState<DesignTemplateName>(defaultDesignSettings.template);
+  const [colorPalette, setColorPalette] = useState<ColorPalette>(defaultDesignSettings.colorPalette);
+  const [fontPairing, setFontPairing] = useState<FontPairing>(defaultDesignSettings.fontPairing);
+  const [transition, setTransition] = useState<SlideTransitionType>(defaultDesignSettings.transition);
+  const [contentDensity, setContentDensity] = useState<ContentDensity>(defaultDesignSettings.contentDensity);
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>(defaultDesignSettings.aspectRatio);
   const [customInstructions, setCustomInstructions] = useState('');
 
   // Template change handler
@@ -110,6 +113,39 @@ export function ThinkingModeGenerator({
     setColorPalette(COLOR_PALETTES[name]);
     setFontPairing(FONT_PAIRINGS[name]);
   }, []);
+
+  const buildDesignBrief = useCallback(() => {
+    const densityGuidance = {
+      minimal: 'Favor whitespace, 2-4 blocks per slide, and one dominant visual or idea.',
+      balanced: 'Keep a balanced mix of concise text and visual proof with 3-5 purposeful blocks per slide.',
+      'data-heavy': 'Use charts and evidence blocks where valuable, but still keep a clear hierarchy and avoid overcrowding.',
+    } as const;
+
+    return [
+      customInstructions.trim(),
+      `Design direction: ${selectedTemplate} template.`,
+      `Color system: primary ${colorPalette.primary}, secondary ${colorPalette.secondary}, accent ${colorPalette.accent}, background ${colorPalette.background}, surface ${colorPalette.surface}.`,
+      `Typography: heading font ${fontPairing.heading}, body font ${fontPairing.body}.`,
+      `Layout guidance: ${densityGuidance[contentDensity]}`,
+      `Aspect ratio: ${aspectRatio}.`,
+      `Transition style: ${transition}.`,
+      'Favor strong hierarchy, restrained accents, and a single focal point per slide.',
+      'Avoid generic filler, repeated layouts, and decorative emojis unless the tone explicitly calls for them.',
+    ].filter(Boolean).join(' ');
+  }, [
+    aspectRatio,
+    colorPalette.accent,
+    colorPalette.background,
+    colorPalette.primary,
+    colorPalette.secondary,
+    colorPalette.surface,
+    contentDensity,
+    customInstructions,
+    fontPairing.body,
+    fontPairing.heading,
+    selectedTemplate,
+    transition,
+  ]);
 
   // Generation state
   const [isGenerating, setIsGenerating] = useState(false);
@@ -162,24 +198,17 @@ export function ThinkingModeGenerator({
         tone,
         audience: audience || undefined,
         length,
+        style: tone === 'creative' ? 'creative' : tone === 'academic' ? 'academic' : 'professional',
         qualityLevel,
         smartLayout: true,
         generateImages: imageSource !== 'none',
         imageSource: imageSource !== 'none' ? imageSource : undefined,
         rawData: inputMode === 'raw' ? rawContent : undefined,
-        additionalContext: [
-          customInstructions,
-          `Design template: ${selectedTemplate}`,
-          `Content density: ${contentDensity}`,
-          `Aspect ratio: ${aspectRatio}`,
-          `Slide transition: ${transition}`,
-          `Heading font: ${fontPairing.heading}, Body font: ${fontPairing.body}`,
-          `Color palette: primary=${colorPalette.primary}, accent=${colorPalette.accent}, bg=${colorPalette.background}`,
-        ].filter(Boolean).join('. '),
+        additionalContext: buildDesignBrief(),
         brandGuidelines: {
           colors: [colorPalette.primary, colorPalette.secondary, colorPalette.accent],
           fonts: [fontPairing.heading, fontPairing.body],
-          tone: tone,
+          tone,
         },
       });
 
@@ -198,7 +227,7 @@ export function ThinkingModeGenerator({
     } finally {
       setIsGenerating(false);
     }
-  }, [topic, rawContent, inputMode, tone, audience, length, qualityLevel, imageSource, selectedTemplate, colorPalette, fontPairing, transition, contentDensity, aspectRatio, customInstructions, onComplete, onError]);
+  }, [topic, rawContent, inputMode, tone, audience, length, qualityLevel, imageSource, colorPalette, fontPairing, onComplete, onError, buildDesignBrief]);
 
   // Handle generation with streaming
   const _handleGenerateStream = useCallback(async () => {
@@ -274,6 +303,15 @@ export function ThinkingModeGenerator({
         tone,
         audience: audience || undefined,
         length: Math.min(length, 6),
+        style: tone === 'creative' ? 'creative' : tone === 'academic' ? 'academic' : 'professional',
+        generateImages: imageSource !== 'none',
+        smartLayout: true,
+        additionalContext: buildDesignBrief(),
+        brandGuidelines: {
+          colors: [colorPalette.primary, colorPalette.secondary, colorPalette.accent],
+          fonts: [fontPairing.heading, fontPairing.body],
+          tone,
+        },
         rawData: inputMode === 'raw' ? rawContent : undefined,
       });
 
@@ -289,7 +327,7 @@ export function ThinkingModeGenerator({
     } finally {
       setIsGenerating(false);
     }
-  }, [topic, rawContent, inputMode, tone, audience, length, onComplete, onError]);
+  }, [topic, rawContent, inputMode, tone, audience, length, imageSource, colorPalette, fontPairing, onComplete, onError, buildDesignBrief]);
 
   return (
     <div className={`thinking-mode-generator ${className}`}>
@@ -481,20 +519,6 @@ export function ThinkingModeGenerator({
 
           {showDesignPanel && (
             <div className="design-panel-content">
-              {/* Custom Instructions */}
-              <div className="form-group">
-                <label htmlFor="customInstructions">Custom Instructions / Prompt Overrides</label>
-                <textarea
-                  id="customInstructions"
-                  value={customInstructions}
-                  onChange={(e) => setCustomInstructions(e.target.value)}
-                  placeholder="e.g., 'Make every slide have a key takeaway footer', 'Use highly academic language'..."
-                  disabled={isGenerating}
-                  className="form-textarea"
-                  rows={2}
-                />
-              </div>
-
               {/* Advanced Settings Row 1 */}
               <div className="form-row">
                 {/* Content Density */}
@@ -594,17 +618,17 @@ export function ThinkingModeGenerator({
 
               {/* Custom Instructions */}
               <div className="form-group mt-4">
-                <label htmlFor="customInstructions">Custom Instructions (Optional)</label>
+                <label htmlFor="customInstructions">Creative Direction And Brand Constraints</label>
                 <textarea
                   id="customInstructions"
                   value={customInstructions}
                   onChange={(e) => setCustomInstructions(e.target.value)}
                   disabled={isGenerating}
-                  placeholder="e.g. Make every slide have a key takeaway footer, Write it like Steve Jobs, Translate completely to Spanish..."
+                  placeholder="e.g. Keep each slide minimal, use editorial tone, make charts feel investor-ready, end with a decisive recommendation..."
                   className="form-textarea"
                   rows={3}
                 />
-                <p className="text-xs text-slate-400 mt-1">Directly instruct the AI on structure, tone overrides, and strict brand requirements.</p>
+                <p className="text-xs text-slate-400 mt-1">This brief is sent to both full and quick generation, alongside your selected palette, typography, density, and transitions.</p>
               </div>
 
             </div>

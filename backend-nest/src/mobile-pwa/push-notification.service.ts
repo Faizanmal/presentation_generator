@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const webpush = require('web-push');
+
+import webpush from 'web-push';
 
 export interface PushSubscription {
   endpoint: string;
@@ -20,7 +21,7 @@ export interface PushNotification {
   badge?: string;
   image?: string;
   tag?: string;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
   actions?: Array<{
     action: string;
     title: string;
@@ -178,7 +179,7 @@ export class PushNotificationService {
         type: options.type || 'SYSTEM_UPDATE',
         title: notification.title,
         body: notification.body,
-        data: notification.data || {},
+        data: this.toPrismaJson(notification.data),
         isRead: false,
       },
     });
@@ -204,6 +205,14 @@ export class PushNotificationService {
     }
 
     return { totalSent, totalFailed };
+  }
+
+  private toPrismaJson(value: unknown): Prisma.InputJsonValue {
+    try {
+      return JSON.parse(JSON.stringify(value ?? {})) as Prisma.InputJsonValue;
+    } catch {
+      return {} as Prisma.InputJsonValue;
+    }
   }
 
   /**
@@ -250,11 +259,14 @@ export class PushNotificationService {
         },
       );
       return true;
-    } catch (error) {
-      this.logger.error(`Push notification failed: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as { statusCode?: number; message?: string };
+      this.logger.error(
+        `Push notification failed: ${err.message ?? String(error)}`,
+      );
 
       // Handle expired subscriptions
-      if (error.statusCode === 410 || error.statusCode === 404) {
+      if (err.statusCode === 410 || err.statusCode === 404) {
         await this.prisma.pushSubscription.updateMany({
           where: { endpoint: subscription.endpoint },
           data: { isActive: false },

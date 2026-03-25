@@ -51,7 +51,7 @@ export interface DataPreview {
     name: string;
     type: 'string' | 'number' | 'date' | 'boolean';
   }>;
-  rows: Array<Record<string, any>>;
+  rows: Array<Record<string, unknown>>;
   totalRows: number;
 }
 
@@ -72,7 +72,7 @@ export class DataConnectorService {
     config: DataSourceConfig,
   ): Promise<DataSourceConnection> {
     // Validate connection
-    await this.validateConnection(config);
+    this.validateConnection(config);
 
     const connection = await this.prisma.dataSourceConnection.create({
       data: {
@@ -171,53 +171,61 @@ export class DataConnectorService {
   /**
    * Test connection
    */
-  async testConnection(
+  testConnection(
     config: DataSourceConfig,
   ): Promise<{ success: boolean; message: string }> {
     try {
-      await this.validateConnection(config);
-      return { success: true, message: 'Connection successful' };
+      this.validateConnection(config);
+      return Promise.resolve({
+        success: true,
+        message: 'Connection successful',
+      });
     } catch (error) {
-      return { success: false, message: error.message };
+      return Promise.resolve({
+        success: false,
+        message: error instanceof Error ? error.message : 'Connection failed',
+      });
     }
   }
 
   /**
    * Validate and test connection
    */
-  private async validateConnection(config: DataSourceConfig): Promise<void> {
+  private validateConnection(config: DataSourceConfig): void {
     switch (config.type) {
       case 'google_sheets':
-        await this.validateGoogleSheets(config);
+        this.validateGoogleSheets(config);
         break;
       case 'excel_online':
-        await this.validateExcelOnline(config);
+        this.validateExcelOnline(config);
         break;
       case 'airtable':
-        await this.validateAirtable(config);
+        this.validateAirtable(config);
         break;
       case 'notion':
-        await this.validateNotion(config);
+        this.validateNotion(config);
         break;
       case 'json_api':
-        await this.validateJsonApi(config);
+        this.validateJsonApi(config);
         break;
       case 'postgresql':
       case 'mysql':
-        await this.validateSqlDatabase(config);
+        this.validateSqlDatabase(config);
         break;
       case 'mongodb':
-        await this.validateMongoDB(config);
+        this.validateMongoDB(config);
         break;
       case 'csv':
         // CSV doesn't need validation
         break;
       default:
-        throw new Error(`Unsupported data source type: ${config.type}`);
+        throw new Error(
+          `Unsupported data source type: ${config.type as string}`,
+        );
     }
   }
 
-  private async validateGoogleSheets(config: DataSourceConfig): Promise<void> {
+  private validateGoogleSheets(config: DataSourceConfig): void {
     if (!config.credentials?.accessToken) {
       throw new Error('Google Sheets requires OAuth access token');
     }
@@ -227,13 +235,13 @@ export class DataConnectorService {
     // In production, would make API call to validate
   }
 
-  private async validateExcelOnline(config: DataSourceConfig): Promise<void> {
+  private validateExcelOnline(config: DataSourceConfig): void {
     if (!config.credentials?.accessToken) {
       throw new Error('Excel Online requires Microsoft OAuth access token');
     }
   }
 
-  private async validateAirtable(config: DataSourceConfig): Promise<void> {
+  private validateAirtable(config: DataSourceConfig): void {
     if (!config.credentials?.apiKey) {
       throw new Error('Airtable requires API key');
     }
@@ -242,7 +250,7 @@ export class DataConnectorService {
     }
   }
 
-  private async validateNotion(config: DataSourceConfig): Promise<void> {
+  private validateNotion(config: DataSourceConfig): void {
     if (!config.credentials?.accessToken) {
       throw new Error('Notion requires OAuth access token');
     }
@@ -251,7 +259,7 @@ export class DataConnectorService {
     }
   }
 
-  private async validateJsonApi(config: DataSourceConfig): Promise<void> {
+  private validateJsonApi(config: DataSourceConfig): void {
     if (!config.config.apiUrl) {
       throw new Error('API URL is required');
     }
@@ -263,13 +271,13 @@ export class DataConnectorService {
     }
   }
 
-  private async validateSqlDatabase(config: DataSourceConfig): Promise<void> {
+  private validateSqlDatabase(config: DataSourceConfig): void {
     if (!config.credentials?.connectionString) {
       throw new Error('Database connection string is required');
     }
   }
 
-  private async validateMongoDB(config: DataSourceConfig): Promise<void> {
+  private validateMongoDB(config: DataSourceConfig): void {
     if (!config.credentials?.connectionString) {
       throw new Error('MongoDB connection string is required');
     }
@@ -286,7 +294,7 @@ export class DataConnectorService {
     options: {
       limit?: number;
       offset?: number;
-      filters?: Record<string, any>;
+      filters?: Record<string, unknown>;
     } = {},
   ): Promise<DataPreview> {
     const connection = await this.prisma.dataSourceConnection.findUnique({
@@ -299,13 +307,13 @@ export class DataConnectorService {
 
     const credentials = connection.credentials
       ? this.decryptCredentials(connection.credentials as object)
-      : null;
+      : undefined;
 
     const config: DataSourceConfig = {
       type: connection.type as DataSourceType,
       name: connection.name,
       credentials,
-      config: connection.config as any,
+      config: connection.config as DataSourceConfig['config'],
     };
 
     return this.fetchFromSource(config, options);
@@ -313,7 +321,11 @@ export class DataConnectorService {
 
   private async fetchFromSource(
     config: DataSourceConfig,
-    options: { limit?: number; offset?: number; filters?: Record<string, any> },
+    options: {
+      limit?: number;
+      offset?: number;
+      filters?: Record<string, unknown>;
+    },
   ): Promise<DataPreview> {
     switch (config.type) {
       case 'google_sheets':
@@ -365,11 +377,11 @@ export class DataConnectorService {
 
     const columns = headers.map((name) => ({
       name,
-      type: this.inferColumnType(dataRows[0]?.[headers.indexOf(name)]) as any,
+      type: this.inferColumnType(dataRows[0]?.[headers.indexOf(name)]),
     }));
 
     const rows = dataRows.map((row) => {
-      const obj: Record<string, any> = {};
+      const obj: Record<string, unknown> = {};
       headers.forEach((h, i) => {
         obj[h] = row[i] ?? null;
       });
@@ -404,7 +416,8 @@ export class DataConnectorService {
     }
 
     const result = await response.json();
-    const values: any[][] = result.values || [];
+    const values: Array<Array<string | number | boolean | null>> =
+      result.values || [];
 
     if (values.length === 0) {
       return { columns: [], rows: [], totalRows: 0 };
@@ -418,11 +431,11 @@ export class DataConnectorService {
 
     const columns = headers.map((name: string) => ({
       name,
-      type: this.inferColumnType(dataRows[0]?.[headers.indexOf(name)]) as any,
+      type: this.inferColumnType(dataRows[0]?.[headers.indexOf(name)]),
     }));
 
     const rows = dataRows.map((row) => {
-      const obj: Record<string, any> = {};
+      const obj: Record<string, unknown> = {};
       headers.forEach((h: string, i: number) => {
         obj[h] = row[i] ?? null;
       });
@@ -449,7 +462,9 @@ export class DataConnectorService {
       throw new Error(`Airtable API error: ${response.statusText}`);
     }
 
-    const result = await response.json();
+    const result = (await response.json()) as {
+      records?: Array<{ fields?: Record<string, unknown> }>;
+    };
     const records = result.records || [];
 
     if (records.length === 0) {
@@ -457,13 +472,13 @@ export class DataConnectorService {
     }
 
     // Infer columns from first record's fields
-    const firstFields = records[0].fields || {};
+    const firstFields = records[0].fields || ({} as Record<string, unknown>);
     const columns = Object.keys(firstFields).map((name) => ({
       name,
-      type: this.inferColumnType(firstFields[name]) as any,
+      type: this.inferColumnType(firstFields[name]),
     }));
 
-    const rows = records.map((r: { fields: Record<string, any> }) => ({
+    const rows = records.map((r) => ({
       ...r.fields,
     }));
 
@@ -494,7 +509,10 @@ export class DataConnectorService {
     }
 
     const result = await response.json();
-    const pages = result.results || [];
+    type NotionProperty = { type: string; [key: string]: unknown };
+    type NotionPage = { properties?: Record<string, NotionProperty> };
+
+    const pages = (result.results || []) as NotionPage[];
 
     if (pages.length === 0) {
       return { columns: [], rows: [], totalRows: 0 };
@@ -503,15 +521,19 @@ export class DataConnectorService {
     // Extract property names & types from first page
     const firstProps = pages[0].properties || {};
     const propNames = Object.keys(firstProps);
-    const columns = propNames.map((name) => ({
-      name,
-      type: this.notionPropertyToColumnType(firstProps[name].type),
-    }));
+    const columns = propNames.map((name) => {
+      const prop = firstProps[name];
+      return {
+        name,
+        type: this.notionPropertyToColumnType(prop?.type ?? ''),
+      };
+    });
 
-    const rows = pages.map((page: { properties: Record<string, any> }) => {
-      const obj: Record<string, any> = {};
+    const rows = pages.map((page: NotionPage) => {
+      const obj: Record<string, unknown> = {};
       propNames.forEach((name) => {
-        obj[name] = this.extractNotionValue(page.properties[name]);
+        const prop = page.properties?.[name];
+        obj[name] = this.extractNotionValue(prop);
       });
       return obj;
     });
@@ -536,32 +558,39 @@ export class DataConnectorService {
     }
   }
 
-  private extractNotionValue(prop: { type: string; [key: string]: any }): any {
+  private extractNotionValue(
+    prop: { type: string; [key: string]: unknown } | null | undefined,
+  ): unknown {
     if (!prop) return null;
     switch (prop.type) {
       case 'title':
         return (
-          prop.title
+          (prop.title as Array<{ plain_text: string }>)
             ?.map((t: { plain_text: string }) => t.plain_text)
             .join('') || ''
         );
       case 'rich_text':
         return (
-          prop.rich_text
+          (prop.rich_text as Array<{ plain_text: string }>)
             ?.map((t: { plain_text: string }) => t.plain_text)
             .join('') || ''
         );
       case 'number':
         return prop.number;
       case 'select':
-        return prop.select?.name || null;
-      case 'multi_select':
         return (
-          prop.multi_select?.map((s: { name: string }) => s.name).join(', ') ||
-          ''
+          (prop.select as { name?: string } | null | undefined)?.name || null
         );
+      case 'multi_select':
+        return Array.isArray(prop.multi_select)
+          ? (prop.multi_select as Array<{ name: string }>)
+              .map((s) => s.name)
+              .join(', ')
+          : '';
       case 'date':
-        return prop.date?.start || null;
+        return (
+          (prop.date as { start?: string } | null | undefined)?.start || null
+        );
       case 'checkbox':
         return prop.checkbox;
       case 'url':
@@ -590,16 +619,16 @@ export class DataConnectorService {
     }
 
     const data = await response.json();
-    const rows = Array.isArray(data)
-      ? data
-      : data.data || data.results || [data];
+    const rows = (
+      Array.isArray(data) ? data : data.data || data.results || [data]
+    ) as Array<Record<string, unknown>>;
 
     // Infer columns from first row
     const columns =
       rows.length > 0
         ? Object.keys(rows[0]).map((name) => ({
             name,
-            type: this.inferColumnType(rows[0][name]) as any,
+            type: this.inferColumnType(rows[0][name]),
           }))
         : [];
 
@@ -610,7 +639,9 @@ export class DataConnectorService {
     };
   }
 
-  private inferColumnType(value: any): string {
+  private inferColumnType(
+    value: unknown,
+  ): 'string' | 'number' | 'date' | 'boolean' {
     if (typeof value === 'number') return 'number';
     if (typeof value === 'boolean') return 'boolean';
     if (value instanceof Date) return 'date';
@@ -631,7 +662,7 @@ export class DataConnectorService {
 
     if (!connection) return;
 
-    const config = connection.config as any;
+    const config = connection.config as DataSourceConfig['config'];
     const interval = intervalMinutes || config.refreshInterval || 60;
 
     // Add to sync queue with repeat
@@ -653,14 +684,18 @@ export class DataConnectorService {
   }
 
   // Encryption helpers (simplified - use proper encryption in production)
-  private encryptCredentials(credentials: object): object {
+  private encryptCredentials(credentials: object): string {
     // In production, use proper encryption
-    return Buffer.from(JSON.stringify(credentials)).toString('base64') as any;
+    return Buffer.from(JSON.stringify(credentials)).toString('base64');
   }
 
-  private decryptCredentials(encrypted: object): any {
+  private decryptCredentials(
+    encrypted: unknown,
+  ): DataSourceConfig['credentials'] {
     // In production, use proper decryption
-    return JSON.parse(Buffer.from(encrypted as any, 'base64').toString());
+    return JSON.parse(
+      Buffer.from(encrypted as string, 'base64').toString(),
+    ) as DataSourceConfig['credentials'];
   }
 
   /**

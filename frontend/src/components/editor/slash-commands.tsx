@@ -15,11 +15,16 @@ import {
     Minus,
     BarChart2,
     Video,
+    Box,
     Link,
     FileText,
     Sparkles,
     ChevronRight,
-    Search
+    Search,
+    LayoutDashboard,
+    GitCommit,
+    SplitSquareHorizontal,
+    Calculator
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -116,6 +121,14 @@ const defaultCommands: Omit<SlashCommand, "action">[] = [
         category: "media",
     },
     {
+        id: "threeDModel",
+        name: "3D Model",
+        description: "Interactive 3D model",
+        icon: Box,
+        keywords: ["3d", "model", "interactive", "webgl"],
+        category: "media",
+    },
+    {
         id: "chart",
         name: "Chart",
         description: "Data visualization",
@@ -141,11 +154,43 @@ const defaultCommands: Omit<SlashCommand, "action">[] = [
         category: "layout",
     },
     {
+        id: "bentoGrid",
+        name: "Bento Grid",
+        description: "Modern masonry stats grid",
+        icon: LayoutDashboard,
+        keywords: ["bento", "grid", "layout", "stats"],
+        category: "layout",
+    },
+    {
+        id: "timeline",
+        name: "Timeline",
+        description: "Animated process timeline",
+        icon: GitCommit,
+        keywords: ["timeline", "process", "steps"],
+        category: "layout",
+    },
+    {
         id: "divider",
         name: "Divider",
         description: "Horizontal line",
         icon: Minus,
         keywords: ["divider", "line", "separator", "hr"],
+        category: "layout",
+    },
+    {
+        id: "comparison",
+        name: "Comparison",
+        description: "Pros/cons or vs layout",
+        icon: SplitSquareHorizontal,
+        keywords: ["compare", "vs", "pros", "cons"],
+        category: "layout",
+    },
+    {
+        id: "statsGrid",
+        name: "Stats Grid",
+        description: "Key metrics highlighted",
+        icon: Calculator,
+        keywords: ["stats", "numbers", "metrics", "data"],
         category: "layout",
     },
     // Embed

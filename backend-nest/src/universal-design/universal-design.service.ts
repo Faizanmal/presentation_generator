@@ -541,8 +541,8 @@ export class UniversalDesignService {
 
     for (const slide of project.slides) {
       for (const block of slide.blocks) {
-        const styles = (block.style as Record<string, any>) || {};
-        const content = (block.content as Record<string, any>) || {};
+        const styles = (block.style as Record<string, unknown>) || {};
+        const content = (block.content as Record<string, unknown>) || {};
         let updated = false;
         const updates: { style?: object; content?: object } = {};
 
@@ -550,13 +550,14 @@ export class UniversalDesignService {
         if (
           issueTypes.includes('typography') &&
           styles.fontSize &&
-          styles.fontSize < 14
+          (styles.fontSize as number) < 14
         ) {
+          const currentFontSize = Number(styles.fontSize);
           updates.style = { ...styles, fontSize: 16 };
           fixResults.push({
             type: 'typography',
             element: `Block ${block.id}`,
-            action: `Increased font size from ${styles.fontSize}px to 16px`,
+            action: `Increased font size from ${currentFontSize}px to 16px`,
           });
           updated = true;
         }

@@ -5,6 +5,20 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { MarketplaceTemplate, Prisma } from '@prisma/client';
+
+type MarketplaceTemplateWithAuthor = MarketplaceTemplate & {
+  author: { id: string; name: string; image: string };
+};
+
+type MarketplaceTemplateDetailsRecord = MarketplaceTemplateWithAuthor & {
+  reviews: Array<{
+    user?: { id: string; name: string };
+    rating: number;
+    comment?: string;
+    createdAt: Date;
+  }>;
+};
 
 export interface TemplateCategory {
   id: string;
@@ -191,12 +205,13 @@ export class TemplateMarketplaceService {
           // via templateData when necessary
           author: { select: { id: true, name: true, image: true } },
         },
-      }) as any, // cast to any to work around Prisma inference oddities
+      }) as unknown,
       this.prisma.marketplaceTemplate.count({ where }),
     ]);
 
-    // the query above is cast to any so we re-type here for clarity
-    const templates: TemplatePreview[] = dbTemplates.map((t: any) => ({
+    const templates: TemplatePreview[] = (
+      dbTemplates as MarketplaceTemplateWithAuthor[]
+    ).map((t: MarketplaceTemplateWithAuthor) => ({
       id: t.id,
       title: t.title,
       description: t.description ?? '',
@@ -235,16 +250,19 @@ export class TemplateMarketplaceService {
           take: 20,
         },
       },
-    })) as any; // cast to any so that downstream property access works
+    })) as unknown as MarketplaceTemplateDetailsRecord;
 
     if (!t) {
       throw new NotFoundException(`Template ${templateId} not found`);
     }
 
     // Parse slide layouts (and other metadata) from the JSON blob
-    const templateData = t.templateData || t.content || {};
+    const templateData = (t.templateData || (t.content as unknown)) as Record<
+      string,
+      unknown
+    >;
     const slideLayouts = Array.isArray(templateData?.slides)
-      ? templateData.slides
+      ? (templateData.slides as Array<unknown>)
       : [];
 
     return {
@@ -268,24 +286,27 @@ export class TemplateMarketplaceService {
       price: t.price > 0 ? t.price : undefined,
       tags: t.tags,
       createdAt: t.createdAt,
-      slides: (slideLayouts as Array<any>).map((s: any, i: number) => ({
-        order: s.order ?? i + 1,
-        layout: s.layout ?? s.layout ?? 'default',
-        thumbnail: s.thumbnail ?? '',
-      })),
+      slides: (slideLayouts as Array<Record<string, unknown>>).map(
+        (s, i: number) => ({
+          order: (s.order as number) ?? i + 1,
+          layout: (s.layout as string) ?? 'default',
+          thumbnail: (s.thumbnail as string) ?? '',
+        }),
+      ),
       theme: {
         primaryColor:
-          (templateData?.colorPalette as string[])?.[0] ?? '#2563eb',
+          ((templateData?.colorPalette as string[]) ?? [])[0] ?? '#2563eb',
         secondaryColor:
-          (templateData?.colorPalette as string[])?.[1] ?? '#1e40af',
-        fontFamily: (templateData?.fonts as string[])?.[0] ?? 'Inter',
+          ((templateData?.colorPalette as string[]) ?? [])[1] ?? '#1e40af',
+        fontFamily: ((templateData?.fonts as string[]) ?? [])[0] ?? 'Inter',
       },
-      reviews: (t.reviews || []).map((r: any) => ({
-        userId: r.user?.id,
-        userName: r.user?.name ?? 'Anonymous',
-        rating: r.rating,
-        comment: r.comment ?? '',
-        createdAt: r.createdAt,
+      reviews: (t.reviews || []).map((r: Record<string, unknown>) => ({
+        userId: (r.user as Record<string, unknown>)?.id as string,
+        userName:
+          ((r.user as Record<string, unknown>)?.name as string) ?? 'Anonymous',
+        rating: r.rating as number,
+        comment: (r.comment as string) ?? '',
+        createdAt: r.createdAt as Date,
       })),
     };
   }
@@ -440,7 +461,7 @@ export class TemplateMarketplaceService {
         price: 0,
         tags: [],
         slideCount: project.slides.length,
-        templateData: content as any,
+        templateData: content as Prisma.InputJsonValue,
       },
     });
 

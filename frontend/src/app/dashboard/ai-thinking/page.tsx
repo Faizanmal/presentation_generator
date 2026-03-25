@@ -4,6 +4,7 @@ import React, { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Brain, Zap, Sparkles, Eye, Download, Loader2 } from 'lucide-react';
 import { ThemeToggleSimple } from '@/components/ui/theme-toggle';
 import { toast } from 'sonner';
@@ -30,6 +31,7 @@ const ThinkingResultPreview = dynamic(
 
 export default function AIThinkingPage() {
     const router = useRouter();
+    const queryClient = useQueryClient();
     const [result, setResult] = useState<ThinkingGenerationResult | null>(null);
     const [isCreatingProject, setIsCreatingProject] = useState(false);
     const [savedProjectId, setSavedProjectId] = useState<string | null>(null);
@@ -51,6 +53,10 @@ export default function AIThinkingPage() {
                 generateImages: generationResult.metadata.generateImages,
             });
             setSavedProjectId(projectResult.projectId);
+            
+            // Invalidate projects query so the new project appears in the dashboard
+            queryClient.invalidateQueries({ queryKey: ["projects"] });
+            
             toast.success('Saved to dashboard');
         } catch (error: unknown) {
             console.error('Failed to auto-save project:', error);
@@ -72,7 +78,7 @@ export default function AIThinkingPage() {
         } finally {
             setIsCreatingProject(false);
         }
-    }, []);
+    }, [queryClient]);
 
     const handleError = useCallback((error: Error) => {
         toast.error('Generation failed', {
@@ -99,6 +105,9 @@ export default function AIThinkingPage() {
                 generateImages: result.metadata.generateImages,
             });
 
+            // Invalidate projects query so the new project appears in the dashboard
+            queryClient.invalidateQueries({ queryKey: ["projects"] });
+
             // Navigate to editor with the generated content
             toast.success(`Project created with ${projectResult.slideCount} slides!`);
             router.push(`/editor/${projectResult.projectId}`);
@@ -121,7 +130,7 @@ export default function AIThinkingPage() {
         } finally {
             setIsCreatingProject(false);
         }
-    }, [result, router, savedProjectId, isCreatingProject]);
+    }, [result, router, savedProjectId, isCreatingProject, queryClient]);
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950">

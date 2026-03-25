@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
     Globe,
     ExternalLink,
@@ -41,13 +41,13 @@ type EmbedServiceType =
 /** Detect service from URL */
 function detectService(url: string): EmbedServiceType {
     const u = url.toLowerCase();
-    if (u.includes('youtube.com') || u.includes('youtu.be')) return 'youtube';
-    if (u.includes('vimeo.com')) return 'vimeo';
-    if (u.includes('figma.com')) return 'figma';
-    if (u.includes('miro.com')) return 'miro';
-    if (u.includes('twitter.com') || u.includes('x.com')) return 'twitter';
-    if (u.includes('codepen.io')) return 'codepen';
-    if (u.includes('loom.com')) return 'loom';
+    if (u.includes('youtube.com') || u.includes('youtu.be')) {return 'youtube';}
+    if (u.includes('vimeo.com')) {return 'vimeo';}
+    if (u.includes('figma.com')) {return 'figma';}
+    if (u.includes('miro.com')) {return 'miro';}
+    if (u.includes('twitter.com') || u.includes('x.com')) {return 'twitter';}
+    if (u.includes('codepen.io')) {return 'codepen';}
+    if (u.includes('loom.com')) {return 'loom';}
     return 'generic';
 }
 
@@ -59,13 +59,13 @@ function generateEmbedHtml(url: string, service: EmbedServiceType): string | nul
                 /(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]+)/,
             );
             if (match)
-                return `<iframe src="https://www.youtube.com/embed/${match[1]}?rel=0" frameborder="0" allowfullscreen style="width:100%;height:100%;aspect-ratio:16/9" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>`;
+                {return `<iframe src="https://www.youtube.com/embed/${match[1]}?rel=0" frameborder="0" allowfullscreen style="width:100%;height:100%;aspect-ratio:16/9" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>`;}
             break;
         }
         case 'vimeo': {
             const match = url.match(/vimeo\.com\/(\d+)/);
             if (match)
-                return `<iframe src="https://player.vimeo.com/video/${match[1]}" frameborder="0" allowfullscreen style="width:100%;height:100%;aspect-ratio:16/9"></iframe>`;
+                {return `<iframe src="https://player.vimeo.com/video/${match[1]}" frameborder="0" allowfullscreen style="width:100%;height:100%;aspect-ratio:16/9"></iframe>`;}
             break;
         }
         case 'figma': {
@@ -80,13 +80,13 @@ function generateEmbedHtml(url: string, service: EmbedServiceType): string | nul
         case 'codepen': {
             const match = url.match(/codepen\.io\/([\w-]+)\/pen\/([\w-]+)/);
             if (match)
-                return `<iframe src="https://codepen.io/${match[1]}/embed/${match[2]}?default-tab=result" frameborder="0" style="width:100%;height:100%;aspect-ratio:16/10" allowfullscreen></iframe>`;
+                {return `<iframe src="https://codepen.io/${match[1]}/embed/${match[2]}?default-tab=result" frameborder="0" style="width:100%;height:100%;aspect-ratio:16/10" allowfullscreen></iframe>`;}
             break;
         }
         case 'loom': {
             const match = url.match(/loom\.com\/(share|embed)\/([\w-]+)/);
             if (match)
-                return `<iframe src="https://www.loom.com/embed/${match[2]}" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style="width:100%;height:100%;aspect-ratio:16/9"></iframe>`;
+                {return `<iframe src="https://www.loom.com/embed/${match[2]}" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style="width:100%;height:100%;aspect-ratio:16/9"></iframe>`;}
             break;
         }
         default:
@@ -101,7 +101,7 @@ async function resolveOembed(url: string): Promise<OEmbedData | null> {
         const res = await fetch(
             `https://noembed.com/embed?url=${encodeURIComponent(url)}&maxwidth=640`,
         );
-        if (!res.ok) return null;
+        if (!res.ok) {return null;}
         return await res.json();
     } catch {
         return null;
@@ -155,18 +155,12 @@ export function OEmbedBlock({
     const [resolvedHtml, setResolvedHtml] = useState(embedHtml || '');
     const [service, setService] = useState<EmbedServiceType>(embedType || 'generic');
 
-    useEffect(() => {
-        if (embedHtml && !resolvedHtml) {
-            setResolvedHtml(embedHtml);
-        }
-        if (embedType && service === 'generic') {
-            setService(embedType);
-        }
-    }, [embedHtml, embedType, resolvedHtml, service]);
+    const displayHtml = resolvedHtml || embedHtml || '';
+    const displayService = service === 'generic' && embedType ? embedType : service;
 
     const resolveUrl = useCallback(
         async (inputUrl: string) => {
-            if (!inputUrl.trim()) return;
+            if (!inputUrl.trim()) {return;}
             setLoading(true);
             setError('');
 
@@ -217,12 +211,12 @@ export function OEmbedBlock({
     );
 
     // If we have HTML, render it
-    if (resolvedHtml && !isEditing) {
+    if (displayHtml && !isEditing) {
         return (
             <div className="relative rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-black">
                 <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm rounded-full px-2.5 py-1 text-xs text-white">
-                    {getServiceIcon(service)}
-                    <span className="capitalize">{service}</span>
+                    {getServiceIcon(displayService)}
+                    <span className="capitalize">{displayService}</span>
                     {embedUrl && (
                         <a
                             href={embedUrl}
@@ -237,7 +231,7 @@ export function OEmbedBlock({
                 <div
                     className="w-full"
                     style={{ aspectRatio: embedAspectRatio || '16/9' }}
-                    dangerouslySetInnerHTML={{ __html: resolvedHtml }}
+                    dangerouslySetInnerHTML={{ __html: displayHtml }}
                 />
             </div>
         );
@@ -272,7 +266,7 @@ export function OEmbedBlock({
                         placeholder="Paste a URL to embed..."
                         className="flex-1 text-sm"
                         onKeyDown={(e) => {
-                            if (e.key === 'Enter') resolveUrl(url);
+                            if (e.key === 'Enter') {resolveUrl(url);}
                         }}
                     />
                     <Button

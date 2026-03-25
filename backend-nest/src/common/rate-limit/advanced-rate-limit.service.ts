@@ -23,31 +23,43 @@ export interface RateLimitResult {
 export class AdvancedRateLimitService {
   private readonly logger = new Logger(AdvancedRateLimitService.name);
 
-  /** 
+  /**
    * Quota Buffer: Caches "Allowed" status for users with high remaining quota.
    * This drastically reduces Upstash command counts for rapid actions (like block edits).
    */
-  private readonly quotaBuffer = new Map<string, {
-    allowed: boolean;
-    remaining: number;
-    resetTime: Date;
-    bufferedUntil: number
-  }>();
+  private readonly quotaBuffer = new Map<
+    string,
+    {
+      allowed: boolean;
+      remaining: number;
+      resetTime: Date;
+      bufferedUntil: number;
+    }
+  >();
 
   constructor(
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
     private readonly configService: ConfigService,
-  ) { }
+  ) {}
 
   /** In-memory fallback for development (avoids Redis round-trips per request) */
-  private readonly devMemoryStore = new Map<string, { count: number; resetAt: number }>();
+  private readonly devMemoryStore = new Map<
+    string,
+    { count: number; resetAt: number }
+  >();
 
-  private checkLimitInMemory(key: string, config: RateLimitConfig): RateLimitResult {
+  private checkLimitInMemory(
+    key: string,
+    config: RateLimitConfig,
+  ): RateLimitResult {
     const now = Date.now();
     const entry = this.devMemoryStore.get(key);
 
     if (!entry || now > entry.resetAt) {
-      this.devMemoryStore.set(key, { count: 1, resetAt: now + config.duration * 1000 });
+      this.devMemoryStore.set(key, {
+        count: 1,
+        resetAt: now + config.duration * 1000,
+      });
       return {
         allowed: true,
         remaining: config.points - 1,
@@ -74,7 +86,10 @@ export class AdvancedRateLimitService {
     key: string,
     config: RateLimitConfig,
   ): Promise<RateLimitResult> {
-    const isRedisEnabled = this.configService.get<boolean>('features.redisEnabled', true);
+    const isRedisEnabled = this.configService.get<boolean>(
+      'features.redisEnabled',
+      true,
+    );
 
     // Fallback if Redis is disabled OR in development
     if (!isRedisEnabled || process.env.NODE_ENV !== 'production') {
@@ -86,7 +101,12 @@ export class AdvancedRateLimitService {
     // --- QUOTA BUFFERING (Optimization) ---
     // If we recently saw this user had plenty of quota, allow them locally for a few seconds.
     const buffered = this.quotaBuffer.get(key);
-    if (buffered && now < buffered.bufferedUntil && buffered.allowed && buffered.remaining > (config.points * 0.2)) {
+    if (
+      buffered &&
+      now < buffered.bufferedUntil &&
+      buffered.allowed &&
+      buffered.remaining > config.points * 0.2
+    ) {
       // Return buffered result (decrement remaining slightly for UI realism)
       return {
         ...buffered,
@@ -128,13 +148,18 @@ export class AdvancedRateLimitService {
           retryAfter: blockTtl,
         };
         // Buffer the block status for 5 seconds to avoid repeated Redis checks
-        this.quotaBuffer.set(key, { ...blockedResult, bufferedUntil: now + 5000 });
+        this.quotaBuffer.set(key, {
+          ...blockedResult,
+          bufferedUntil: now + 5000,
+        });
         return blockedResult;
       }
 
       const allowed = count <= config.points;
       const remaining = Math.max(0, config.points - count);
-      const resetTime = new Date(now + (ttl > 0 ? ttl : config.duration) * 1000);
+      const resetTime = new Date(
+        now + (ttl > 0 ? ttl : config.duration) * 1000,
+      );
 
       // Set block key if exceeded and blockDuration is configured
       if (!allowed && config.blockDuration) {
@@ -150,7 +175,7 @@ export class AdvancedRateLimitService {
 
       // BUFFER SUCCESS results if they have > 20% quota left
       // Buffer for 10 seconds (avoids 10 Redis calls in 10s for active users)
-      if (allowed && remaining > (config.points * 0.2)) {
+      if (allowed && remaining > config.points * 0.2) {
         this.quotaBuffer.set(key, { ...result, bufferedUntil: now + 10000 });
       }
 

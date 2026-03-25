@@ -1,7 +1,8 @@
-/* eslint-disable react/no-array-index-key */
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ContentGovernanceLoading() {
+  const skeletonCards = [1, 2, 3];
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -12,8 +13,8 @@ export default function ContentGovernanceLoading() {
         <Skeleton className="h-10 w-40" />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-32 rounded-xl" />
+        {skeletonCards.map((id) => (
+          <Skeleton key={id} className="h-32 rounded-xl" />
         ))}
       </div>
       <Skeleton className="h-100 rounded-xl" />

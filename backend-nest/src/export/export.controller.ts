@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, UseGuards, Res } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, UseGuards, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { ExportService } from './export.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -48,4 +48,33 @@ export class ExportController {
     res.setHeader('Expires', '0');
     res.send(result.data);
   }
+
+  /**
+   * Advanced export to PPTX (allows body options)
+   */
+  @Post(':projectId/pptx')
+  @ThrottleExportPDF()
+  @Feature('highResExport')
+  async exportProjectToPptx(
+    @CurrentUser() user: { id: string },
+    @Param('projectId') projectId: string,
+    @Body() options: { includeNotes?: boolean; includeAnimations?: boolean; quality?: 'standard' | 'high' },
+    @Res() res: Response,
+  ) {
+    const result = await this.exportService.exportProject(user.id, projectId, {
+      format: 'pptx',
+      ...options,
+    });
+
+    res.setHeader('Content-Type', result.mimeType);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${result.filename}"`,
+    );
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.send(result.data);
+  }
 }
+

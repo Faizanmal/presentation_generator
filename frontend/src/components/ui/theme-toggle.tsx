@@ -1,5 +1,4 @@
 "use client";
-/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useTheme as useNextTheme } from "next-themes";
 import { motion, AnimatePresence } from "framer-motion";
@@ -11,17 +10,11 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "./dropdown-menu";
-import { useEffect, useState } from "react";
-
 type Theme = "light" | "dark" | "system";
 
 export function useTheme() {
     const { theme, setTheme, resolvedTheme, systemTheme } = useNextTheme();
-    const [mounted, setMounted] = useState(false);
-
-    useEffect(() => {
-        setMounted(true);
-    }, []);
+    const mounted = Boolean(theme);
 
     return {
         theme: (theme || "system") as Theme,

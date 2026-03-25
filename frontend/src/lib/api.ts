@@ -134,11 +134,15 @@ class ApiClient {
           this.isRefreshing = true;
 
           try {
-            const { data } = await this.client.post<{ accessToken: string }>(
+            const { data } = await this.client.post<{ accessToken: string; refreshToken: string; expiresIn: number }>(
               '/auth/refresh',
               { refreshToken: this.storedRefreshToken },
             );
             this.setToken(data.accessToken);
+            this.setRefreshToken(data.refreshToken);
+            // Clear CSRF token since session identifier changed
+            this.csrfToken = null;
+            this.csrfPromise = null;
             this.notifyRefreshed(data.accessToken);
             if (originalRequest.headers) {
               originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
@@ -702,6 +706,16 @@ class ApiClient {
     audience?: string;
     length?: number;
     type?: string;
+    style?: 'professional' | 'creative' | 'academic' | 'casual';
+    generateImages?: boolean;
+    smartLayout?: boolean;
+    additionalContext?: string;
+    brandGuidelines?: {
+      colors?: string[];
+      fonts?: string[];
+      tone?: string;
+      restrictions?: string[];
+    };
     rawData?: string; // Support for unstructured raw data inputs
   }): Promise<ThinkingGenerationResult> {
     const { data } = await this.client.post<ThinkingGenerationResult>('/ai/thinking/generate/quick', params);
@@ -1681,13 +1695,30 @@ class ApiClient {
   async exportToPptx(projectId: string, options?: {
     includeNotes?: boolean;
     includeAnimations?: boolean;
-  }): Promise<Blob> {
-    const { data } = await this.client.post(
+  }): Promise<{ blob: Blob; filename?: string }> {
+    const response = await this.client.post(
       `/export/${projectId}/pptx`,
       options,
-      { responseType: 'blob' }
+      { 
+        responseType: 'blob',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        }
+      }
     );
-    return data;
+
+    let filename: string | undefined;
+    const disposition = response.headers['content-disposition'];
+    if (disposition) {
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      if (match && match[1]) {
+        filename = match[1];
+      }
+    }
+
+    return { blob: response.data, filename };
   }
 
   async exportToVideo(projectId: string, options?: {

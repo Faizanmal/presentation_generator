@@ -183,11 +183,12 @@ export function ExportOptionsPanel({
 
         case 'pptx':
           setExportProgress(30);
-          const pptxBlob = await api.exportToPptx(projectId, {
+          const pptxResponse = await api.exportToPptx(projectId, {
             includeNotes,
             includeAnimations,
           });
-          blob = pptxBlob;
+          if (pptxResponse.filename) { filename = pptxResponse.filename; }
+          blob = pptxResponse.blob;
           break;
 
         case 'html':
@@ -260,7 +261,25 @@ export function ExportOptionsPanel({
       }
     } catch (error) {
       const err = error as AxiosError<{ message: string }>;
-      toast.error(err.response?.data?.message || 'Export failed');
+      
+      let errorMsg = 'Export failed';
+      if (err.response?.data) {
+        if (err.response.data instanceof Blob) {
+          errorMsg = await err.response.data.text().then(text => {
+            try {
+              return JSON.parse(text).message || 'Export failed';
+            } catch {
+              return 'Export failed';
+            }
+          });
+        } else {
+          errorMsg = err.response.data.message || 'Export failed';
+        }
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
+      
+      toast.error(errorMsg);
     } finally {
       setIsExporting(false);
       setTimeout(() => setExportProgress(0), 1000);
@@ -300,7 +319,7 @@ export function ExportOptionsPanel({
           Export
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-137.5">
+      <DialogContent className="sm:max-w-137.5 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Export Presentation</DialogTitle>
           <DialogDescription>
@@ -310,7 +329,7 @@ export function ExportOptionsPanel({
 
         <div className="space-y-4 py-4">
           {/* Format selection */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             {EXPORT_OPTIONS.map((option) => (
               <Card
                 key={option.id}
@@ -320,29 +339,29 @@ export function ExportOptionsPanel({
                 )}
                 onClick={() => setSelectedFormat(option.id)}
               >
-                <CardContent className="p-4">
+                <CardContent className="p-3">
                   <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                       <div className={cn(
-                        'p-2 rounded-lg',
+                        'p-1.5 rounded-md flex-shrink-0',
                         selectedFormat === option.id
                           ? 'bg-blue-500 text-white'
                           : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                       )}>
                         {option.icon}
                       </div>
-                      <div>
-                        <h4 className="font-medium text-sm">{option.name}</h4>
-                        <p className="text-xs text-slate-500">{option.description}</p>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-medium text-xs truncate">{option.name}</h4>
+                        <p className="text-xs text-slate-500 truncate">{option.description}</p>
                       </div>
                     </div>
                     {option.isPremium && (
-                      <Badge variant="secondary" className="bg-linear-to-r from-amber-100 to-yellow-100 text-amber-700">
+                      <Badge variant="secondary" className="bg-linear-to-r from-amber-100 to-yellow-100 text-amber-700 text-xs px-1.5 py-0.5 flex-shrink-0">
                         Pro
                       </Badge>
                     )}
                     {option.id === 'pdf-hifi' && (
-                      <Badge variant="secondary" className="bg-linear-to-r from-indigo-100 to-purple-100 text-indigo-700">
+                      <Badge variant="secondary" className="bg-linear-to-r from-indigo-100 to-purple-100 text-indigo-700 text-xs px-1.5 py-0.5 flex-shrink-0">
                         New
                       </Badge>
                     )}
@@ -373,6 +392,17 @@ export function ExportOptionsPanel({
                   onCheckedChange={setIncludeNotes}
                 />
               </div>
+
+              {selectedFormat === 'pptx' && (
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="include-animations" className="text-sm">Include animations</Label>
+                  <Switch
+                    id="include-animations"
+                    checked={includeAnimations}
+                    onCheckedChange={setIncludeAnimations}
+                  />
+                </div>
+              )}
 
               {(selectedFormat === 'pdf' || selectedFormat === 'pdf-hifi') && (
                 <div className="flex items-center justify-between">

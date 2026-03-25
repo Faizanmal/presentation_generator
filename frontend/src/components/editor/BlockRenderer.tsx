@@ -16,7 +16,11 @@ import { ChartBlock } from "./chart-block";
 import { ImageAIControls } from "./image-ai-controls";
 import RichTextEditor from "./RichTextEditor";
 import { OEmbedBlock } from "./oembed-block";
+import { ThreeDBlock } from "./three-d-block";
+import { BentoGridBlock } from "./bento-grid-block";
+import { TimelineBlock } from "./timeline-block";
 import type { EmbedServiceType } from "./oembed-block";
+import { motion } from "framer-motion";
 
 interface BlockRendererProps {
   block: Block;
@@ -265,7 +269,7 @@ const BlockRenderer = React.memo(({
           return (
             <div className="flex items-start gap-3 p-3 rounded-lg transition-all duration-200 hover:bg-slate-50 dark:hover:bg-slate-800/50">
               <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-xl shadow-sm"
+                className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-xl shadow-sm"
                 style={{
                   background: `linear-gradient(135deg, ${colorWithAlpha(primaryColor, 0.15)}, ${colorWithAlpha(accentColor, 0.1)})`,
                   border: `1px solid ${colorWithAlpha(primaryColor, 0.2)}`,
@@ -355,7 +359,7 @@ const BlockRenderer = React.memo(({
                 >
                   {/* Custom gradient bullet */}
                   <span
-                    className="mt-2 w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm"
+                    className="mt-2 w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
                     style={{
                       background: gradientFromColor(primaryColor),
                       boxShadow: `0 0 8px ${colorWithAlpha(primaryColor, 0.3)}`,
@@ -393,7 +397,7 @@ const BlockRenderer = React.memo(({
                 >
                   {/* Gradient number badge */}
                   <span
-                    className="mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold text-white flex-shrink-0 shadow-sm"
+                    className="mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold text-white shrink-0 shadow-sm"
                     style={{
                       background: gradientFromColor(primaryColor),
                       boxShadow: `0 2px 8px ${colorWithAlpha(primaryColor, 0.3)}`,
@@ -628,58 +632,10 @@ const BlockRenderer = React.memo(({
         );
       }
 
-      case "TIMELINE": {
-        const timelineItems = (content?.items as string[]) || ["Phase 1: Planning", "Phase 2: Development", "Phase 3: Launch"];
-        const keyedTimelineItems = buildKeyedTextItems(timelineItems, "timeline");
-        return (
-          <div className="relative pl-8">
-            {/* Vertical line */}
-            <div
-              className="absolute left-3 top-2 bottom-2 w-0.5 rounded-full"
-              style={{ background: `linear-gradient(180deg, ${primaryColor}, ${colorWithAlpha(accentColor, 0.3)})` }}
-            />
-            <div className="space-y-5">
-              {keyedTimelineItems.map(({ item, key }, i: number) => (
-                <div key={key} className="relative flex items-start gap-4 animate-fade-in-up" style={{ animationDelay: `${i * 0.1}s` }}>
-                  {/* Timeline dot */}
-                  <div
-                    className="absolute -left-5 mt-1.5 w-4 h-4 rounded-full border-2 border-white dark:border-slate-900 shadow-md flex-shrink-0 z-10"
-                    style={{
-                      background: gradientFromColor(i === 0 ? primaryColor : accentColor),
-                      boxShadow: `0 0 0 3px ${colorWithAlpha(i === 0 ? primaryColor : accentColor, 0.2)}`,
-                    }}
-                  />
-                  {/* Timeline content */}
-                  <div
-                    className="flex-1 p-4 rounded-xl transition-all duration-200 hover:shadow-md"
-                    style={{
-                      background: `linear-gradient(135deg, ${colorWithAlpha(primaryColor, 0.04)}, ${colorWithAlpha(secondaryColor, 0.02)})`,
-                      border: `1px solid ${colorWithAlpha(primaryColor, 0.1)}`,
-                    }}
-                  >
-                    <span
-                      contentEditable
-                      suppressContentEditableWarning
-                      onInput={(e) => {
-                        const items = [...timelineItems] as string[];
-                        items[i] = (e.target as HTMLElement).innerText;
-                        setContent({ ...content, items });
-                      }}
-                      onFocus={onFocus}
-                      onBlur={onBlur}
-                      className="text-base font-medium outline-none"
-                      style={{ fontFamily: theme?.fonts?.body || "'Inter', system-ui" }}
-                    >
-                      {item}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      }
-
+      case "BENTO_GRID":
+        return <BentoGridBlock content={content} theme={theme} onChange={setContent} isEditing={isActive} />;
+      case "TIMELINE":
+        return <TimelineBlock content={content} theme={theme} onChange={setContent} isEditing={isActive} />;
       case "COMPARISON": {
         const comparisonItems = ((content?.items as string[]) || [
           "Option A: Fast and simple",
@@ -850,9 +806,21 @@ const BlockRenderer = React.memo(({
         }
         return (
           <div
-            className="w-full aspect-square max-w-[120px] mx-auto rounded-lg"
+            className="w-full aspect-square max-w-30 mx-auto rounded-lg"
             style={{ backgroundColor: shapeColor, opacity: 0.2 }}
           />
+        );
+      }
+
+      case "3D_MODEL": {
+        return (
+          <div className="h-64 sm:h-80 md:h-96 w-full max-w-4xl mx-auto rounded-xl overflow-hidden shadow-2xl bg-black/5 dark:bg-white/5 backdrop-blur-md border border-black/10 dark:border-white/10 group-hover:shadow-blue-500/20 transition-all duration-300">
+            <ThreeDBlock
+              modelUrl={content?.url as string}
+              autoRotate
+              environment="sunset"
+            />
+          </div>
         );
       }
 
@@ -865,20 +833,29 @@ const BlockRenderer = React.memo(({
     }
   };
 
-  // Stagger animation delay based on block order
-  const animDelay = Math.min(blockIndex * 0.06, 0.5);
+
 
   return (
-    <div
+    <motion.div
       ref={setNodeRef}
+      layoutId={`block-${block.id}`}
       style={{
         ...style,
-        animationDelay: `${animDelay}s`,
       }}
-      className={`group relative rounded-xl transition-all duration-300 animate-fade-in-up ${isActive
+      initial={{ opacity: 0, y: 24, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -12, scale: 0.95, transition: { duration: 0.2 } }}
+      transition={{
+        delay: blockIndex * 0.05,
+        type: "spring",
+        stiffness: 300,
+        damping: 24,
+        layout: { type: "spring", stiffness: 200, damping: 25 },
+      }}
+      className={`group relative rounded-xl transition-shadow duration-300 ${isActive
         ? "ring-2 ring-blue-500/70 shadow-lg shadow-blue-500/10"
         : "hover:ring-1 hover:ring-slate-300/80 hover:shadow-md"
-        } ${isDragging ? "opacity-50 scale-[0.98]" : ""}`}
+        } ${isDragging ? "opacity-50 scale-[0.98] z-50" : ""}`}
     >
       {/* Controls */}
       <div className="absolute -left-9 top-1/2 -translate-y-1/2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
@@ -908,8 +885,10 @@ const BlockRenderer = React.memo(({
       </div>
 
       {/* Block content */}
-      <div className="p-3">{renderBlockContent()}</div>
-    </div>
+      <div className="p-3">
+        {renderBlockContent()}
+      </div>
+    </motion.div>
   );
 });
 

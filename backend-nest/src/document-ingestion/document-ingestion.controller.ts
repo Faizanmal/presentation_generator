@@ -12,6 +12,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { DocumentIngestionService } from './document-ingestion.service';
+import { IngestionResult } from './document-ingestion.service';
 
 interface IngestionOptionsDto {
   slideCount?: string;
@@ -44,7 +45,7 @@ export class DocumentIngestionController {
     @CurrentUser() user: { id: string },
     @UploadedFile() file: Express.Multer.File,
     @Body() options: IngestionOptionsDto,
-  ): Promise<any> {
+  ): Promise<IngestionResult> {
     if (!file) {
       throw new BadRequestException('No file uploaded.');
     }

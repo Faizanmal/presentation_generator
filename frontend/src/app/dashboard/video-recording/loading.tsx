@@ -1,4 +1,3 @@
-/* eslint-disable react/no-array-index-key */
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function VideoRecordingLoading() {
@@ -9,8 +8,8 @@ export default function VideoRecordingLoading() {
         <Skeleton className="h-10 w-36" />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-48 rounded-xl" />
+        {[1, 2, 3].map((id) => (
+          <Skeleton key={id} className="h-48 rounded-xl" />
         ))}
       </div>
     </div>

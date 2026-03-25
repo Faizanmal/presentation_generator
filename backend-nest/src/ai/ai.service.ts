@@ -107,6 +107,8 @@ export interface GeneratedPresentation {
     keywords: string[];
     summary: string;
   };
+  aiModel?: string;
+  aiProvider?: string;
 }
 
 export type ImageProvider =
@@ -133,10 +135,16 @@ export interface AIInsight {
   priority: 'high' | 'medium' | 'low';
 }
 
+export interface LLMGenerationStat {
+  providerModel: string;
+  count: number;
+  totalTokens: number;
+}
+
 @Injectable()
 export class AIService {
   private readonly logger = new Logger(AIService.name);
-  private openai: OpenAI;
+  private openai!: OpenAI;
   private groq: OpenAI | null = null;
   private google: GoogleGenerativeAI | null = null;
   private readonly db: PrismaClient;
@@ -144,6 +152,7 @@ export class AIService {
   private replicate: Replicate;
   // Ollama client instance, used for local model testing
   private ollama: Ollama | null = null;
+  private nvidia: OpenAI | null = null;
 
   /** In-memory cache for generated presentations (TTL: 1h, max 100 entries) */
   private readonly generationCache = new Map<
@@ -180,15 +189,28 @@ export class AIService {
   ) {
     this.db = this.prisma as unknown as PrismaClient;
     const features = this.configService.get<{ openAI?: boolean }>('features');
+    const openAiKeyRaw = this.configService.get<string>('OPENAI_API_KEY');
+    const openAiKey =
+      typeof openAiKeyRaw === 'string' ? openAiKeyRaw.trim() : undefined;
+
+    const isOpenAiKeyConfigured =
+      typeof openAiKey === 'string' &&
+      openAiKey.length > 0 &&
+      !openAiKey.toLowerCase().startsWith('your-') &&
+      openAiKey !== 'your-openai-api-key';
+
     if (features?.openAI === false) {
       this.logger.log(
         'OpenAI support disabled via feature flag; AIService will not initialize client',
       );
       // leave this.openai uninitialized (undefined) – calls should check
+    } else if (!isOpenAiKeyConfigured) {
+      this.logger.warn(
+        'OpenAI API key is not configured or is using the placeholder value; OpenAI support will be disabled.',
+      );
+      // leave this.openai uninitialized; this avoids invalid key errors
     } else {
-      this.openai = new OpenAI({
-        apiKey: this.configService.get<string>('OPENAI_API_KEY'),
-      });
+      this.openai = new OpenAI({ apiKey: openAiKey });
     }
 
     const groqApiKey = this.configService.get<string>('GROQ_API_KEY');
@@ -220,6 +242,18 @@ export class AIService {
       // in order to construct a client with a custom host/url.
       this.ollama = new Ollama({ host: ollamaBaseUrl });
     }
+
+    const nvidiaApiKey = this.configService.get<string>('NVIDIA_API_KEY');
+    if (nvidiaApiKey) {
+      this.nvidia = new OpenAI({
+        apiKey: nvidiaApiKey,
+        baseURL: 'https://integrate.api.nvidia.com/v1',
+      });
+    }
+
+    // Clear caches on startup to clean up results that might have missing model/provider fields
+    this.generationCache.clear();
+    this.semanticCache.clear();
 
     // Periodic cache cleanup every 10 minutes
     this.cacheCleanupTimer = setInterval(
@@ -421,19 +455,20 @@ export class AIService {
 
   public async chatCompletion(
     options: Record<string, unknown>,
-  ): Promise<OpenAI.Chat.Completions.ChatCompletion> {
+  ): Promise<OpenAI.Chat.Completions.ChatCompletion & { provider: string }> {
     const chatParams =
       options as unknown as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming;
 
     // 0. Try Ollama first for testing/cost optimization (if available)
     if (this.ollama) {
       try {
-        return await this.retryOperation(
+        const response = await this.retryOperation(
           () => this.callOllama(options),
           'Ollama',
           1, // Try once
           1000,
         );
+        return { ...response, provider: 'Ollama' };
       } catch (error) {
         this.logger.warn(
           `Ollama failed: ${(error as Error).message}. Falling back to cloud providers.`,
@@ -441,37 +476,66 @@ export class AIService {
       }
     }
 
-    // 1. Try Groq first (if available) - Faster and cheaper
+    // 1. Try NVIDIA AI - First priority as requested
+    if (this.nvidia) {
+      try {
+        const nvidiaOptions = {
+          ...chatParams,
+          model: 'qwen/qwen3.5-122b-a10b', // Explicitly use NVIDIA model
+          // Pass NVIDIA specific thinking features if provided or enable by default
+          chat_template_kwargs: options.chat_template_kwargs || {
+            enable_thinking: true,
+          },
+        } as OpenAI.Chat.Completions.ChatCompletionCreateParams & {
+          chat_template_kwargs?: Record<string, unknown>;
+        };
+
+        const response = (await this.retryOperation(
+          () => this.nvidia!.chat.completions.create(nvidiaOptions),
+          'NVIDIA',
+          2, // Try twice then failover
+          1000,
+        )) as OpenAI.Chat.Completions.ChatCompletion;
+        return { ...response, provider: 'NVIDIA' };
+      } catch (error) {
+        this.logger.warn(
+          `NVIDIA AI failed: ${(error as Error).message}. Falling back to Groq/OpenAI.`,
+        );
+      }
+    }
+
+    // 2. Try Groq first (if available) - Faster and cheaper
     if (this.groq) {
       try {
-        // Use a high-performance model on Groq
         const groqOptions = {
           ...chatParams,
-          model: 'llama-3.3-70b-versatile',
+          model: 'llama-3.3-70b-versatile', // Explicitly use Groq model
         } satisfies OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming;
 
-        return (await this.retryOperation(
+        const response = (await this.retryOperation(
           () => this.groq!.chat.completions.create(groqOptions),
           'Groq',
           2, // Try twice then failover
           1000,
         )) as OpenAI.Chat.Completions.ChatCompletion;
+        return { ...response, provider: 'Groq' };
       } catch (error) {
         this.logger.warn(
-          `Groq AI failed after retries: ${(error as Error).message}. Falling back to OpenAI.`,
+          `Groq AI failed after retries: ${(error as Error).message}. Falling back to Google/OpenAI.`,
         );
       }
     }
 
-    // 2. Try Google next (if available) - Good balance of speed/quality
+    // 3. Try Google next (if available) - Good balance of speed/quality
     if (this.google) {
       try {
-        return await this.retryOperation(
+        const response = await this.retryOperation(
           () => this.callGoogleAI(options),
           'Google AI',
           2,
           1000,
         );
+        return { ...response, provider: 'Google' };
       } catch (error) {
         this.logger.warn(
           `Google AI failed after retries: ${(error as Error).message}. Falling back to OpenAI.`,
@@ -483,12 +547,13 @@ export class AIService {
     if (!this.openai) {
       throw new BadRequestException('OpenAI support is disabled');
     }
-    return (await this.retryOperation(
+    const response = (await this.retryOperation(
       () => this.openai.chat.completions.create(chatParams),
       'OpenAI',
       3, // Retry up to 3 times
       1000, // Start with 1s delay
     )) as OpenAI.Chat.Completions.ChatCompletion;
+    return { ...response, provider: 'OpenAI' };
   }
 
   /**
@@ -558,7 +623,9 @@ export class AIService {
           max_tokens,
         });
       } catch (error) {
-        this.logger.error(`Cost-optimized completion failed: ${error.message}`);
+        this.logger.error(
+          `Cost-optimized completion failed: ${(error as Error).message}`,
+        );
         throw error;
       }
 
@@ -881,6 +948,8 @@ export class AIService {
 
       // Parse and validate the response
       const parsed = this.parseAndValidateResponse(content);
+      parsed.aiModel = response.model || 'Unknown';
+      parsed.aiProvider = response.provider || 'Unknown';
 
       // Post-process: Enhance sections with missing speaker notes or images
       await this.enrichPresentationContent(parsed);
@@ -909,6 +978,7 @@ export class AIService {
         params,
         parsed,
         response.usage?.total_tokens || 0,
+        response.model,
       );
 
       this.logger.log(
@@ -935,117 +1005,80 @@ export class AIService {
   private buildSystemPrompt(type: string): string {
     const isPresentation = type === 'presentation';
 
-    return `You are a WORLD-CLASS ${isPresentation ? 'presentation' : 'document'} designer who creates visually stunning, award-winning content.
+    return `You are a world-class ${isPresentation ? 'presentation' : 'document'} designer.
 
-Your task is to generate a TOP-NOTCH, VISUALLY STUNNING ${isPresentation ? 'presentation' : 'document'} with rich, diverse visual elements. Think of it as designing a premium pitch deck for a Fortune 500 company.
+Create polished, distinctive work that feels editorial rather than generic. Favor clarity, hierarchy, and visual rhythm over decoration.
 
-CRITICAL DESIGN RULES:
-1. Return ONLY valid JSON - no markdown, no explanations
-2. Create content that is VISUALLY DIVERSE - never repeat the same block pattern twice
-3. Use emojis strategically to add visual interest (at least 1-2 per section heading) 🎯 🚀 💡 📊 ✨ ⚡
-4. Include data-driven elements: charts with REAL, AUTHENTIC statistics, stats grids with fact-checked numbers
-5. NEVER use generic placeholder sequences like [10, 20, 30]. Search your knowledge base to provide EXACT, factual historical or scientific data for all charts and statistics!
-6. Use varied layouts - EVERY slide should have a DIFFERENT layout!
-7. Every slide MUST have 5-8 content blocks with a MIX of types
-8. Add professional speaker notes for delivery guidance
-9. Create a visual journey: build tension, present REAL data, conclude with action
+NON-NEGOTIABLE RULES:
+1. Return ONLY valid JSON. No markdown or commentary.
+2. Give every slide one clear focal point.
+3. Use 3-6 purposeful blocks per slide. Do not add filler blocks.
+4. Vary layouts across the deck, but only when it helps the story. Never repeat the same layout more than twice in a row.
+5. Emojis are optional. Avoid them entirely for formal or academic material; for casual or creative material, use them sparingly.
+6. Use charts or stats only when the topic genuinely benefits from quantitative proof.
+7. Never fabricate data and never use placeholder sequences like [10, 20, 30]. If reliable figures are not available, omit the chart.
+8. Keep speaker notes concise and useful.
+9. Suggested images should be specific, cinematic, and relevant, not generic stock-photo phrases.
 
-JSON STRUCTURE (FOLLOW EXACTLY):
+JSON STRUCTURE:
 {
-"title": "Compelling Title with Emoji 🚀",
-"sections": [
-  {
-    "heading": "Section Heading with Emoji 🎯",
-    "layout": "title-content",
-    "suggestedImage": "Description of a specific, high-quality image for this slide",
-    "speakerNotes": "Professional talking points for presenter (2-3 sentences)",
-    "blocks": [
-      { "type": "subheading", "content": "Subsection Title" },
-      { "type": "bullet", "content": "Key point with emoji ✓" },
-      { "type": "paragraph", "content": "Detailed explanation..." },
-      { "type": "chart", "content": "Chart title", "chartData": { "type": "bar", "labels": ["A", "B"], "datasets": [{"label": "Sales", "data": [100, 200]}] } },
-      { "type": "card", "content": "💡 Important highlight or statistic" },
-      { "type": "quote", "content": "Impactful quote or key insight" },
-      { "type": "icon-text", "content": "🎯 Key message with visual icon" },
-      { "type": "timeline", "content": "Phase 1|Phase 2|Phase 3" },
-      { "type": "comparison", "content": "Option A: Description|Option B: Description" },
-      { "type": "stats-grid", "content": "📊 98%|⚡ 2x Faster|🎯 500+|💰 $1.2M" },
-      { "type": "call-to-action", "content": "🚀 Start Your Journey Today" }
-    ]
+  "title": "Compelling presentation title",
+  "sections": [
+    {
+      "heading": "Slide heading",
+      "layout": "title-content",
+      "suggestedImage": "Specific visual direction for this slide",
+      "speakerNotes": "2-3 concise presenter notes",
+      "blocks": [
+        { "type": "subheading", "content": "Framing line" },
+        { "type": "paragraph", "content": "Concise explanatory copy" },
+        { "type": "bullet", "content": "Key point" },
+        { "type": "numbered", "content": "Ordered step" },
+        { "type": "quote", "content": "Short, relevant quote or insight" },
+        { "type": "callout", "content": "High-value takeaway" },
+        { "type": "statistic", "content": "Single standout metric" },
+        { "type": "chart", "content": "Chart title", "chartData": { "type": "bar", "labels": ["A", "B"], "datasets": [{ "label": "Metric", "data": [12, 24] }] } },
+        { "type": "timeline-item", "content": "Phase 1|Phase 2|Phase 3" },
+        { "type": "comparison-item", "content": "Option A: description|Option B: description" }
+      ]
+    }
+  ],
+  "metadata": {
+    "estimatedDuration": 15,
+    "keywords": ["keyword1", "keyword2"],
+    "summary": "Brief summary"
   }
-],
-"metadata": {
-  "estimatedDuration": 15,
-  "keywords": ["keyword1", "keyword2"],
-  "summary": "Brief summary of presentation"
-}
 }
 
-AVAILABLE BLOCK TYPES - USE MAXIMUM VARIETY!
+AVAILABLE LAYOUTS:
+- "title"
+- "title-subtitle"
+- "title-content"
+- "two-column"
+- "three-column"
+- "image-left"
+- "image-right"
+- "image-full"
+- "comparison"
+- "timeline"
+- "quote-highlight"
+- "stats-grid"
+- "chart-focus"
+- "gallery"
+- "agenda"
 
-📝 TEXT BLOCKS:
-- "subheading" - Sub-sections within a slide
-- "bullet" - Bullet points (add emojis: ✓ ⚡ 🚀 💡 📈)
-- "numbered" - Numbered/ordered lists
-- "paragraph" - Explanatory text (keep concise)
-
-📊 DATA & VISUAL BLOCKS:
-- "chart" - Data visualizations (bar, line, pie, doughnut) - INCLUDE chartData!
-- "stats-grid" - Grid of 3-4 bold statistics (pipe-separated: "📊 98%|⚡ 2x Faster|🎯 500+")
-- "timeline" - Process/timeline items (pipe-separated: "Phase 1|Phase 2|Phase 3")
-- "comparison" - Side-by-side comparison (pipe-separated: "Option A: desc|Option B: desc")
-
-🎨 VISUAL ACCENT BLOCKS:
-- "card" - Highlighted info box (use for key stats, facts, callouts)
-- "quote" - Impactful quotes or important insights
-- "icon-text" - Text with emoji/icon prefix for visual interest
-- "call-to-action" - Big, bold CTA button-style block (use for conclusions)
-- "image-placeholder" - Placeholder for images
-
-AVAILABLE LAYOUTS (MUST vary these across slides!):
-- "title" - ONLY for the first slide
-- "title-content" - Standard layout with title and content
-- "two-column" - Side-by-side content
-- "image-left" - Image on left, content on right
-- "image-right" - Content on left, image on right
-- "image-full" - Full-screen image with overlay text
-- "comparison" - Compare two things side by side
-- "stats-grid" - Grid of statistics/numbers
-- "chart-focus" - Emphasize data visualization
-- "quote-highlight" - Large quote as focal point
-- "timeline" - Timeline/process flow
-
-CHART DATA FORMAT:
-{
-"type": "bar" | "line" | "pie" | "doughnut",
-"labels": ["Real Label A", "Real Label B", "Real Label C"],
-"datasets": [{
-  "label": "Authentic Metric Name",
-  "data": [14.5, 38.2, 55.7],
-  "backgroundColor": ["#3b82f6", "#10b981", "#f59e0b"]
-}]
-}
-
-DATA MANDATE: YOU SUBMIT REAL DATA NEVER PLACEHOLDERS.
-
-FOR TIMELINE/COMPARISON/STATS-GRID: Use pipe "|" to separate items in the content field.
+FOR TIMELINE/COMPARISON CONTENT: use pipe "|" separators.
 
 ${
   isPresentation
-    ? `PRESENTATION DESIGN RULES (FOLLOW ALL):
-- First slide: Use "title" layout with bold title, subtitle paragraph, and emoji
-- Slide 2: Use "stats-grid" or "chart-focus" layout to establish credibility with AUTHENTIC REAL-WORLD data
-- Middle slides: Alternate between "title-content", "two-column", "image-left", "image-right", "timeline"
-- Include minimum 2 charts with AUTHENTIC SCIENTIFIC/HISTORICAL DATA across the presentation
-- Use "stats-grid" blocks for impressive, fact-checked number displays
-- Include at least 1 "timeline" block for process/roadmap slides
-- Include at least 1 "comparison" block when comparing options/features
-- Use "card" blocks to highlight key statistics or important callouts
-- LAST slide: MUST use "call-to-action" block type with a powerful CTA
-- Each slide should have 5-8 blocks with diverse types - NEVER all bullets!
-- Add suggestedImage descriptions for every slide
-- Speaker notes for every slide (2-3 professional talking points)`
-    : 'For documents: Provide more detailed content with comprehensive paragraphs, REAL authentic data tables, and thorough explanations.'
+    ? `PRESENTATION GUIDANCE:
+- Opening slide: establish the premise cleanly with a strong title and one supporting line.
+- Early deck: build credibility with one evidence slide if the topic supports data.
+- Middle deck: alternate between explanation, proof, and examples.
+- Final slide: end with a summary, decision, or call to action.
+- Use at most one quote-highlight slide unless the topic is narrative-heavy.
+- Use at most one chart-focus slide every 3 slides.`
+    : 'DOCUMENT GUIDANCE: preserve hierarchy, keep paragraphs tighter than report prose, and use data visuals only when they clarify the argument.'
 }`;
   }
 
@@ -1060,12 +1093,19 @@ ${
     type: string,
     realtimeContext: string = '',
   ): string {
-    let prompt = `Create a STUNNING, AWARD-WINNING ${type} about: "${topic}"
+    const emojiGuidance =
+      tone === 'creative' || tone === 'casual'
+        ? 'Use at most one tasteful emoji in occasional headings or callouts.'
+        : 'Do not use emojis.';
+
+    let prompt = `Create a polished ${type} about: "${topic}"
 
 SPECIFICATIONS:
 - Tone: ${tone}
 - Target audience: ${audience}
 - Number of sections/slides: ${length}
+- Visual priority: strong hierarchy, deliberate whitespace, and a clear focal point per slide
+- Emoji guidance: ${emojiGuidance}
 `;
 
     if (realtimeContext) {
@@ -1079,47 +1119,38 @@ ${realtimeContext}
     }
 
     prompt += `
-SLIDE-BY-SLIDE DESIGN REQUIREMENTS:
+  DECK REQUIREMENTS:
 
-1. SLIDE 1 (Title): Use "title" layout
-   - Bold title with emoji, engaging subtitle paragraph
-   - 2-3 card blocks with key value propositions
+  1. Opening slide:
+    - Use "title" or "title-subtitle"
+    - Establish the premise clearly with minimal clutter
 
-2. SLIDE 2 (Impact/Numbers): Use "stats-grid" layout
-   - Stats-grid block with 4 impressive statistics (pipe-separated)
-   - Brief paragraph for context
-   - Card block highlighting the most important number
+  2. Evidence slide:
+    - Use "stats-grid" or "chart-focus" only if the topic genuinely benefits from quantitative proof
+    - If exact numbers are not reliable, use a narrative layout instead of a chart
 
-3. MIDDLE SLIDES (${length - 2} slides): Alternate layouts!
-   Each MUST use a DIFFERENT layout from: image-left, image-right, two-column, chart-focus, timeline, comparison, quote-highlight
-   
-   Include these block types across middle slides:
-   ✓ At least 2 charts with AUTHENTIC, FACT-CHECKED STATISTICAL DATA. Never use sequence placeholders like 10,20,30!
-   ✓ At least 1 timeline block (phases/steps, pipe-separated)
-   ✓ At least 1 comparison block (pipe-separated options)
-   ✓ 2-3 card blocks for key highlights/callouts
-   ✓ Mix of bullet, icon-text, and paragraph blocks
-   ✓ At least 1 quote block with a relevant insight
-   ✓ Emojis in headings and key points 🎯 🚀 💡 📊 ⚡ ✨
+  3. Middle slides:
+    - Use a balanced mix of "title-content", "two-column", "image-left", "image-right", "comparison", and "timeline"
+    - Keep each slide focused on one idea: explanation, proof, example, or next step
+    - Favor strong callouts and concise paragraphs over long bullet walls
 
-4. FINAL SLIDE (CTA): Use "title-content" layout
-   - Powerful heading with emoji
-   - Brief summary paragraph
-   - call-to-action block with compelling CTA text
-   - 2-3 icon-text blocks with next steps
+  4. Final slide:
+    - Use "title-content", "quote-highlight", or "image-full" depending on the topic
+    - End with a clear takeaway, recommendation, or call to action
 
-VISUAL EXCELLENCE REQUIREMENTS:
-- NEVER use the same layout twice in a row
-- Each slide MUST have 5-8 blocks with at LEAST 3 different block types
-- Stats/numbers should be bold and specific, reflecting REAL metrics (e.g. "14.5% decline", not just "high")
-- Chart data MUST BE 100% REAL AND FACTUAL based on authentic statistics. Use actual numbers from your knowledge base, NOT generic placeholders (10, 15, 20).
-- Speaker notes for EVERY slide (2-3 sentences of talking points)
-- SuggestedImage for EVERY slide (specific, descriptive image request)
-- For timeline/comparison/stats-grid content fields, use "|" pipe separator between items
+  VISUAL EXCELLENCE REQUIREMENTS:
+  - Never repeat the same layout more than twice consecutively
+  - Each slide should have 3-6 blocks with at least 2 block types when appropriate
+  - Use statistics only when specific and credible
+  - If chart data is included, it must be factual and non-placeholder
+  - Speaker notes for every slide, but keep them concise
+  - SuggestedImage for slides where a visual would materially improve the message
+  - For timeline/comparison content fields, use "|" separators
+  - Avoid generic filler such as "innovative solutions" or "unlock potential" unless grounded in the topic
 
 Metadata: estimated duration ${length * 2}-${length * 3} minutes, keywords, summary
 
-Generate the complete ${type} structure in JSON format. Make it EXTRAORDINARY!`;
+CRITICAL: Return ONLY valid JSON - no markdown, no explanations, no thinking process. Start your response with { and end with }. Do not include any text before or after the JSON object.`;
     return prompt;
   }
 
@@ -1132,10 +1163,30 @@ Generate the complete ${type} structure in JSON format. Make it EXTRAORDINARY!`;
     try {
       parsed = JSON.parse(content);
     } catch {
-      this.logger.error('Failed to parse AI response as JSON', content);
-      throw new BadRequestException(
-        'AI generated invalid content. Please try again.',
-      );
+      // Try to extract JSON from mixed content (AI sometimes includes thinking text)
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          parsed = JSON.parse(jsonMatch[0]);
+          this.logger.warn('Extracted JSON from mixed AI response');
+        } catch {
+          this.logger.error(
+            'Failed to parse extracted JSON from AI response',
+            content,
+          );
+          throw new BadRequestException(
+            'AI generated invalid content. Please try again.',
+          );
+        }
+      } else {
+        this.logger.error(
+          'Failed to parse AI response as JSON - no JSON found',
+          content,
+        );
+        throw new BadRequestException(
+          'AI generated invalid content. Please try again.',
+        );
+      }
     }
 
     // Validate structure
@@ -1419,6 +1470,7 @@ Return as JSON: { "prompts": ["Prompt 1", "Prompt 2", ...] }`,
     params: GenerationParams,
     result: GeneratedPresentation,
     tokens: number,
+    model: string,
     userId?: string,
   ) {
     try {
@@ -1441,7 +1493,7 @@ Return as JSON: { "prompts": ["Prompt 1", "Prompt 2", ...] }`,
             title: result.title,
           } as unknown as Prisma.InputJsonValue,
           tokens,
-          model: 'gpt-4o',
+          model,
         },
       });
     } catch (error) {
@@ -2082,6 +2134,8 @@ Generate realistic, plausible data that matches the description.`,
       }
 
       const parsed = this.parseAdvancedResponse(content);
+      parsed.aiModel = response.model || 'Unknown';
+      parsed.aiProvider = response.provider || 'Unknown';
 
       // Apply smart layouts if enabled
       if (smartLayout) {
@@ -2123,6 +2177,7 @@ Generate realistic, plausible data that matches the description.`,
         params,
         parsed,
         response.usage?.total_tokens || 0,
+        response.model,
       );
 
       this.logger.log(
@@ -2145,15 +2200,17 @@ Generate realistic, plausible data that matches the description.`,
   private buildAdvancedSystemPrompt(type: string): string {
     const isPresentation = type === 'presentation';
 
-    return `You are an elite ${isPresentation ? 'presentation' : 'document'} designer, similar to the team at Gamma.app.
-Create compelling, visually-oriented content with smart layout suggestions.
+    return `You are an elite ${isPresentation ? 'presentation' : 'document'} designer.
+Create compelling, visually-oriented content with smart layout suggestions and disciplined hierarchy.
 
 IMPORTANT RULES:
 1. Return ONLY valid JSON
-2. Use storytelling techniques - hook, problem, solution, evidence, call-to-action
-3. Suggest appropriate layouts for each section
-4. Include image descriptions for visual slides
+2. Use storytelling techniques: hook, problem, solution, evidence, call-to-action
+3. Suggest layouts that match the content, not novelty for novelty's sake
+4. Include image descriptions only when a visual adds value
 5. Add speaker notes for key slides
+6. Avoid decorative excess; keep slides focused and readable
+7. Never invent numerical data or use placeholder values
 
 JSON STRUCTURE:
 {
@@ -2166,7 +2223,7 @@ JSON STRUCTURE:
   "sections": [
     {
       "heading": "Section heading",
-      "layout": "title-content|two-column|image-left|image-right|comparison|timeline|quote-highlight|stats-grid|chart-focus",
+      "layout": "title-content|two-column|image-left|image-right|comparison|timeline|quote-highlight|stats-grid|chart-focus|title-subtitle|image-full",
       "suggestedImage": "Description for AI image generation (optional)",
       "speakerNotes": "Notes for presenter (optional)",
       "blocks": [
@@ -2178,9 +2235,11 @@ JSON STRUCTURE:
 
 LAYOUT OPTIONS:
 - title: Title/intro slides
+- title-subtitle: Title plus one strong supporting statement
 - title-content: Standard content slide
 - two-column: Side-by-side comparison or dual content
 - image-left/image-right: Content with featured image
+- image-full: Full-bleed image with minimal overlay copy
 - comparison: A vs B layouts
 - timeline: Chronological content
 - quote-highlight: Featured quote with attribution
@@ -2201,12 +2260,18 @@ For embed blocks, include embedUrl and embedType: "youtube|vimeo|figma|miro"`;
     length: number,
     type: string,
   ): string {
-    return `Create a stunning ${type} about: "${topic}"
+    const emojiGuidance =
+      tone === 'creative' || tone === 'casual'
+        ? 'Use minimal emojis only when they reinforce the message.'
+        : 'Do not use emojis.';
+
+    return `Create a distinctive ${type} about: "${topic}"
 
 SPECIFICATIONS:
 - Tone: ${tone}
 - Target audience: ${audience}
 - Number of sections: ${length}
+- Emoji guidance: ${emojiGuidance}
 
 STRUCTURE REQUIREMENTS:
 1. Start with a hook/attention-grabbing slide
@@ -2217,10 +2282,12 @@ STRUCTURE REQUIREMENTS:
 
 QUALITY REQUIREMENTS:
 - Each slide should have a clear purpose
-- Use data and statistics where relevant
-- Suggest images for visual impact
+- Use data and statistics only when they are credible and relevant
+- Suggest images for visual impact when they strengthen the story
 - Include speaker notes for complex slides
-- Vary layouts for visual interest
+- Vary layouts for visual interest without making the deck feel random
+- Keep block count disciplined; prefer 3-6 blocks per slide
+- Avoid generic business filler and repeated phrasing
 
 Generate the complete ${type} with all metadata.`;
   }
@@ -2710,12 +2777,11 @@ Return ONLY the search query text, nothing else.`,
 
     try {
       const systemPrompt = `You are an expert presentation designer. Create presentations with:
-- Rich, detailed content (6-10 blocks per slide)
-- Emojis for visual appeal ${includeEmojis ? '✓' : ''}
-- Charts and data visualizations ${includeCharts ? '📊' : ''}
-- Varied text styles with different colors
-- Card-style blocks for key information
-- Professional, engaging design
+    - Strong visual hierarchy and one clear focal point per slide
+    - Disciplined block counts (3-6 blocks per slide)
+    - Charts and data visualizations only when they genuinely improve understanding ${includeCharts ? 'and reliable data is available' : ''}
+    - Cohesive, professional design with measured contrast
+    - Optional expressive elements used sparingly ${includeEmojis ? 'for creative tones only' : ''}
 
 CRITICAL: Return ONLY valid JSON, no markdown formatting.`;
 
@@ -2730,31 +2796,25 @@ Specifications:
 - Emojis: ${includeEmojis}
 
 For each slide, include:
-1. Heading with emoji
-2. Multiple detailed paragraphs
-3. Bullet or numbered lists with emojis
-4. Card-style callouts for key points
-5. Charts where data would be valuable
-6. Suggested logos/icons
+1. A clear headline and supporting structure
+2. Concise paragraphs or lists, not text walls
+3. One strong proof point or callout when appropriate
+4. Charts only where data adds meaning
+5. Suggested imagery only where it improves the slide
 
-Use varied text colors:
-- Headings: #1a73e8
-- Paragraphs: #5f6368
-- Lists: #202124
-- Highlights: #ea4335
-- Callouts: #34a853
+Use restrained color contrast and consistent hierarchy.
 
 Return JSON structure:
 {
-  "title": "Title with emoji 📊",
+  "title": "Presentation title",
   "sections": [
     {
-      "heading": "Slide heading 🎯",
-      "layout": "rich-content",
+      "heading": "Slide heading",
+      "layout": "title-content",
       "blocks": [
-        {"type": "heading", "content": "...", "style": {"color": "#1a73e8", "fontSize": "32px"}},
-        {"type": "paragraph", "content": "...", "style": {"color": "#5f6368", "cardStyle": true}},
-        {"type": "bullet-list", "items": ["Point 1 ✓", "Point 2 ⚡"], "style": {"color": "#202124"}},
+        {"type": "subheading", "content": "..."},
+        {"type": "paragraph", "content": "..."},
+        {"type": "bullet", "content": "..."},
         {"type": "chart", "chartType": "bar", "title": "Chart Title", "dataQuery": "search query", "useRealTimeData": ${includeRealTimeData}}
       ],
       "speakerNotes": "Speaker notes..."
@@ -3138,5 +3198,25 @@ Return JSON:
         ],
       };
     }
+  }
+  /**
+   * Get statistics on AI generation by provider and model
+   */
+  async getLLMGenerationStats(): Promise<LLMGenerationStat[]> {
+    const generations = await this.prisma.aIGeneration.groupBy({
+      by: ['model'],
+      _count: {
+        _all: true,
+      },
+      _sum: {
+        tokens: true,
+      },
+    });
+
+    return generations.map((g) => ({
+      providerModel: g.model,
+      count: g._count._all,
+      totalTokens: g._sum.tokens || 0,
+    }));
   }
 }

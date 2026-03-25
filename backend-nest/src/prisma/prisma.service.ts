@@ -37,7 +37,9 @@ export class PrismaService
     }
 
     const isProd = process.env.NODE_ENV === 'production';
-    const isSupabase = connectionString.includes('supabase.com') || connectionString.includes('supabase.co');
+    const isSupabase =
+      connectionString.includes('supabase.com') ||
+      connectionString.includes('supabase.co');
 
     const pool = new Pool({
       connectionString,
@@ -49,7 +51,7 @@ export class PrismaService
         10,
       ),
       // Fix for 'self-signed certificate in certificate chain' on Supabase/Railway
-      ssl: (isProd || isSupabase) ? { rejectUnauthorized: false } : undefined,
+      ssl: isProd || isSupabase ? { rejectUnauthorized: false } : undefined,
     });
 
     // surface low‑level errors from the pg pool so they show up in our logs

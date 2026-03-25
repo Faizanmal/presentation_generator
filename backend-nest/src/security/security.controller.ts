@@ -9,17 +9,20 @@ import {
   Delete,
   Put,
   Query,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { MfaService } from './mfa.service';
-import { RbacService, Permission } from './rbac.service';
+import { RbacService, Permission, Role } from './rbac.service';
 import { SamlService } from './saml.service';
 import { ComplianceService, ComplianceStandard } from './compliance.service';
 import { BackupService } from './backup.service';
 import { SiemService } from './siem.service';
 import { ThreatDetectionService } from './threat-detection.service';
 import { RequirePermission } from './guards/permission.decorator';
+
+type AlertStatus = 'open' | 'investigating' | 'resolved' | 'false_positive';
 
 @ApiTags('Security')
 @Controller('api/security')
@@ -122,7 +125,12 @@ export class SecurityController {
     @Param('userId') userId: string,
     @Body() body: { role: string },
   ) {
-    await this.rbacService.assignRole(userId, body.role as any);
+    const role = body.role as Role;
+    if (!Object.values(Role).includes(role)) {
+      throw new BadRequestException('Invalid role');
+    }
+
+    await this.rbacService.assignRole(userId, role);
     return { success: true };
   }
 
@@ -133,7 +141,7 @@ export class SecurityController {
   @RequirePermission(Permission.ADMIN_SETTINGS)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Configure SAML SSO for organization' })
-  async configureSaml(
+  configureSaml(
     @Body()
     body: {
       tenantId: string;
@@ -173,7 +181,7 @@ export class SecurityController {
   @RequirePermission(Permission.ADMIN_SETTINGS)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Generate compliance report' })
-  async getComplianceReport(@Param('standard') standard: string) {
+  getComplianceReport(@Param('standard') standard: string) {
     return this.complianceService.generateComplianceReport(
       standard as ComplianceStandard,
     );
@@ -222,7 +230,7 @@ export class SecurityController {
   @RequirePermission(Permission.ADMIN_SETTINGS)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'List all backups' })
-  async listBackups() {
+  listBackups() {
     return this.backupService.listBackups();
   }
 
@@ -231,7 +239,7 @@ export class SecurityController {
   @RequirePermission(Permission.ADMIN_SETTINGS)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get backup statistics' })
-  async getBackupStats() {
+  getBackupStats() {
     return this.backupService.getBackupStats();
   }
 
@@ -278,7 +286,13 @@ export class SecurityController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get security alerts' })
   async getSecurityAlerts(@Query('status') status?: string) {
-    return this.siemService.getAlerts(status as any);
+    return this.siemService.getAlerts(
+      status as unknown as
+        | 'open'
+        | 'investigating'
+        | 'resolved'
+        | 'false_positive',
+    );
   }
 
   @Put('siem/alerts/:alertId/status')
@@ -290,7 +304,10 @@ export class SecurityController {
     @Param('alertId') alertId: string,
     @Body() body: { status: string },
   ) {
-    await this.siemService.updateAlertStatus(alertId, body.status as any);
+    await this.siemService.updateAlertStatus(
+      alertId,
+      body.status as unknown as AlertStatus,
+    );
     return { success: true };
   }
 

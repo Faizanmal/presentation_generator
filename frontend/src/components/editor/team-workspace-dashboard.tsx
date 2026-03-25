@@ -1,5 +1,4 @@
 'use client';
-/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api';
@@ -196,10 +195,15 @@ export function TeamWorkspaceDashboard() {
     }
   }, [orgId]);
 
+   
   useEffect(() => {
-    if (isOpen) {
-      fetchData();
-    }
+    if (!isOpen) { return; }
+
+    const frame = requestAnimationFrame(() => {
+      void fetchData();
+    });
+
+    return () => cancelAnimationFrame(frame);
   }, [isOpen, fetchData]);
 
   const getRoleIcon = (role: TeamMember['role']) => {

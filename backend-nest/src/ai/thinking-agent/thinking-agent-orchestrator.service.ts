@@ -55,7 +55,7 @@ export class ThinkingAgentOrchestratorService {
     private readonly generatorAgent: GeneratorAgentService,
     private readonly criticAgent: CriticAgentService,
     private readonly researchAgent: ResearchAgentService,
-  ) { }
+  ) {}
 
   // Token budget limits per quality level (to prevent runaway costs)
   private readonly TOKEN_BUDGETS = {
@@ -378,22 +378,22 @@ export class ThinkingAgentOrchestratorService {
       // Use the last reflection result instead of re-reflecting (saves tokens!)
       const qualityReport = lastReflectionResult
         ? this.criticAgent.generateQualityReport(
-          lastReflectionResult.reflection,
-        )
+            lastReflectionResult.reflection,
+          )
         : {
-          overallScore: state.qualityScore * 10,
-          breakdown: {
-            contentQuality: 70,
-            structureQuality: 70,
-            engagementPotential: 70,
-            visualRichness: 70,
-            audienceAlignment: 70,
-            originality: 70,
-          },
-          suggestions: [],
-          comparisonToTarget: (state.qualityScore / 8) * 100,
-          passedThreshold: state.qualityScore >= state.targetQualityScore,
-        };
+            overallScore: state.qualityScore * 10,
+            breakdown: {
+              contentQuality: 70,
+              structureQuality: 70,
+              engagementPotential: 70,
+              visualRichness: 70,
+              audienceAlignment: 70,
+              originality: 70,
+            },
+            suggestions: [],
+            comparisonToTarget: (state.qualityScore / 8) * 100,
+            passedThreshold: state.qualityScore >= state.targetQualityScore,
+          };
 
       const metadata: GenerationMetadata = {
         totalTokensUsed: totalTokens,
@@ -474,13 +474,33 @@ export class ThinkingAgentOrchestratorService {
         transitionPoints: ['After introduction', 'Before conclusion'],
       },
       visualStrategy: {
-        colorMood: 'professional',
-        imageStyle: 'photography',
-        chartPreference: 'clean-minimal',
-        layoutVariety: ['title-content', 'two-column', 'image-right'],
+        colorMood: params.brandGuidelines?.colors?.length
+          ? 'bold'
+          : params.style === 'creative'
+            ? 'vibrant'
+            : 'professional',
+        imageStyle:
+          params.style === 'creative' ? 'illustration' : 'photography',
+        chartPreference: params.audience?.toLowerCase().includes('executive')
+          ? 'clean-minimal'
+          : 'infographic',
+        layoutVariety: [
+          'title-subtitle',
+          'stats-grid',
+          'title-content',
+          'two-column',
+          'image-right',
+          'comparison',
+          'timeline',
+          'chart-focus',
+        ],
       },
       estimatedSlides: params.length || 6,
-      keyMessages: [params.topic],
+      keyMessages: [
+        params.topic,
+        `Why ${params.topic} matters`,
+        `What should happen next about ${params.topic}`,
+      ],
       potentialChallenges: [],
     };
 
@@ -502,6 +522,8 @@ export class ThinkingAgentOrchestratorService {
         style: params.style,
         generateImages: params.generateImages,
         rawData: params.rawData,
+        additionalContext: params.additionalContext,
+        brandGuidelines: params.brandGuidelines,
       },
     );
 
@@ -872,9 +894,9 @@ export class ThinkingAgentOrchestratorService {
       params.rawData
         ? Promise.resolve(params.rawData)
         : this.researchAgent
-          .conductResearch(params.topic, [])
-          .then((r) => r.summary)
-          .catch(() => ''),
+            .conductResearch(params.topic, [])
+            .then((r) => r.summary)
+            .catch(() => ''),
     ]);
 
     this.logger.log(`✅ Parallel planning + research complete`);

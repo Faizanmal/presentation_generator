@@ -348,10 +348,9 @@ export class DataResidencyService {
     organizationId: string,
   ): Promise<{ downloadUrl: string; expiresAt: Date }> {
     // Collect all user data
-    const userData = await this.collectUserData(userId, organizationId);
+    const _userData = await this.collectUserData(userId, organizationId);
 
     // Generate export file
-    const exportData = JSON.stringify(userData, null, 2);
     const exportKey = `gdpr-exports/${organizationId}/${userId}/${Date.now()}.json`;
 
     // TODO: Upload to S3 in the correct region
@@ -425,7 +424,7 @@ export class DataResidencyService {
 
   private async collectUserData(
     userId: string,
-    organizationId: string,
+    _organizationId: string,
   ): Promise<object> {
     const [user, projects, activities] = await Promise.all([
       this.prisma.user.findUnique({

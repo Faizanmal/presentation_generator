@@ -256,7 +256,10 @@ export class ThemesService {
         }
       }
     } catch (error) {
-      this.logger.error('Failed to seed themes during startup:', (error as Error).message);
+      this.logger.error(
+        'Failed to seed themes during startup:',
+        (error as Error).message,
+      );
       // We don't throw here to allow the application to continue starting even if seeding fails
     }
   }

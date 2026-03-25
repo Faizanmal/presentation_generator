@@ -71,10 +71,12 @@ export class ImageAcquisitionService implements OnModuleDestroy {
   constructor(private readonly configService: ConfigService) {
     const isProd = process.env.NODE_ENV === 'production';
     // Use absolute path in production to avoid ambiguity with CWD
-    const defaultDir = isProd ? '/app/uploads/acquired-images' : './uploads/acquired-images';
-    
+    const defaultDir = isProd
+      ? '/app/uploads/acquired-images'
+      : './uploads/acquired-images';
+
     this.uploadDir = this.configService.get('UPLOAD_DIR') || defaultDir;
-    
+
     // We don't await this as it's called in a constructor, but we handle errors inside
     void this.ensureUploadDir();
 
@@ -150,7 +152,9 @@ export class ImageAcquisitionService implements OnModuleDestroy {
   async acquireImage(options: ImageAcquisitionOptions): Promise<AcquiredImage> {
     // Check if downloading is disabled
     if (!this.configService.get<boolean>('features.imageDownload')) {
-      throw new Error('Image downloading from external sources is currently disabled');
+      throw new Error(
+        'Image downloading from external sources is currently disabled',
+      );
     }
 
     this.logger.log(

@@ -1,10 +1,11 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as speakeasy from 'speakeasy';
 import * as QRCode from 'qrcode';
 import { Inject } from '@nestjs/common';
 import { Redis } from 'ioredis';
 import * as crypto from 'crypto';
+import twilio from 'twilio';
 
 export interface MfaSetupResult {
   secret: string;
@@ -235,8 +236,6 @@ export class MfaService {
 
     if (twilioSid && twilioToken && twilioFrom) {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const twilio = require('twilio');
         const client = twilio(twilioSid, twilioToken);
         await client.messages.create({
           body: `Your PresentationDesigner MFA code is: ${code}. It expires in 5 minutes.`,

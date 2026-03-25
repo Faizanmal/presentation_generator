@@ -1153,4 +1153,17 @@ Format as a numbered list with clear structure.`;
     await this.usersService.incrementAIGenerations(user.id, 2);
     return { analysis };
   }
+  /**
+   * Get overall AI generation statistics by provider
+   */
+  @Get('stats')
+  @HttpCode(HttpStatus.OK)
+  async getGenerationStats() {
+    const stats = await this.aiService.getLLMGenerationStats();
+    return {
+      success: true,
+      stats,
+      message: 'LLM generation statistics retrieved successfully',
+    };
+  }
 }

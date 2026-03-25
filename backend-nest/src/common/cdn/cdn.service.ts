@@ -737,7 +737,10 @@ export class CDNService {
       // @ts-expect-error optional dependency—it may not exist at compile time
       const awsCloudWatch = (await import('@aws-sdk/client-cloudwatch').catch(
         () => null,
-      )) as null | { CloudWatchClient: any; GetMetricStatisticsCommand: any };
+      )) as null | {
+        CloudWatchClient: unknown;
+        GetMetricStatisticsCommand: unknown;
+      };
       if (!awsCloudWatch) {
         throw new Error('CloudWatch module not available');
       }
@@ -747,11 +750,10 @@ export class CDNService {
       type CloudWatchClientType = new (opts: { region: string }) => {
         send: (cmd: unknown) => Promise<unknown>;
       };
-      const CloudWatchClientCtor =
-        CloudWatchClient as unknown as CloudWatchClientType;
+      const CloudWatchClientCtor = CloudWatchClient as CloudWatchClientType;
       type GetMetricStatisticsCommandType = new (input: unknown) => unknown;
       const GetMetricStatisticsCommandCtor =
-        GetMetricStatisticsCommand as unknown as GetMetricStatisticsCommandType;
+        GetMetricStatisticsCommand as GetMetricStatisticsCommandType;
 
       const cloudWatch = new CloudWatchClientCtor({ region });
 
@@ -760,7 +762,7 @@ export class CDNService {
         { Name: 'Region', Value: 'Global' },
       ];
 
-      const [requestsResult, bytesResult] = (await Promise.all([
+      const [requestsResult, bytesResult] = await Promise.all([
         cloudWatch.send(
           new GetMetricStatisticsCommandCtor({
             Namespace: 'AWS/CloudFront',
@@ -783,17 +785,18 @@ export class CDNService {
             Statistics: ['Sum'],
           }),
         ),
-      ])) as [any, any];
+      ]);
 
       const requestsDataPoints =
-        (requestsResult.Datapoints as Array<{ Sum?: number }> | undefined) ||
-        [];
+        ((requestsResult as { Datapoints?: Array<{ Sum?: number }> })
+          .Datapoints as Array<{ Sum?: number }> | undefined) || [];
       const totalRequests = requestsDataPoints.reduce(
         (sum: number, dp) => sum + (dp.Sum || 0),
         0,
       );
       const bytesDataPoints =
-        (bytesResult.Datapoints as Array<{ Sum?: number }> | undefined) || [];
+        ((bytesResult as { Datapoints?: Array<{ Sum?: number }> })
+          .Datapoints as Array<{ Sum?: number }> | undefined) || [];
       const totalBandwidth = bytesDataPoints.reduce(
         (sum: number, dp) => sum + (dp.Sum || 0),
         0,

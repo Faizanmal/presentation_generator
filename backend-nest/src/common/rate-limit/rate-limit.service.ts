@@ -75,12 +75,17 @@ export class RateLimitService {
 
   constructor(private readonly configService: ConfigService) {
     const redisUrl = this.configService.get<string>('REDIS_URL');
+    const useRedisGlobally = this.configService.get<boolean>(
+      'RATE_LIMIT_USE_REDIS',
+      false,
+    );
+
     this.strategy = this.configService.get<RateLimitStrategy>(
       'RATE_LIMIT_STRATEGY',
       RateLimitStrategy.SLIDING_WINDOW,
     );
 
-    if (redisUrl) {
+    if (redisUrl && useRedisGlobally) {
       const redisOptions: import('ioredis').RedisOptions = {
         lazyConnect: true,
         maxRetriesPerRequest: null,
@@ -98,20 +103,24 @@ export class RateLimitService {
       this.redis = client;
 
       // Attach error listener immediately
-      client.on('error', (err: any) => {
-        if (err.code === 'ECONNREFUSED') {
-          this.logger.error(`RateLimit Redis connection failed: ${err.message}`);
+      client.on('error', (err: Error) => {
+        if ((err as { code?: string }).code === 'ECONNREFUSED') {
+          this.logger.error(
+            `RateLimit Redis connection failed: ${err.message}`,
+          );
         } else {
           this.logger.error('RateLimit Redis error:', err);
         }
       });
 
       // Initiate connection
-      void client.connect().catch(() => { });
+      void client.connect().catch(() => {});
 
-      this.logger.log('Rate Limit Service initialized with Redis (lazy-load)');
+      this.logger.log('Rate Limit Service initialized with Redis (heavy mode)');
     } else {
-      this.logger.log('Rate Limit Service initialized with in-memory store');
+      this.logger.log(
+        `Rate Limit Service initialized with in-memory store (Mode: ${redisUrl ? 'Manual/Safe' : 'Default'})`,
+      );
     }
   }
 
@@ -547,7 +556,7 @@ export class RateLimitMiddleware implements NestMiddleware {
   constructor(
     private readonly rateLimitService: RateLimitService,
     private readonly configService: ConfigService,
-  ) { }
+  ) {}
 
   async use(req: Request, res: Response, next: NextFunction) {
     const config: RateLimitConfig = {

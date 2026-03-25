@@ -217,7 +217,7 @@ export class UsersService {
   /**
    * Create subscription for user
    */
-  async createSubscription(userId: string) {
+  async createSubscription(userId: string): Promise<unknown> {
     return this.prisma.subscription.create({
       data: {
         userId,

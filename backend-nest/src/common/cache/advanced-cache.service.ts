@@ -11,7 +11,7 @@ interface CacheOptions {
 export class AdvancedCacheService {
   private readonly logger = new Logger(AdvancedCacheService.name);
 
-  constructor(@Inject('REDIS_CLIENT') private readonly redis: Redis) { }
+  constructor(@Inject('REDIS_CLIENT') private readonly redis: Redis) {}
 
   /**
    * Get value from cache with automatic deserialization

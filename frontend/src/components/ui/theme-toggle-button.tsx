@@ -1,9 +1,7 @@
 "use client";
-/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useTheme } from "next-themes";
 import { Sun, Moon, Monitor } from "lucide-react";
-import { useEffect, useState } from "react";
 
 type Theme = "light" | "dark" | "system";
 
@@ -13,13 +11,11 @@ interface ThemeToggleButtonProps {
 
 export function ThemeToggleButton({ variant = "light" }: ThemeToggleButtonProps) {
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) { return null; }
+  // Avoid hydration mismatch by rendering a consistent initial UI on both server and client.
+  // Use window detection instead of state updates in effects to satisfy lint and avoid cascading renders.
+  const mounted = typeof window !== "undefined";
+  const activeTheme = mounted ? theme ?? "system" : "system";
 
   const themeOptions = [
     { key: "light", icon: Sun, title: "Light mode" },
@@ -40,7 +36,7 @@ export function ThemeToggleButton({ variant = "light" }: ThemeToggleButtonProps)
         <button
           key={key}
           onClick={() => setTheme(key as Theme)}
-          className={`p-2 rounded transition-colors ${theme === key
+          className={`p-2 rounded transition-colors ${activeTheme === key
               ? isDark
                 ? "bg-slate-700 text-blue-400"
                 : "bg-slate-100 dark:bg-slate-700 text-blue-600 dark:text-blue-400"

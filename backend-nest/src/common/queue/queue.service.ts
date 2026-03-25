@@ -77,8 +77,8 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     this.redisConnection = new Redis(redisUrl, redisOptions);
 
     // Immediate error handler to prevent unhandled error event
-    this.redisConnection.on('error', (err: any) => {
-      if (err.code === 'ECONNREFUSED') {
+    this.redisConnection.on('error', (err: Error) => {
+      if ((err as { code?: string }).code === 'ECONNREFUSED') {
         this.logger.error(`Queue Redis connection failed: ${err.message}`);
       } else {
         this.logger.error('Queue Redis error:', err);
@@ -340,7 +340,6 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
    * Get queue statistics efficiently using a pipeline
    */
   async getQueueStats(queueName: string): Promise<QueueStats> {
-    const queue = this.getQueue(queueName);
     const pipeline = this.redisConnection!.pipeline();
 
     pipeline.zcard(`bull:${queueName}:wait`);

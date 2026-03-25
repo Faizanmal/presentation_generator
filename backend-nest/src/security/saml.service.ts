@@ -37,8 +37,8 @@ interface SamlifyStatic {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const saml: SamlifyStatic = require('samlify');
+import * as samlImport from 'samlify';
+const saml = samlImport as unknown as SamlifyStatic;
 
 export interface SamlConfig {
   entityId: string;
@@ -77,8 +77,12 @@ export class SamlService {
 
     // Suppress samlify missing signatureConfig warning
     const originalWarn = console.warn;
-    console.warn = (...args: any[]) => {
-      if (typeof args[0] === 'string' && args[0].includes('missing signatureConfig')) return;
+    console.warn = (...args: unknown[]) => {
+      if (
+        typeof args[0] === 'string' &&
+        args[0].includes('missing signatureConfig')
+      )
+        return;
       originalWarn(...args);
     };
 
@@ -199,7 +203,7 @@ export class SamlService {
     } catch (error) {
       this.logger.error('SAML response validation failed:', error);
       // preserve original error as cause for diagnostics
-      throw new Error('Invalid SAML response', { cause: error as Error });
+      throw new Error('Invalid SAML response', { cause: error });
     }
   }
 

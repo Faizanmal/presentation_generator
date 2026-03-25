@@ -54,6 +54,7 @@ const SlidePanel = React.memo(({
   // Theme-based colors
   const bgColor = theme?.colors?.background || "#ffffff";
   const primaryColor = theme?.colors?.primary || "#3b82f6";
+  const accentColor = theme?.colors?.accent || "#10b981";
 
   // Determine if this is a title slide
   const isTitleSlide = slide.layout === 'title' || index === 0;
@@ -121,14 +122,22 @@ const SlidePanel = React.memo(({
         className="aspect-16/10 p-2.5 relative overflow-hidden"
         style={{ backgroundColor: bgColor }}
       >
-        {/* Decorative accent for title slides */}
+        {/* Ambient mesh gradient decoration */}
         {isTitleSlide && (
-          <div
-            className="absolute -top-4 -right-4 w-16 h-16 rounded-full opacity-15"
-            style={{
-              background: `radial-gradient(circle, ${primaryColor}, transparent)`,
-            }}
-          />
+          <>
+            <div
+              className="absolute -top-6 -right-6 w-20 h-20 rounded-full opacity-20 blur-md"
+              style={{
+                background: `radial-gradient(circle, ${primaryColor}, transparent)`,
+              }}
+            />
+            <div
+              className="absolute -bottom-4 -left-4 w-14 h-14 rounded-full opacity-10 blur-sm"
+              style={{
+                background: `radial-gradient(circle, ${accentColor || primaryColor}, transparent)`,
+              }}
+            />
+          </>
         )}
 
         {/* Mini representation of slide content */}

@@ -223,6 +223,9 @@ export class AudienceAdaptationService {
     }
 
     // Log the adaptation
+    // Using a generic model name that identifies the operation better
+    const modelUsed = 'Audience-Adaptation-Service';
+
     await this.prisma.aIGeneration.create({
       data: {
         userId,
@@ -230,7 +233,7 @@ export class AudienceAdaptationService {
         prompt: `Audience adaptation: ${options.targetAudience}`,
         response: JSON.stringify({ adaptedSlides }),
         tokens: 0,
-        model: 'gpt-4o',
+        model: modelUsed,
       },
     });
 

@@ -287,12 +287,12 @@ export class MobilePwaService {
   /**
    * Get app update info
    */
-  async getAppUpdateInfo(currentVersion: string): Promise<{
+  getAppUpdateInfo(currentVersion: string): {
     updateAvailable: boolean;
     latestVersion: string;
     releaseNotes?: string;
     forceUpdate: boolean;
-  }> {
+  } {
     const latestVersion = '2.0.0'; // Would come from config/database
     const minSupportedVersion = '1.5.0';
 
@@ -326,13 +326,13 @@ export class MobilePwaService {
    * Get mobile-optimized presentation data
    */
   async getMobilePresentation(
-    userId: string,
+    _userId: string,
     presentationId: string,
     options: {
       quality?: 'low' | 'medium' | 'high';
       includeAssets?: boolean;
     } = {},
-  ) {
+  ): Promise<unknown> {
     const presentation = await this.prisma.presentation.findUnique({
       where: { id: presentationId },
       include: {
@@ -368,25 +368,37 @@ export class MobilePwaService {
   }
 
   private optimizeBlockForMobile(
-    block: any,
+    block: unknown,
     quality: 'low' | 'medium' | 'high',
-  ) {
-    const optimized = { ...block };
+  ): unknown {
+    const blockData = block as {
+      type?: string;
+      content?: Record<string, unknown> & { url?: string };
+    };
+    const optimized = { ...(blockData as Record<string, unknown>) };
 
     // Optimize image URLs based on quality
-    if (block.type === 'IMAGE' && block.content?.url) {
-      const sizeMap = { low: 480, medium: 720, high: 1080 };
+    if (blockData.type === 'IMAGE' && blockData.content?.url) {
+      const sizeMap: Record<'low' | 'medium' | 'high', number> = {
+        low: 480,
+        medium: 720,
+        high: 1080,
+      };
       optimized.content = {
-        ...block.content,
-        mobileUrl: `${block.content.url}?w=${sizeMap[quality]}`,
+        ...blockData.content,
+        mobileUrl: `${blockData.content.url}?w=${sizeMap[quality]}`,
       };
     }
 
     // Optimize video blocks
-    if (block.type === 'VIDEO' && block.content?.url) {
-      const qualityMap = { low: '360p', medium: '720p', high: '1080p' };
+    if (blockData.type === 'VIDEO' && blockData.content?.url) {
+      const qualityMap: Record<'low' | 'medium' | 'high', string> = {
+        low: '360p',
+        medium: '720p',
+        high: '1080p',
+      };
       optimized.content = {
-        ...block.content,
+        ...blockData.content,
         mobileQuality: qualityMap[quality],
       };
     }
@@ -400,7 +412,7 @@ export class MobilePwaService {
   async getMobileAnalytics(
     userId: string,
     period: 'day' | 'week' | 'month' = 'week',
-  ) {
+  ): Promise<unknown> {
     const daysMap = { day: 1, week: 7, month: 30 };
     const startDate = new Date(
       Date.now() - daysMap[period] * 24 * 60 * 60 * 1000,

@@ -28,7 +28,8 @@ interface SlideContent {
   }>;
 }
 
-interface IngestionResult {
+export interface IngestionResult {
+  success?: boolean;
   originalFilename: string;
   mimeType: string;
   extractedTextLength: number;
@@ -74,7 +75,7 @@ export class DocumentIngestionService {
     this.validateMimeType(mimeType as SupportedMimeType);
 
     // 2. Extract raw text from the document
-    const rawText = await this.extractText(fileBuffer, mimeType);
+    const rawText = this.extractText(fileBuffer, mimeType);
 
     if (!rawText || rawText.trim().length < 50) {
       throw new BadRequestException(
@@ -136,10 +137,7 @@ export class DocumentIngestionService {
   /**
    * Extract raw text from various document formats
    */
-  private async extractText(
-    fileBuffer: Buffer,
-    mimeType: string,
-  ): Promise<string> {
+  private extractText(fileBuffer: Buffer, mimeType: string): string {
     switch (mimeType) {
       case 'text/plain':
       case 'text/markdown':
@@ -189,7 +187,7 @@ export class DocumentIngestionService {
    * We parse the raw PDF buffer for text objects.
    * For production, consider pdf-parse or pdfjs-dist.
    */
-  private async extractTextFromPdf(fileBuffer: Buffer): Promise<string> {
+  private extractTextFromPdf(fileBuffer: Buffer): string {
     try {
       // Lightweight PDF text extraction
       // Looks for text between BT/ET markers and parenthesized strings
@@ -200,7 +198,7 @@ export class DocumentIngestionService {
       const parenRegex = /\(([^)\\]*(?:\\.[^)\\]*)*)\)/g;
       let match;
       while ((match = parenRegex.exec(pdfString)) !== null) {
-        const decoded = match[1]
+        const decoded = (match[1] as string)
           .replace(/\\n/g, '\n')
           .replace(/\\r/g, '\r')
           .replace(/\\t/g, '\t')
@@ -215,11 +213,11 @@ export class DocumentIngestionService {
       // Strategy 2: Look for hex-encoded text streams
       const hexRegex = /<([0-9A-Fa-f\s]+)>/g;
       while ((match = hexRegex.exec(pdfString)) !== null) {
-        const hex = match[1].replace(/\s/g, '');
+        const hex = (match[1] as string).replace(/\s/g, '');
         if (hex.length > 4 && hex.length % 2 === 0) {
           try {
-            const decoded = Buffer.from(hex, 'hex').toString(
-              'utf-16be' as BufferEncoding,
+            const decoded = new TextDecoder('utf-16be').decode(
+              Buffer.from(hex, 'hex'),
             );
             if (decoded.trim().length > 0 && /[a-zA-Z]/.test(decoded)) {
               textChunks.push(decoded);
@@ -252,7 +250,7 @@ export class DocumentIngestionService {
    * Extract text from DOCX (Office Open XML)
    * DOCX is a ZIP containing XML files — we extract from word/document.xml
    */
-  private async extractTextFromDocx(fileBuffer: Buffer): Promise<string> {
+  private extractTextFromDocx(fileBuffer: Buffer): string {
     try {
       // DOCX is a ZIP file. We need to find word/document.xml
       // Simple approach: look for the XML content in the buffer
@@ -263,8 +261,8 @@ export class DocumentIngestionService {
       const wtRegex = /<w:t[^>]*>([^<]*)<\/w:t>/g;
       let match;
       while ((match = wtRegex.exec(bufStr)) !== null) {
-        if (match[1].trim()) {
-          textParts.push(match[1]);
+        if ((match[1] as string).trim()) {
+          textParts.push(match[1] as string);
         }
       }
 

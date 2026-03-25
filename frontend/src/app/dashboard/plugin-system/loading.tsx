@@ -1,4 +1,3 @@
-/* eslint-disable react/no-array-index-key */
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function PluginSystemLoading() {
@@ -20,8 +19,8 @@ export default function PluginSystemLoading() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         <Skeleton className="h-10 w-64" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-48 rounded-lg" />
+          {[1, 2, 3, 4, 5, 6].map((id) => (
+            <Skeleton key={id} className="h-48 rounded-lg" />
           ))}
         </div>
       </main>

@@ -184,6 +184,9 @@ export class ThinkingAgentController {
       qualityLevel: 'standard',
       maxThinkingIterations: 1,
       targetQualityScore: 6,
+      additionalContext: body.additionalContext,
+      rawData: body.rawData,
+      brandGuidelines: body.brandGuidelines,
     };
 
     const result = await this.orchestrator.generateQuick(params);

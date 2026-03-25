@@ -1,4 +1,4 @@
-import { Module, OnModuleInit } from '@nestjs/common';
+import { Module, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
@@ -113,46 +113,62 @@ import featureFlagsConfig from './common/config/feature-flags.config';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
         const url = configService.get<string>('REDIS_URL');
-        const isProd = process.env.NODE_ENV === 'production';
 
         const commonOptions = {
           maxRetriesPerRequest: null,
-          // Production safety: reduce heartbeat chatter
-          // Extension of lock duration and stalled interval reduces periodic checks
-          lockDuration: isProd ? 60000 : 30000,
-          stalledInterval: isProd ? 60000 : 30000,
+          // CRITICAL: Reduce Redis command count for free tiers
+          // Increase lock duration and staggered check intervals to minimize heartbeat 'chatter'
+          lockDuration: 300000, // 5 minutes (standard is 30s)
+          stalledInterval: 300000, // Check for stalled jobs every 5 mins
+          maxStalledCount: 1, // Don't keep retrying stalled jobs too much
+
           retryStrategy: (times: number) => {
-            if (times > 5) return null;
-            return 5000;
+            if (times > 5) return null; // stop retrying after 5 attempts
+            return 10000; // wait 10s between reconnects
           },
         };
 
-        const connection = isProd && url ? new (require('ioredis'))(url, {
-          ...commonOptions,
-          ...(url.startsWith('rediss://') && { tls: { rejectUnauthorized: false } }),
-        }) : {
-          host: configService.get('REDIS_HOST') || 'localhost',
-          port: configService.get('REDIS_PORT') || 6379,
-          ...commonOptions,
-        };
+        const connection = url
+          ? {
+              url: url,
+              ...commonOptions,
+              ...(url.startsWith('rediss://') && {
+                tls: { rejectUnauthorized: false },
+              }),
+            }
+          : {
+              host: configService.get('REDIS_HOST') || 'localhost',
+              port: configService.get('REDIS_PORT') || 6379,
+              password: configService.get('REDIS_PASSWORD'),
+              ...commonOptions,
+            };
 
-        // If it's a Redis instance, attach error listener immediately
-        if (typeof (connection as any).on === 'function') {
-          (connection as any).on('error', (err: any) => {
-            const bullLogger = new (require('@nestjs/common').Logger)('BullMQ');
-            if (err.code === 'ECONNREFUSED') {
-              bullLogger.error(`BullMQ Redis connection failed: ${err.message}`);
+        if ('on' in connection && typeof connection.on === 'function') {
+          (
+            connection as {
+              on: (event: string, handler: (err: Error) => void) => void;
+            }
+          ).on('error', (err: Error) => {
+            const bullLogger = new Logger('BullMQ');
+            if (
+              err.message.includes('LimitReached') ||
+              err.message.includes('command limit')
+            ) {
+              bullLogger.error(
+                '❌ REDIS LIMIT REACHED! AI Generation will fail until Redis is upgraded/reset.',
+              );
             } else {
-              bullLogger.error('BullMQ Redis Error:', err);
+              bullLogger.warn(`BullMQ Redis Error: ${err.message}`);
             }
           });
         }
 
         return {
-          connection: connection as any,
+          connection: connection,
           defaultJobOptions: {
-            removeOnComplete: true,
-            removeOnFail: { count: 100 },
+            removeOnComplete: true, // Auto-clean finished jobs to save memory/commands
+            removeOnFail: { count: 10 },
+            attempts: 1, // Minimize retries that burn through limits
           },
         };
       },
@@ -280,7 +296,7 @@ import featureFlagsConfig from './common/config/feature-flags.config';
   ],
 })
 export class AppModule implements OnModuleInit {
-  constructor(private readonly themesService: ThemesService) { }
+  constructor(private readonly themesService: ThemesService) {}
 
   async onModuleInit() {
     // Seed default themes on startup

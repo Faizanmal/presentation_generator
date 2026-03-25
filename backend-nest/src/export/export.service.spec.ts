@@ -231,5 +231,19 @@ describe('ExportService', () => {
       const result = await service.canExport('user-1');
       expect(result).toBe(false);
     });
+
+    it('should return true when exportPremiumEnabled feature flag is on', async () => {
+      jest.spyOn(service['configService'], 'get').mockImplementation((key: string) => {
+        if (key === 'features') {
+          return { exportPremiumEnabled: true };
+        }
+        return null;
+      });
+      mockUsersService.getSubscription.mockResolvedValue({
+        plan: 'FREE',
+      });
+      const result = await service.canExport('user-1');
+      expect(result).toBe(true);
+    });
   });
 });

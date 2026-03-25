@@ -76,8 +76,7 @@ export function AIChatPanel({
         if (projectId && !sessionId && !createSessionMutation.isPending) {
             createSessionMutation.mutate(projectId);
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [projectId]);
+    }, [projectId, sessionId, createSessionMutation]);
 
     // Send message mutation
     const sendMessageMutation = useMutation({

@@ -1,5 +1,14 @@
 import type { Metadata } from "next";
-import { Inter, Playfair_Display } from "next/font/google";
+import { 
+  Inter, 
+  Playfair_Display, 
+  Sora, 
+  Space_Grotesk, 
+  Outfit, 
+  Bebas_Neue,
+  DM_Serif_Display,
+  DM_Sans
+} from "next/font/google";
 import { Toaster } from "@/components/ui/sooner";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { AuthProvider } from "@/components/providers/auth-provider";
@@ -16,15 +25,17 @@ if (typeof window !== 'undefined') {
   setupErrorTracking();
 }
 
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-});
+const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
+const playfair = Playfair_Display({ variable: "--font-playfair", subsets: ["latin"] });
+const sora = Sora({ variable: "--font-sora", subsets: ["latin"] });
+const spaceGrotesk = Space_Grotesk({ variable: "--font-space-grotesk", subsets: ["latin"] });
+const outfit = Outfit({ variable: "--font-outfit", subsets: ["latin"] });
+const bebasNeue = Bebas_Neue({ variable: "--font-bebas-neue", weight: "400", subsets: ["latin"] });
+const dmSerifDisplay = DM_Serif_Display({ variable: "--font-dm-serif", weight: "400", subsets: ["latin"] });
+const dmSans = DM_Sans({ variable: "--font-dm-sans", subsets: ["latin"] });
 
-const playfair = Playfair_Display({
-  variable: "--font-playfair",
-  subsets: ["latin"],
-});
+const fontClasses = `${inter.variable} ${playfair.variable} ${sora.variable} ${spaceGrotesk.variable} ${outfit.variable} ${bebasNeue.variable} ${dmSerifDisplay.variable} ${dmSans.variable}`;
+
 
 export const metadata: Metadata = {
   title: "Presentation Designer - AI-Powered Presentations",
@@ -42,7 +53,7 @@ export default function RootLayout({
       <head>
         <GoogleTagManager />
       </head>
-      <body className={`${inter.variable} ${playfair.variable} font-sans antialiased`}>
+      <body className={`${fontClasses} font-sans antialiased`}>
         <GoogleTagManagerNoScript />
         <ThemeProvider
           attribute="class"

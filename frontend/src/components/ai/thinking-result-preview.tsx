@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import type { ThinkingGenerationResult, QualityScore } from '@/types';
 import {
     CheckCircle,
@@ -230,13 +231,17 @@ export function ThinkingResultPreview({ result, className = '' }: ThinkingResult
                                                     }}
                                                 >
                                                     {/* This img tag loads over the background image, grabbing a real image from unsplash dynamically based on the AI keyword. For production, switch to an official stock API */}
-                                                    <img
+                                                    <Image
                                                         src={`https://source.unsplash.com/featured/1200x800/?${encodeURIComponent(result.presentation.sections[currentSlideIndex].suggestedImage?.prompt.split(' ')[0] || 'business')}`}
-                                                        alt={result.presentation.sections[currentSlideIndex].suggestedImage?.prompt}
+                                                        alt={result.presentation.sections[currentSlideIndex].suggestedImage?.prompt || ''}
                                                         className="absolute inset-0 w-full h-full object-cover mix-blend-overlay opacity-90"
-                                                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                                        fill
+                                                        unoptimized
+                                                        onError={() => {
+                                                            // If the image fails to load, we keep the background placeholder.
+                                                        }}
                                                     />
-                                                    <div className="absolute inset-0 bg-linear-to-t from-slate-900/80 via-slate-900/20 to-transparent"></div>
+                                                    <div className="absolute inset-0 bg-linear-to-t from-slate-900/80 via-slate-900/20 to-transparent" />
 
                                                     <div className="absolute bottom-4 left-4 right-4 text-white">
                                                         <div className="flex items-center gap-2 mb-2">

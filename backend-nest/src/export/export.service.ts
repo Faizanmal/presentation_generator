@@ -119,6 +119,15 @@ export class ExportService {
    * Check if user can export (premium feature)
    */
   async canExport(userId: string): Promise<boolean> {
+    const featureFlags = this.configService.get('features') as {
+      exportPremiumEnabled?: boolean;
+    };
+
+    // Allow bypass in dev or explicit config override
+    if (featureFlags?.exportPremiumEnabled) {
+      return true;
+    }
+
     const subscription = await this.usersService.getSubscription(userId);
     return subscription.plan !== SubscriptionPlan.FREE;
   }

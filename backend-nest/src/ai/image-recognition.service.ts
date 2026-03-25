@@ -23,7 +23,7 @@ export interface ImageAnalysisResult {
 @Injectable()
 export class ImageRecognitionService {
   private readonly logger = new Logger(ImageRecognitionService.name);
-  private client: ImageAnnotatorClient;
+  private client: ImageAnnotatorClient | null;
   private openai: OpenAI;
 
   constructor(private readonly configService: ConfigService) {
@@ -36,7 +36,7 @@ export class ImageRecognitionService {
       this.client = new ImageAnnotatorClient({ keyFilename: keyFile });
     } else {
       // Do not instantiate without credentials to prevent MetadataLookupWarning (GCP metadata server polling)
-      this.client = null as any;
+      this.client = null;
     }
 
     this.openai = new OpenAI({
@@ -49,6 +49,12 @@ export class ImageRecognitionService {
    */
   async analyzeImage(imageUrl: string): Promise<ImageAnalysisResult> {
     try {
+      if (!this.client) {
+        throw new InternalServerErrorException(
+          'Google Vision client not configured',
+        );
+      }
+
       // 1. Perform Label, Object, and SafeSearch Detection
       const [result] = await this.client.annotateImage({
         image: { source: { imageUri: imageUrl } },

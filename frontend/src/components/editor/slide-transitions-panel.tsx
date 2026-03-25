@@ -186,7 +186,7 @@ export function SlideTransitionsPanel({
 
   const applyPreset = (presetName: string) => {
     const preset = TRANSITION_PRESETS[presetName];
-    if (!preset) return;
+    if (!preset) {return;}
     const newConfig: TransitionConfig = {
       type: preset.type as TransitionType,
       duration: preset.duration,

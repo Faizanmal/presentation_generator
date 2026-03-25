@@ -5,17 +5,10 @@ import {
     Search,
     Shapes,
     ArrowRight,
-    Type,
     LayoutGrid,
     Minus,
     Star,
     Heart,
-    CircleDot,
-    Triangle,
-    Square,
-    Hexagon,
-    Pentagon,
-    Diamond,
     Zap,
     CloudLightning,
     Flame,
@@ -29,11 +22,6 @@ import {
     AlertTriangle,
     Info,
     HelpCircle,
-    ArrowUp,
-    ArrowDown,
-    ArrowLeft,
-    ChevronsRight,
-    CornerDownRight,
     TrendingUp,
     TrendingDown,
     BarChart3,
@@ -69,7 +57,6 @@ import {
     Gem,
     Sparkles,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';

@@ -18,11 +18,19 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { toast } from "sonner";
-import type { Slide, Theme, UpdateBlockInput, BlockContent, BlockType } from "@/types";
+import type { Slide, Theme, UpdateBlockInput, BlockContent, BlockType, BlockStyle } from "@/types";
 import { api } from "@/lib/api";
 import { useEditorStore } from "@/stores/editor-store";
 import BlockRenderer from "./BlockRenderer";
 import { SlashCommandMenu, useSlashCommands } from "./slash-commands";
+import dynamic from "next/dynamic";
+import { AnimatePresence } from "framer-motion";
+
+// Lazy-load 3D background to avoid SSR issues and reduce initial bundle
+const Ambient3DBackground = dynamic(
+  () => import("./ambient-3d-background").then(m => m.Ambient3DBackground),
+  { ssr: false }
+);
 
 interface SlideCanvasProps {
   projectId: string;
@@ -46,142 +54,143 @@ const COMMAND_TO_BLOCK: Record<string, { type: BlockType; content: BlockContent 
   divider: { type: "DIVIDER", content: {} },
   columns: { type: "PARAGRAPH", content: { text: "Column layout" } },
   link: { type: "PARAGRAPH", content: { text: "Link text" } },
+  bentoGrid: { type: "BENTO_GRID", content: {
+    items: [
+      { id: '1', title: 'Revenue Growth', subtitle: '+124% YOY', icon: 'TrendingUp', color: 'accent', span: 'col-span-2 row-span-1' },
+      { id: '2', title: 'Active Users', subtitle: '45.2K', icon: 'Users', color: 'primary', span: 'col-span-1 row-span-2' },
+      { id: '3', title: 'Global Reach', subtitle: '12 Countries', icon: 'Zap', color: 'secondary', span: 'col-span-1 row-span-1' },
+      { id: '4', title: 'New Features', subtitle: 'Automated AI workflows', icon: 'Sparkles', color: 'primary', span: 'col-span-2 row-span-1' },
+    ]
+  } },
+  timeline: { type: "TIMELINE", content: {
+    items: [
+      { id: '1', title: 'Q1: Foundation', description: 'Core product development.', status: 'completed' },
+      { id: '2', title: 'Q2: Marketing', description: 'Expand user base.', status: 'current' },
+      { id: '3', title: 'Q3: Scaling', description: 'Enter new markets.', status: 'upcoming' },
+    ]
+  } },
   aiGenerate: { type: "PARAGRAPH", content: { text: "AI Generated content..." } },
+  comparison: { type: "COMPARISON", content: { items: ["Option A: Fast and simple", "Option B: Powerful and flexible"] } },
+  statsGrid: { type: "STATS_GRID", content: { items: ["📊 98% Accuracy", "⚡ 2x Faster", "🎯 500+ Users", "💰 $1.2M Saved"] } },
   // New block types
   embed: { type: "OEMBED", content: { embedUrl: "", embedType: "generic", embedHtml: "", embedAspectRatio: "16/9" } },
   shape: { type: "SHAPE", content: { svg: "", shapeName: "rectangle", shapeColor: "#3b82f6" } },
+  threeDModel: { type: "3D_MODEL", content: { url: "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/DamagedHelmet/glTF-Binary/DamagedHelmet.glb" } },
 };
 
-/** Generate a subtle decorative background SVG pattern */
-const getDecoPattern = (primaryColor: string, layout: string): React.ReactNode => {
-  const r = parseInt(primaryColor.slice(1, 3), 16);
-  const g = parseInt(primaryColor.slice(3, 5), 16);
-  const b = parseInt(primaryColor.slice(5, 7), 16);
-  const colorLight = `rgba(${r}, ${g}, ${b}, 0.04)`;
-  const colorMedium = `rgba(${r}, ${g}, ${b}, 0.07)`;
+import { motion } from "framer-motion";
+
+/** Generate a subtle decorative background SVG pattern with modern animated glass blobs */
+const getDecoPattern = (primaryColor: string, accentColor: string, layout: string): React.ReactNode => {
+  const rPrimary = parseInt(primaryColor.slice(1, 3), 16) || 59;
+  const gPrimary = parseInt(primaryColor.slice(3, 5), 16) || 130;
+  const bPrimary = parseInt(primaryColor.slice(5, 7), 16) || 246;
+  const colorLight = `rgba(${rPrimary}, ${gPrimary}, ${bPrimary}, 0.08)`;
+  const colorMedium = `rgba(${rPrimary}, ${gPrimary}, ${bPrimary}, 0.15)`;
+  
+  const rAccent = parseInt(accentColor?.slice(1, 3) || '10', 16) || 16;
+  const gAccent = parseInt(accentColor?.slice(3, 5) || 'b9', 16) || 185;
+  const bAccent = parseInt(accentColor?.slice(5, 7) || '81', 16) || 129;
+  const accentLight = `rgba(${rAccent}, ${gAccent}, ${bAccent}, 0.1)`;
 
   if (layout === 'title') {
     return (
-      <>
-        {/* Large gradient circle - top right */}
-        <div
-          className="absolute -top-20 -right-20 w-80 h-80 rounded-full opacity-60 pointer-events-none"
-          style={{
-            background: `radial-gradient(circle, ${colorMedium} 0%, transparent 70%)`,
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        {/* Animated large blob top right */}
+        <motion.div
+          animate={{
+            scale: [1, 1.1, 1],
+            rotate: [0, 90, 0],
           }}
+          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+          className="absolute -top-40 -right-40 w-[600px] h-[600px] rounded-full blur-[80px] opacity-70"
+          style={{ background: `radial-gradient(circle, ${colorMedium} 0%, transparent 70%)` }}
         />
-        {/* Smaller circle - bottom left */}
-        <div
-          className="absolute -bottom-16 -left-16 w-56 h-56 rounded-full opacity-40 pointer-events-none"
-          style={{
-            background: `radial-gradient(circle, ${colorMedium} 0%, transparent 70%)`,
+        {/* Animated blob bottom left */}
+        <motion.div
+          animate={{
+            scale: [1, 1.2, 1],
+            rotate: [0, -90, 0],
           }}
+          transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+          className="absolute -bottom-40 -left-20 w-[500px] h-[500px] rounded-full blur-[60px] opacity-60"
+          style={{ background: `radial-gradient(circle, ${accentLight} 0%, transparent 70%)` }}
         />
-        {/* Subtle diagonal line accent */}
-        <div
-          className="absolute inset-0 opacity-30 pointer-events-none"
-          style={{
-            background: `linear-gradient(135deg, transparent 40%, ${colorLight} 50%, transparent 60%)`,
-          }}
-        />
-      </>
+        {/* Noise overlay for premium texture */}
+        <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E\")" }} />
+      </div>
     );
   }
 
   if (layout === 'stats-grid' || layout === 'chart-focus') {
     return (
-      <>
-        {/* Grid dots pattern */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
         <div
-          className="absolute inset-0 opacity-20 pointer-events-none"
+          className="absolute inset-0 opacity-20"
           style={{
             backgroundImage: `radial-gradient(${colorMedium} 1px, transparent 1px)`,
-            backgroundSize: '24px 24px',
+            backgroundSize: '32px 32px',
           }}
         />
-      </>
+        <div className="absolute top-0 right-0 w-full h-[500px] bg-gradient-to-b from-white/10 to-transparent blur-3xl opacity-50 dark:from-black/10" />
+      </div>
     );
   }
 
   if (layout === 'quote-highlight') {
     return (
-      <>
-        {/* Large decorative quote background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
         <div
-          className="absolute top-4 left-4 text-[200px] leading-none font-serif opacity-[0.03] pointer-events-none select-none"
+          className="absolute -top-10 left-10 text-[300px] leading-none font-serif opacity-[0.02] pointer-events-none select-none"
           style={{ color: primaryColor }}
         >
           &ldquo;
         </div>
-        <div
-          className="absolute bottom-0 right-0 w-64 h-64 rounded-tl-full opacity-30 pointer-events-none"
-          style={{
-            background: `radial-gradient(circle at bottom right, ${colorLight} 0%, transparent 70%)`,
-          }}
+        <motion.div
+           animate={{ scale: [1, 1.05, 1], opacity: [0.3, 0.5, 0.3] }}
+           transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+           className="absolute bottom-0 right-0 w-[400px] h-[400px] rounded-tl-full blur-[40px] opacity-40"
+           style={{ background: `radial-gradient(circle at bottom right, ${colorLight} 0%, transparent 70%)` }}
         />
-      </>
+      </div>
     );
   }
 
   if (layout === 'timeline') {
     return (
-      <>
-        {/* Vertical timeline accent */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
         <div
-          className="absolute left-12 top-8 bottom-8 w-0.5 opacity-15 pointer-events-none"
-          style={{
-            background: `repeating-linear-gradient(180deg, ${primaryColor} 0px, ${primaryColor} 8px, transparent 8px, transparent 16px)`,
-          }}
+          className="absolute left-[4.5rem] top-8 bottom-8 w-px opacity-20"
+          style={{ background: `linear-gradient(to bottom, transparent, ${primaryColor}, transparent)` }}
         />
-        {/* Small dots at intervals */}
-        {[20, 40, 60, 80].map((pct) => (
-          <div
-            key={pct}
-            className="absolute left-[44px] w-2 h-2 rounded-full opacity-15 pointer-events-none"
-            style={{
-              top: `${pct}%`,
-              backgroundColor: primaryColor,
-            }}
-          />
-        ))}
-      </>
+        <div className="absolute bottom-0 right-0 w-full h-1/2 bg-gradient-to-t from-[rgba(0,0,0,0.02)] to-transparent dark:from-[rgba(255,255,255,0.02)]" />
+      </div>
     );
   }
 
   if (layout === 'comparison') {
     return (
-      <>
-        {/* Center divider */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 bg-gradient-to-r from-transparent via-[rgba(0,0,0,0.02)] to-transparent dark:via-[rgba(255,255,255,0.02)]">
         <div
-          className="absolute top-8 bottom-8 left-1/2 w-px opacity-15 pointer-events-none"
-          style={{ backgroundColor: primaryColor }}
+          className="absolute top-12 bottom-12 left-1/2 w-px opacity-20"
+          style={{ background: `linear-gradient(to bottom, transparent, ${primaryColor}, transparent)` }}
         />
-        {/* VS badge */}
-        <div
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 rounded-full opacity-10 pointer-events-none flex items-center justify-center"
-          style={{ backgroundColor: primaryColor }}
-        />
-      </>
+      </div>
     );
   }
 
   // Default subtle accent for content slides
   return (
-    <>
-      <div
-        className="absolute top-0 right-0 w-48 h-48 rounded-bl-full opacity-30 pointer-events-none"
-        style={{
-          background: `radial-gradient(circle at top right, ${colorLight} 0%, transparent 70%)`,
-        }}
+    <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+      <motion.div
+        animate={{ opacity: [0.15, 0.25, 0.15] }}
+        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute -top-40 -right-20 w-[500px] h-[500px] rounded-full blur-[80px]"
+        style={{ background: `radial-gradient(circle at center, ${colorLight} 0%, transparent 60%)` }}
       />
-      {/* Subtle bottom gradient accent */}
-      <div
-        className="absolute bottom-0 left-0 right-0 h-1 opacity-60 pointer-events-none"
-        style={{
-          background: `linear-gradient(90deg, ${colorMedium}, transparent 50%, ${colorMedium})`,
-        }}
-      />
-    </>
+      {/* Premium subtle border glow at bottom */}
+      <div className="absolute bottom-0 left-0 right-0 h-px opacity-40" style={{ background: `linear-gradient(90deg, transparent, ${colorMedium}, transparent)` }} />
+    </div>
   );
 };
 
@@ -236,6 +245,7 @@ export default function SlideCanvas({ projectId, slide, theme }: SlideCanvasProp
   const bgColor = theme?.colors?.background || "#ffffff";
   const textColor = theme?.colors?.text || "#1f2937";
   const primaryColor = theme?.colors?.primary || "#3b82f6";
+  const accentColor = theme?.colors?.accent || "#10b981";
 
   // DnD sensors
   const sensors = useSensors(
@@ -324,8 +334,8 @@ export default function SlideCanvas({ projectId, slide, theme }: SlideCanvasProp
         ...(position.width != null && { width: position.width }),
         ...(position.height != null && { height: position.height }),
       };
-      updateBlock(slide.id, blockId, { style: newStyle as import('@/types').BlockStyle });
-      updateBlockMutation.mutate({ blockId, data: { style: newStyle as import('@/types').BlockStyle } });
+      updateBlock(slide.id, blockId, { style: newStyle as BlockStyle });
+      updateBlockMutation.mutate({ blockId, data: { style: newStyle as BlockStyle } });
     },
     [slide.id, slide.blocks, updateBlock, updateBlockMutation]
   );
@@ -361,7 +371,17 @@ export default function SlideCanvas({ projectId, slide, theme }: SlideCanvasProp
         }}
       >
         {/* Decorative background pattern based on layout */}
-        {getDecoPattern(primaryColor, isTitleSlide ? 'title' : slideLayout)}
+        {getDecoPattern(primaryColor, accentColor, isTitleSlide ? 'title' : slideLayout)}
+
+        {/* Premium 3D ambient background for title slides */}
+        {isTitleSlide && (
+          <Ambient3DBackground
+            primaryColor={primaryColor}
+            accentColor={accentColor}
+            variant="floating-spheres"
+            intensity={0.45}
+          />
+        )}
 
         <div
           className={`h-full overflow-y-auto relative z-10 ${isTitleSlide
@@ -393,19 +413,21 @@ export default function SlideCanvas({ projectId, slide, theme }: SlideCanvasProp
               </div>
             ) : (
               <div className={`space-y-5 ${isTitleSlide ? "text-center w-full max-w-2xl" : ""}`}>
-                {sortedBlocks.map((block, index) => (
-                  <BlockRenderer
-                    key={block.id}
-                    block={block}
-                    theme={theme}
-                    isActive={activeBlockId === block.id}
-                    blockIndex={index}
-                    onFocus={() => setActiveBlockId(block.id)}
-                    onBlur={() => setActiveBlockId(null)}
-                    onChange={(content) => handleBlockChange(block.id, content)}
-                    onDelete={() => handleBlockDelete(block.id)}
-                  />
-                ))}
+                <AnimatePresence mode="popLayout">
+                  {sortedBlocks.map((block, index) => (
+                    <BlockRenderer
+                      key={block.id}
+                      block={block}
+                      theme={theme}
+                      isActive={activeBlockId === block.id}
+                      blockIndex={index}
+                      onFocus={() => setActiveBlockId(block.id)}
+                      onBlur={() => setActiveBlockId(null)}
+                      onChange={(content) => handleBlockChange(block.id, content)}
+                      onDelete={() => handleBlockDelete(block.id)}
+                    />
+                  ))}
+                </AnimatePresence>
 
                 {/* Slash command hint at end of content */}
                 <div className="text-slate-400/60 italic text-sm py-3 flex items-center justify-center gap-1.5">

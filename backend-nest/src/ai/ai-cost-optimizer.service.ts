@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../prisma/prisma.service';
 
 /**
  * AI Cost Optimizer Service
@@ -33,7 +34,7 @@ export class AICostOptimizerService {
   private monthlyCosts = new Map<string, number>();
 
   /** Request deduplication cache */
-  private readonly requestDedup = new Map<string, Promise<any>>();
+  private readonly requestDedup = new Map<string, Promise<unknown>>();
   private readonly dedupTimestamps = new Map<string, number>();
 
   /** Model cost configurations */
@@ -86,6 +87,14 @@ export class AICostOptimizerService {
       quality: 'medium',
     },
 
+    // NVIDIA NIM - Fast and high quality
+    {
+      provider: 'nvidia',
+      model: 'qwen/qwen3.5-122b-a10b',
+      costPerToken: 0.0000007, // Estimating based on similar models
+      speed: 'fast',
+      quality: 'high',
+    },
     // OpenAI - Expensive but high quality
     {
       provider: 'openai',
@@ -110,7 +119,10 @@ export class AICostOptimizerService {
     },
   ];
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly prisma: PrismaService,
+  ) {
     // Start cleanup interval for deduplication cache
     setInterval(() => this.cleanupDedupCache(), 60000); // Every minute
 
@@ -163,29 +175,38 @@ export class AICostOptimizerService {
       )!;
     }
 
-    // Pro tier prefers Groq (cheap and fast)
+    // Pro tier prefers NVIDIA (if available) or Groq
     if (userTier === 'pro') {
-      // For complex operations, use better Groq model
+      const nvidiaModel = this.modelCosts.find(
+        (m) => m.provider === 'nvidia' && m.model === 'qwen/qwen3.5-122b-a10b',
+      );
+      if (nvidiaModel) return nvidiaModel;
+
+      // Fallback to Groq
       if (operation === 'generation' || operation === 'analysis') {
         return this.modelCosts.find(
           (m) => m.provider === 'groq' && m.model === 'llama-3.3-70b-versatile',
         )!;
       }
-      // For simple operations, use cheaper Groq model
       return this.modelCosts.find(
         (m) => m.provider === 'groq' && m.model === 'mixtral-8x7b-32768',
       )!;
     }
 
-    // Enterprise can use OpenAI but prefer cheaper models for simple tasks
-    if (operation === 'chat' || operation === 'enhancement') {
+    // Enterprise prefers NVIDIA for generation/analysis
+    if (operation === 'generation' || operation === 'analysis') {
+      const nvidiaModel = this.modelCosts.find(
+        (m) => m.provider === 'nvidia' && m.model === 'qwen/qwen3.5-122b-a10b',
+      );
+      if (nvidiaModel) return nvidiaModel;
+
       return this.modelCosts.find(
-        (m) => m.provider === 'openai' && m.model === 'gpt-4o-mini',
+        (m) => m.provider === 'openai' && m.model === 'gpt-4o',
       )!;
     }
 
     return this.modelCosts.find(
-      (m) => m.provider === 'openai' && m.model === 'gpt-4o',
+      (m) => m.provider === 'openai' && m.model === 'gpt-4o-mini',
     )!;
   }
 
@@ -270,6 +291,8 @@ export class AICostOptimizerService {
         monthlyKey,
         (this.monthlyCosts.get(monthlyKey) || 0) + estimatedCost,
       );
+
+      // Tracking is now handled by logGeneration via AIService to avoid double-logging
 
       // Check if user exceeded limits
       this.checkCostLimits(userId, dailyKey, monthlyKey, estimatedCost);
@@ -375,7 +398,7 @@ export class AICostOptimizerService {
     // Check if identical request is in flight
     if (this.requestDedup.has(key)) {
       this.logger.log(`Deduplicating request: ${key}`);
-      return this.requestDedup.get(key)!;
+      return this.requestDedup.get(key)! as Promise<T>;
     }
 
     // Execute and cache the promise

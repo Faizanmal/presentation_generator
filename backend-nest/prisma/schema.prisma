@@ -181,6 +181,8 @@ model Project {
   generatedFromPrompt String? @db.Text
   tone                String?
   audience            String?
+  aiModel             String?    // The exact model used (e.g., gpt-4o, qwen)
+  aiProvider          String?    // The provider used (e.g., NVIDIA, OpenAI)
   metadata            Json?
   analytics           Json? // Analytics data
 

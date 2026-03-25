@@ -256,6 +256,8 @@ export class ProjectsService {
         generatedFromPrompt: generateDto.topic,
         tone: generateDto.tone,
         audience: generateDto.audience,
+        aiModel: content.aiModel,
+        aiProvider: content.aiProvider,
         themeId: defaultTheme?.id, // Auto-assign default theme
       },
     });

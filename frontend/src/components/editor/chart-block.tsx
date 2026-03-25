@@ -1,5 +1,4 @@
 'use client';
-/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
@@ -78,11 +77,16 @@ export function ChartBlock({
   // Sync internal state if external data prop changes (e.g. real AI data loaded)
   useEffect(() => {
     if (!data) { return; }
-    setChartType(data.type || 'bar');
-    setChartData(data.data || DEFAULT_DATA);
-    setTitle(data.title || '');
-    setShowLegend(data.showLegend ?? true);
-    setShowGrid(data.showGrid ?? true);
+
+    const frame = requestAnimationFrame(() => {
+      setChartType(data.type || 'bar');
+      setChartData(data.data || DEFAULT_DATA);
+      setTitle(data.title || '');
+      setShowLegend(data.showLegend ?? true);
+      setShowGrid(data.showGrid ?? true);
+    });
+
+    return () => cancelAnimationFrame(frame);
   }, [data]);
 
   const drawBarChart = useCallback((
@@ -93,22 +97,31 @@ export function ChartBlock({
   ) => {
     const chartWidth = width - padding * 2;
     const chartHeight = height - padding * 2 - (showLegend ? 30 : 0);
-    const barWidth = Math.min((chartWidth / chartData.length) * 0.5, 40); // Max width, proportional
-    const maxValue = Math.max(...chartData.map((d) => d.value), 1) * 1.15; // 15% headroom
+    const barWidth = Math.min((chartWidth / chartData.length) * 0.55, 48);
+    const maxValue = Math.max(...chartData.map((d) => d.value), 1) * 1.15;
 
-    // Draw grid
+    // Draw soft grid lines (modern style)
     if (showGrid) {
-      ctx.strokeStyle = '#f1f5f9'; // Very subtle slate-100
-      ctx.lineWidth = 1;
-      ctx.setLineDash([4, 4]); // Dashed grid
       for (let i = 0; i <= 4; i++) {
         const y = padding + (chartHeight / 4) * i;
+        const gradient = ctx.createLinearGradient(padding, y, width - padding, y);
+        gradient.addColorStop(0, 'rgba(148, 163, 184, 0)');
+        gradient.addColorStop(0.15, 'rgba(148, 163, 184, 0.12)');
+        gradient.addColorStop(0.85, 'rgba(148, 163, 184, 0.12)');
+        gradient.addColorStop(1, 'rgba(148, 163, 184, 0)');
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(padding, y);
         ctx.lineTo(width - padding, y);
         ctx.stroke();
+        // Y-axis value label
+        const val = Math.round(maxValue - (maxValue / 4) * i);
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '500 10px Inter, system-ui, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(val.toString(), padding - 8, y + 4);
       }
-      ctx.setLineDash([]); // Reset
     }
 
     // Draw bars
@@ -471,7 +484,7 @@ export function ChartBlock({
     });
   }, [chartData]);
 
-  // Draw chart on canvas
+  // Draw chart on canvas (with Retina/HiDPI support)
   const drawChart = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) { return; }
@@ -479,9 +492,19 @@ export function ChartBlock({
     const ctx = canvas.getContext('2d');
     if (!ctx) { return; }
 
-    const width = canvas.width;
-    const height = canvas.height;
-    const padding = 40;
+    // HiDPI support: scale canvas for crisp rendering on retina
+    const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
+    const logicalWidth = 400;
+    const logicalHeight = 300;
+    canvas.width = logicalWidth * dpr;
+    canvas.height = logicalHeight * dpr;
+    canvas.style.width = `${logicalWidth}px`;
+    canvas.style.height = `${logicalHeight}px`;
+    ctx.scale(dpr, dpr);
+
+    const width = logicalWidth;
+    const height = logicalHeight;
+    const padding = 45;
 
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
@@ -544,20 +567,21 @@ export function ChartBlock({
   };
 
   return (
-    <div className={cn('relative rounded-xl border border-slate-200/60 bg-white/70 backdrop-blur-md p-5 shadow-sm transition-all duration-300 hover:shadow-md dark:bg-slate-900/60 dark:border-slate-700/60 w-full h-full min-h-75', className)}>
+    <div className={cn('relative rounded-2xl border border-slate-200/40 bg-white/80 backdrop-blur-xl p-6 shadow-sm transition-all duration-300 hover:shadow-lg dark:bg-slate-900/70 dark:border-slate-700/40 w-full h-full min-h-75', className)}>
       {/* Title */}
       {title && (
-        <h3 className="text-center text-lg font-semibold text-slate-800 mb-2">
+        <h3 className="text-center text-base font-bold text-slate-800 dark:text-slate-200 mb-3 tracking-tight">
           {title}
         </h3>
       )}
 
-      {/* Chart Canvas */}
+      {/* Chart Canvas — HiDPI ready */}
       <canvas
         ref={canvasRef}
         width={400}
         height={300}
         className="w-full h-auto"
+        style={{ imageRendering: 'auto' }}
       />
 
       {/* Settings Popover (only in edit mode) */}

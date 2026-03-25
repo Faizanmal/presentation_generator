@@ -200,7 +200,7 @@ export class ComplianceReportService {
         break;
       case 'PCI-DSS':
         checks.push(
-          ...(await this.runPCIDSSChecks(organizationId, startDate, endDate)),
+          ...this.runPCIDSSChecks(organizationId, startDate, endDate),
         );
         break;
     }
@@ -211,7 +211,7 @@ export class ComplianceReportService {
   private async runSOC2Checks(
     organizationId: string,
     startDate: Date,
-    endDate: Date,
+    _endDate: Date,
   ): Promise<ComplianceCheck[]> {
     const checks: ComplianceCheck[] = [];
 
@@ -308,8 +308,8 @@ export class ComplianceReportService {
 
   private async runGDPRChecks(
     organizationId: string,
-    startDate: Date,
-    endDate: Date,
+    _startDate: Date,
+    _endDate: Date,
   ): Promise<ComplianceCheck[]> {
     const checks: ComplianceCheck[] = [];
     const policy = await this.dataResidencyService.getPolicy(organizationId);
@@ -404,7 +404,7 @@ export class ComplianceReportService {
   private async runHIPAAChecks(
     organizationId: string,
     startDate: Date,
-    endDate: Date,
+    _endDate: Date,
   ): Promise<ComplianceCheck[]> {
     const checks: ComplianceCheck[] = [];
 
@@ -480,8 +480,8 @@ export class ComplianceReportService {
 
   private async runISO27001Checks(
     organizationId: string,
-    startDate: Date,
-    endDate: Date,
+    _startDate: Date,
+    _endDate: Date,
   ): Promise<ComplianceCheck[]> {
     // Simplified ISO 27001 checks
     return [
@@ -506,17 +506,17 @@ export class ComplianceReportService {
         framework: 'ISO27001',
         category: 'A.12 - Operations Security',
         requirement: 'Logging and monitoring enabled',
-        status: await this.checkAuditLogging(organizationId, startDate),
+        status: await this.checkAuditLogging(organizationId, _startDate),
         lastChecked: new Date(),
       },
     ];
   }
 
-  private async runPCIDSSChecks(
-    organizationId: string,
-    startDate: Date,
-    endDate: Date,
-  ): Promise<ComplianceCheck[]> {
+  private runPCIDSSChecks(
+    _organizationId: string,
+    _startDate: Date,
+    _endDate: Date,
+  ): ComplianceCheck[] {
     return [
       {
         id: 'pci-1',

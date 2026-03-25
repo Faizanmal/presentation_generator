@@ -122,7 +122,7 @@ export class ImageAcquisitionController {
     private readonly imageAcquisitionService: ImageAcquisitionService,
     private readonly configService: ConfigService,
     @InjectQueue('image-acquisition') private readonly imageQueue: Queue,
-  ) { }
+  ) {}
 
   /**
    * Acquire single image (synchronous)

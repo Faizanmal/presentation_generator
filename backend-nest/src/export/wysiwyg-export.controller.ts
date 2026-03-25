@@ -8,6 +8,7 @@ import {
   Header,
 } from '@nestjs/common';
 import type { Response } from 'express';
+import puppeteer from 'puppeteer';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { WysiwygExportService } from './wysiwyg-export.service';
@@ -87,9 +88,6 @@ export class WysiwygExportController {
     quality: 'standard' | 'high',
   ): Promise<Buffer> {
     // Dynamic import to avoid hard dependency on puppeteer
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const puppeteer = require('puppeteer');
-
     const slidePages =
       await this.wysiwygService.generatePerSlideHtml(projectId);
 

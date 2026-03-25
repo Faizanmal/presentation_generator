@@ -82,6 +82,29 @@ export default function DashboardPage() {
     }
   }, [authLoading, isAuthenticated, initialized, router]);
 
+  // Refresh projects when page regains focus or becomes visible (in case generation completed while user was away)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && isAuthenticated) {
+        queryClient.invalidateQueries({ queryKey: ["projects"] });
+      }
+    };
+
+    const handleFocus = () => {
+      if (isAuthenticated) {
+        queryClient.invalidateQueries({ queryKey: ["projects"] });
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [isAuthenticated, queryClient]);
+
   // Fetch projects
   const { data: projects, isLoading: projectsLoading } = useQuery({
     queryKey: ["projects"],
@@ -132,8 +155,7 @@ export default function DashboardPage() {
       if (job?.jobId) {
         const poll = async () => {
           try {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const status = await (api as any).getProjectGenerationStatus(job.jobId);
+            const status = await api.getProjectGenerationStatus(job.jobId);
 
             if (status.state === 'completed') {
               if (status.result) {

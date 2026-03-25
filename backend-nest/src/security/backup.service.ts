@@ -62,7 +62,7 @@ export class BackupService {
 
     try {
       await this.createBackup('full');
-      await this.cleanupOldBackups();
+      this.cleanupOldBackups();
 
       this.logger.log('✓ Scheduled backup completed successfully');
     } catch (error) {
@@ -108,7 +108,7 @@ export class BackupService {
       );
 
       // Save backup metadata
-      await this.saveBackupMetadata(result);
+      this.saveBackupMetadata(result);
 
       return result;
     } catch (error) {
@@ -157,7 +157,7 @@ export class BackupService {
         archive.directory(uploadsDir, 'uploads');
       }
 
-      archive.finalize();
+      void archive.finalize();
     });
   }
 
@@ -166,7 +166,7 @@ export class BackupService {
    */
   private async createIncrementalBackup(backupPath: string): Promise<void> {
     // Get last backup timestamp
-    const lastBackup = await this.getLastBackup();
+    const lastBackup = this.getLastBackup();
     const since = lastBackup?.timestamp || new Date(0);
 
     // Export only changed data
@@ -183,7 +183,7 @@ export class BackupService {
       archive.append(JSON.stringify(data, null, 2), {
         name: 'database_incremental.json',
       });
-      archive.finalize();
+      void archive.finalize();
     });
   }
 
@@ -346,7 +346,7 @@ export class BackupService {
   /**
    * List available backups
    */
-  async listBackups(): Promise<BackupResult[]> {
+  listBackups(): BackupResult[] {
     const metadataPath = path.join(this.backupDir, 'backups.json');
 
     if (!fs.existsSync(metadataPath)) {
@@ -365,15 +365,15 @@ export class BackupService {
   /**
    * Get last backup
    */
-  private async getLastBackup(): Promise<BackupResult | null> {
-    const backups = await this.listBackups();
+  private getLastBackup(): BackupResult | null {
+    const backups = this.listBackups();
     return backups.length > 0 ? backups[0] : null;
   }
 
   /**
    * Save backup metadata
    */
-  private async saveBackupMetadata(backup: BackupResult): Promise<void> {
+  private saveBackupMetadata(backup: BackupResult): void {
     const metadataPath = path.join(this.backupDir, 'backups.json');
 
     let backups: BackupResult[] = [];
@@ -391,8 +391,8 @@ export class BackupService {
   /**
    * Cleanup old backups
    */
-  private async cleanupOldBackups(): Promise<void> {
-    const backups = await this.listBackups();
+  private cleanupOldBackups(): void {
+    const backups = this.listBackups();
     const now = Date.now();
     let deletedCount = 0;
 
@@ -494,14 +494,14 @@ export class BackupService {
   /**
    * Get backup statistics
    */
-  async getBackupStats(): Promise<{
+  getBackupStats(): {
     totalBackups: number;
     totalSize: number;
     oldestBackup: Date | null;
     newestBackup: Date | null;
     lastBackupAge: number;
-  }> {
-    const backups = await this.listBackups();
+  } {
+    const backups = this.listBackups();
 
     const totalSize = backups.reduce((sum, b) => sum + b.size, 0);
     const oldestBackup =
@@ -550,7 +550,7 @@ export class BackupService {
     }
 
     // Step 2: Verify backup
-    const lastBackup = await this.getLastBackup();
+    const lastBackup = this.getLastBackup();
     if (lastBackup && (await this.verifyBackup(lastBackup.id))) {
       steps.push({
         step: 'Verify backup',
@@ -594,11 +594,12 @@ export class BackupService {
   ): Promise<void> {
     // Use unzipper for extraction (lazy require to keep it optional)
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const unzipper = require('unzipper');
+      const { Extract } = (await import('unzipper')) as {
+        Extract: (options: { path: string }) => NodeJS.WritableStream;
+      };
       await new Promise<void>((resolve, reject) => {
         createReadStream(zipPath)
-          .pipe(unzipper.Extract({ path: targetDir }))
+          .pipe(Extract({ path: targetDir }))
           .on('close', resolve)
           .on('error', reject);
       });

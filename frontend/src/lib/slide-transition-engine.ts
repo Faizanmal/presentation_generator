@@ -260,7 +260,7 @@ export function getElementAnimationCSS(
     const delay = `${config.delay}ms`;
     const easing = EASING_CSS[config.easing] || 'ease';
 
-    if (config.type === 'none') return '';
+    if (config.type === 'none') {return '';}
 
     const animationName = `elem${config.type
         .split('-')
@@ -279,10 +279,10 @@ export function getElementAnimationCSS(
  * Call this once during application initialization.
  */
 export function injectTransitionKeyframes(): void {
-    if (typeof document === 'undefined') return;
+    if (typeof document === 'undefined') {return;}
 
     const id = 'presentation-transition-keyframes';
-    if (document.getElementById(id)) return;
+    if (document.getElementById(id)) {return;}
 
     const style = document.createElement('style');
     style.id = id;

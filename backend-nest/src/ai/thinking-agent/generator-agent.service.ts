@@ -28,7 +28,7 @@ export class GeneratorAgentService {
     private readonly configService: ConfigService,
     private readonly aiService: AIService,
     private readonly realTimeDataService: RealTimeDataService,
-  ) { }
+  ) {}
 
   /**
    * Generate a complete presentation based on the plan
@@ -369,6 +369,10 @@ Return JSON:
     },
   ): Promise<{ section: EnhancedSection; tokens: number }> {
     const layoutForType = this.getLayoutForSectionType(context.type);
+    const emojiGuidance =
+      context.tone === 'creative' || context.tone === 'casual'
+        ? 'If useful, include at most one subtle emoji in the heading or a key callout.'
+        : 'Do not use emojis.';
 
     const prompt = `You are an expert presentation content creator. Generate ONE powerful, visually rich slide.
 
@@ -385,24 +389,26 @@ SUGGESTED LAYOUT: ${layoutForType}
 ${context.rawData ? `REAL-TIME DATA & CONTEXT: "${context.rawData.substring(0, 5000)}..."` : ''}
 
 CRITICAL INSTRUCTIONS:
-1. **Charts:** If this slide discusses data, trends, or comparisons (especially if Real-Time Data is provided above), YOU MUST generate a "chart" block with realistic "chartData" based on the provided data.
-2. **Visuals:** Use relevant emojis 🌟 in headings or key points.
-3. **Card Style:** For key paragraphs, use "paragraph" blocks with 'variant': 'card'.
-4. **Data Accuracy:** EXTRACT NUMBERS from the Real-Time Data provided above. Do not hallucinate numbers if data is available.
-5. **Detail:** Provide comprehensive content (50-75 words/paragraph).
-6. **Transitions:** You MUST select an appropriate transition type from: 'none', 'fade', 'slide-left', 'slide-right', 'slide-up', 'slide-down', 'zoom-in', 'zoom-out', 'flip-x', 'flip-y', 'cube', 'cover-left', 'cover-right', 'reveal', 'dissolve', 'morph', 'swipe', 'push'. E.g. 'zoom-in' for CTAs, 'fade' for data slides.
+1. **Focus:** Give the slide one dominant message and build all blocks around it.
+2. **Charts:** Only include a "chart" block if the slide discusses data, trends, or comparisons and you have credible numbers. If data is weak or absent, use a narrative block instead.
+3. **Visuals:** ${emojiGuidance}
+4. **Card Style:** Use a paragraph or callout with 'variant': 'card' only for the single strongest takeaway, not for every block.
+5. **Data Accuracy:** Extract numbers from the Real-Time Data provided above. Never hallucinate numbers and never use placeholder sequences.
+6. **Density:** Use 3-5 purposeful blocks. Avoid filler and repeated bullet phrasing.
+7. **Copy:** Paragraphs should be concise and high signal, usually 30-55 words.
+8. **Transitions:** Select a transition type that matches the slide intent from: 'none', 'fade', 'slide-left', 'slide-right', 'slide-up', 'slide-down', 'zoom-in', 'zoom-out', 'flip-x', 'flip-y', 'cube', 'cover-left', 'cover-right', 'reveal', 'dissolve', 'morph', 'swipe', 'push'.
 
 ${context.brandGuidelines ? `BRAND GUIDELINES TO FOLLOW:\n- Colors: ${context.brandGuidelines.colors?.join(', ')}\n- Fonts: ${context.brandGuidelines.fonts?.join(', ')}\n- Tone: ${context.brandGuidelines.tone}` : ''}
 ${context.additionalContext ? `USER CUSTOM INSTRUCTIONS & DESIGN SYSTEM CONFIGURATION (CRITICAL! FOLLOW THIS strictly):\n${context.additionalContext}` : ''}
 
 Think step by step:
 1. Does the Real-Time Data contain stats/numbers relevant to this slide?
-2. If yes, create a chart (bar, line, pie) visualizing them.
-3. Structure the content to highlight these insights.
+2. If yes, decide whether a chart, statistic, or callout is the clearest way to present them.
+3. Structure the slide with a strong headline, one focal proof point, and supporting context.
 
 Return JSON:
 {
-  "heading": "Compelling heading with emoji 🚀",
+  "heading": "Compelling heading",
   "subheading": "Detailed subheading explaining the context",
   "blocks": [
     {
@@ -746,7 +752,7 @@ Return JSON:
         {
           role: 'system',
           content:
-            'You are an expert presentation creator. Always respond with valid JSON. Be creative, engaging, and professional.',
+            'You are an expert presentation creator. You must respond with valid JSON only. Do not include any explanations, comments, or text outside of the JSON structure. Your response must be parseable JSON.',
         },
         { role: 'user', content: prompt },
       ],
@@ -768,12 +774,28 @@ Return JSON:
   }
 
   /**
-   * Parse JSON with fallback
+   * Parse JSON with fallback and extraction from mixed responses
    */
   private parseJSON<T>(content: string, fallback: T): T {
     try {
+      // First try direct parsing
       return JSON.parse(content) as T;
     } catch {
+      // If direct parsing fails, try to extract JSON from mixed response
+      try {
+        // Look for JSON object/array in the response
+        const jsonMatch = content.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+        if (jsonMatch) {
+          const extractedJson = jsonMatch[0];
+          this.logger.log('Extracted JSON from mixed AI response');
+          return JSON.parse(extractedJson) as T;
+        }
+      } catch (extractError) {
+        this.logger.warn(
+          `Failed to extract JSON from mixed response: ${extractError.message}`,
+        );
+      }
+
       this.logger.warn('Failed to parse AI response, using fallback');
       return fallback;
     }

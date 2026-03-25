@@ -236,12 +236,7 @@ export class EnterpriseComplianceService {
       includePolicies?: boolean;
       period?: { start: Date; end: Date };
     } = {},
-  ): Promise<{
-    reports: ComplianceReport[];
-    auditLogs?: object;
-    policies?: object;
-    metadata: object;
-  }> {
+  ): Promise<unknown> {
     const settings = await this.getSettings(organizationId);
     const frameworks = options.frameworks || settings?.enabledFrameworks || [];
 
@@ -255,7 +250,20 @@ export class EnterpriseComplianceService {
       reports.push(report);
     }
 
-    const result: any = {
+    const result: {
+      reports: ComplianceReport[];
+      metadata: {
+        organizationId: string;
+        generatedAt: Date;
+        frameworks: ComplianceFramework[];
+        period?: { start: Date; end: Date };
+      };
+      auditLogs?: unknown;
+      policies?: {
+        dataResidency: unknown;
+        compliance: unknown;
+      };
+    } = {
       reports,
       metadata: {
         organizationId,

@@ -125,18 +125,7 @@ export function DocumentUploadPanel({
         setIsDragging(false);
     }, []);
 
-    const handleDrop = useCallback((e: React.DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsDragging(false);
-
-        const file = e.dataTransfer.files[0];
-        if (file) {
-            selectFile(file);
-        }
-    }, []);
-
-    const selectFile = (file: File) => {
+    const selectFile = useCallback((file: File) => {
         const isSupported = SUPPORTED_TYPES.some(
             (t) => t.mime === file.type || file.name.endsWith(t.ext),
         );
@@ -155,10 +144,21 @@ export function DocumentUploadPanel({
         setError(null);
         setResult(null);
         setStatus('idle');
-    };
+    }, []);
+
+    const handleDrop = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+
+        const file = e.dataTransfer.files[0];
+        if (file) {
+            selectFile(file);
+        }
+    }, [selectFile]);
 
     const handleUpload = async () => {
-        if (!selectedFile) return;
+        if (!selectedFile) {return;}
 
         setStatus('uploading');
         setProgress(10);
@@ -210,8 +210,8 @@ export function DocumentUploadPanel({
     };
 
     const formatFileSize = (bytes: number) => {
-        if (bytes < 1024) return `${bytes} B`;
-        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        if (bytes < 1024) {return `${bytes} B`;}
+        if (bytes < 1024 * 1024) {return `${(bytes / 1024).toFixed(1)} KB`;}
         return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
     };
 
@@ -238,7 +238,7 @@ export function DocumentUploadPanel({
                         className="hidden"
                         onChange={(e) => {
                             const file = e.target.files?.[0];
-                            if (file) selectFile(file);
+                            if (file) {selectFile(file);}
                         }}
                     />
                     <div className="flex flex-col items-center gap-3">
@@ -466,13 +466,13 @@ export function DocumentUploadPanel({
 
                     {/* Slide preview list */}
                     <div className="space-y-1 max-h-48 overflow-y-auto">
-                        {result.slides.map((slide, i) => (
+                        {result.slides.map((slide, index) => (
                             <div
-                                key={i}
+                                key={`${slide.title}-${slide.layout}-${slide.blocks.length}`}
                                 className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-muted/50 text-sm"
                             >
                                 <span className="text-xs text-muted-foreground font-mono w-5">
-                                    {i + 1}
+                                    {index + 1}
                                 </span>
                                 <span className="truncate">{slide.title}</span>
                                 <Badge variant="outline" className="text-[10px] ml-auto">

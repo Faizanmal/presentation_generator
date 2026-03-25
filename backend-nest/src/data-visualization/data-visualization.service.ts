@@ -404,7 +404,6 @@ export class DataVisualizationService {
     const metrics = numericColumns.map((col) => {
       const values = data.rows.map((r) => Number(r[col.name]) || 0);
       const sum = values.reduce((a, b) => a + b, 0);
-      const avg = sum / values.length;
 
       return {
         column: col.name,

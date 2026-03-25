@@ -297,7 +297,7 @@ export class EnterpriseComplianceController {
 
   @Get('regions')
   @ApiOperation({ summary: 'Get available data regions' })
-  async getAvailableRegions() {
+  getAvailableRegions() {
     return this.dataResidencyService.getAvailableRegions();
   }
 

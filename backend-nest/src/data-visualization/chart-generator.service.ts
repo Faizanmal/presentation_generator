@@ -59,7 +59,7 @@ export interface GeneratedChart {
     labels: string[];
     datasets: Array<{
       label: string;
-      data: number[];
+      data: number[] | Array<{ x: number; y: number }>;
       backgroundColor?: string | string[];
       borderColor?: string;
     }>;
@@ -244,7 +244,7 @@ export class ChartGeneratorService {
       datasets: [
         {
           label: `${xField} vs ${yField}`,
-          data: points as any,
+          data: points,
           backgroundColor: colors[0],
         },
       ],
@@ -464,11 +464,11 @@ export class ChartGeneratorService {
   /**
    * Export chart as image
    */
-  async exportChartAsImage(
+  exportChartAsImage(
     chartId: string,
     format: 'png' | 'svg' | 'pdf',
-    options?: { width?: number; height?: number },
-  ): Promise<{ imageUrl: string }> {
+    _options?: { width?: number; height?: number },
+  ): { imageUrl: string } {
     // In production, would use a charting library to render and export
     // For now, return placeholder
     return {

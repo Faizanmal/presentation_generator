@@ -14,7 +14,7 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "sh startup.sh",
+    "start:prod": "node dist/src/main.js",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" ",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -95,6 +95,7 @@
     "pg": "^8.17.2",
     "pptxgenjs": "^4.0.1",
     "prom-client": "^15.1.3",
+    "puppeteer": "^24.39.1",
     "qrcode": "^1.5.4",
     "reflect-metadata": "^0.2.2",
     "replicate": "^1.4.0",
@@ -170,6 +171,9 @@
   "overrides": {
     "hono": "^4.12.5",
     "lodash": "^4.17.23",
+    "eslint": {
+      "ajv": "6.12.6"
+    },
     "ajv": "^8.18.0",
     "@hono/node-server": "^1.19.11",
     "@tootallnate/once": "^3.0.1"

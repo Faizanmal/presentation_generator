@@ -19,17 +19,22 @@ import Redis from 'ioredis';
         const db = parseInt(configService.get<string>('REDIS_DB') || '0');
         const keyPrefix = configService.get<string>('REDIS_KEY_PREFIX') || '';
 
-        const redisOptions: any = {
+        const redisOptions: Record<string, unknown> = {
           db,
           keyPrefix,
           retryStrategy(times: number) {
-            const maxRetries = configService.get<number>('REDIS_MAX_RETRIES') || 5;
+            const maxRetries =
+              configService.get<number>('REDIS_MAX_RETRIES') || 5;
             if (times > maxRetries) {
-              logger.error(`Redis unavailable after ${maxRetries} attempts. Continuing without Redis features.`);
+              logger.error(
+                `Redis unavailable after ${maxRetries} attempts. Continuing without Redis features.`,
+              );
               return null;
             }
             const delay = 5000; // Fixed 5s delay to keep logs extremely quiet
-            logger.warn(`Redis reconnecting... (attempt ${times}/${maxRetries})`);
+            logger.warn(
+              `Redis reconnecting... (attempt ${times}/${maxRetries})`,
+            );
             return delay;
           },
           maxRetriesPerRequest: null, // Critical for robust error handling with reconnections
@@ -60,11 +65,16 @@ import Redis from 'ioredis';
         }
 
         // ATTACH ERROR LISTENER IMMEDIATELY to avoid "Unhandled error event"
-        client.on('error', (err: any) => {
+        client.on('error', (err: Error) => {
           // Suppress redundant logs if we are already in a retry loop
-          if (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND') {
+          if (
+            (err as { code?: string }).code === 'ECONNREFUSED' ||
+            (err as { code?: string }).code === 'ENOTFOUND'
+          ) {
             // These are handled by retryStrategy, just log a concise error
-            logger.error(`✗ Redis connection error (${err.code}): ${err.message}`);
+            logger.error(
+              `✗ Redis connection error (${(err as { code?: string }).code}): ${err.message}`,
+            );
           } else {
             logger.error(`✗ Redis error:`, err);
           }
@@ -90,4 +100,4 @@ import Redis from 'ioredis';
   ],
   exports: ['REDIS_CLIENT'],
 })
-export class RedisModule { }
+export class RedisModule {}

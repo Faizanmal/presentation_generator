@@ -6,6 +6,8 @@ import type { SlideTransitionType } from '@/lib/slide-transition-engine';
 
 // ----- Design Template Presets -----
 
+export const DEFAULT_DESIGN_TEMPLATE: DesignTemplateName = 'corporate-blue';
+
 export type DesignTemplateName =
     | 'modern-minimalist'
     | 'tech-dark'
@@ -14,7 +16,9 @@ export type DesignTemplateName =
     | 'elegant-serif'
     | 'bold-statement'
     | 'nature-organic'
-    | 'retro-vintage';
+    | 'retro-vintage'
+    | 'neon-cyber'
+    | 'soft-pastel';
 
 export interface DesignTemplate {
     name: DesignTemplateName;
@@ -66,127 +70,157 @@ export interface DesignSettings {
 
 export const COLOR_PALETTES: Record<DesignTemplateName, ColorPalette> = {
     'modern-minimalist': {
-        primary: '#0f172a',
-        secondary: '#64748b',
-        accent: '#3b82f6',
-        background: '#ffffff',
-        surface: '#f8fafc',
-        text: '#0f172a',
-        textMuted: '#94a3b8',
+        primary: '#111827',
+        secondary: '#475569',
+        accent: '#0ea5e9',
+        background: '#f8fafc',
+        surface: '#ffffff',
+        text: '#111827',
+        textMuted: '#64748b',
     },
     'tech-dark': {
-        primary: '#a78bfa',
+        primary: '#8b5cf6',
         secondary: '#06b6d4',
-        accent: '#22d3ee',
-        background: '#0f0f23',
-        surface: '#1a1a3e',
-        text: '#e2e8f0',
-        textMuted: '#64748b',
+        accent: '#38bdf8',
+        background: '#0b1120',
+        surface: '#111827',
+        text: '#e5eefb',
+        textMuted: '#8aa0bf',
     },
     'corporate-blue': {
-        primary: '#1e40af',
-        secondary: '#1e3a5f',
-        accent: '#3b82f6',
-        background: '#f0f4ff',
-        surface: '#dbeafe',
-        text: '#1e293b',
-        textMuted: '#64748b',
+        primary: '#163b66',
+        secondary: '#2c5282',
+        accent: '#14b8a6',
+        background: '#f5f9ff',
+        surface: '#e9f1fb',
+        text: '#10253f',
+        textMuted: '#5b7088',
     },
     'playful-gradient': {
-        primary: '#ec4899',
-        secondary: '#8b5cf6',
-        accent: '#f59e0b',
-        background: '#fdf2f8',
-        surface: '#fce7f3',
+        primary: '#db2777',
+        secondary: '#7c3aed',
+        accent: '#fb923c',
+        background: '#fff7fb',
+        surface: '#fde7f3',
         text: '#1f2937',
         textMuted: '#6b7280',
     },
     'elegant-serif': {
-        primary: '#78350f',
-        secondary: '#92400e',
-        accent: '#d97706',
-        background: '#fffbeb',
-        surface: '#fef3c7',
-        text: '#1c1917',
-        textMuted: '#78716c',
+        primary: '#6b3f1d',
+        secondary: '#8b5e34',
+        accent: '#c08457',
+        background: '#fffaf3',
+        surface: '#f7ead9',
+        text: '#2a211b',
+        textMuted: '#7c6b5c',
     },
     'bold-statement': {
-        primary: '#dc2626',
-        secondary: '#0f172a',
-        accent: '#facc15',
-        background: '#18181b',
-        surface: '#27272a',
+        primary: '#ef4444',
+        secondary: '#111827',
+        accent: '#f59e0b',
+        background: '#111111',
+        surface: '#1f2937',
         text: '#fafafa',
-        textMuted: '#a1a1aa',
+        textMuted: '#cbd5e1',
     },
     'nature-organic': {
-        primary: '#059669',
-        secondary: '#065f46',
-        accent: '#10b981',
-        background: '#f0fdf4',
-        surface: '#dcfce7',
-        text: '#14532d',
-        textMuted: '#6b7280',
+        primary: '#0f766e',
+        secondary: '#166534',
+        accent: '#84cc16',
+        background: '#f5fbf7',
+        surface: '#e3f5eb',
+        text: '#163124',
+        textMuted: '#5f7a69',
     },
     'retro-vintage': {
-        primary: '#b45309',
-        secondary: '#9a3412',
-        accent: '#ea580c',
-        background: '#fef7ed',
-        surface: '#fff7ed',
-        text: '#431407',
-        textMuted: '#78716c',
+        primary: '#9a3412',
+        secondary: '#7c2d12',
+        accent: '#d97706',
+        background: '#fff7ed',
+        surface: '#ffedd5',
+        text: '#4a1d0a',
+        textMuted: '#7c6b5c',
+    },
+    'neon-cyber': {
+        primary: '#00f5d4',
+        secondary: '#9b5de5',
+        accent: '#f15bb5',
+        background: '#0a0a1a',
+        surface: '#141428',
+        text: '#e8e8ff',
+        textMuted: '#8888aa',
+    },
+    'soft-pastel': {
+        primary: '#7c3aed',
+        secondary: '#f472b6',
+        accent: '#fb923c',
+        background: '#faf5ff',
+        surface: '#f3e8ff',
+        text: '#1e1b4b',
+        textMuted: '#6b6b99',
     },
 };
 
 export const FONT_PAIRINGS: Record<DesignTemplateName, FontPairing> = {
     'modern-minimalist': {
-        heading: 'Inter',
-        body: 'Inter',
-        label: 'Clean & Modern',
-        description: 'Minimalist geometric sans-serif',
+        heading: 'Sora',
+        body: 'Manrope',
+        label: 'Editorial Minimal',
+        description: 'Sharp sans-serif hierarchy with clean body copy',
     },
     'tech-dark': {
         heading: 'JetBrains Mono',
-        body: 'Inter',
-        label: 'Tech Mono',
-        description: 'Monospace headings with clean body',
+        body: 'Space Grotesk',
+        label: 'Futurist Console',
+        description: 'Technical edge with stronger display contrast',
     },
     'corporate-blue': {
         heading: 'Outfit',
         body: 'Source Sans 3',
-        label: 'Corporate Pro',
-        description: 'Professional and authoritative',
+        label: 'Boardroom Modern',
+        description: 'Executive clarity with polished authority',
     },
     'playful-gradient': {
         heading: 'Fredoka',
         body: 'Nunito',
-        label: 'Playful Rounded',
-        description: 'Friendly and approachable',
+        label: 'Playful Energy',
+        description: 'Rounded, expressive, and upbeat',
     },
     'elegant-serif': {
         heading: 'Playfair Display',
         body: 'Lora',
-        label: 'Classic Serif',
-        description: 'Timeless elegance',
+        label: 'Magazine Serif',
+        description: 'Sophisticated editorial contrast',
     },
     'bold-statement': {
         heading: 'Bebas Neue',
-        body: 'Roboto',
-        label: 'Bold Impact',
-        description: 'High contrast and attention-grabbing',
+        body: 'Barlow',
+        label: 'Poster Impact',
+        description: 'Punchy headlines with sturdy supporting text',
     },
     'nature-organic': {
         heading: 'DM Serif Display',
         body: 'DM Sans',
-        label: 'Organic Warmth',
-        description: 'Natural and grounded',
+        label: 'Organic Calm',
+        description: 'Warm contrast with grounded readability',
     },
     'retro-vintage': {
-        heading: 'Pacifico',
+        heading: 'Abril Fatface',
         body: 'Raleway',
-        label: 'Retro Charm',
-        description: 'Nostalgic and characterful',
+        label: 'Vintage Editorial',
+        description: 'Nostalgic display typography with cleaner body text',
+    },
+    'neon-cyber': {
+        heading: 'Space Grotesk',
+        body: 'Inter',
+        label: 'Cyber Terminal',
+        description: 'Electric futurist with geometric precision',
+    },
+    'soft-pastel': {
+        heading: 'DM Serif Display',
+        body: 'DM Sans',
+        label: 'Lavender Dream',
+        description: 'Gentle serif contrast with airy sans-serif body',
     },
 };
 
@@ -194,7 +228,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
     {
         name: 'modern-minimalist',
         label: 'Modern Minimalist',
-        description: 'Clean, spacious, focused',
+        description: 'Editorial whitespace and crisp hierarchy',
         icon: '◻️',
         colors: COLOR_PALETTES['modern-minimalist'],
         fonts: FONT_PAIRINGS['modern-minimalist'],
@@ -204,7 +238,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
     {
         name: 'tech-dark',
         label: 'Tech Dark',
-        description: 'Neon accents, dark mode',
+        description: 'High-contrast, futuristic, data-ready',
         icon: '🌃',
         colors: COLOR_PALETTES['tech-dark'],
         fonts: FONT_PAIRINGS['tech-dark'],
@@ -214,7 +248,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
     {
         name: 'corporate-blue',
         label: 'Corporate Blue',
-        description: 'Professional, trustworthy',
+        description: 'Executive polish with teal accents',
         icon: '🏢',
         colors: COLOR_PALETTES['corporate-blue'],
         fonts: FONT_PAIRINGS['corporate-blue'],
@@ -224,7 +258,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
     {
         name: 'playful-gradient',
         label: 'Playful Gradient',
-        description: 'Fun, vibrant, colorful',
+        description: 'Lively color with controlled energy',
         icon: '🎨',
         colors: COLOR_PALETTES['playful-gradient'],
         fonts: FONT_PAIRINGS['playful-gradient'],
@@ -234,7 +268,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
     {
         name: 'elegant-serif',
         label: 'Elegant Serif',
-        description: 'Classic, sophisticated',
+        description: 'Magazine-style storytelling',
         icon: '📜',
         colors: COLOR_PALETTES['elegant-serif'],
         fonts: FONT_PAIRINGS['elegant-serif'],
@@ -244,7 +278,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
     {
         name: 'bold-statement',
         label: 'Bold Statement',
-        description: 'High contrast, impactful',
+        description: 'Poster-like impact for decisive messaging',
         icon: '⚡',
         colors: COLOR_PALETTES['bold-statement'],
         fonts: FONT_PAIRINGS['bold-statement'],
@@ -254,7 +288,7 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
     {
         name: 'nature-organic',
         label: 'Nature Organic',
-        description: 'Soft, earthy, calming',
+        description: 'Soft depth with grounded contrast',
         icon: '🌿',
         colors: COLOR_PALETTES['nature-organic'],
         fonts: FONT_PAIRINGS['nature-organic'],
@@ -264,12 +298,32 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
     {
         name: 'retro-vintage',
         label: 'Retro Vintage',
-        description: 'Warm tones, character',
+        description: 'Warm editorial nostalgia without clutter',
         icon: '📻',
         colors: COLOR_PALETTES['retro-vintage'],
         fonts: FONT_PAIRINGS['retro-vintage'],
         borderRadius: '8px',
         cardStyle: 'outlined',
+    },
+    {
+        name: 'neon-cyber',
+        label: 'Neon Cyber',
+        description: 'Electric dark mode with vivid neon accents',
+        icon: '🌐',
+        colors: COLOR_PALETTES['neon-cyber'],
+        fonts: FONT_PAIRINGS['neon-cyber'],
+        borderRadius: '12px',
+        cardStyle: 'glassmorphism',
+    },
+    {
+        name: 'soft-pastel',
+        label: 'Soft Pastel',
+        description: 'Airy lavender elegance with warm rose touches',
+        icon: '🦋',
+        colors: COLOR_PALETTES['soft-pastel'],
+        fonts: FONT_PAIRINGS['soft-pastel'],
+        borderRadius: '16px',
+        cardStyle: 'elevated',
     },
 ];
 
@@ -314,7 +368,7 @@ export const TRANSITION_OPTIONS: { value: SlideTransitionType; label: string; ic
 ];
 
 // Helper to get default settings for a template
-export function getDefaultDesignSettings(template: DesignTemplateName = 'modern-minimalist'): DesignSettings {
+export function getDefaultDesignSettings(template: DesignTemplateName = DEFAULT_DESIGN_TEMPLATE): DesignSettings {
     return {
         template,
         colorPalette: COLOR_PALETTES[template],

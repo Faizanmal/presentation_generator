@@ -28,6 +28,7 @@ export interface ThinkingModeGenerationParams {
     smartLayout?: boolean;
     qualityLevel?: 'standard' | 'high' | 'premium';
     additionalContext?: string;
+    rawData?: string;
     brandGuidelines?: {
         colors?: string[];
         fonts?: string[];
@@ -121,7 +122,7 @@ export function useThinkingMode(options: UseThinkingModeOptions = {}) {
      * Quick generation without thinking loop
      */
     const generateQuick = useCallback(
-        async (params: Pick<ThinkingModeGenerationParams, 'topic' | 'tone' | 'audience' | 'length' | 'type'>) => {
+        async (params: ThinkingModeGenerationParams) => {
             setIsGenerating(true);
             setError(null);
             setResult(null);
@@ -134,6 +135,12 @@ export function useThinkingMode(options: UseThinkingModeOptions = {}) {
                     audience: params.audience,
                     length: params.length,
                     type: params.type,
+                    style: params.style,
+                    generateImages: params.generateImages,
+                    smartLayout: params.smartLayout,
+                    additionalContext: params.additionalContext,
+                    brandGuidelines: params.brandGuidelines,
+                    rawData: params.rawData,
                 });
 
                 setProgress(100);

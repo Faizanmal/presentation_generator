@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { BlockType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface SyncOperation {
@@ -8,14 +9,14 @@ export interface SyncOperation {
   type: 'CREATE' | 'UPDATE' | 'DELETE';
   resource: string;
   resourceId?: string;
-  data: Record<string, any>;
+  data: Record<string, unknown>;
   timestamp: number;
   clientId: string;
 }
 
 export interface SyncConflict {
   clientOperation: SyncOperation;
-  serverState: Record<string, any>;
+  serverState: Record<string, unknown>;
   serverTimestamp: number;
 }
 
@@ -28,6 +29,7 @@ export interface SyncResult {
 @Injectable()
 export class OfflineSyncService {
   private readonly logger = new Logger(OfflineSyncService.name);
+  private readonly blockTypeValues = new Set<string>(Object.values(BlockType));
 
   constructor(
     private readonly prisma: PrismaService,
@@ -126,7 +128,7 @@ export class OfflineSyncService {
           success: false,
           conflict: {
             clientOperation: op,
-            serverState: existing as object,
+            serverState: existing as Record<string, unknown>,
             serverTimestamp: existing.updatedAt.getTime(),
           },
         };
@@ -136,8 +138,8 @@ export class OfflineSyncService {
         data: {
           id: op.resourceId,
           userId,
-          title: op.data.title || 'Untitled',
-          content: op.data.content || {},
+          title: (op.data.title as string) || 'Untitled',
+          content: (op.data.content as object) || {},
           isOfflineCreated: true,
           ...op.data,
         },
@@ -161,7 +163,7 @@ export class OfflineSyncService {
           success: false,
           conflict: {
             clientOperation: op,
-            serverState: existing as object,
+            serverState: existing as Record<string, unknown>,
             serverTimestamp: existing.updatedAt.getTime(),
           },
         };
@@ -190,12 +192,22 @@ export class OfflineSyncService {
     op: SyncOperation,
   ): Promise<{ success: boolean; conflict?: SyncConflict; error?: string }> {
     if (op.type === 'CREATE') {
+      const projectId =
+        this.getString(op.data, 'projectId') ||
+        this.getString(op.data, 'presentationId') ||
+        '';
+      const presentationId = this.getNullableString(op.data, 'presentationId');
+      const order =
+        this.getNumber(op.data, 'position') ||
+        this.getNumber(op.data, 'order') ||
+        0;
+
       await this.prisma.slide.create({
         data: {
           id: op.resourceId,
-          projectId: op.data.projectId || op.data.presentationId,
-          presentationId: op.data.presentationId,
-          order: op.data.position || op.data.order || 0,
+          projectId,
+          presentationId,
+          order,
           content: op.data.content || {},
         },
       });
@@ -216,7 +228,7 @@ export class OfflineSyncService {
           success: false,
           conflict: {
             clientOperation: op,
-            serverState: existing as object,
+            serverState: existing as Record<string, unknown>,
             serverTimestamp: existing.updatedAt.getTime(),
           },
         };
@@ -245,15 +257,24 @@ export class OfflineSyncService {
     op: SyncOperation,
   ): Promise<{ success: boolean; conflict?: SyncConflict; error?: string }> {
     if (op.type === 'CREATE') {
+      const slideId = this.getNullableString(op.data, 'slideId');
+      const projectId = this.getString(op.data, 'projectId') || '';
+      const blockType = this.getBlockType(op.data);
+      const type = this.getNullableString(op.data, 'type');
+      const order =
+        this.getNumber(op.data, 'position') ||
+        this.getNumber(op.data, 'order') ||
+        0;
+
       await this.prisma.block.create({
         data: {
           id: op.resourceId,
-          slideId: op.data.slideId,
-          projectId: op.data.projectId || '',
-          blockType: op.data.blockType || op.data.type || 'PARAGRAPH',
-          type: op.data.type,
+          slideId,
+          projectId,
+          blockType,
+          type,
           content: op.data.content || {},
-          order: op.data.position || op.data.order || 0,
+          order,
         },
       });
       return { success: true };
@@ -273,7 +294,7 @@ export class OfflineSyncService {
           success: false,
           conflict: {
             clientOperation: op,
-            serverState: existing as object,
+            serverState: existing as Record<string, unknown>,
             serverTimestamp: existing.updatedAt.getTime(),
           },
         };
@@ -302,14 +323,22 @@ export class OfflineSyncService {
     op: SyncOperation,
   ): Promise<{ success: boolean; conflict?: SyncConflict; error?: string }> {
     if (op.type === 'CREATE') {
+      const projectId =
+        this.getString(op.data, 'projectId') ||
+        this.getString(op.data, 'presentationId') ||
+        '';
+      const presentationId = this.getNullableString(op.data, 'presentationId');
+      const slideId = this.getNullableString(op.data, 'slideId');
+      const content = this.getString(op.data, 'content') || '';
+
       await this.prisma.comment.create({
         data: {
           id: op.resourceId,
           userId,
-          projectId: op.data.projectId || op.data.presentationId || '',
-          presentationId: op.data.presentationId,
-          slideId: op.data.slideId,
-          content: op.data.content || '',
+          projectId,
+          presentationId,
+          slideId,
+          content,
         },
       });
       return { success: true };
@@ -338,12 +367,18 @@ export class OfflineSyncService {
     op: SyncOperation,
   ): Promise<{ success: boolean; conflict?: SyncConflict; error?: string }> {
     if (op.type === 'CREATE') {
+      const slideId = this.getString(op.data, 'slideId') || '';
+      const content = this.getString(op.data, 'content') || '';
+
       await this.prisma.speakerNote.create({
         data: {
           id: op.resourceId,
-          slideId: op.data.slideId,
-          content: op.data.content,
-          ...op.data,
+          slideId,
+          content,
+          voice: this.getNullableString(op.data, 'voice'),
+          audioUrl: this.getNullableString(op.data, 'audioUrl'),
+          duration: this.getNumber(op.data, 'duration'),
+          isAIGenerated: this.getBoolean(op.data, 'isAIGenerated'),
         },
       });
       return { success: true };
@@ -365,6 +400,53 @@ export class OfflineSyncService {
     }
 
     return { success: false, error: 'Invalid operation type' };
+  }
+
+  private getString(data: Record<string, unknown>, key: string): string | null {
+    const value = data[key];
+    return typeof value === 'string' ? value : null;
+  }
+
+  private getNullableString(
+    data: Record<string, unknown>,
+    key: string,
+  ): string | null {
+    const value = data[key];
+    if (typeof value === 'string') {
+      return value;
+    }
+    return null;
+  }
+
+  private getNumber(data: Record<string, unknown>, key: string): number | null {
+    const value = data[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === 'string' && value.trim()) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+    return null;
+  }
+
+  private getBoolean(
+    data: Record<string, unknown>,
+    key: string,
+  ): boolean | undefined {
+    const value = data[key];
+    return typeof value === 'boolean' ? value : undefined;
+  }
+
+  private getBlockType(data: Record<string, unknown>): BlockType {
+    const candidate =
+      this.getString(data, 'blockType') || this.getString(data, 'type');
+    if (candidate && this.blockTypeValues.has(candidate)) {
+      return candidate as BlockType;
+    }
+    return BlockType.PARAGRAPH;
   }
 
   /**
@@ -419,8 +501,8 @@ export class OfflineSyncService {
     userId: string,
     lastSyncTimestamp: number,
   ): Promise<{
-    created: Record<string, any[]>;
-    updated: Record<string, any[]>;
+    created: Record<string, unknown[]>;
+    updated: Record<string, unknown[]>;
     deleted: Record<string, string[]>;
   }> {
     const sinceDate = new Date(lastSyncTimestamp);
@@ -443,13 +525,13 @@ export class OfflineSyncService {
       },
     });
 
-    const created: Record<string, any[]> = {
+    const created: Record<string, unknown[]> = {
       presentations: [],
       slides: [],
       blocks: [],
     };
 
-    const updated: Record<string, any[]> = {
+    const updated: Record<string, unknown[]> = {
       presentations: [],
       slides: [],
       blocks: [],
@@ -511,7 +593,7 @@ export class OfflineSyncService {
     userId: string,
     conflictId: string,
     resolution: 'client' | 'server' | 'merge',
-    mergedData?: Record<string, any>,
+    mergedData?: Record<string, unknown>,
   ): Promise<{ success: boolean }> {
     const conflict = await this.prisma.syncConflict.findUnique({
       where: { id: conflictId },
@@ -544,7 +626,9 @@ export class OfflineSyncService {
     return { success: true };
   }
 
-  private async applyClientResolution(conflict: any): Promise<void> {
+  private async applyClientResolution(
+    conflict: Record<string, unknown>,
+  ): Promise<void> {
     const clientOp = conflict.clientOperation as SyncOperation;
 
     switch (clientOp.resource) {
@@ -570,8 +654,8 @@ export class OfflineSyncService {
   }
 
   private async applyMergedResolution(
-    conflict: any,
-    mergedData: Record<string, any>,
+    conflict: Record<string, unknown>,
+    mergedData: Record<string, unknown>,
   ): Promise<void> {
     const clientOp = conflict.clientOperation as SyncOperation;
 

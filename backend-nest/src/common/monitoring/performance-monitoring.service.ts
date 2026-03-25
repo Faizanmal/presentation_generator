@@ -72,10 +72,10 @@ export class PerformanceMonitoringService {
   private startMetricsCollection(): void {
     // Configurable via METRICS_POLL_INTERVAL_SECONDS
     // Default: 900s (15 min) in production, 300s (5 min) in development
-    const defaultInterval =
-      process.env.NODE_ENV === 'production' ? 900 : 300;
+    const defaultInterval = process.env.NODE_ENV === 'production' ? 900 : 300;
     const intervalMs =
-      Number(process.env.METRICS_POLL_INTERVAL_SECONDS || defaultInterval) * 1000;
+      Number(process.env.METRICS_POLL_INTERVAL_SECONDS || defaultInterval) *
+      1000;
 
     setInterval((): void => {
       void (async (): Promise<void> => {
@@ -83,9 +83,9 @@ export class PerformanceMonitoringService {
           const metrics = await this.collectMetrics();
           this.logger.log(
             `System Metrics | DB Conn: ${metrics.database.activeConnections}/${metrics.database.poolSize} | ` +
-            `Cache Hit Rate: ${metrics.cache.hitRate.toFixed(2)}% | ` +
-            `Avg Response: ${metrics.performance.avgResponseTimeMs.toFixed(0)}ms | ` +
-            `RPS: ${metrics.performance.requestsPerSecond.toFixed(0)}`,
+              `Cache Hit Rate: ${metrics.cache.hitRate.toFixed(2)}% | ` +
+              `Avg Response: ${metrics.performance.avgResponseTimeMs.toFixed(0)}ms | ` +
+              `RPS: ${metrics.performance.requestsPerSecond.toFixed(0)}`,
           );
         } catch (error) {
           this.logger.error('Failed to collect metrics:', error);

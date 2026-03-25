@@ -194,7 +194,7 @@ export class DataVisualizationController {
   @ApiQuery({ name: 'format', required: false, enum: ['png', 'svg', 'pdf'] })
   @ApiQuery({ name: 'width', required: false, type: Number })
   @ApiQuery({ name: 'height', required: false, type: Number })
-  async exportChart(
+  exportChart(
     @Param('id') chartId: string,
     @Query('format') format?: 'png' | 'svg' | 'pdf',
     @Query('width') width?: string,

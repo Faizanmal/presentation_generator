@@ -704,7 +704,7 @@ Return JSON:
         {
           role: 'system',
           content:
-            'You are an expert presentation critic and quality evaluator. Be thorough but constructive. Always respond with valid JSON.',
+            'You are an expert presentation critic and quality evaluator. Be thorough but constructive. You must respond with valid JSON only. Do not include any explanations, comments, or text outside of the JSON structure. Your response must be parseable JSON.',
         },
         { role: 'user', content: prompt },
       ],
@@ -730,8 +730,24 @@ Return JSON:
    */
   private parseJSON<T>(content: string, fallback: T): T {
     try {
+      // First try direct parsing
       return JSON.parse(content) as T;
     } catch {
+      // If direct parsing fails, try to extract JSON from mixed response
+      try {
+        // Look for JSON object/array in the response
+        const jsonMatch = content.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+        if (jsonMatch) {
+          const extractedJson = jsonMatch[0];
+          this.logger.log('Extracted JSON from mixed AI response');
+          return JSON.parse(extractedJson) as T;
+        }
+      } catch (extractError) {
+        this.logger.warn(
+          `Failed to extract JSON from mixed response: ${extractError.message}`,
+        );
+      }
+
       this.logger.warn('Failed to parse AI response, using fallback');
       return fallback;
     }

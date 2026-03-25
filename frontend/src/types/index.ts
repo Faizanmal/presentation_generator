@@ -119,11 +119,13 @@ export type BlockType =
   | 'EMBED'
   | 'OEMBED'
   | 'CHART'
-  | 'VIDEO'
-  | 'AUDIO'
+  | 'BENTO_GRID'
   | 'TIMELINE'
   | 'COMPARISON'
   | 'STATS_GRID'
+  | '3D_MODEL'
+  | 'VIDEO'
+  | 'AUDIO'
   | 'CALL_TO_ACTION'
   | 'SHAPE';
 
@@ -131,7 +133,7 @@ export interface BlockContent {
   text?: string;
   url?: string;
   alt?: string;
-  items?: string[];
+  items?: Array<string | Record<string, unknown>>;
   code?: string;
   language?: string;
   author?: string;

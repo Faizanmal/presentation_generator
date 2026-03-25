@@ -335,6 +335,128 @@ const slideTemplates: SlideTemplate[] = [
             },
         ],
     },
+
+    // Premium Smart Grid Templates
+    {
+        id: "bento-grid",
+        name: "Bento Grid",
+        description: "Modern asymmetric content grid layout",
+        category: "creative",
+        icon: <LayoutGrid className="h-5 w-5" />,
+        preview: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+        blocks: [
+            {
+                type: "HEADING",
+                content: { text: "Features Overview" },
+                style: { fontSize: "32px" },
+            },
+            {
+                type: "STATS_GRID",
+                content: {
+                    items: [
+                        "Lightning Fast",
+                        "AI Powered",
+                        "Enterprise Ready",
+                        "99.9% Uptime",
+                    ],
+                },
+            },
+        ],
+    },
+    {
+        id: "feature-showcase",
+        name: "Feature Showcase",
+        description: "Highlight 3 key features with icons",
+        category: "creative",
+        icon: <Sparkles className="h-5 w-5" />,
+        preview: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)",
+        blocks: [
+            {
+                type: "HEADING",
+                content: { text: "Why Choose Us" },
+                style: { fontSize: "36px", textAlign: "center" },
+            },
+            {
+                type: "COMPARISON",
+                content: {
+                    items: [
+                        "🚀 10x Faster Performance",
+                        "🔒 Enterprise Security",
+                        "🎯 Precision Analytics",
+                    ],
+                },
+            },
+        ],
+    },
+    {
+        id: "metric-dashboard",
+        name: "Metric Dashboard",
+        description: "Big numbers that make an impact",
+        category: "data",
+        icon: <TrendingUp className="h-5 w-5" />,
+        preview: "linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%)",
+        blocks: [
+            {
+                type: "HEADING",
+                content: { text: "Key Results" },
+                style: { fontSize: "32px", textAlign: "center" },
+            },
+            {
+                type: "STATS_GRID",
+                content: {
+                    items: [
+                        "$4.2M Revenue",
+                        "340% Growth",
+                        "98.5% Retention",
+                        "2.1M Users",
+                    ],
+                },
+            },
+        ],
+    },
+    {
+        id: "before-after",
+        name: "Before / After",
+        description: "Dramatic transformation comparison",
+        category: "data",
+        icon: <Target className="h-5 w-5" />,
+        preview: "linear-gradient(135deg, #dc2626 0%, #16a34a 100%)",
+        blocks: [
+            {
+                type: "HEADING",
+                content: { text: "The Transformation" },
+                style: { fontSize: "32px", textAlign: "center" },
+            },
+            {
+                type: "COMPARISON",
+                content: {
+                    items: [
+                        "Before: Manual processes, 6-hour workflows, high error rates",
+                        "After: Automated pipeline, 15-minute delivery, 99.9% accuracy",
+                    ],
+                },
+            },
+        ],
+    },
+    {
+        id: "closing-cta",
+        name: "Closing / CTA",
+        description: "End with a strong call to action",
+        category: "creative",
+        icon: <Target className="h-5 w-5" />,
+        preview: "linear-gradient(135deg, #f97316 0%, #ef4444 100%)",
+        blocks: [
+            {
+                type: "CALL_TO_ACTION",
+                content: { text: "Ready to Get Started?" },
+            },
+            {
+                type: "PARAGRAPH",
+                content: { text: "Contact us today for a free demo and see the difference." },
+                style: { textAlign: "center", fontSize: "18px", opacity: 0.8 },
+            },
+        ],
+    },
 ];
 
 // Starter Templates (full presentations)
