@@ -5,6 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { LayoutType } from '@shared/index';
 import OpenAI from 'openai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { PrismaService } from '../prisma/prisma.service';
@@ -62,23 +63,6 @@ export interface ChartData {
   }>;
   options?: Record<string, unknown>;
 }
-
-export type LayoutType =
-  | 'title'
-  | 'title-subtitle'
-  | 'title-content'
-  | 'two-column'
-  | 'three-column'
-  | 'image-left'
-  | 'image-right'
-  | 'image-full'
-  | 'comparison'
-  | 'timeline'
-  | 'quote-highlight'
-  | 'stats-grid'
-  | 'chart-focus'
-  | 'gallery'
-  | 'agenda';
 
 export interface GeneratedSection {
   heading: string;
@@ -210,7 +194,7 @@ export class AIService {
       );
       // leave this.openai uninitialized; this avoids invalid key errors
     } else {
-      this.openai = new OpenAI({ apiKey: openAiKey });
+      this.openai = new OpenAI({ apiKey: openAiKey, timeout: 30000 }); // 30 second timeout
     }
 
     const groqApiKey = this.configService.get<string>('GROQ_API_KEY');
@@ -218,6 +202,7 @@ export class AIService {
       this.groq = new OpenAI({
         apiKey: groqApiKey,
         baseURL: 'https://api.groq.com/openai/v1',
+        timeout: 30000, // 30 second timeout
       });
     }
 

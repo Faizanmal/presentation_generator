@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards, Res } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Res,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import { ExportService } from './export.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -58,7 +67,12 @@ export class ExportController {
   async exportProjectToPptx(
     @CurrentUser() user: { id: string },
     @Param('projectId') projectId: string,
-    @Body() options: { includeNotes?: boolean; includeAnimations?: boolean; quality?: 'standard' | 'high' },
+    @Body()
+    options: {
+      includeNotes?: boolean;
+      includeAnimations?: boolean;
+      quality?: 'standard' | 'high';
+    },
     @Res() res: Response,
   ) {
     const result = await this.exportService.exportProject(user.id, projectId, {
@@ -77,4 +91,3 @@ export class ExportController {
     res.send(result.data);
   }
 }
-

@@ -230,6 +230,7 @@ export class ThinkingAgentOrchestratorService {
               rawData: researchData, // Pass the combined research data
               additionalContext: params.additionalContext,
               brandGuidelines: params.brandGuidelines,
+              enableQualityRefinement: params.enableQualityRefinement ?? true, // Enable by default for better quality
             });
           presentation = generationResult.presentation;
           state.steps.push(...generationResult.thinkingSteps);

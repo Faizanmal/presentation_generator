@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -60,6 +60,7 @@ import SlidePanel from "@/components/editor/SlidePanel";
 import SlideCanvas from "@/components/editor/SlideCanvas";
 import ThemeSelector from "@/components/editor/ThemeSelector";
 import BlockToolbar from "@/components/editor/BlockToolbar";
+import { SlideDesignControls } from "@/components/editor/slide-design-controls";
 
 // New usability components
 import { CommandPalette } from "@/components/ui/command-palette";
@@ -72,7 +73,19 @@ import { useRecentProjects } from "@/components/ui/favorites-recent";
 import { DocumentUploadDialog } from "@/components/editor/document-upload-panel";
 import { MasterSlidePanel } from "@/components/editor/master-slide-panel";
 import type { MasterSlideTemplate } from "@/components/editor/master-slide-panel";
-import { Shield } from "lucide-react";
+import { Shield, SlidersHorizontal } from "lucide-react";
+
+type EditorCommandDetail = {
+  type: "insert-block" | "ai-action" | "open-export" | "open-share" | "add-slide";
+  payload?: Record<string, unknown>;
+};
+
+const COMMAND_BLOCK_MAP: Record<string, { blockType: BlockType; content: Record<string, unknown> }> = {
+  heading1: { blockType: "HEADING", content: { text: "Heading" } },
+  paragraph: { blockType: "PARAGRAPH", content: { text: "Start typing..." } },
+  image: { blockType: "IMAGE", content: { url: "", alt: "" } },
+  code: { blockType: "CODE", content: { code: "// Your code here", language: "javascript" } },
+};
 
 
 export default function EditorPage() {
@@ -89,6 +102,7 @@ export default function EditorPage() {
   const setCurrentSlideIndex = useEditorStore((state) => state.setCurrentSlideIndex);
   const updateProject = useEditorStore((state) => state.updateProject);
   const addSlide = useEditorStore((state) => state.addSlide);
+  const addBlock = useEditorStore((state) => state.addBlock);
   const deleteSlide = useEditorStore((state) => state.deleteSlide);
   const reorderSlides = useEditorStore((state) => state.reorderSlides);
   const setTheme = useEditorStore((state) => state.setTheme);
@@ -104,6 +118,10 @@ export default function EditorPage() {
   const [showTemplatesDialog, setShowTemplatesDialog] = useState(false);
   const [showDocUpload, setShowDocUpload] = useState(false);
   const [showMasterSlides, setShowMasterSlides] = useState(false);
+  const [showDesignControls, setShowDesignControls] = useState(false);
+  const [layoutDensity, setLayoutDensity] = useState(62);
+  const [toneOfVoice, setToneOfVoice] = useState(74);
+  const notesSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Undo/Redo history
   const {
@@ -247,13 +265,25 @@ export default function EditorPage() {
     const updateSlideStore = useEditorStore.getState().updateSlide;
     updateSlideStore(currentSlide.id, { speakerNotes: notes });
 
-    // Auto-save using the same mechanism or debounce
-    try {
-      api.updateSlide(currentSlide.id, { speakerNotes: notes });
-    } catch (error) {
-      console.error("Failed to save speaker notes", error);
+    if (notesSaveTimerRef.current) {
+      clearTimeout(notesSaveTimerRef.current);
     }
+
+    notesSaveTimerRef.current = setTimeout(() => {
+      api.updateSlide(currentSlide.id, { speakerNotes: notes }).catch((error) => {
+        console.error("Failed to save speaker notes", error);
+      });
+    }, 500);
   }, [currentSlide]);
+
+  useEffect(() => {
+    return () => {
+      if (notesSaveTimerRef.current) {
+        clearTimeout(notesSaveTimerRef.current);
+        notesSaveTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // Handle duplicate slide
   const handleDuplicateSlide = useCallback(async (slide: Slide) => {
@@ -293,6 +323,13 @@ export default function EditorPage() {
       toast.error("Failed to apply theme");
     }
   }, [projectId, setTheme]);
+
+  const handleDesignThemeChange = useCallback((themeId: string) => {
+    const selectedTheme = themes?.find((theme) => theme.id === themeId);
+    if (selectedTheme) {
+      void handleThemeChange(selectedTheme);
+    }
+  }, [handleThemeChange, themes]);
 
   // Handle export
   const handleExport = useCallback(async (format: "html" | "json" | "pdf" | "pptx") => {
@@ -338,6 +375,63 @@ export default function EditorPage() {
   const handlePresent = useCallback(() => {
     window.open(`/present/${projectId}`, "_blank");
   }, [projectId]);
+
+  useEffect(() => {
+    const handleEditorCommand = async (event: Event) => {
+      const customEvent = event as CustomEvent<EditorCommandDetail>;
+      const detail = customEvent.detail;
+      if (!detail) {
+        return;
+      }
+
+      if (detail.type === "add-slide") {
+        await handleAddSlide();
+        return;
+      }
+
+      if (detail.type === "open-export") {
+        await handleExport("pdf");
+        return;
+      }
+
+      if (detail.type === "open-share") {
+        toast.info("Share modal is coming soon.");
+        return;
+      }
+
+      if (detail.type === "ai-action") {
+        const action = typeof detail.payload?.action === "string" ? detail.payload.action : "enhance";
+        toast.info(`AI action queued: ${action}`);
+        return;
+      }
+
+      if (detail.type === "insert-block") {
+        const commandId = typeof detail.payload?.commandId === "string" ? detail.payload.commandId : "paragraph";
+        const mapped = COMMAND_BLOCK_MAP[commandId];
+        if (!currentSlide || !mapped) {
+          return;
+        }
+
+        try {
+          const newBlock = await api.blocks.create(projectId, currentSlide.id, {
+            projectId,
+            blockType: mapped.blockType,
+            content: mapped.content,
+            order: currentSlide.blocks?.length || 0,
+          });
+          addBlock(currentSlide.id, newBlock);
+          toast.success("Block added");
+        } catch {
+          toast.error("Failed to add block");
+        }
+      }
+    };
+
+    window.addEventListener("presentation:editor-command", handleEditorCommand as EventListener);
+    return () => {
+      window.removeEventListener("presentation:editor-command", handleEditorCommand as EventListener);
+    };
+  }, [addBlock, currentSlide, handleAddSlide, handleExport, projectId]);
 
   if (authLoading || projectLoading) {
     return (
@@ -471,7 +565,7 @@ export default function EditorPage() {
                 Master
               </Button>
             </SheetTrigger>
-            <SheetContent className="overflow-y-auto p-0 w-[380px]">
+            <SheetContent className="overflow-y-auto p-0 w-96">
               <MasterSlidePanel
                 isEnterprise
                 onApplyTemplate={(template: MasterSlideTemplate) => {
@@ -505,6 +599,43 @@ export default function EditorPage() {
                   }
                 }}
               />
+            </SheetContent>
+          </Sheet>
+
+          <Sheet open={showDesignControls} onOpenChange={setShowDesignControls}>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="sm">
+                <SlidersHorizontal className="h-4 w-4 mr-2" />
+                Design
+              </Button>
+            </SheetTrigger>
+            <SheetContent className="overflow-y-auto p-0 w-96">
+              <div className="p-5 border-b border-slate-200 dark:border-slate-800">
+                <h3 className="text-base font-semibold text-slate-900 dark:text-white">Presentation Design</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  Control density and tone to shape the final presentation style.
+                </p>
+              </div>
+              <div className="p-5">
+                <SlideDesignControls
+                  projectId={projectId}
+                  themes={(themes || []).map((theme) => ({
+                    id: theme.id,
+                    name: theme.name,
+                    colors: {
+                      background: theme.colors.background,
+                      primary: theme.colors.primary,
+                      text: theme.colors.text,
+                      accent: theme.colors.accent,
+                    },
+                  }))}
+                  currentThemeId={project.theme?.id}
+                  onThemeChange={handleDesignThemeChange}
+                  onExportPdf={() => handleExport("pdf")}
+                  onLayoutDensityChange={setLayoutDensity}
+                  onToneChange={setToneOfVoice}
+                />
+              </div>
             </SheetContent>
           </Sheet>
 
@@ -633,6 +764,8 @@ export default function EditorPage() {
                 projectId={projectId}
                 slide={currentSlide}
                 theme={project.theme || undefined}
+                presentationDensity={layoutDensity}
+                presentationTone={toneOfVoice}
               />
             )}
           </div>

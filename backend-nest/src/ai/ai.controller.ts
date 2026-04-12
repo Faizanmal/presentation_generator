@@ -745,6 +745,41 @@ Format as a numbered list with clear structure.`;
   }
 
   /**
+   * Apply a specific layout to a slide
+   */
+  @Post('apply-layout')
+  @HttpCode(HttpStatus.OK)
+  async applyLayout(
+    @CurrentUser() user: { id: string },
+    @Body()
+    body: {
+      projectId: string;
+      slideId: string;
+      layoutType: string;
+      blocks: { id?: string; type: string; content: unknown }[];
+    },
+  ) {
+    const canGenerate = await this.usersService.canGenerateAI(user.id);
+    if (!canGenerate) {
+      throw new ForbiddenException('AI generation limit reached');
+    }
+
+    const layout = {
+      type: body.layoutType || 'single-column',
+      alignment: 'left',
+      spacing: 'normal',
+      blocks: (body.blocks || []).map((b, i) => ({
+        id: b.id || `block-${i}`,
+        type: b.type,
+        order: i + 1,
+        width: '100%',
+      })),
+    };
+
+    return { layout };
+  }
+
+  /**
    * Get layout recommendations based on block types
    */
   @Post('layout-recommendations')

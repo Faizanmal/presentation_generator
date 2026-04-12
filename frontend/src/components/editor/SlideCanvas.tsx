@@ -21,10 +21,9 @@ import { toast } from "sonner";
 import type { Slide, Theme, UpdateBlockInput, BlockContent, BlockType, BlockStyle } from "@/types";
 import { api } from "@/lib/api";
 import { useEditorStore } from "@/stores/editor-store";
-import BlockRenderer from "./BlockRenderer";
 import { SlashCommandMenu, useSlashCommands } from "./slash-commands";
+import { LayoutCompiler } from "./LayoutCompiler";
 import dynamic from "next/dynamic";
-import { AnimatePresence } from "framer-motion";
 
 // Lazy-load 3D background to avoid SSR issues and reduce initial bundle
 const Ambient3DBackground = dynamic(
@@ -36,6 +35,8 @@ interface SlideCanvasProps {
   projectId: string;
   slide: Slide;
   theme?: Theme;
+  presentationDensity?: number;
+  presentationTone?: number;
 }
 
 // Slash command block type mapping
@@ -103,7 +104,7 @@ const getDecoPattern = (primaryColor: string, accentColor: string, layout: strin
             rotate: [0, 90, 0],
           }}
           transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-          className="absolute -top-40 -right-40 w-[600px] h-[600px] rounded-full blur-[80px] opacity-70"
+          className="absolute -top-40 -right-40 w-150 h-150 rounded-full blur-3xl opacity-70"
           style={{ background: `radial-gradient(circle, ${colorMedium} 0%, transparent 70%)` }}
         />
         {/* Animated blob bottom left */}
@@ -113,7 +114,7 @@ const getDecoPattern = (primaryColor: string, accentColor: string, layout: strin
             rotate: [0, -90, 0],
           }}
           transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-          className="absolute -bottom-40 -left-20 w-[500px] h-[500px] rounded-full blur-[60px] opacity-60"
+          className="absolute -bottom-40 -left-20 w-125 h-125 rounded-full blur-2xl opacity-60"
           style={{ background: `radial-gradient(circle, ${accentLight} 0%, transparent 70%)` }}
         />
         {/* Noise overlay for premium texture */}
@@ -132,7 +133,7 @@ const getDecoPattern = (primaryColor: string, accentColor: string, layout: strin
             backgroundSize: '32px 32px',
           }}
         />
-        <div className="absolute top-0 right-0 w-full h-[500px] bg-gradient-to-b from-white/10 to-transparent blur-3xl opacity-50 dark:from-black/10" />
+        <div className="absolute top-0 right-0 w-full h-125 bg-linear-to-b from-white/10 to-transparent blur-3xl opacity-50 dark:from-black/10" />
       </div>
     );
   }
@@ -149,7 +150,7 @@ const getDecoPattern = (primaryColor: string, accentColor: string, layout: strin
         <motion.div
            animate={{ scale: [1, 1.05, 1], opacity: [0.3, 0.5, 0.3] }}
            transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-           className="absolute bottom-0 right-0 w-[400px] h-[400px] rounded-tl-full blur-[40px] opacity-40"
+           className="absolute bottom-0 right-0 w-100 h-100 rounded-tl-full blur-2xl opacity-40"
            style={{ background: `radial-gradient(circle at bottom right, ${colorLight} 0%, transparent 70%)` }}
         />
       </div>
@@ -160,17 +161,17 @@ const getDecoPattern = (primaryColor: string, accentColor: string, layout: strin
     return (
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
         <div
-          className="absolute left-[4.5rem] top-8 bottom-8 w-px opacity-20"
+          className="absolute left-18 top-8 bottom-8 w-px opacity-20"
           style={{ background: `linear-gradient(to bottom, transparent, ${primaryColor}, transparent)` }}
         />
-        <div className="absolute bottom-0 right-0 w-full h-1/2 bg-gradient-to-t from-[rgba(0,0,0,0.02)] to-transparent dark:from-[rgba(255,255,255,0.02)]" />
+        <div className="absolute bottom-0 right-0 w-full h-1/2 bg-linear-to-t from-[rgba(0,0,0,0.02)] to-transparent dark:from-[rgba(255,255,255,0.02)]" />
       </div>
     );
   }
 
   if (layout === 'comparison') {
     return (
-      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 bg-gradient-to-r from-transparent via-[rgba(0,0,0,0.02)] to-transparent dark:via-[rgba(255,255,255,0.02)]">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 bg-linear-to-r from-transparent via-[rgba(0,0,0,0.02)] to-transparent dark:via-[rgba(255,255,255,0.02)]">
         <div
           className="absolute top-12 bottom-12 left-1/2 w-px opacity-20"
           style={{ background: `linear-gradient(to bottom, transparent, ${primaryColor}, transparent)` }}
@@ -185,7 +186,7 @@ const getDecoPattern = (primaryColor: string, accentColor: string, layout: strin
       <motion.div
         animate={{ opacity: [0.15, 0.25, 0.15] }}
         transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute -top-40 -right-20 w-[500px] h-[500px] rounded-full blur-[80px]"
+        className="absolute -top-40 -right-20 w-125 h-125 rounded-full blur-3xl"
         style={{ background: `radial-gradient(circle at center, ${colorLight} 0%, transparent 60%)` }}
       />
       {/* Premium subtle border glow at bottom */}
@@ -194,12 +195,19 @@ const getDecoPattern = (primaryColor: string, accentColor: string, layout: strin
   );
 };
 
-export default function SlideCanvas({ projectId, slide, theme }: SlideCanvasProps) {
+export default function SlideCanvas({
+  projectId,
+  slide,
+  theme,
+  presentationDensity = 60,
+  presentationTone = 70,
+}: SlideCanvasProps) {
   const updateBlock = useEditorStore((state) => state.updateBlock);
   const deleteBlock = useEditorStore((state) => state.deleteBlock);
   const reorderBlocks = useEditorStore((state) => state.reorderBlocks);
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const pendingBlockSyncTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   // Add block from slash command
   const addBlockMutation = useMutation({
@@ -265,6 +273,33 @@ export default function SlideCanvas({ projectId, slide, theme }: SlideCanvasProp
     },
   });
 
+  useEffect(() => {
+    const timers = pendingBlockSyncTimersRef.current;
+    return () => {
+      for (const timer of timers.values()) {
+        clearTimeout(timer);
+      }
+      timers.clear();
+    };
+  }, []);
+
+  const queueBlockSync = useCallback(
+    (blockId: string, data: UpdateBlockInput, delayMs = 300) => {
+      const pending = pendingBlockSyncTimersRef.current.get(blockId);
+      if (pending) {
+        clearTimeout(pending);
+      }
+
+      const timer = setTimeout(() => {
+        updateBlockMutation.mutate({ blockId, data });
+        pendingBlockSyncTimersRef.current.delete(blockId);
+      }, delayMs);
+
+      pendingBlockSyncTimersRef.current.set(blockId, timer);
+    },
+    [updateBlockMutation]
+  );
+
   // Delete block mutation
   const deleteBlockMutation = useMutation({
     mutationFn: (blockId: string) => api.blocks.delete(projectId, slide.id, blockId),
@@ -282,9 +317,9 @@ export default function SlideCanvas({ projectId, slide, theme }: SlideCanvasProp
     (blockId: string, content: Record<string, unknown>) => {
       const blockContent = content as BlockContent;
       updateBlock(slide.id, blockId, { content: blockContent });
-      updateBlockMutation.mutate({ blockId, data: { content: blockContent } });
+      queueBlockSync(blockId, { content: blockContent }, 320);
     },
-    [slide.id, updateBlock, updateBlockMutation]
+    [slide.id, updateBlock, queueBlockSync]
   );
 
   // Handle block delete
@@ -335,9 +370,9 @@ export default function SlideCanvas({ projectId, slide, theme }: SlideCanvasProp
         ...(position.height != null && { height: position.height }),
       };
       updateBlock(slide.id, blockId, { style: newStyle as BlockStyle });
-      updateBlockMutation.mutate({ blockId, data: { style: newStyle as BlockStyle } });
+      queueBlockSync(blockId, { style: newStyle as BlockStyle }, 140);
     },
-    [slide.id, slide.blocks, updateBlock, updateBlockMutation]
+    [slide.id, slide.blocks, updateBlock, queueBlockSync]
   );
 
   // Sort blocks by order
@@ -348,6 +383,8 @@ export default function SlideCanvas({ projectId, slide, theme }: SlideCanvasProp
 
   // Determine layout for decorative treatment
   const slideLayout = slide.layout || 'content';
+  const isDenseCanvas = presentationDensity >= 66;
+  const canvasPaddingClass = isDenseCanvas ? 'p-8' : presentationDensity < 34 ? 'p-12' : 'p-10';
 
   // Determine if this is a title slide (first slide usually)
   const isTitleSlide = slideLayout === 'title' || sortedBlocks.some(
@@ -362,7 +399,7 @@ export default function SlideCanvas({ projectId, slide, theme }: SlideCanvasProp
     >
       <div
         ref={canvasRef}
-        className="w-full max-w-4xl aspect-16/10 rounded-2xl shadow-2xl overflow-hidden relative transition-all duration-300"
+          className="w-full max-w-4xl aspect-16/10 rounded-2xl shadow-2xl overflow-hidden relative transition-all duration-300"
         style={{
           backgroundColor: bgColor,
           color: textColor,
@@ -385,8 +422,8 @@ export default function SlideCanvas({ projectId, slide, theme }: SlideCanvasProp
 
         <div
           className={`h-full overflow-y-auto relative z-10 ${isTitleSlide
-            ? "flex flex-col items-center justify-center p-12"
-            : "p-8"
+            ? `flex flex-col items-center justify-center ${canvasPaddingClass}`
+            : canvasPaddingClass
             }`}
         >
           <SortableContext
@@ -412,22 +449,19 @@ export default function SlideCanvas({ projectId, slide, theme }: SlideCanvasProp
                 </div>
               </div>
             ) : (
-              <div className={`space-y-5 ${isTitleSlide ? "text-center w-full max-w-2xl" : ""}`}>
-                <AnimatePresence mode="popLayout">
-                  {sortedBlocks.map((block, index) => (
-                    <BlockRenderer
-                      key={block.id}
-                      block={block}
-                      theme={theme}
-                      isActive={activeBlockId === block.id}
-                      blockIndex={index}
-                      onFocus={() => setActiveBlockId(block.id)}
-                      onBlur={() => setActiveBlockId(null)}
-                      onChange={(content) => handleBlockChange(block.id, content)}
-                      onDelete={() => handleBlockDelete(block.id)}
-                    />
-                  ))}
-                </AnimatePresence>
+              <div className="w-full h-full">
+                <LayoutCompiler
+                  layoutType={slideLayout}
+                  blocks={sortedBlocks}
+                  theme={theme}
+                  presentationDensity={presentationDensity}
+                  presentationTone={presentationTone}
+                  activeBlockId={activeBlockId}
+                  onFocus={setActiveBlockId}
+                  onBlur={() => setActiveBlockId(null)}
+                  onChange={handleBlockChange}
+                  onDelete={handleBlockDelete}
+                />
 
                 {/* Slash command hint at end of content */}
                 <div className="text-slate-400/60 italic text-sm py-3 flex items-center justify-center gap-1.5">

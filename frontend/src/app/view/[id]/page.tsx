@@ -20,6 +20,7 @@ import ChartBlock from "@/components/editor/chart-block";
 import type { Variants } from "framer-motion";
 import { motion, AnimatePresence } from "framer-motion";
 import dynamic from "next/dynamic";
+import { LayoutCompiler } from "@/components/editor/LayoutCompiler";
 
 // Lazy-load 3D background for title slides in presentation view
 const Ambient3DBackground = dynamic(
@@ -430,24 +431,23 @@ function SlideView({ slide, theme }: { slide: Slide; theme?: Theme }) {
         />
       )}
 
-      <div className={`h-full overflow-y-auto relative z-10 ${isTitleSlide
-        ? "flex flex-col items-center justify-center p-16"
-        : "p-12"
-      }`}>
+      <div className="w-full h-full">
         <motion.div
-          className={`space-y-8 ${isTitleSlide ? "text-center w-full max-w-3xl" : ""}`}
+          className="w-full h-full"
           variants={containerVariants}
           initial="hidden"
           animate="visible"
         >
-          {sortedBlocks.map((block) => (
-            <motion.div key={block.id} variants={blockVariants} layoutId={`present-block-${block.id}`}>
-              <BlockView
-                block={block}
-                theme={theme}
-              />
-            </motion.div>
-          ))}
+          <LayoutCompiler
+            layoutType={slide.layout || 'content'}
+            blocks={sortedBlocks}
+            theme={theme}
+            renderBlock={(block) => (
+              <motion.div key={block.id} variants={blockVariants} layoutId={`present-block-${block.id}`}>
+                <BlockView block={block} theme={theme} />
+              </motion.div>
+            )}
+          />
         </motion.div>
       </div>
     </div>

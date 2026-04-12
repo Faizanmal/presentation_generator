@@ -90,6 +90,16 @@ export function QuickActionsToolbar({
     position = "bottom",
     compact = false,
 }: QuickActionsToolbarProps) {
+    const isMac = useMemo(() => {
+        if (typeof navigator === "undefined") {
+            return true;
+        }
+        return /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+    }, []);
+    const modKeyLabel = isMac ? "⌘" : "Ctrl";
+    const formatShortcut = (shortcut?: string) =>
+        shortcut ? shortcut.replaceAll("⌘", modKeyLabel) : undefined;
+
     const primaryActions: QuickAction[] = useMemo(() => [
         {
             id: "undo",
@@ -233,7 +243,12 @@ export function QuickActionsToolbar({
                 (position === "left" || position === "right") && "flex-col"
             )}>
                 {primaryActions.map((action) => (
-                    <QuickActionButton key={action.id} action={action} compact={compact} />
+                    <QuickActionButton
+                        key={action.id}
+                        action={action}
+                        compact={compact}
+                        formattedShortcut={formatShortcut(action.shortcut)}
+                    />
                 ))}
             </div>
 
@@ -245,7 +260,12 @@ export function QuickActionsToolbar({
                 (position === "left" || position === "right") && "flex-col"
             )}>
                 {secondaryActions.map((action) => (
-                    <QuickActionButton key={action.id} action={action} compact={compact} />
+                    <QuickActionButton
+                        key={action.id}
+                        action={action}
+                        compact={compact}
+                        formattedShortcut={formatShortcut(action.shortcut)}
+                    />
                 ))}
             </div>
 
@@ -319,10 +339,14 @@ export function QuickActionsToolbar({
 
 function QuickActionButton({
     action,
+    formattedShortcut,
 }: {
     action: QuickAction;
+    formattedShortcut?: string;
     compact?: boolean;
 }) {
+    const label = formattedShortcut ? `${action.name} (${formattedShortcut})` : action.name;
+
     return (
         <button
             className={cn(
@@ -333,7 +357,8 @@ function QuickActionButton({
             )}
             onClick={action.action}
             disabled={action.disabled}
-            title={action.name}
+            title={label}
+            aria-label={label}
             type="button"
         >
             {action.icon}

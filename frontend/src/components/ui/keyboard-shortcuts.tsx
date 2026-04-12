@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
     Dialog,
     DialogContent,
@@ -109,6 +109,20 @@ export function KeyboardShortcutsDialog({
     open,
     onOpenChange,
 }: KeyboardShortcutsDialogProps) {
+    const isMac = useMemo(() => {
+        if (typeof navigator === "undefined") {
+            return true;
+        }
+        return /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+    }, []);
+
+    const renderKey = (key: string) => {
+        if (key !== "⌘") {
+            return key;
+        }
+        return isMac ? "⌘" : "Ctrl";
+    };
+
     // Listen for Cmd/Ctrl + / to toggle
     useEffect(() => {
         const down = (e: KeyboardEvent) => {
@@ -156,7 +170,7 @@ export function KeyboardShortcutsDialog({
                                                     key={key}
                                                     className="inline-flex items-center justify-center min-w-6 h-6 px-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm"
                                                 >
-                                                    {key}
+                                                    {renderKey(key)}
                                                 </kbd>
                                             ))}
                                         </div>
@@ -169,7 +183,9 @@ export function KeyboardShortcutsDialog({
 
                 <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
                     <p className="text-xs text-slate-500 dark:text-slate-400 text-center">
-                        Tip: On Windows, use <kbd className="px-1 py-0.5 text-xs bg-slate-100 dark:bg-slate-800 rounded">Ctrl</kbd> instead of <kbd className="px-1 py-0.5 text-xs bg-slate-100 dark:bg-slate-800 rounded">⌘</kbd>
+                        {isMac
+                            ? "Tip: Press Cmd + / to open this keyboard shortcuts panel quickly."
+                            : "Tip: On Windows/Linux, use Ctrl in place of Cmd shortcuts."}
                     </p>
                 </div>
             </DialogContent>

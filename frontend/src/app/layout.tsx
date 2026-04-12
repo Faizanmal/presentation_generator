@@ -49,17 +49,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" data-theme="light" style={{ colorScheme: 'light' }}>
       <head>
         <GoogleTagManager />
       </head>
       <body className={`${fontClasses} font-sans antialiased`}>
         <GoogleTagManagerNoScript />
         <ThemeProvider
-          attribute="class"
+          attribute="data-theme"
           defaultTheme="system"
           enableSystem
-          enableColorScheme
           disableTransitionOnChange={false}
           storageKey="presentation-theme"
         >

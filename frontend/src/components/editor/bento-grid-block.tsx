@@ -98,7 +98,6 @@ export function BentoGridBlock({ content, theme, onChange, isEditing = false }: 
               <div 
                 className="font-bold text-lg mb-1 outline-none empty:after:content-['Title']"
                 contentEditable={isEditing}
-                suppressContentEditableWarning
                 onBlur={(e) => handleTextChange(item.id, 'title', e.currentTarget.innerText)}
               >
                 {item.title}
@@ -106,7 +105,6 @@ export function BentoGridBlock({ content, theme, onChange, isEditing = false }: 
               <div 
                 className="text-sm opacity-80 font-medium outline-none empty:after:content-['Subtitle']"
                 contentEditable={isEditing}
-                suppressContentEditableWarning
                 onBlur={(e) => handleTextChange(item.id, 'subtitle', e.currentTarget.innerText)}
                 style={{ color: itemColor }}
               >

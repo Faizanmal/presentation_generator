@@ -677,8 +677,8 @@ function CreateProjectModal({
                       <SelectItem value="professional">Professional</SelectItem>
                       <SelectItem value="casual">Casual</SelectItem>
                       <SelectItem value="academic">Academic</SelectItem>
-                      <SelectItem value="inspirational">Inspirational</SelectItem>
-                      <SelectItem value="technical">Technical</SelectItem>
+                      <SelectItem value="creative">Creative</SelectItem>
+                      <SelectItem value="persuasive">Persuasive</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

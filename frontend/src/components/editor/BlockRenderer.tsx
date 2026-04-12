@@ -27,10 +27,12 @@ interface BlockRendererProps {
   theme?: Theme;
   isActive: boolean;
   blockIndex?: number; // For stagger animation
-  onFocus: () => void;
-  onBlur: () => void;
-  onChange: (content: Record<string, unknown>) => void;
-  onDelete: () => void;
+  presentationDensity?: number;
+  presentationTone?: number;
+  onFocus?: () => void;
+  onBlur?: () => void;
+  onChange?: (content: Record<string, unknown>) => void;
+  onDelete?: () => void;
 }
 
 const normalizeKeyPart = (value: string) =>
@@ -70,6 +72,8 @@ const BlockRenderer = React.memo(({
   theme,
   isActive,
   blockIndex = 0,
+  presentationDensity = 60,
+  presentationTone = 70,
   onFocus,
   onBlur,
   onChange,
@@ -95,6 +99,13 @@ const BlockRenderer = React.memo(({
   const secondaryColor = theme?.colors?.secondary || "#8b5cf6";
   // surface color was used in earlier designs but is currently unused
   // const surfaceColor = theme?.colors?.surface || "#f8fafc";
+  const isDense = presentationDensity >= 66;
+  const isSpacious = presentationDensity < 34;
+  const bodyLineHeight = isDense ? 1.55 : 1.72;
+  const readableWidth = isDense ? '36rem' : '42rem';
+  const headingScale = isSpacious ? 'clamp(2.9rem, 5.5vw, 5.25rem)' : 'clamp(2.6rem, 5vw, 4.75rem)';
+  const subheadingScale = isSpacious ? 'clamp(1.7rem, 3vw, 2.5rem)' : 'clamp(1.45rem, 2.3vw, 2.25rem)';
+  const bodyOpacity = presentationTone > 66 ? 0.9 : presentationTone < 34 ? 0.8 : 0.85;
 
   // Content state
   const [content, setContent] = useState(block.content);
@@ -108,7 +119,7 @@ const BlockRenderer = React.memo(({
     }
     debounceRef.current = setTimeout(() => {
       if (JSON.stringify(content) !== JSON.stringify(block.content)) {
-        onChange(content);
+        onChange?.(content);
       }
     }, 500);
     return () => {
@@ -182,21 +193,20 @@ const BlockRenderer = React.memo(({
             <h1
               ref={contentRef}
               contentEditable
-              suppressContentEditableWarning
               onInput={handleTextChange}
               onFocus={onFocus}
               onBlur={onBlur}
-              className="text-4xl font-bold outline-none leading-tight tracking-tight transition-all duration-200"
+              className="outline-none font-black leading-[0.95] tracking-tight transition-all duration-200 text-[clamp(2.6rem,5vw,4.75rem)]"
               style={{
                 fontFamily: theme?.fonts?.heading || "'Inter', system-ui",
                 color: customColor?.startsWith('#') ? customColor : primaryColor,
                 textAlign,
-                fontSize: customFontSize || undefined,
+                fontSize: customFontSize || headingScale,
                 textShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                maxWidth: '11ch',
               }}
-            >
-              {content?.text || "Heading"}
-            </h1>
+              dangerouslySetInnerHTML={{ __html: content?.text || "Heading" }}
+            />
           </div>
         );
 
@@ -205,21 +215,20 @@ const BlockRenderer = React.memo(({
           <h2
             ref={contentRef}
             contentEditable
-            suppressContentEditableWarning
             onInput={handleTextChange}
             onFocus={onFocus}
             onBlur={onBlur}
-            className="text-2xl font-semibold outline-none leading-snug transition-all duration-200"
+            className="outline-none font-semibold leading-snug transition-all duration-200 text-[clamp(1.45rem,2.3vw,2.25rem)]"
             style={{
               fontFamily: theme?.fonts?.heading || "'Inter', system-ui",
               color: customColor?.startsWith('#') ? customColor : undefined,
               textAlign,
-              fontSize: customFontSize || undefined,
+              fontSize: customFontSize || subheadingScale,
               opacity: 0.9,
+              maxWidth: '16ch',
             }}
-          >
-            {content?.text || "Subheading"}
-          </h2>
+            dangerouslySetInnerHTML={{ __html: content?.text || "Subheading" }}
+          />
         );
 
       case "PARAGRAPH": {
@@ -232,7 +241,7 @@ const BlockRenderer = React.memo(({
         if (isCard) {
           return (
             <div
-              className="relative p-5 rounded-xl overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5"
+              className="relative p-5 rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5"
               style={{
                 background: `linear-gradient(135deg, ${colorWithAlpha(primaryColor, 0.08)}, ${colorWithAlpha(secondaryColor, 0.06)})`,
                 backdropFilter: 'blur(8px)',
@@ -247,19 +256,20 @@ const BlockRenderer = React.memo(({
               <p
                 ref={contentRef}
                 contentEditable
-                suppressContentEditableWarning
                 onInput={handleTextChange}
                 onFocus={onFocus}
                 onBlur={onBlur}
-                className="text-lg leading-relaxed outline-none relative z-10 font-medium"
+                className="outline-none relative z-10 font-medium text-[1.05rem] leading-8"
                 style={{
                   fontFamily: theme?.fonts?.body || "'Inter', system-ui",
                   color: customColor?.startsWith('#') ? customColor : undefined,
                   textAlign,
+                  lineHeight: bodyLineHeight,
+                  opacity: bodyOpacity,
+                  maxWidth: readableWidth,
                 }}
-              >
-                {textContent}
-              </p>
+                dangerouslySetInnerHTML={{ __html: textContent }}
+              />
             </div>
           );
         }
@@ -280,18 +290,18 @@ const BlockRenderer = React.memo(({
               <p
                 ref={contentRef}
                 contentEditable
-                suppressContentEditableWarning
                 onInput={handleTextChange}
                 onFocus={onFocus}
                 onBlur={onBlur}
-                className="text-lg leading-relaxed outline-none flex-1 pt-1.5"
+                className="outline-none flex-1 pt-1.5 text-[1.05rem] leading-8"
                 style={{
                   fontFamily: theme?.fonts?.body || "'Inter', system-ui",
                   color: customColor?.startsWith('#') ? customColor : undefined,
+                  lineHeight: bodyLineHeight,
+                  opacity: bodyOpacity,
                 }}
-              >
-                {textContent}
-              </p>
+                dangerouslySetInnerHTML={{ __html: textContent }}
+              />
             </div>
           );
         }
@@ -305,22 +315,20 @@ const BlockRenderer = React.memo(({
               <p
                 ref={contentRef}
                 contentEditable
-                suppressContentEditableWarning
                 onInput={handleTextChange}
                 onFocus={onFocus}
                 onBlur={onBlur}
                 className="outline-none font-extrabold tracking-tight bg-clip-text text-transparent"
                 style={{
                   fontFamily: theme?.fonts?.heading || "'Inter', system-ui",
-                  fontSize: customFontSize || '3.5rem',
+                  fontSize: customFontSize || (isDense ? '3.1rem' : '3.75rem'),
                   lineHeight: 1.1,
                   backgroundImage: gradientFromColor(primaryColor),
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
                 }}
-              >
-                {textContent}
-              </p>
+                dangerouslySetInnerHTML={{ __html: textContent }}
+              />
             </div>
           );
         }
@@ -330,32 +338,32 @@ const BlockRenderer = React.memo(({
           <p
             ref={contentRef}
             contentEditable
-            suppressContentEditableWarning
             onInput={handleTextChange}
             onFocus={onFocus}
             onBlur={onBlur}
-            className="text-lg leading-relaxed outline-none transition-colors duration-200"
+            className="outline-none transition-colors duration-200 text-[1.05rem] leading-8"
             style={{
               fontFamily: theme?.fonts?.body || "'Inter', system-ui",
               color: customColor?.startsWith('#') ? customColor : undefined,
               textAlign,
               fontSize: customFontSize || undefined,
-              opacity: blockStyle.opacity ? Number(blockStyle.opacity) : undefined,
+              opacity: blockStyle.opacity ? Number(blockStyle.opacity) : bodyOpacity,
+              lineHeight: bodyLineHeight,
+              maxWidth: readableWidth,
             }}
-          >
-            {textContent}
-          </p>
+            dangerouslySetInnerHTML={{ __html: textContent }}
+          />
         );
       }
 
       case "BULLET_LIST":
         return (
-          <ul className="space-y-3 pl-1">
+          <ul className="space-y-4 pl-1 max-w-[42rem]">
             {keyedBulletItems.map(({ item, key }, i: number) => {
               return (
                 <li
                   key={key}
-                  className="flex items-start gap-3 group/item transition-all duration-200 hover:translate-x-0.5"
+                  className="flex items-start gap-3 group/item transition-all duration-200 hover:translate-x-1"
                 >
                   {/* Custom gradient bullet */}
                   <span
@@ -367,7 +375,6 @@ const BlockRenderer = React.memo(({
                   />
                   <span
                     contentEditable
-                    suppressContentEditableWarning
                     onInput={(e) => {
                       const items = [...bulletItems] as string[];
                       items[i] = (e.target as HTMLElement).innerText;
@@ -375,11 +382,14 @@ const BlockRenderer = React.memo(({
                     }}
                     onFocus={onFocus}
                     onBlur={onBlur}
-                    className="text-lg outline-none flex-1 leading-relaxed"
-                    style={{ fontFamily: theme?.fonts?.body || "'Inter', system-ui" }}
-                  >
-                    {item}
-                  </span>
+                    className="outline-none flex-1 text-[1.02rem] leading-8"
+                    style={{
+                      fontFamily: theme?.fonts?.body || "'Inter', system-ui",
+                      lineHeight: bodyLineHeight,
+                      opacity: bodyOpacity,
+                    }}
+                    dangerouslySetInnerHTML={{ __html: item }}
+                  />
                 </li>
               );
             })}
@@ -388,12 +398,12 @@ const BlockRenderer = React.memo(({
 
       case "NUMBERED_LIST":
         return (
-          <ol className="space-y-3 pl-1">
+          <ol className="space-y-4 pl-1 max-w-[42rem]">
             {keyedNumberedItems.map(({ item, key }, i: number) => {
               return (
                 <li
                   key={key}
-                  className="flex items-start gap-3 group/item transition-all duration-200 hover:translate-x-0.5"
+                  className="flex items-start gap-3 group/item transition-all duration-200 hover:translate-x-1"
                 >
                   {/* Gradient number badge */}
                   <span
@@ -407,7 +417,6 @@ const BlockRenderer = React.memo(({
                   </span>
                   <span
                     contentEditable
-                    suppressContentEditableWarning
                     onInput={(e) => {
                       const items = [...numberedItems] as string[];
                       items[i] = (e.target as HTMLElement).innerText;
@@ -415,11 +424,14 @@ const BlockRenderer = React.memo(({
                     }}
                     onFocus={onFocus}
                     onBlur={onBlur}
-                    className="text-lg outline-none flex-1 leading-relaxed pt-0.5"
-                    style={{ fontFamily: theme?.fonts?.body || "'Inter', system-ui" }}
-                  >
-                    {item}
-                  </span>
+                    className="outline-none flex-1 pt-0.5 text-[1.02rem] leading-8"
+                    style={{
+                      fontFamily: theme?.fonts?.body || "'Inter', system-ui",
+                      lineHeight: bodyLineHeight,
+                      opacity: bodyOpacity,
+                    }}
+                    dangerouslySetInnerHTML={{ __html: item }}
+                  />
                 </li>
               );
             })}
@@ -464,7 +476,7 @@ const BlockRenderer = React.memo(({
 
       case "CODE":
         return (
-          <div className="rounded-xl overflow-hidden shadow-lg">
+          <div className="rounded-2xl overflow-hidden shadow-xl border border-slate-200/70 dark:border-slate-700/70">
             {/* Code header bar */}
             <div
               className="flex items-center gap-2 px-4 py-2.5"
@@ -480,7 +492,7 @@ const BlockRenderer = React.memo(({
               </span>
             </div>
             <pre
-              className="p-5 overflow-x-auto"
+              className="p-5 overflow-x-auto bg-slate-950"
               style={{
                 fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
                 background: '#0f172a',
@@ -489,16 +501,14 @@ const BlockRenderer = React.memo(({
             >
               <code
                 contentEditable
-                suppressContentEditableWarning
                 onInput={(e) => {
                   setContent({ ...content, code: (e.target as HTMLElement).innerText });
                 }}
                 onFocus={onFocus}
                 onBlur={onBlur}
-                className="outline-none text-sm leading-relaxed"
-              >
-                {content?.code || "// Your code here"}
-              </code>
+                className="outline-none text-sm leading-7"
+                dangerouslySetInnerHTML={{ __html: content?.code || "// Your code here" }}
+              />
             </pre>
           </div>
         );
@@ -506,7 +516,7 @@ const BlockRenderer = React.memo(({
       case "QUOTE":
         return (
           <div
-            className="relative pl-6 py-4 pr-4 rounded-r-xl transition-all duration-300"
+            className="relative pl-7 py-5 pr-5 rounded-2xl transition-all duration-300 max-w-[42rem]"
             style={{
               borderLeft: `4px solid ${accentColor}`,
               background: `linear-gradient(135deg, ${colorWithAlpha(accentColor, 0.06)}, ${colorWithAlpha(primaryColor, 0.03)})`,
@@ -522,18 +532,17 @@ const BlockRenderer = React.memo(({
 
             <p
               contentEditable
-              suppressContentEditableWarning
               onInput={handleTextChange}
               onFocus={onFocus}
               onBlur={onBlur}
-              className="text-xl outline-none italic leading-relaxed relative z-10"
+              className="outline-none italic leading-[1.9] relative z-10 text-[clamp(1.2rem,2vw,1.6rem)]"
               style={{
                 fontFamily: theme?.fonts?.body || "'Georgia', serif",
                 textAlign,
+                opacity: bodyOpacity,
               }}
-            >
-              {content?.text || "Quote text..."}
-            </p>
+              dangerouslySetInnerHTML={{ __html: content?.text || "Quote text..." }}
+            />
             {content?.author && (
               <footer className="mt-3 text-sm font-medium flex items-center gap-2 relative z-10">
                 <div
@@ -564,7 +573,7 @@ const BlockRenderer = React.memo(({
 
       case "TABLE":
         return (
-          <div className="tiptap-wrapper my-4 relative z-10" onFocus={onFocus} onBlur={onBlur}>
+          <div className="tiptap-wrapper my-4 relative z-10 rounded-2xl border border-slate-200/70 dark:border-slate-700/70 shadow-lg overflow-hidden bg-white/80 dark:bg-slate-900/70" onFocus={onFocus} onBlur={onBlur}>
             <RichTextEditor
               initialContent={content?.html as string}
               initialRows={content?.rows as string[][]}
@@ -578,7 +587,7 @@ const BlockRenderer = React.memo(({
 
       case "EMBED":
         return (
-          <div className="aspect-video rounded-xl overflow-hidden shadow-lg">
+          <div className="aspect-video rounded-2xl overflow-hidden shadow-xl border border-slate-200/70 dark:border-slate-700/70">
             {content?.url ? (
               <iframe
                 src={content.url}
@@ -642,14 +651,14 @@ const BlockRenderer = React.memo(({
           "Option B: Powerful and flexible",
         ]).map((text, idx) => ({ id: text || `cmp-${idx}`, text }));
         return (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-5xl">
             {comparisonItems.map((entry, i) => {
               const colors = [primaryColor, accentColor, secondaryColor];
               const color = colors[i % colors.length];
               return (
                 <div
                   key={entry.id}
-                  className="p-5 rounded-xl transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 relative overflow-hidden"
+                  className="p-6 rounded-2xl transition-all duration-300 hover:shadow-xl hover:-translate-y-1 relative overflow-hidden"
                   style={{
                     background: `linear-gradient(135deg, ${colorWithAlpha(color, 0.08)}, ${colorWithAlpha(color, 0.03)})`,
                     border: `1px solid ${colorWithAlpha(color, 0.15)}`,
@@ -668,7 +677,6 @@ const BlockRenderer = React.memo(({
                   </div>
                   <p
                     contentEditable
-                    suppressContentEditableWarning
                     onInput={(e) => {
                       const items = [...comparisonItems];
                       items[i].text = (e.target as HTMLElement).innerText;
@@ -677,11 +685,14 @@ const BlockRenderer = React.memo(({
                     }}
                     onFocus={onFocus}
                     onBlur={onBlur}
-                    className="text-base leading-relaxed outline-none font-medium"
-                    style={{ fontFamily: theme?.fonts?.body || "'Inter', system-ui" }}
-                  >
-                    {entry.text}
-                  </p>
+                    className="outline-none font-medium text-[1.02rem] leading-8"
+                    style={{
+                      fontFamily: theme?.fonts?.body || "'Inter', system-ui",
+                      lineHeight: bodyLineHeight,
+                      opacity: bodyOpacity,
+                    }}
+                    dangerouslySetInnerHTML={{ __html: entry.text }}
+                  />
                 </div>
               );
             })}
@@ -697,14 +708,14 @@ const BlockRenderer = React.memo(({
           "💰 $1.2M Saved",
         ]).map((text, idx) => ({ id: text || `stat-${idx}`, text }));
         return (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4 max-w-5xl">
             {statsItems.map((entry, i) => {
               const colors = [primaryColor, accentColor, secondaryColor, '#f59e0b'];
               const color = colors[i % colors.length];
               return (
                 <div
                   key={entry.id}
-                  className="relative p-5 rounded-xl text-center transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 overflow-hidden group/stat"
+                  className="relative p-6 rounded-2xl text-center transition-all duration-300 hover:shadow-xl hover:-translate-y-1 overflow-hidden group/stat"
                   style={{
                     background: `linear-gradient(135deg, ${colorWithAlpha(color, 0.06)}, ${colorWithAlpha(color, 0.02)})`,
                     border: `1px solid ${colorWithAlpha(color, 0.12)}`,
@@ -717,7 +728,6 @@ const BlockRenderer = React.memo(({
                   />
                   <p
                     contentEditable
-                    suppressContentEditableWarning
                     onInput={(e) => {
                       const items = [...statsItems];
                       items[i].text = (e.target as HTMLElement).innerText;
@@ -726,11 +736,13 @@ const BlockRenderer = React.memo(({
                     }}
                     onFocus={onFocus}
                     onBlur={onBlur}
-                    className="text-lg font-bold outline-none relative z-10"
-                    style={{ fontFamily: theme?.fonts?.heading || "'Inter', system-ui" }}
-                  >
-                    {entry.text}
-                  </p>
+                    className="text-xl font-black outline-none relative z-10 tracking-tight"
+                    style={{
+                      fontFamily: theme?.fonts?.heading || "'Inter', system-ui",
+                      lineHeight: 1.1,
+                    }}
+                    dangerouslySetInnerHTML={{ __html: entry.text }}
+                  />
                 </div>
               );
             })}
@@ -742,7 +754,7 @@ const BlockRenderer = React.memo(({
         const ctaText = content?.text || "🚀 Get Started Today";
         return (
           <div
-            className="relative p-8 rounded-2xl text-center overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
+            className="relative p-10 rounded-3xl text-center overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 max-w-4xl mx-auto"
             style={{
               background: gradientFromColor(primaryColor),
               boxShadow: `0 8px 32px ${colorWithAlpha(primaryColor, 0.3)}`,
@@ -763,15 +775,13 @@ const BlockRenderer = React.memo(({
             <p
               ref={contentRef}
               contentEditable
-              suppressContentEditableWarning
               onInput={handleTextChange}
               onFocus={onFocus}
               onBlur={onBlur}
-              className="text-2xl font-bold text-white outline-none relative z-10 drop-shadow-sm"
+              className="text-3xl md:text-4xl font-black text-white outline-none relative z-10 drop-shadow-sm leading-tight"
               style={{ fontFamily: theme?.fonts?.heading || "'Inter', system-ui" }}
-            >
-              {ctaText}
-            </p>
+              dangerouslySetInnerHTML={{ __html: ctaText }}
+            />
           </div>
         );
       }

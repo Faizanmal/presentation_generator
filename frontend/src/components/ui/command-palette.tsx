@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
     Command,
@@ -53,6 +53,11 @@ interface CommandPaletteProps {
     isEditorMode?: boolean;
 }
 
+type EditorCommandDetail = {
+    type: "insert-block" | "ai-action" | "open-export" | "open-share" | "add-slide";
+    payload?: Record<string, unknown>;
+};
+
 export function CommandPalette({
     onNewProject,
     onNewAIProject,
@@ -66,6 +71,25 @@ export function CommandPalette({
     const [open, setOpen] = useState(false);
     const router = useRouter();
     const { logout, user } = useAuthStore();
+    const isMac = useMemo(() => {
+        if (typeof navigator === "undefined") {
+            return true;
+        }
+        return /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+    }, []);
+    const modKeyLabel = isMac ? "⌘" : "Ctrl";
+
+    const fmtShortcut = useCallback(
+        (value: string) => value.replaceAll("⌘", modKeyLabel),
+        [modKeyLabel]
+    );
+
+    const emitEditorCommand = useCallback((detail: EditorCommandDetail) => {
+        if (typeof window === "undefined") {
+            return;
+        }
+        window.dispatchEvent(new CustomEvent<EditorCommandDetail>("presentation:editor-command", { detail }));
+    }, []);
 
     // Listen for keyboard shortcut (Cmd/Ctrl + K)
     useEffect(() => {
@@ -97,12 +121,12 @@ export function CommandPalette({
                         <CommandItem onSelect={() => runCommand(() => onNewProject?.())}>
                             <Plus className="mr-2 h-4 w-4" />
                             <span>New Blank Presentation</span>
-                            <CommandShortcut>⌘N</CommandShortcut>
+                            <CommandShortcut>{fmtShortcut("⌘N")}</CommandShortcut>
                         </CommandItem>
                         <CommandItem onSelect={() => runCommand(() => onNewAIProject?.())}>
                             <Wand2 className="mr-2 h-4 w-4" />
                             <span>Generate with AI</span>
-                            <CommandShortcut>⌘G</CommandShortcut>
+                            <CommandShortcut>{fmtShortcut("⌘G")}</CommandShortcut>
                         </CommandItem>
                         <CommandItem onSelect={() => runCommand(() => router.push("/dashboard"))}>
                             <Home className="mr-2 h-4 w-4" />
@@ -120,46 +144,51 @@ export function CommandPalette({
                                 <CommandItem onSelect={() => runCommand(() => onUndo?.())}>
                                     <Undo className="mr-2 h-4 w-4" />
                                     <span>Undo</span>
-                                    <CommandShortcut>⌘Z</CommandShortcut>
+                                    <CommandShortcut>{fmtShortcut("⌘Z")}</CommandShortcut>
                                 </CommandItem>
                                 <CommandItem onSelect={() => runCommand(() => onRedo?.())}>
                                     <Redo className="mr-2 h-4 w-4" />
                                     <span>Redo</span>
-                                    <CommandShortcut>⌘⇧Z</CommandShortcut>
+                                    <CommandShortcut>{fmtShortcut("⌘⇧Z")}</CommandShortcut>
+                                </CommandItem>
+                                <CommandItem onSelect={() => runCommand(() => emitEditorCommand({ type: "add-slide" }))}>
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    <span>Add Slide</span>
+                                    <CommandShortcut>{fmtShortcut("⌘Enter")}</CommandShortcut>
                                 </CommandItem>
                                 <CommandItem onSelect={() => runCommand(() => router.push(`/present/${projectId}`))}>
                                     <Play className="mr-2 h-4 w-4" />
                                     <span>Present</span>
-                                    <CommandShortcut>⌘P</CommandShortcut>
+                                    <CommandShortcut>{fmtShortcut("⌘P")}</CommandShortcut>
                                 </CommandItem>
-                                <CommandItem onSelect={() => runCommand(() => {/* Open export modal */ })}>
+                                <CommandItem onSelect={() => runCommand(() => emitEditorCommand({ type: "open-export" }))}>
                                     <Download className="mr-2 h-4 w-4" />
                                     <span>Export Presentation</span>
-                                    <CommandShortcut>⌘E</CommandShortcut>
+                                    <CommandShortcut>{fmtShortcut("⌘E")}</CommandShortcut>
                                 </CommandItem>
-                                <CommandItem onSelect={() => runCommand(() => {/* Open share modal */ })}>
+                                <CommandItem onSelect={() => runCommand(() => emitEditorCommand({ type: "open-share" }))}>
                                     <Share2 className="mr-2 h-4 w-4" />
                                     <span>Share Presentation</span>
-                                    <CommandShortcut>⌘S</CommandShortcut>
+                                    <CommandShortcut>{fmtShortcut("⌘S")}</CommandShortcut>
                                 </CommandItem>
                             </CommandGroup>
 
                             <CommandSeparator />
 
                             <CommandGroup heading="Insert Element">
-                                <CommandItem onSelect={() => runCommand(() => {/* Insert heading */ })}>
+                                <CommandItem onSelect={() => runCommand(() => emitEditorCommand({ type: "insert-block", payload: { commandId: "heading1" } }))}>
                                     <Layout className="mr-2 h-4 w-4" />
                                     <span>Add Heading</span>
                                 </CommandItem>
-                                <CommandItem onSelect={() => runCommand(() => {/* Insert paragraph */ })}>
+                                <CommandItem onSelect={() => runCommand(() => emitEditorCommand({ type: "insert-block", payload: { commandId: "paragraph" } }))}>
                                     <FileText className="mr-2 h-4 w-4" />
                                     <span>Add Paragraph</span>
                                 </CommandItem>
-                                <CommandItem onSelect={() => runCommand(() => {/* Insert image */ })}>
+                                <CommandItem onSelect={() => runCommand(() => emitEditorCommand({ type: "insert-block", payload: { commandId: "image" } }))}>
                                     <ImageIcon className="mr-2 h-4 w-4" />
                                     <span>Add Image</span>
                                 </CommandItem>
-                                <CommandItem onSelect={() => runCommand(() => {/* Insert code block */ })}>
+                                <CommandItem onSelect={() => runCommand(() => emitEditorCommand({ type: "insert-block", payload: { commandId: "code" } }))}>
                                     <Code className="mr-2 h-4 w-4" />
                                     <span>Add Code Block</span>
                                 </CommandItem>
@@ -168,19 +197,19 @@ export function CommandPalette({
                             <CommandSeparator />
 
                             <CommandGroup heading="AI Tools">
-                                <CommandItem onSelect={() => runCommand(() => {/* AI enhance */ })}>
+                                <CommandItem onSelect={() => runCommand(() => emitEditorCommand({ type: "ai-action", payload: { action: "enhance" } }))}>
                                     <Sparkles className="mr-2 h-4 w-4" />
                                     <span>Enhance with AI</span>
                                 </CommandItem>
-                                <CommandItem onSelect={() => runCommand(() => {/* AI shorten */ })}>
+                                <CommandItem onSelect={() => runCommand(() => emitEditorCommand({ type: "ai-action", payload: { action: "shorten" } }))}>
                                     <Zap className="mr-2 h-4 w-4" />
                                     <span>Shorten Text</span>
                                 </CommandItem>
-                                <CommandItem onSelect={() => runCommand(() => {/* AI expand */ })}>
+                                <CommandItem onSelect={() => runCommand(() => emitEditorCommand({ type: "ai-action", payload: { action: "expand" } }))}>
                                     <MessageSquare className="mr-2 h-4 w-4" />
                                     <span>Expand Text</span>
                                 </CommandItem>
-                                <CommandItem onSelect={() => runCommand(() => {/* Generate speaker notes */ })}>
+                                <CommandItem onSelect={() => runCommand(() => emitEditorCommand({ type: "ai-action", payload: { action: "speaker-notes" } }))}>
                                     <Mic className="mr-2 h-4 w-4" />
                                     <span>Generate Speaker Notes</span>
                                 </CommandItem>
@@ -217,12 +246,12 @@ export function CommandPalette({
                         <CommandItem onSelect={() => runCommand(() => onToggleTheme?.())}>
                             <Sun className="mr-2 h-4 w-4" />
                             <span>Toggle Theme</span>
-                            <CommandShortcut>⌘T</CommandShortcut>
+                            <CommandShortcut>{fmtShortcut("⌘T")}</CommandShortcut>
                         </CommandItem>
                         <CommandItem onSelect={() => runCommand(() => onShowKeyboardShortcuts?.())}>
                             <Keyboard className="mr-2 h-4 w-4" />
                             <span>Keyboard Shortcuts</span>
-                            <CommandShortcut>⌘/</CommandShortcut>
+                            <CommandShortcut>{fmtShortcut("⌘/")}</CommandShortcut>
                         </CommandItem>
                         <CommandItem onSelect={() => runCommand(() => {/* Open help */ })}>
                             <HelpCircle className="mr-2 h-4 w-4" />

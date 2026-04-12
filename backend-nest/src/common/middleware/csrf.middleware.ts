@@ -1,42 +1,9 @@
 import { Injectable, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
-import { doubleCsrf } from 'csrf-csrf';
+import { doubleCsrfProtection } from '../csrf/double-csrf.config';
 
 @Injectable()
 export class CsrfMiddleware implements NestMiddleware {
-  private csrfProtection: (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ) => void;
-
-  constructor() {
-    const isProduction = process.env.NODE_ENV === 'production';
-
-    const { doubleCsrfProtection } = doubleCsrf({
-      getSecret: () =>
-        process.env.CSRF_SECRET || 'default-csrf-secret-change-in-production',
-      getSessionIdentifier: (req) =>
-        (req.headers['authorization'] as string) || req.ip || '',
-      cookieName: isProduction
-        ? '__Host-psifi.x-csrf-token'
-        : 'psifi.x-csrf-token',
-      cookieOptions: {
-        sameSite: 'strict',
-        path: '/',
-        secure: isProduction,
-        httpOnly: true,
-      },
-      size: 64,
-      ignoredMethods: ['GET', 'HEAD', 'OPTIONS'],
-      getCsrfTokenFromRequest: (req) => {
-        return req.headers['x-csrf-token'] as string;
-      },
-    });
-
-    this.csrfProtection = doubleCsrfProtection;
-  }
-
   use(req: Request, res: Response, next: NextFunction) {
     // Skip CSRF for health checks, metrics, and webhooks
     const skipPaths = ['/health', '/metrics', '/api/payments/webhook'];
@@ -44,19 +11,18 @@ export class CsrfMiddleware implements NestMiddleware {
       return next();
     }
 
-    // Debug logging for CSRF issues
-    if (
-      req.method !== 'GET' &&
-      req.method !== 'HEAD' &&
-      req.method !== 'OPTIONS'
-    ) {
+    // Debug logging for CSRF issues (non-GET, non-HEAD, non-OPTIONS)
+    const isMutation = !['GET', 'HEAD', 'OPTIONS'].includes(req.method);
+    if (isMutation) {
       console.log(`[CSRF Debug] ${req.method} ${req.path}`, {
-        tokenHeader: req.headers['x-csrf-token'],
+        tokenHeader: req.headers['x-csrf-token']
+          ? req.headers['x-csrf-token'].substring(0, 10) + '...'
+          : 'null',
         cookies: req.cookies,
         isProduction: process.env.NODE_ENV === 'production',
       });
     }
 
-    this.csrfProtection(req, res, next);
+    doubleCsrfProtection(req, res, next);
   }
 }

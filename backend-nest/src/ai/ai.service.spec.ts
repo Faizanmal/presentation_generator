@@ -4,8 +4,8 @@ import {
   AIService,
   GenerationParams,
   GeneratedPresentation,
-  LayoutType,
 } from './ai.service';
+import type { LayoutType } from '@shared/index';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealTimeDataService } from './realtime-data.service';
 
