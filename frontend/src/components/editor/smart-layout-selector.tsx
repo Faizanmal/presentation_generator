@@ -10,18 +10,7 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
-export type LayoutType =
-  | 'title'
-  | 'title-content'
-  | 'two-column'
-  | 'image-left'
-  | 'image-right'
-  | 'full-image'
-  | 'comparison'
-  | 'quote'
-  | 'chart'
-  | 'list'
-  | 'timeline';
+import type { LayoutType } from '@shared/index';
 
 interface LayoutOption {
   id: LayoutType;
@@ -114,7 +103,7 @@ const LAYOUTS: LayoutOption[] = [
     ),
   },
   {
-    id: 'full-image',
+    id: 'image-full',
     name: 'Full Image',
     description: 'Full-bleed background image',
     icon: <ImageIcon className="h-4 w-4" />,
@@ -146,7 +135,7 @@ const LAYOUTS: LayoutOption[] = [
     ),
   },
   {
-    id: 'quote',
+    id: 'quote-highlight',
     name: 'Quote',
     description: 'Large quote with attribution',
     icon: <FileText className="h-4 w-4" />,
@@ -159,7 +148,7 @@ const LAYOUTS: LayoutOption[] = [
     ),
   },
   {
-    id: 'chart',
+    id: 'chart-focus',
     name: 'Chart',
     description: 'Data visualization slide',
     icon: <BarChart3 className="h-4 w-4" />,
@@ -176,7 +165,7 @@ const LAYOUTS: LayoutOption[] = [
     ),
   },
   {
-    id: 'list',
+    id: 'content',
     name: 'Bullet List',
     description: 'Title with bullet points',
     icon: <FileText className="h-4 w-4" />,

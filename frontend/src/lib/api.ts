@@ -284,6 +284,9 @@ class ApiClient {
     if (data.refreshToken) {
       this.setRefreshToken(data.refreshToken);
     }
+    // Clear CSRF token to ensure a fresh one is fetched for the new session
+    this.csrfToken = null;
+    this.csrfPromise = null;
     return data;
   }
 
@@ -293,6 +296,9 @@ class ApiClient {
     if (data.refreshToken) {
       this.setRefreshToken(data.refreshToken);
     }
+    // Clear CSRF token to ensure a fresh one is fetched for the new session
+    this.csrfToken = null;
+    this.csrfPromise = null;
     return data;
   }
 
@@ -2742,35 +2748,6 @@ class ApiClient {
   }
 
   // ============================================
-  // A/B TESTING API
-  // ============================================
-
-  async createABTest(projectId: string, input: { name: string; variants: object[] }) {
-    const { data } = await this.client.post(`/ab-testing/tests/${projectId}`, input);
-    return data;
-  }
-
-  async getABTest(id: string) {
-    const { data } = await this.client.get(`/ab-testing/tests/${id}`);
-    return data;
-  }
-
-  async listABTests(projectId: string) {
-    const { data } = await this.client.get(`/ab-testing/tests/project/${projectId}`);
-    return data;
-  }
-
-  async recordABImpression(testId: string, variantId: string) {
-    const { data } = await this.client.post(`/ab-testing/tests/${testId}/impression`, { variantId });
-    return data;
-  }
-
-  async getABResults(testId: string) {
-    const { data } = await this.client.get(`/ab-testing/tests/${testId}/results`);
-    return data;
-  }
-
-  // ============================================
   // AI COPILOT API
   // ============================================
 
@@ -3430,14 +3407,6 @@ class ApiClient {
     get: (id: string) => this.getStoryboard(id),
     list: (projectId?: string) => this.listStoryboards(projectId),
     apply: (id: string, projectId?: string) => this.applyStoryboard(id, projectId),
-  };
-
-  readonly abTesting = {
-    create: (projectId: string, input: { name: string; variants: object[] }) => this.createABTest(projectId, input),
-    get: (id: string) => this.getABTest(id),
-    list: (projectId: string) => this.listABTests(projectId),
-    recordImpression: (testId: string, variantId: string) => this.recordABImpression(testId, variantId),
-    getResults: (testId: string) => this.getABResults(testId),
   };
 
   readonly copilot = {

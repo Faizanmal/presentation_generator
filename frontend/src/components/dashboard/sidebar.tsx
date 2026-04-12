@@ -15,7 +15,6 @@ import {
     PanelLeftClose,
     PanelLeftOpen,
     Zap,
-    FlaskConical,
     Glasses,
     MessageSquareMore,
     MonitorSmartphone,
@@ -74,13 +73,6 @@ export function Sidebar({ className, isCollapsed = false, onCollapse, onLinkClic
                 { title: "AI Research", icon: Search, href: "/dashboard/ai-research" },
                 { title: "Storyboarding", icon: Layers, href: "/dashboard/storyboarding" },
                 { title: "Image Gallery", icon: ImageIcon, href: "/dashboard/image-gallery" },
-            ]
-        },
-        {
-            id: "analytics",
-            title: "Analytics & Data",
-            items: [
-                { title: "A/B Testing", icon: FlaskConical, href: "/dashboard/ab-testing" },
             ]
         },
         {

@@ -106,7 +106,7 @@ export default function Home() {
               <Link href="/dashboard" className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
                 Dashboard
               </Link>
-              <Link href="/editor" className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+              <Link href="/dashboard" className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
                 Create
               </Link>
               <Link href="#features" className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
@@ -518,7 +518,7 @@ export default function Home() {
                 <h4 className="font-semibold mb-4">Product</h4>
                 <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
                   <li><Link href="/dashboard" className="hover:text-slate-900 dark:hover:text-white transition-colors">Dashboard</Link></li>
-                  <li><Link href="/editor" className="hover:text-slate-900 dark:hover:text-white transition-colors">Create Presentation</Link></li>
+                  <li><Link href="/dashboard" className="hover:text-slate-900 dark:hover:text-white transition-colors">Create Presentation</Link></li>
                   <li><Link href="#features" className="hover:text-slate-900 dark:hover:text-white transition-colors">Features</Link></li>
                   <li><Link href="#pricing" className="hover:text-slate-900 dark:hover:text-white transition-colors">Pricing</Link></li>
                   <li><Link href="/marketplace" className="hover:text-slate-900 dark:hover:text-white transition-colors">Templates</Link></li>

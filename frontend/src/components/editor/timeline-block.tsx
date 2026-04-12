@@ -74,7 +74,6 @@ export function TimelineBlock({ content, theme, onChange, isEditing = false }: T
                 <div 
                   className="font-bold text-lg mb-2 outline-none empty:after:content-['Phase']"
                   contentEditable={isEditing}
-                  suppressContentEditableWarning
                   onBlur={(e) => handleTextChange(item.id, 'title', e.currentTarget.innerText)}
                 >
                   {item.title}
@@ -83,7 +82,6 @@ export function TimelineBlock({ content, theme, onChange, isEditing = false }: T
                   className="text-sm outline-none empty:after:content-['Description']"
                   style={{ color: textBodyColor }}
                   contentEditable={isEditing}
-                  suppressContentEditableWarning
                   onBlur={(e) => handleTextChange(item.id, 'description', e.currentTarget.innerText)}
                 >
                   {item.description}

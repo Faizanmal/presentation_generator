@@ -51,7 +51,6 @@ import { DocumentIngestionModule } from './document-ingestion/document-ingestion
 // New AI-Enhanced Creativity & Immersive Tech modules
 import { AIResearchModule } from './ai-research/ai-research.module';
 import { StoryboardingModule } from './storyboarding/storyboarding.module';
-import { ABTestingModule } from './ab-testing/ab-testing.module';
 
 // Advanced Collaboration & Analytics modules
 import { AICopilotModule } from './ai-copilot/ai-copilot.module';
@@ -246,7 +245,6 @@ import featureFlagsConfig from './common/config/feature-flags.config';
     // AI-Enhanced Creativity & Immersive Tech
     AIResearchModule,
     StoryboardingModule,
-    ABTestingModule,
 
     // Advanced Collaboration & Analytics
     AICopilotModule,

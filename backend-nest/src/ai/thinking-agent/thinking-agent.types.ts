@@ -157,6 +157,7 @@ export interface EnhancedGenerationParams {
   additionalContext?: string;
   rawData?: string; // Unstructured raw data input
   brandGuidelines?: BrandGuidelines;
+  enableQualityRefinement?: boolean;
 }
 
 export interface BrandGuidelines {
@@ -218,22 +219,7 @@ export type BlockType =
   | 'timeline-item'
   | 'comparison-item';
 
-export type LayoutType =
-  | 'title'
-  | 'title-subtitle'
-  | 'title-content'
-  | 'two-column'
-  | 'three-column'
-  | 'image-left'
-  | 'image-right'
-  | 'image-full'
-  | 'comparison'
-  | 'timeline'
-  | 'quote-highlight'
-  | 'stats-grid'
-  | 'chart-focus'
-  | 'gallery'
-  | 'agenda';
+import type { LayoutType } from '@shared/index';
 
 export type TransitionStyle = 'fade' | 'slide' | 'zoom' | 'flip' | 'none';
 

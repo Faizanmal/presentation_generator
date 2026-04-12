@@ -37,6 +37,11 @@ export function useCollaboration({
   onUserLeft,
 }: UseCollaborationOptions) {
   const socketRef = useRef<Socket | null>(null);
+  const cursorThrottleMs = 80;
+  const lastCursorSentAtRef = useRef(0);
+  const pendingCursorRef = useRef<CursorPosition | null>(null);
+  const cursorFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recentBlockPayloadRef = useRef<Map<string, { signature: string; ts: number }>>(new Map());
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [cursors, setCursors] = useState<Map<string, CursorPosition & { color: string; userName: string }>>(
@@ -140,6 +145,11 @@ export function useCollaboration({
 
     // Cleanup
     return () => {
+      if (cursorFlushTimerRef.current) {
+        clearTimeout(cursorFlushTimerRef.current);
+        cursorFlushTimerRef.current = null;
+      }
+      pendingCursorRef.current = null;
       socket.emit('project:leave', { projectId });
       socket.disconnect();
       socketRef.current = null;
@@ -148,13 +158,61 @@ export function useCollaboration({
 
   // Send cursor position
   const sendCursorPosition = useCallback((position: CursorPosition) => {
-    socketRef.current?.emit('cursor:move', position);
+    const socket = socketRef.current;
+    if (!socket) {return;}
+
+    const now = Date.now();
+    const elapsed = now - lastCursorSentAtRef.current;
+
+    if (elapsed >= cursorThrottleMs) {
+      socket.emit('cursor:move', position);
+      lastCursorSentAtRef.current = now;
+      pendingCursorRef.current = null;
+      if (cursorFlushTimerRef.current) {
+        clearTimeout(cursorFlushTimerRef.current);
+        cursorFlushTimerRef.current = null;
+      }
+      return;
+    }
+
+    pendingCursorRef.current = position;
+    if (cursorFlushTimerRef.current) {
+      return;
+    }
+
+    const waitMs = Math.max(0, cursorThrottleMs - elapsed);
+    cursorFlushTimerRef.current = setTimeout(() => {
+      if (pendingCursorRef.current && socketRef.current) {
+        socketRef.current.emit('cursor:move', pendingCursorRef.current);
+        lastCursorSentAtRef.current = Date.now();
+      }
+      pendingCursorRef.current = null;
+      cursorFlushTimerRef.current = null;
+    }, waitMs);
   }, []);
 
   // Send block update
   const sendBlockUpdate = useCallback(
     (slideId: string, blockId: string, data: Record<string, unknown>) => {
-      socketRef.current?.emit('block:update', {
+      const socket = socketRef.current;
+      if (!socket) {return;}
+
+      const cacheKey = `${slideId}:${blockId}`;
+      const payloadSignature = JSON.stringify(data);
+      const now = Date.now();
+      const prev = recentBlockPayloadRef.current.get(cacheKey);
+
+      // Skip rapid duplicate payloads to reduce network noise during typing.
+      if (prev && prev.signature === payloadSignature && now - prev.ts < 250) {
+        return;
+      }
+
+      recentBlockPayloadRef.current.set(cacheKey, {
+        signature: payloadSignature,
+        ts: now,
+      });
+
+      socket.emit('block:update', {
         projectId,
         slideId,
         blockId,

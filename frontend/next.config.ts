@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
   // Tree-shake large packages — dramatically reduces compile time
   // lucide-react alone has 1000+ exports without this
   experimental: {
+    externalDir: true,
     optimizePackageImports: [
       "lucide-react",
       "framer-motion",

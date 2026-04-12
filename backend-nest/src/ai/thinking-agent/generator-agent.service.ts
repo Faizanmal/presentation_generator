@@ -9,9 +9,9 @@ import {
   EnhancedSection,
   EnhancedBlock,
   ThinkingStep,
-  LayoutType,
   ChartData,
 } from './thinking-agent.types';
+import type { LayoutType } from '@shared/index';
 
 /**
  * Generator Agent Service
@@ -42,6 +42,7 @@ export class GeneratorAgentService {
       generateImages?: boolean;
       rawData?: string;
       additionalContext?: string;
+      enableQualityRefinement?: boolean;
       brandGuidelines?: {
         colors?: string[];
         fonts?: string[];
@@ -182,30 +183,43 @@ export class GeneratorAgentService {
       }
     }
 
-    thinkingSteps.push({
-      stepNumber: options.generateImages
-        ? 4 + totalSections
-        : 3 + totalSections,
-      phase: 'generation',
-      thought: `Generated metadata - Duration: ${metadata.estimatedDuration}min, Keywords: ${metadata.keywords.length}`,
-      action: 'Metadata generation',
-      observation: `Total generation time: ${Date.now() - startTime}ms`,
-      timestamp: new Date(),
-    });
-
-    const presentation: EnhancedPresentation = {
+    let finalPresentation: EnhancedPresentation = {
       title: titleResult.title,
       subtitle: titleResult.subtitle,
       sections,
       metadata,
     };
 
+    // Step 5: Quality Refinement (Optional)
+    if (options.enableQualityRefinement) {
+      this.logger.log('🔍 Step 5: Performing quality refinement...');
+      const refinedPresentation = await this.refinePresentationQuality(
+        finalPresentation,
+        plan,
+        topic,
+      );
+      if (refinedPresentation) {
+        finalPresentation = refinedPresentation.presentation;
+        totalTokens += refinedPresentation.tokens;
+        thinkingSteps.push({
+          stepNumber: options.generateImages
+            ? 5 + totalSections
+            : 4 + totalSections,
+          phase: 'refinement',
+          thought: `Refined presentation quality - improved ${refinedPresentation.improvements} aspects`,
+          action: 'Quality refinement',
+          observation: `Overall score improved to ${refinedPresentation.score}`,
+          timestamp: new Date(),
+        });
+      }
+    }
+
     this.logger.log(
       `✅ Generation complete: ${sections.length} sections in ${Date.now() - startTime}ms`,
     );
 
     return {
-      presentation,
+      presentation: finalPresentation,
       thinkingSteps,
       tokensUsed: totalTokens,
     };
@@ -735,6 +749,209 @@ Return JSON:
       },
       tokens: response.tokens,
     };
+  }
+
+  /**
+   * Refine presentation quality based on analysis
+   */
+  private async refinePresentationQuality(
+    presentation: EnhancedPresentation,
+    plan: PresentationPlan,
+    topic: string,
+  ): Promise<{
+    presentation: EnhancedPresentation;
+    score: number;
+    improvements: number;
+    tokens: number;
+  } | null> {
+    // Analyze current quality
+    const analysis = this.analyzePresentationQuality(presentation);
+
+    if (analysis.overallScore >= 8) {
+      this.logger.log(
+        'Presentation quality is already good, skipping refinement',
+      );
+      return null;
+    }
+
+    this.logger.log(
+      `Current quality score: ${analysis.overallScore}, refining...`,
+    );
+
+    // Generate improvements
+    const improvements = await this.generateQualityImprovements(
+      presentation,
+      analysis,
+      plan,
+      topic,
+    );
+
+    if (improvements.length === 0) {
+      return null;
+    }
+
+    // Apply improvements
+    const refined = await this.applyRefinements(presentation, improvements);
+
+    // Re-analyze
+    const newAnalysis = this.analyzePresentationQuality(refined.presentation);
+
+    return {
+      presentation: refined.presentation,
+      score: newAnalysis.overallScore,
+      improvements: improvements.length,
+      tokens: refined.tokensUsed,
+    };
+  }
+
+  /**
+   * Analyze presentation quality
+   */
+  private analyzePresentationQuality(presentation: EnhancedPresentation): {
+    overallScore: number;
+    metrics: Array<{
+      name: string;
+      score: number;
+      issues: string[];
+      recommendations: string[];
+    }>;
+  } {
+    const sections = presentation.sections;
+    const totalBlocks = sections.reduce((sum, s) => sum + s.blocks.length, 0);
+    const avgBlocksPerSlide = totalBlocks / sections.length;
+
+    const metrics = [
+      {
+        name: 'Content Density',
+        score: Math.min(10, 10 * (Math.min(5, avgBlocksPerSlide) / 5)),
+        issues: avgBlocksPerSlide > 7 ? ['Too many blocks per slide'] : [],
+        recommendations: ['Aim for 3-5 blocks per slide'],
+      },
+      {
+        name: 'Slide Count',
+        score: Math.min(
+          10,
+          sections.length < 5
+            ? 3
+            : sections.length < 15
+              ? 9
+              : sections.length < 30
+                ? 10
+                : 7,
+        ),
+        issues:
+          sections.length < 5
+            ? ['Too few slides']
+            : sections.length > 30
+              ? ['Very long presentation']
+              : [],
+        recommendations:
+          sections.length < 5
+            ? ['Add more slides']
+            : sections.length > 30
+              ? ['Consider breaking into multiple']
+              : ['Slide count appropriate'],
+      },
+      {
+        name: 'Visual Hierarchy',
+        score: 7, // Simplified
+        issues: [],
+        recommendations: ['Ensure clear visual hierarchy'],
+      },
+      {
+        name: 'Content Quality',
+        score: sections.every(
+          (s) =>
+            s.blocks.length >= 2 &&
+            s.blocks.some((b) => b.type === 'paragraph'),
+        )
+          ? 8
+          : 5,
+        issues: sections.some((s) => s.blocks.length < 2)
+          ? ['Some slides lack sufficient content']
+          : [],
+        recommendations: ['Ensure each slide has meaningful content'],
+      },
+    ];
+
+    const overallScore = Math.round(
+      metrics.reduce((sum, m) => sum + m.score, 0) / metrics.length,
+    );
+
+    return { overallScore, metrics };
+  }
+
+  /**
+   * Generate quality improvements
+   */
+  private async generateQualityImprovements(
+    presentation: EnhancedPresentation,
+    analysis: ReturnType<typeof this.analyzePresentationQuality>,
+    plan: PresentationPlan,
+    topic: string,
+  ): Promise<
+    Array<{
+      area: string;
+      currentState: string;
+      suggestedChange: string;
+      priority: string;
+      affectedSections: number[];
+    }>
+  > {
+    const improvements: Array<{
+      area: string;
+      currentState: string;
+      suggestedChange: string;
+      priority: string;
+      affectedSections: number[];
+    }> = [];
+
+    // Add improvements based on analysis
+    analysis.metrics.forEach((metric) => {
+      if (metric.score < 7) {
+        metric.issues.forEach((issue) => {
+          improvements.push({
+            area: metric.name,
+            currentState: issue,
+            suggestedChange: metric.recommendations[0] || 'Improve this aspect',
+            priority: metric.score < 5 ? 'high' : 'medium',
+            affectedSections: presentation.sections.map((_, i) => i), // All sections
+          });
+        });
+      }
+    });
+
+    // AI-powered improvement suggestions
+    const prompt = `Analyze this presentation and suggest specific improvements.
+
+PRESENTATION:
+Title: ${presentation.title}
+Sections: ${presentation.sections.map((s) => `${s.heading} (${s.blocks.length} blocks)`).join(', ')}
+
+QUALITY ANALYSIS:
+${analysis.metrics.map((m) => `${m.name}: ${m.score}/10 - ${m.issues.join(', ')}`).join('\n')}
+
+TOPIC: ${topic}
+AUDIENCE: ${plan.targetAudience.type}
+
+Suggest 2-3 specific improvements. Return JSON:
+[{
+  "area": "Content Quality",
+  "currentState": "Issue description",
+  "suggestedChange": "How to fix it",
+  "priority": "high|medium|low",
+  "affectedSections": [0, 1, 2]
+}]`;
+
+    try {
+      const response = await this.callAI(prompt);
+      const aiImprovements = this.parseJSON(response.content, []);
+      improvements.push(...aiImprovements);
+    } catch (_error) {
+      this.logger.warn('Failed to generate AI improvements');
+    }
+
+    return improvements.slice(0, 5); // Limit to 5 improvements
   }
 
   /**

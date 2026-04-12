@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { useTheme } from "next-themes";
 import { Sun, Moon, Monitor } from "lucide-react";
 
@@ -10,12 +11,16 @@ interface ThemeToggleButtonProps {
 }
 
 export function ThemeToggleButton({ variant = "light" }: ThemeToggleButtonProps) {
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
 
-  // Avoid hydration mismatch by rendering a consistent initial UI on both server and client.
-  // Use window detection instead of state updates in effects to satisfy lint and avoid cascading renders.
-  const mounted = typeof window !== "undefined";
-  const activeTheme = mounted ? theme ?? "system" : "system";
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // On the server or before hydration, use a fixed theme value that matches what's used in SSR.
+  // After hydration, use the actual theme.
+  const activeTheme = mounted ? (resolvedTheme ?? "system") : "system";
 
   const themeOptions = [
     { key: "light", icon: Sun, title: "Light mode" },

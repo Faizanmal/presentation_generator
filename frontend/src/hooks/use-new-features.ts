@@ -69,39 +69,6 @@ export function useStoryboards(projectId: string) {
 }
 
 // ============================================
-// A/B TESTING HOOKS
-// ============================================
-
-export function useABTests(projectId: string) {
-  const queryClient = useQueryClient();
-
-  const { data: tests, isLoading } = useQuery({
-    queryKey: ['ab-tests', projectId],
-    queryFn: () => api.abTesting.list(projectId),
-    enabled: !!projectId,
-  });
-
-  const createTest = useMutation({
-    mutationFn: (input: { name: string; variants: object[] }) =>
-      api.abTesting.create(projectId, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ab-tests', projectId] }),
-  });
-
-  return { tests, isLoading, createTest };
-}
-
-export function useABTestResults(testId: string) {
-  return useQuery({
-    queryKey: ['ab-test-results', testId],
-    queryFn: () => api.abTesting.getResults(testId),
-    enabled: !!testId,
-    refetchInterval: 30000,
-  });
-}
-
-
-
-// ============================================
 // AI COPILOT HOOKS
 // ============================================
 

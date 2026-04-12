@@ -17,6 +17,8 @@ import { api } from "@/lib/api";
 import type { Slide, Theme, Block } from "@/types";
 import Image from "next/image";
 import ChartBlock from "@/components/editor/chart-block";
+import { LayoutCompiler } from "@/components/editor/LayoutCompiler";
+import { motion } from "framer-motion";
 
 export default function PresentPage() {
   const params = useParams();
@@ -260,6 +262,21 @@ function SlideView({ slide, theme }: { slide: Slide; theme?: Theme }) {
   // Sort blocks by order
   const sortedBlocks = [...(slide.blocks || [])].sort((a, b) => a.order - b.order);
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const blockVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 }
+  };
+
   return (
     <div
       className="w-full h-full max-w-[90vw] max-h-[90vh] aspect-16/10 rounded-lg shadow-2xl overflow-hidden"
@@ -269,16 +286,24 @@ function SlideView({ slide, theme }: { slide: Slide; theme?: Theme }) {
         fontFamily: (theme?.fonts as Theme['fonts'] | undefined)?.body || "system-ui",
       }}
     >
-      <div className="h-full p-12 overflow-y-auto flex flex-col justify-center">
-        <div className="space-y-6">
-          {sortedBlocks.map((block) => (
-            <BlockView
-              key={block.id}
-              block={block}
-              theme={theme}
-            />
-          ))}
-        </div>
+      <div className="w-full h-full">
+        <motion.div
+          className="w-full h-full"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          <LayoutCompiler
+            layoutType={slide.layout || 'content'}
+            blocks={sortedBlocks}
+            theme={theme}
+            renderBlock={(block) => (
+              <motion.div key={block.id} variants={blockVariants} layoutId={`present-block-${block.id}`}>
+                <BlockView block={block} theme={theme} />
+              </motion.div>
+            )}
+          />
+        </motion.div>
       </div>
     </div>
   );

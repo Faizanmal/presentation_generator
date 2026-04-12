@@ -349,17 +349,24 @@ export class ThinkingProjectService {
   private mapLayoutType(layout: string): string {
     const layoutMap: Record<string, string> = {
       'title-slide': 'title',
-      'content-slide': 'content',
-      'two-column': 'twoColumn',
-      'image-left': 'imageLeft',
-      'image-right': 'imageRight',
-      'full-image': 'fullImage',
+      'content-slide': 'title-content',
+      content: 'title-content',
+      'two-column': 'two-column',
+      twocolumn: 'two-column',
+      'image-left': 'image-left',
+      imageleft: 'image-left',
+      'image-right': 'image-right',
+      imageright: 'image-right',
+      'full-image': 'full-image',
+      fullimage: 'full-image',
       comparison: 'comparison',
       timeline: 'timeline',
       quote: 'quote',
+      chart: 'chart',
+      list: 'list',
     };
 
-    return layoutMap[layout?.toLowerCase()] || layout || 'content';
+    return layoutMap[layout?.toLowerCase()] || layout || 'title-content';
   }
 
   /**
