@@ -87,9 +87,9 @@ export class EmailProviderService implements OnModuleInit {
           this.logger.log(
             `✓ Email provider '${config.name}' connected successfully`,
           );
-        } catch (verifyError) {
+        } catch (error) {
           this.logger.warn(
-            `⚠ Email provider '${config.name}' failed verification: ${verifyError.message}. Will retry on first send.`,
+            `⚠ Email provider '${config.name}' failed verification: ${(error as Error).message}. Will retry on first send.`,
           );
         }
 
@@ -103,7 +103,7 @@ export class EmailProviderService implements OnModuleInit {
         });
       } catch (error) {
         this.logger.error(
-          `✗ Failed to initialize email provider '${config.name}': ${error.message}`,
+          `✗ Failed to initialize email provider '${config.name}': ${(error as Error).message}`,
         );
       }
     }
@@ -295,11 +295,11 @@ export class EmailProviderService implements OnModuleInit {
         };
       } catch (error) {
         health.failureCount++;
-        health.lastError = error.message;
+        health.lastError = (error as Error).message;
         health.lastErrorAt = new Date();
 
         this.logger.warn(
-          `✗ Provider '${providerName}' failed: ${error.message}. Trying next provider...`,
+          `✗ Provider '${providerName}' failed: ${(error as Error).message}. Trying next provider...`,
         );
 
         // Check if circuit should open

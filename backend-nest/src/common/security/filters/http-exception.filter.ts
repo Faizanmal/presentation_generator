@@ -79,7 +79,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     }
 
     // Don't expose internal errors to clients
-    if (statusCode === (HttpStatus.INTERNAL_SERVER_ERROR as number)) {
+    if (statusCode === Number(HttpStatus.INTERNAL_SERVER_ERROR)) {
       message = 'Internal server error';
       details = undefined;
     }
@@ -93,10 +93,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       path,
     };
 
-    if (
-      details &&
-      statusCode !== (HttpStatus.INTERNAL_SERVER_ERROR as number)
-    ) {
+    if (details && statusCode !== Number(HttpStatus.INTERNAL_SERVER_ERROR)) {
       errorResponse.details = details;
     }
 

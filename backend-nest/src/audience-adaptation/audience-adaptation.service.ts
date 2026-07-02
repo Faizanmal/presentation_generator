@@ -399,18 +399,16 @@ Provide the adapted text and list the specific changes made.
         content?: string;
         items?: string[];
       };
-      if ('text' in obj)
-        return { ...obj, text: adaptedText } as Prisma.JsonValue;
-      if ('content' in obj)
-        return { ...obj, content: adaptedText } as Prisma.JsonValue;
+      if ('text' in obj) return { ...obj, text: adaptedText };
+      if ('content' in obj) return { ...obj, content: adaptedText };
       if (Array.isArray(obj.items)) {
         return {
           ...obj,
           items: adaptedText.split('\n').filter(Boolean),
-        } as Prisma.JsonValue;
+        };
       }
       // Fallback: set a content property
-      return { ...obj, content: adaptedText } as Prisma.JsonValue;
+      return { ...obj, content: adaptedText };
     }
     return adaptedText;
   }

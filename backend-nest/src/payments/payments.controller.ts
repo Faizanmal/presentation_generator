@@ -16,7 +16,7 @@ import {
 } from '../common/decorators/throttle.decorator';
 
 class CreateCheckoutDto {
-  plan: 'pro' | 'enterprise';
+  plan!: 'pro' | 'enterprise';
 }
 
 @Controller('payments')
@@ -51,7 +51,7 @@ export class PaymentsController {
    * Get current subscription details
    */
   @Get('subscription')
-  async getSubscription(@CurrentUser() user: { id: string }) {
+  async getSubscription(@CurrentUser() user: { id: string }): Promise<unknown> {
     return this.paymentsService.getStripeSubscription(user.id);
   }
 

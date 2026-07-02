@@ -100,7 +100,7 @@ describe('UsersService', () => {
 
     it('should return null when email is undefined, falsy, or non-string', async () => {
       // no database call should be made
-      const result = await service.findByEmail(undefined as unknown as string);
+      const result = await service.findByEmail(undefined);
       expect(result).toBeNull();
       expect(mockPrismaService.user.findUnique).not.toHaveBeenCalled();
 

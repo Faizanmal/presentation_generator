@@ -13,9 +13,19 @@ function GoogleCallbackContent() {
 
   useEffect(() => {
     const token = searchParams.get("token");
+    const refreshToken = searchParams.get("refreshToken");
+    const error = searchParams.get("error");
+
+    if (error) {
+      router.push(`/login?error=${encodeURIComponent(error)}`);
+      return;
+    }
 
     if (token) {
       api.setToken(token);
+      if (refreshToken) {
+        api.setRefreshToken(refreshToken);
+      }
       fetchProfile().then(() => {
         fetchSubscription();
         router.push("/dashboard");

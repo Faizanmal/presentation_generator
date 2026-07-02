@@ -14,6 +14,11 @@ import { SamlService } from './saml.service';
 import { SecurityController } from './security.controller';
 import { PermissionGuard } from './guards/permission.guard';
 import { PrismaModule } from '../prisma/prisma.module';
+import {
+  PromptInjectionGuard,
+  AIOutputSanitizerService,
+} from './prompt-injection.guard';
+import { AIGenerationRateLimiter } from './ai-rate-limiter.guard';
 
 /**
  * Global Security Module
@@ -38,6 +43,9 @@ import { PrismaModule } from '../prisma/prisma.module';
     BackupService,
     SamlService,
     PermissionGuard,
+    PromptInjectionGuard,
+    AIOutputSanitizerService,
+    AIGenerationRateLimiter,
     {
       provide: APP_GUARD,
       useClass: PermissionGuard,
@@ -54,6 +62,9 @@ import { PrismaModule } from '../prisma/prisma.module';
     SiemService,
     BackupService,
     SamlService,
+    PromptInjectionGuard,
+    AIOutputSanitizerService,
+    AIGenerationRateLimiter,
   ],
 })
 export class SecurityModule {}

@@ -214,7 +214,11 @@ export class SocialSharingService {
     } catch (error) {
       this.logger.error('LinkedIn share failed', error);
       await this.logShare(userId, projectId, 'linkedin', false);
-      return { platform: 'linkedin', success: false, error: error.message };
+      return {
+        platform: 'linkedin',
+        success: false,
+        error: (error as Error).message,
+      };
     }
   }
 
@@ -282,7 +286,11 @@ export class SocialSharingService {
     } catch (error) {
       this.logger.error('Twitter share failed', error);
       await this.logShare(userId, projectId, 'twitter', false);
-      return { platform: 'twitter', success: false, error: error.message };
+      return {
+        platform: 'twitter',
+        success: false,
+        error: (error as Error).message,
+      };
     }
   }
 
@@ -384,7 +392,11 @@ export class SocialSharingService {
     } catch (error) {
       this.logger.error('YouTube upload failed', error);
       await this.logShare(userId, projectId, 'youtube', false);
-      return { platform: 'youtube', success: false, error: error.message };
+      return {
+        platform: 'youtube',
+        success: false,
+        error: (error as Error).message,
+      };
     }
   }
 

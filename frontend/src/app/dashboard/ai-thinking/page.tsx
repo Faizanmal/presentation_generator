@@ -12,6 +12,8 @@ import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import type { ThinkingGenerationResult } from '@/types';
 
+
+
 // Dynamically import heavy AI components
 const ThinkingModeGenerator = dynamic(
     () => import('@/components/ai').then(mod => mod.ThinkingModeGenerator),
@@ -35,102 +37,70 @@ export default function AIThinkingPage() {
     const [result, setResult] = useState<ThinkingGenerationResult | null>(null);
     const [isCreatingProject, setIsCreatingProject] = useState(false);
     const [savedProjectId, setSavedProjectId] = useState<string | null>(null);
+    const [autoSaveFailed, setAutoSaveFailed] = useState(false);
 
-    const handleComplete = useCallback(async (generationResult: ThinkingGenerationResult) => {
+    const saveProject = useCallback(async (generationResult: ThinkingGenerationResult): Promise<string | null> => {
+        const projectResult = await api.createProjectFromThinkingResult({
+            presentation: generationResult.presentation,
+            title: generationResult.presentation.title,
+            description: generationResult.presentation.metadata.summary,
+            generateImages: generationResult.metadata.generateImages,
+        });
+        queryClient.invalidateQueries({ queryKey: ['projects'] });
+        return projectResult.projectId;
+    }, [queryClient]);
+
+    const handleComplete = useCallback((generationResult: ThinkingGenerationResult) => {
         setResult(generationResult);
+        setAutoSaveFailed(false);
         toast.success('Presentation generated successfully!', {
             description: `Quality score: ${generationResult.qualityReport.overallScore.toFixed(1)}/10`,
         });
 
-        // Auto-save to dashboard
+        // Auto-save: fire immediately, non-blocking
         setIsCreatingProject(true);
-        try {
-            toast.info('Saving to dashboard...');
-            const projectResult = await api.createProjectFromThinkingResult({
-                presentation: generationResult.presentation,
-                title: generationResult.presentation.title,
-                description: generationResult.presentation.metadata.summary,
-                generateImages: generationResult.metadata.generateImages,
-            });
-            setSavedProjectId(projectResult.projectId);
-            
-            // Invalidate projects query so the new project appears in the dashboard
-            queryClient.invalidateQueries({ queryKey: ["projects"] });
-            
-            toast.success('Saved to dashboard');
-        } catch (error: unknown) {
-            console.error('Failed to auto-save project:', error);
-            let errorMessage = 'Failed to save to dashboard';
-            if (error instanceof Error) {
-                errorMessage = error.message;
-            } else if (typeof error === 'object' && error !== null) {
-                const err = error as { response?: { data?: { message?: string } | string } };
-                const data = err?.response?.data;
-                if (typeof data === 'string') {
-                    errorMessage = data;
-                } else if (data && typeof data === 'object' && data.message) {
-                    errorMessage = data.message;
-                }
-            }
-            toast.error('Failed to save to dashboard', {
-                description: errorMessage,
-            });
-        } finally {
-            setIsCreatingProject(false);
-        }
-    }, [queryClient]);
+        saveProject(generationResult)
+            .then((projectId) => {
+                setSavedProjectId(projectId);
+                toast.success('Saved to dashboard');
+            })
+            .catch(() => {
+                setAutoSaveFailed(true);
+                toast.error('Auto-save failed — use the Save button to retry.');
+            })
+            .finally(() => setIsCreatingProject(false));
+    }, [saveProject]);
 
     const handleError = useCallback((error: Error) => {
-        toast.error('Generation failed', {
-            description: error.message,
-        });
+        toast.error('Generation failed', { description: error.message });
     }, []);
 
     const handleCreateProject = useCallback(async () => {
-        if (!result || isCreatingProject) { return; }
+        if (isCreatingProject) { return; }
 
-        // If already saved, just navigate
         if (savedProjectId) {
             router.push(`/editor/${savedProjectId}`);
             return;
         }
 
+        if (!result) { return; }
+
         setIsCreatingProject(true);
         try {
-            // Create a project from the generated presentation using the thinking API
-            const projectResult = await api.createProjectFromThinkingResult({
-                presentation: result.presentation,
-                title: result.presentation.title,
-                description: result.presentation.metadata.summary,
-                generateImages: result.metadata.generateImages,
-            });
-
-            // Invalidate projects query so the new project appears in the dashboard
-            queryClient.invalidateQueries({ queryKey: ["projects"] });
-
-            // Navigate to editor with the generated content
-            toast.success(`Project created with ${projectResult.slideCount} slides!`);
-            router.push(`/editor/${projectResult.projectId}`);
+            const projectId = await saveProject(result);
+            setSavedProjectId(projectId);
+            setAutoSaveFailed(false);
+            router.push(`/editor/${projectId}`);
         } catch (error: unknown) {
-            let errorMessage = 'Failed to create project';
-            if (error instanceof Error) {
-                errorMessage = error.message;
-            } else if (typeof error === 'object' && error !== null) {
-                const err = error as { response?: { data?: { message?: string } | string } };
-                const data = err?.response?.data;
-                if (typeof data === 'string') {
-                    errorMessage = data;
-                } else if (data && typeof data === 'object' && data.message) {
-                    errorMessage = data.message;
-                }
-            }
-            toast.error('Failed to create project', {
-                description: errorMessage,
+            const msg = error instanceof Error ? error.message
+                : (error as { response?: { data?: { message?: string } | string } })?.response?.data;
+            toast.error('Failed to save project', {
+                description: typeof msg === 'string' ? msg : (msg as { message?: string })?.message,
             });
         } finally {
             setIsCreatingProject(false);
         }
-    }, [result, router, savedProjectId, isCreatingProject, queryClient]);
+    }, [result, router, savedProjectId, isCreatingProject, saveProject]);
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
@@ -225,7 +195,7 @@ export default function AIThinkingPage() {
                                         disabled={isCreatingProject}
                                         className="flex-1 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 dark:from-purple-700 dark:to-blue-700 dark:hover:from-purple-800 dark:hover:to-blue-800"
                                     >
-                                        {isCreatingProject ? 'Creating...' : 'Create Project'}
+                                        {isCreatingProject ? 'Saving...' : savedProjectId ? 'Open in Editor' : autoSaveFailed ? 'Retry Save' : 'Open in Editor'}
                                     </Button>
                                     <Button variant="outline" className="border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800">
                                         <Download className="h-4 w-4 mr-2" />

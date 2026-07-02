@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { DataConnectorService, DataPreview } from './data-connector.service';
 
@@ -118,8 +119,8 @@ export class ChartGeneratorService {
       data: {
         id: chartId,
         connectionId,
-        config: config as object,
-        data: chartData as object,
+        config: config as unknown as Prisma.InputJsonValue,
+        data: chartData,
       },
     });
 
@@ -416,7 +417,7 @@ export class ChartGeneratorService {
     // Update stored chart
     await this.prisma.savedChart.update({
       where: { id: chartId },
-      data: { data: chartData as object, updatedAt: new Date() },
+      data: { data: chartData, updatedAt: new Date() },
     });
 
     return {
@@ -499,8 +500,8 @@ export class ChartGeneratorService {
       data: {
         id: `chart-${Date.now()}`,
         connectionId: original.connectionId,
-        config: config as object,
-        data: data as object,
+        config: config,
+        data: data,
       },
     });
 

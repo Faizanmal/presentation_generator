@@ -22,7 +22,7 @@ export class InteractiveEmbedsGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
   @WebSocketServer()
-  server: Server;
+  server!: Server;
 
   private readonly logger = new Logger(InteractiveEmbedsGateway.name);
   private embedRooms: Map<string, Set<string>> = new Map();

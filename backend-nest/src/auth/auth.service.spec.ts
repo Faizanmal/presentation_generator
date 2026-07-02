@@ -266,7 +266,7 @@ describe('AuthService', () => {
       await expect(
         service.googleAuth({
           ...googleProfile,
-          email: '' as string,
+          email: '',
         }),
       ).rejects.toThrow(BadRequestException);
 

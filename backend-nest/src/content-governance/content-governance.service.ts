@@ -337,7 +337,7 @@ export class ContentGovernanceService {
       timestamp: new Date(),
     });
 
-    let newStatus: ApprovalStatus = request.status as ApprovalStatus;
+    let newStatus: ApprovalStatus = request.status;
     let newStage: WorkflowStage = request.currentStage as WorkflowStage;
 
     if (action === 'approve') {

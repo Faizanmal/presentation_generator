@@ -22,7 +22,7 @@ export enum DataImportSourceEnum {
 
 export class ImportDataDto {
   @IsEnum(DataImportSourceEnum)
-  source: DataImportSourceEnum;
+  source!: DataImportSourceEnum;
 
   @IsOptional()
   @IsString()

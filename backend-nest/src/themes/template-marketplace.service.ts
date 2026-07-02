@@ -5,7 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { MarketplaceTemplate, Prisma } from '@prisma/client';
+import { MarketplaceTemplate } from '@prisma/client';
 
 type MarketplaceTemplateWithAuthor = MarketplaceTemplate & {
   author: { id: string; name: string; image: string };
@@ -461,7 +461,7 @@ export class TemplateMarketplaceService {
         price: 0,
         tags: [],
         slideCount: project.slides.length,
-        templateData: content as Prisma.InputJsonValue,
+        templateData: content,
       },
     });
 

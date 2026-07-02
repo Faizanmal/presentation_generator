@@ -277,8 +277,10 @@ export class GeneratorAgentService {
       }
 
       return formattedData;
-    } catch (e) {
-      this.logger.warn(`Failed to fetch data for ${query}: ${e.message}`);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to fetch data for ${query}: ${(error as Error).message}`,
+      );
       return null;
     }
   }
@@ -723,12 +725,7 @@ Return JSON:
 
     const parsed = this.parseJSON<ParsedRefinement>(response.content, {
       heading: section.heading,
-      blocks: section.blocks as Array<{
-        type: string;
-        content: string;
-        formatting?: unknown;
-        chartData?: unknown;
-      }>,
+      blocks: section.blocks,
       layout: section.layout,
     });
 
@@ -985,7 +982,7 @@ Suggest 2-3 specific improvements. Return JSON:
         tokens: response.usage?.total_tokens || 0,
       };
     } catch (error) {
-      this.logger.error(`AI call failed: ${error.message}`);
+      this.logger.error(`AI call failed: ${(error as Error).message}`);
       throw error;
     }
   }
@@ -1009,7 +1006,7 @@ Suggest 2-3 specific improvements. Return JSON:
         }
       } catch (extractError) {
         this.logger.warn(
-          `Failed to extract JSON from mixed response: ${extractError.message}`,
+          `Failed to extract JSON from mixed response: ${(extractError as Error).message}`,
         );
       }
 

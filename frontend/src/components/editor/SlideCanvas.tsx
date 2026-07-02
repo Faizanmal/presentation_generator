@@ -55,21 +55,25 @@ const COMMAND_TO_BLOCK: Record<string, { type: BlockType; content: BlockContent 
   divider: { type: "DIVIDER", content: {} },
   columns: { type: "PARAGRAPH", content: { text: "Column layout" } },
   link: { type: "PARAGRAPH", content: { text: "Link text" } },
-  bentoGrid: { type: "BENTO_GRID", content: {
-    items: [
-      { id: '1', title: 'Revenue Growth', subtitle: '+124% YOY', icon: 'TrendingUp', color: 'accent', span: 'col-span-2 row-span-1' },
-      { id: '2', title: 'Active Users', subtitle: '45.2K', icon: 'Users', color: 'primary', span: 'col-span-1 row-span-2' },
-      { id: '3', title: 'Global Reach', subtitle: '12 Countries', icon: 'Zap', color: 'secondary', span: 'col-span-1 row-span-1' },
-      { id: '4', title: 'New Features', subtitle: 'Automated AI workflows', icon: 'Sparkles', color: 'primary', span: 'col-span-2 row-span-1' },
-    ]
-  } },
-  timeline: { type: "TIMELINE", content: {
-    items: [
-      { id: '1', title: 'Q1: Foundation', description: 'Core product development.', status: 'completed' },
-      { id: '2', title: 'Q2: Marketing', description: 'Expand user base.', status: 'current' },
-      { id: '3', title: 'Q3: Scaling', description: 'Enter new markets.', status: 'upcoming' },
-    ]
-  } },
+  bentoGrid: {
+    type: "BENTO_GRID", content: {
+      items: [
+        { id: '1', title: 'Revenue Growth', subtitle: '+124% YOY', icon: 'TrendingUp', color: 'accent', span: 'col-span-2 row-span-1' },
+        { id: '2', title: 'Active Users', subtitle: '45.2K', icon: 'Users', color: 'primary', span: 'col-span-1 row-span-2' },
+        { id: '3', title: 'Global Reach', subtitle: '12 Countries', icon: 'Zap', color: 'secondary', span: 'col-span-1 row-span-1' },
+        { id: '4', title: 'New Features', subtitle: 'Automated AI workflows', icon: 'Sparkles', color: 'primary', span: 'col-span-2 row-span-1' },
+      ]
+    }
+  },
+  timeline: {
+    type: "TIMELINE", content: {
+      items: [
+        { id: '1', title: 'Q1: Foundation', description: 'Core product development.', status: 'completed' },
+        { id: '2', title: 'Q2: Marketing', description: 'Expand user base.', status: 'current' },
+        { id: '3', title: 'Q3: Scaling', description: 'Enter new markets.', status: 'upcoming' },
+      ]
+    }
+  },
   aiGenerate: { type: "PARAGRAPH", content: { text: "AI Generated content..." } },
   comparison: { type: "COMPARISON", content: { items: ["Option A: Fast and simple", "Option B: Powerful and flexible"] } },
   statsGrid: { type: "STATS_GRID", content: { items: ["📊 98% Accuracy", "⚡ 2x Faster", "🎯 500+ Users", "💰 $1.2M Saved"] } },
@@ -88,7 +92,7 @@ const getDecoPattern = (primaryColor: string, accentColor: string, layout: strin
   const bPrimary = parseInt(primaryColor.slice(5, 7), 16) || 246;
   const colorLight = `rgba(${rPrimary}, ${gPrimary}, ${bPrimary}, 0.08)`;
   const colorMedium = `rgba(${rPrimary}, ${gPrimary}, ${bPrimary}, 0.15)`;
-  
+
   const rAccent = parseInt(accentColor?.slice(1, 3) || '10', 16) || 16;
   const gAccent = parseInt(accentColor?.slice(3, 5) || 'b9', 16) || 185;
   const bAccent = parseInt(accentColor?.slice(5, 7) || '81', 16) || 129;
@@ -148,10 +152,10 @@ const getDecoPattern = (primaryColor: string, accentColor: string, layout: strin
           &ldquo;
         </div>
         <motion.div
-           animate={{ scale: [1, 1.05, 1], opacity: [0.3, 0.5, 0.3] }}
-           transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-           className="absolute bottom-0 right-0 w-100 h-100 rounded-tl-full blur-2xl opacity-40"
-           style={{ background: `radial-gradient(circle at bottom right, ${colorLight} 0%, transparent 70%)` }}
+          animate={{ scale: [1, 1.05, 1], opacity: [0.3, 0.5, 0.3] }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute bottom-0 right-0 w-100 h-100 rounded-tl-full blur-2xl opacity-40"
+          style={{ background: `radial-gradient(circle at bottom right, ${colorLight} 0%, transparent 70%)` }}
         />
       </div>
     );
@@ -399,8 +403,9 @@ export default function SlideCanvas({
     >
       <div
         ref={canvasRef}
-          className="w-full max-w-4xl aspect-16/10 rounded-2xl shadow-2xl overflow-hidden relative transition-all duration-300"
+        className="w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden relative transition-all duration-500"
         style={{
+          aspectRatio: '16 / 9',
           backgroundColor: bgColor,
           color: textColor,
           fontFamily: theme?.fonts?.body || "'Inter', system-ui",
@@ -421,7 +426,7 @@ export default function SlideCanvas({
         )}
 
         <div
-          className={`h-full overflow-y-auto relative z-10 ${isTitleSlide
+          className={`absolute inset-0 overflow-hidden relative z-10 ${isTitleSlide
             ? `flex flex-col items-center justify-center ${canvasPaddingClass}`
             : canvasPaddingClass
             }`}
@@ -463,14 +468,7 @@ export default function SlideCanvas({
                   onDelete={handleBlockDelete}
                 />
 
-                {/* Slash command hint at end of content */}
-                <div className="text-slate-400/60 italic text-sm py-3 flex items-center justify-center gap-1.5">
-                  <span>Type</span>
-                  <span className="inline-flex items-center bg-slate-100/60 dark:bg-slate-700/60 px-1.5 py-0.5 rounded border border-slate-200/60 dark:border-slate-600/60 text-slate-500 dark:text-slate-400 font-mono text-xs">
-                    /
-                  </span>
-                  <span>for commands</span>
-                </div>
+
               </div>
             )}
           </SortableContext>

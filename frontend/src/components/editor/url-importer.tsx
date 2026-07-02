@@ -6,7 +6,6 @@ import {
     Link,
     Globe,
     FileText,
-    Youtube,
     Upload,
     Loader2,
     Check,
@@ -17,6 +16,7 @@ import {
     RefreshCw,
     ShieldCheck,
 } from "lucide-react";
+import { FaYoutube } from 'react-icons/fa';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -73,7 +73,7 @@ interface URLImporterProps {
 
 const IMPORT_SOURCES = [
     { id: 'url', label: 'Website URL', icon: Globe, description: 'Import from any webpage' },
-    { id: 'youtube', label: 'YouTube', icon: Youtube, description: 'Import from video' },
+    { id: 'youtube', label: 'YouTube', icon: FaYoutube, description: 'Import from video' },
     { id: 'document', label: 'Document', icon: FileText, description: 'PDF, Word, or text' },
 ] as const;
 
@@ -208,7 +208,7 @@ export function URLImporter({ onImport, onClose }: URLImporterProps) {
                     <div className="space-y-2">
                         <Label htmlFor="youtube-input">YouTube Video URL</Label>
                         <div className="relative">
-                            <Youtube className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-red-500" />
+                            <FaYoutube className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-red-500" />
                             <Input
                                 id="youtube-input"
                                 value={url}

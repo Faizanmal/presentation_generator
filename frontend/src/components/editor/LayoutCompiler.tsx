@@ -99,10 +99,10 @@ export function LayoutCompiler({
   switch (layoutType) {
     case 'title':
       return (
-        <div className={`w-full h-full flex flex-col items-center justify-center text-center max-w-5xl mx-auto ${titlePadding} ${verticalGap} relative z-10`}>
+        <div className={`absolute inset-0 flex flex-col items-center justify-center text-center ${titlePadding} ${verticalGap} z-10`}>
           <div className="w-full max-w-4xl">{renderBlockList(titleBlocks, 't-')}</div>
           <div className="w-full opacity-90 max-w-3xl">{renderBlockList(bodyBlocks, 'b-')}</div>
-          {mediaBlocks.length > 0 && <div className="w-full mt-6 max-w-4xl">{renderBlockList(mediaBlocks, 'm-')}</div>}
+          {mediaBlocks.length > 0 && <div className="w-full mt-4 max-w-4xl">{renderBlockList(mediaBlocks, 'm-')}</div>}
         </div>
       );
 
@@ -113,13 +113,13 @@ export function LayoutCompiler({
         const col1 = bodyBlocks.slice(0, mid);
         const col2 = bodyBlocks.slice(mid);
         return (
-          <div className={`w-full h-full flex flex-col ${contentPadding} ${verticalGap} relative z-10`}>
-            {titleBlocks.length > 0 && <div className="mb-2 shrink-0">{renderBlockList(titleBlocks, 't-')}</div>}
-            <div className={`flex-1 grid grid-cols-1 lg:grid-cols-2 ${columnGap} items-start overflow-y-auto pr-2`}>
-              <div className={`flex flex-col ${isDense ? 'gap-4' : 'gap-5'} ${readableWidth}`}>
+          <div className={`absolute inset-0 flex flex-col ${contentPadding} ${verticalGap} z-10`}>
+            {titleBlocks.length > 0 && <div className="shrink-0">{renderBlockList(titleBlocks, 't-')}</div>}
+            <div className={`flex-1 grid grid-cols-2 ${columnGap} items-start overflow-hidden min-h-0`}>
+              <div className={`flex flex-col ${isDense ? 'gap-3' : 'gap-4'} overflow-hidden`}>
                 {renderBlockList([...col1, ...mediaBlocks.slice(0, 1)], 'c1-')}
               </div>
-              <div className={`flex flex-col ${isDense ? 'gap-4' : 'gap-5'} ${readableWidth}`}>
+              <div className={`flex flex-col ${isDense ? 'gap-3' : 'gap-4'} overflow-hidden`}>
                 {renderBlockList([...col2, ...mediaBlocks.slice(1)], 'c2-')}
               </div>
             </div>
@@ -129,15 +129,15 @@ export function LayoutCompiler({
 
     case 'image-left':
       return (
-        <div className={`w-full h-full grid grid-cols-1 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] ${columnGap} items-stretch relative z-10 ${contentPadding}`}>
-          <div className="min-h-[18rem] flex items-center justify-center overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-800/50 shadow-sm">
+        <div className={`absolute inset-0 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] ${columnGap} items-stretch z-10 ${contentPadding}`}>
+          <div className="flex items-center justify-center overflow-hidden rounded-2xl bg-slate-50/90 dark:bg-slate-800/50">
             {mediaBlocks.length > 0 ? (
               <div className="w-full h-full">{renderBlockList(mediaBlocks, 'm-')}</div>
             ) : (
-              <div className="text-slate-400 font-medium">Media Zone</div>
+              <div className="text-slate-400 font-medium text-sm">Image Zone</div>
             )}
           </div>
-          <div className={`flex flex-col ${isDense ? 'gap-4' : 'gap-5'} overflow-y-auto pl-2 py-2 justify-center ${readableWidth}`}>
+          <div className={`flex flex-col ${isDense ? 'gap-3' : 'gap-4'} overflow-hidden justify-center`}>
             {renderBlockList([...titleBlocks, ...bodyBlocks], 'content-')}
           </div>
         </div>
@@ -145,15 +145,15 @@ export function LayoutCompiler({
 
     case 'image-right':
       return (
-        <div className={`w-full h-full grid grid-cols-1 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] ${columnGap} items-stretch relative z-10 ${contentPadding}`}>
-          <div className={`flex flex-col ${isDense ? 'gap-4' : 'gap-5'} overflow-y-auto pr-2 py-2 justify-center ${readableWidth}`}>
+        <div className={`absolute inset-0 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] ${columnGap} items-stretch z-10 ${contentPadding}`}>
+          <div className={`flex flex-col ${isDense ? 'gap-3' : 'gap-4'} overflow-hidden justify-center`}>
             {renderBlockList([...titleBlocks, ...bodyBlocks], 'content-')}
           </div>
-          <div className="min-h-[18rem] flex items-center justify-center overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-800/50 shadow-sm">
+          <div className="flex items-center justify-center overflow-hidden rounded-2xl bg-slate-50/90 dark:bg-slate-800/50">
             {mediaBlocks.length > 0 ? (
               <div className="w-full h-full">{renderBlockList(mediaBlocks, 'm-')}</div>
             ) : (
-              <div className="text-slate-400 font-medium">Media Zone</div>
+              <div className="text-slate-400 font-medium text-sm">Image Zone</div>
             )}
           </div>
         </div>
@@ -161,19 +161,17 @@ export function LayoutCompiler({
 
     case 'image-full':
       return (
-        <div className="w-full h-full relative overflow-hidden flex flex-col items-stretch group rounded-xl">
+        <div className="absolute inset-0 overflow-hidden">
           <div className="absolute inset-0 z-0 bg-slate-200 dark:bg-slate-800">
             {mediaBlocks.length > 0 && (
-               <div className="w-full h-full object-cover [&_img]:object-cover [&_img]:h-full [&_img]:w-full">
-                 {renderBlockList(mediaBlocks, 'm-')}
-               </div>
+              <div className="w-full h-full [&_img]:object-cover [&_img]:h-full [&_img]:w-full">
+                {renderBlockList(mediaBlocks, 'm-')}
+              </div>
             )}
           </div>
-          {/* Add a dimming overlay to guarantee text contrast */}
-          <div className="absolute inset-0 bg-black/40 mix-blend-multiply z-0 pointer-events-none" />
-          
-          <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col justify-end p-12 bg-linear-to-t from-black/80 via-black/40 to-transparent">
-            <div className="drop-shadow-md text-white brightness-150">
+          <div className="absolute inset-0 bg-black/40 z-0 pointer-events-none" />
+          <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col justify-end p-12 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
+            <div className="drop-shadow-md text-white">
               {renderBlockList([...titleBlocks, ...bodyBlocks], 'content-')}
             </div>
           </div>
@@ -182,21 +180,29 @@ export function LayoutCompiler({
 
     case 'quote-highlight':
       return (
-        <div className={`w-full h-full flex flex-col items-center justify-center ${isSpacious ? 'p-16' : 'p-12'} text-center relative z-10`}>
-          <div className="max-w-3xl flex flex-col gap-8">
+        <div className={`absolute inset-0 flex flex-col items-center justify-center ${isSpacious ? 'p-16' : 'p-12'} text-center z-10`}>
+          <div className="max-w-3xl flex flex-col gap-6">
             {renderBlockList([...titleBlocks, ...bodyBlocks], 'content-')}
+          </div>
+        </div>
+      );
+
+    case 'stats-grid':
+      return (
+        <div className={`absolute inset-0 flex flex-col ${contentPadding} ${verticalGap} z-10`}>
+          {titleBlocks.length > 0 && <div className="shrink-0">{renderBlockList(titleBlocks, 't-')}</div>}
+          <div className="flex-1 grid grid-cols-2 gap-4 min-h-0 overflow-hidden">
+            {renderBlockList([...bodyBlocks, ...mediaBlocks], 'content-')}
           </div>
         </div>
       );
 
     case 'chart-focus':
       return (
-        <div className={`w-full h-full flex flex-col ${contentPadding} ${verticalGap} relative z-10`}>
+        <div className={`absolute inset-0 flex flex-col ${contentPadding} ${verticalGap} z-10`}>
           {titleBlocks.length > 0 && <div className="shrink-0">{renderBlockList(titleBlocks, 't-')}</div>}
-          <div className="flex-1 flex text-center overflow-hidden min-h-0 bg-slate-50/60 dark:bg-slate-800/30 rounded-2xl p-4 shadow-inner">
-            <div className="w-full h-full flex items-center justify-center">
-              {renderBlockList(mediaBlocks.length > 0 ? mediaBlocks : bodyBlocks, 'content-')}
-            </div>
+          <div className="flex-1 flex items-center justify-center overflow-hidden min-h-0 bg-slate-50/60 dark:bg-slate-800/30 rounded-2xl p-4">
+            {renderBlockList(mediaBlocks.length > 0 ? mediaBlocks : bodyBlocks, 'content-')}
           </div>
         </div>
       );
@@ -206,9 +212,9 @@ export function LayoutCompiler({
     case 'timeline':
     default:
       return (
-        <div className={`w-full h-full flex flex-col ${contentPadding} ${verticalGap} relative z-10`}>
+        <div className={`absolute inset-0 flex flex-col ${contentPadding} ${verticalGap} z-10`}>
           {titleBlocks.length > 0 && <div className="shrink-0">{renderBlockList(titleBlocks, 't-')}</div>}
-          <div className={`flex-1 flex flex-col ${isDense ? 'gap-4' : 'gap-5'} overflow-y-auto px-1 min-h-0 ${readableWidth}`}>
+          <div className={`flex-1 flex flex-col ${isDense ? 'gap-3' : 'gap-4'} overflow-hidden min-h-0`}>
             {renderBlockList([...bodyBlocks, ...mediaBlocks], 'content-')}
           </div>
         </div>

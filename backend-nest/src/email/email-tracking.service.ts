@@ -83,7 +83,9 @@ export class EmailTrackingService {
         `📊 Tracked email event: ${event.status} [${event.type}] → ${event.recipient}`,
       );
     } catch (error) {
-      this.logger.error(`Failed to track email event: ${error.message}`);
+      this.logger.error(
+        `Failed to track email event: ${(error as Error).message}`,
+      );
     }
   }
 

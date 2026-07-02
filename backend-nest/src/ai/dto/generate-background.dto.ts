@@ -26,7 +26,7 @@ export enum BackgroundStyle {
 export class GenerateBackgroundDto {
   @IsString()
   @IsNotEmpty()
-  prompt: string;
+  prompt!: string;
 
   @IsEnum(BackgroundStyle)
   @IsOptional()
@@ -51,7 +51,7 @@ export class BatchGenerateBackgroundDto {
   @IsArray()
   @IsString({ each: true })
   @IsNotEmpty({ each: true })
-  prompts: string[];
+  prompts!: string[];
 
   @IsEnum(BackgroundStyle)
   @IsOptional()
@@ -65,16 +65,16 @@ export class BatchGenerateBackgroundDto {
 export class RefineBackgroundDto {
   @IsString()
   @IsNotEmpty()
-  originalUrl: string;
+  originalUrl!: string;
 
   @IsString()
   @IsNotEmpty()
-  instruction: string; // e.g., "make it darker", "add more blue"
+  instruction!: string; // e.g., "make it darker", "add more blue"
 }
 
 export class BackgroundPresetDto {
   @IsEnum(BackgroundStyle)
-  style: BackgroundStyle;
+  style!: BackgroundStyle;
 
   @IsString()
   @IsOptional()

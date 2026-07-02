@@ -19,18 +19,18 @@ class CreateSessionDto {
 }
 
 class SendMessageDto {
-  message: string;
+  message!: string;
 }
 
 class QuickActionDto {
-  action: string;
+  action!: string;
   projectId?: string;
   slideId?: string;
   blockId?: string;
 }
 
 class FeedbackDto {
-  feedback: 'thumbs_up' | 'thumbs_down';
+  feedback!: 'thumbs_up' | 'thumbs_down';
 }
 
 @ApiTags('AI Copilot')

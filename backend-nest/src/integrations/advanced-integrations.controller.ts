@@ -16,8 +16,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdvancedIntegrationsService } from './advanced-integrations.service';
 
 class RegisterWebhookDto {
-  url: string;
-  events: string[];
+  url!: string;
+  events!: string[];
 }
 
 @Controller('integrations')

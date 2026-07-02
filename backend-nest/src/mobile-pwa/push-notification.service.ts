@@ -211,7 +211,7 @@ export class PushNotificationService {
     try {
       return JSON.parse(JSON.stringify(value ?? {})) as Prisma.InputJsonValue;
     } catch {
-      return {} as Prisma.InputJsonValue;
+      return {};
     }
   }
 

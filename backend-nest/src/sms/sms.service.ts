@@ -40,7 +40,7 @@ export class SmsService {
       });
       this.logger.log(`SMS sent to ${to}`);
     } catch (error) {
-      this.logger.error(`Failed to send SMS to ${to}`, error.stack);
+      this.logger.error(`Failed to send SMS to ${to}`, (error as Error).stack);
       throw error;
     }
   }

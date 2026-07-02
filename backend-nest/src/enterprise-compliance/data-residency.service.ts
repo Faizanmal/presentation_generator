@@ -395,7 +395,7 @@ export class DataResidencyService {
         organizationId,
         type: 'deletion',
         status: 'pending',
-        options: options as object,
+        options: options,
       },
     });
 

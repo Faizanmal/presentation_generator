@@ -1090,7 +1090,7 @@ export class ImageAcquisitionService implements OnModuleDestroy {
 
       return {
         totalImages: files.length,
-        bySource: sourceCount as Record<ImageSource, number>,
+        bySource: sourceCount,
         totalSize,
         avgSize: files.length > 0 ? Math.round(totalSize / files.length) : 0,
         mostUsedTags: [],

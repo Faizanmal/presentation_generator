@@ -341,7 +341,9 @@ export default function LoginPage() {
 
         // Set expiry timer
         if (response.expiresInSeconds) {
-          setOtpExpiresAt(new Date(Date.now() + response.expiresInSeconds * 1000));
+          const expiresAt = new Date();
+          expiresAt.setSeconds(expiresAt.getSeconds() + response.expiresInSeconds);
+          setOtpExpiresAt(expiresAt);
         }
 
         // Set resend cooldown

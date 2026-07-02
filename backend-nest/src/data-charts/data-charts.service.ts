@@ -7,7 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { AIService } from '../ai/ai.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { Prisma } from '@prisma/client';
+
 import { Cron, CronExpression } from '@nestjs/schedule';
 
 // Configurable limits
@@ -222,7 +222,7 @@ export class DataChartsService {
         name,
         type: 'MANUAL',
         config: {},
-        data: rows as unknown as Prisma.InputJsonValue,
+        data: rows,
       },
     });
 
@@ -592,8 +592,7 @@ Return a JSON object with:
     const updated = await this.prisma.dataChart.update({
       where: { id: chartId },
       data: {
-        config:
-          mergedConfig as unknown as import('@prisma/client').Prisma.InputJsonValue,
+        config: mergedConfig,
         cachedData:
           processedData as unknown as import('@prisma/client').Prisma.InputJsonValue,
       },

@@ -31,7 +31,7 @@ const EXPORT_FORMATS: ExportFormat[] = [
     name: "PDF (Standard)",
     description: "High-quality PDF export with all slides",
     fileExtension: ".pdf",
-    icon: <Image className="w-4 h-4" alt="" />,
+    icon: <Image className="w-4 h-4" />,
     category: "static",
     isPremium: false,
     quality: 85,
@@ -101,7 +101,7 @@ const EXPORT_FORMATS: ExportFormat[] = [
     name: "Animated WebP",
     description: "Lightweight animated slides",
     fileExtension: ".webp",
-    icon: <Image className="w-4 h-4" alt="" />,
+    icon: <Image className="w-4 h-4" />,
     category: "static",
     isPremium: true,
     quality: 87,
@@ -154,7 +154,12 @@ export function AdvancedExportSystem({
       toast.error("Please select an export format");
       return;
     }
-    if (selectedFormatData?.isPremium) {
+    const selectedFormatData = EXPORT_FORMATS.find((f) => f.id === selectedFormat);
+    if (!selectedFormatData) {
+      toast.error("Selected format not found");
+      return;
+    }
+    if (selectedFormatData.isPremium) {
       toast.info("This format requires a premium plan");
       return;
     }

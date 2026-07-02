@@ -14,7 +14,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AIResearchService } from './ai-research.service';
 
 class ResearchTopicDto {
-  topic: string;
+  topic!: string;
   projectId?: string;
   sources?: string[];
   maxResults?: number;

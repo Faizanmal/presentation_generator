@@ -32,41 +32,41 @@ import { DataChartsService, ChartConfig } from './data-charts.service';
 // ─── DTOs ──────────────────────────────────────────────────────────────────
 
 class CreateCSVDataSourceDto {
-  @IsString() @IsNotEmpty() projectId: string;
-  @IsString() @IsNotEmpty() @MaxLength(100) name: string;
-  @IsString() @IsNotEmpty() csvContent: string;
+  @IsString() @IsNotEmpty() projectId!: string;
+  @IsString() @IsNotEmpty() @MaxLength(100) name!: string;
+  @IsString() @IsNotEmpty() csvContent!: string;
   @IsOptional() @IsIn([',', ';', '\t', '|']) delimiter?: string;
 }
 
 class ConnectGoogleSheetsDto {
-  @IsString() @IsNotEmpty() projectId: string;
-  @IsString() @IsNotEmpty() @MaxLength(100) name: string;
-  @IsString() @IsNotEmpty() sheetId: string;
-  @IsString() @IsNotEmpty() range: string;
-  @IsString() @IsNotEmpty() accessToken: string;
+  @IsString() @IsNotEmpty() projectId!: string;
+  @IsString() @IsNotEmpty() @MaxLength(100) name!: string;
+  @IsString() @IsNotEmpty() sheetId!: string;
+  @IsString() @IsNotEmpty() range!: string;
+  @IsString() @IsNotEmpty() accessToken!: string;
 }
 
 class ConnectAPIDataSourceDto {
-  @IsString() @IsNotEmpty() projectId: string;
-  @IsString() @IsNotEmpty() @MaxLength(100) name: string;
+  @IsString() @IsNotEmpty() projectId!: string;
+  @IsString() @IsNotEmpty() @MaxLength(100) name!: string;
   @IsUrl({ protocols: ['http', 'https'], require_tld: false })
-  apiEndpoint: string;
+  apiEndpoint!: string;
   @IsOptional() @IsObject() headers?: Record<string, string>;
   @IsOptional() @IsNumber() @Min(1) @Max(10080) refreshInterval?: number;
   @IsOptional() @IsString() @MaxLength(200) dataPath?: string;
 }
 
 class CreateJSONDataSourceDto {
-  @IsString() @IsNotEmpty() projectId: string;
-  @IsString() @IsNotEmpty() @MaxLength(100) name: string;
-  jsonContent: string | unknown[];
+  @IsString() @IsNotEmpty() projectId!: string;
+  @IsString() @IsNotEmpty() @MaxLength(100) name!: string;
+  jsonContent!: string | unknown[];
 }
 
 class CreateChartDto {
-  @IsString() @IsNotEmpty() slideId: string;
-  @IsString() @IsNotEmpty() blockId: string;
-  @IsString() @IsNotEmpty() dataSourceId: string;
-  config: ChartConfig;
+  @IsString() @IsNotEmpty() slideId!: string;
+  @IsString() @IsNotEmpty() blockId!: string;
+  @IsString() @IsNotEmpty() dataSourceId!: string;
+  config!: ChartConfig;
 }
 
 class SuggestChartDto {
@@ -74,7 +74,7 @@ class SuggestChartDto {
 }
 
 class UpdateChartConfigDto {
-  config: Partial<ChartConfig>;
+  config!: Partial<ChartConfig>;
 }
 
 // ─── Helper ────────────────────────────────────────────────────────────────

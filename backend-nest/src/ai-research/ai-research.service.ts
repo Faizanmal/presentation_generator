@@ -2,6 +2,7 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
+import { Prisma } from '@prisma/client';
 import axios from 'axios';
 
 interface ResearchResult {
@@ -253,7 +254,7 @@ export class AIResearchService {
         where: { id: research.id },
         data: {
           status: 'completed',
-          results: results as unknown as object,
+          results: results as unknown as Prisma.InputJsonValue,
           summary,
           keywords,
           completedAt: new Date(),
@@ -889,7 +890,7 @@ Keywords:`,
     // Flatten and count keywords
     const keywordFrequency: Record<string, number> = {};
     for (const r of topKeywordsRaw) {
-      const kws = r.keywords as unknown as string[];
+      const kws = r.keywords;
       if (Array.isArray(kws)) {
         for (const kw of kws) {
           keywordFrequency[kw] = (keywordFrequency[kw] || 0) + 1;

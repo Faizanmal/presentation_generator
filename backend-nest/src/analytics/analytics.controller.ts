@@ -16,21 +16,21 @@ import { AnalyticsService } from './analytics.service';
 
 // DTO for tracking
 class StartViewDto {
-  projectId: string;
-  sessionId: string;
+  projectId!: string;
+  sessionId!: string;
 }
 
 class TrackSlideDto {
-  presentationViewId: string;
-  slideId: string;
-  slideIndex: number;
+  presentationViewId!: string;
+  slideId!: string;
+  slideIndex!: number;
 }
 
 class TrackHeatmapDto {
-  projectId: string;
-  slideId: string;
-  x: number;
-  y: number;
+  projectId!: string;
+  slideId!: string;
+  x!: number;
+  y!: number;
 }
 
 @Controller('analytics')

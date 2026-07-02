@@ -31,9 +31,6 @@ import {
   Mail,
   Copy,
   Check,
-  Twitter,
-  Linkedin,
-  Facebook,
   QrCode,
   Eye,
   Lock,
@@ -43,6 +40,7 @@ import {
   ExternalLink,
   Download,
 } from 'lucide-react';
+import { FaTwitter, FaLinkedin, FaFacebook } from 'react-icons/fa';
 
 interface ShareSettings {
   isPublic: boolean;
@@ -229,7 +227,7 @@ export function EmbedSharePanel({
                   className="flex-1"
                   onClick={() => window.open(socialShareUrls.twitter, '_blank')}
                 >
-                  <Twitter className="h-5 w-5 mr-2" />
+                  <FaTwitter className="h-5 w-5 mr-2" />
                   Twitter
                 </Button>
                 <Button
@@ -238,7 +236,7 @@ export function EmbedSharePanel({
                   className="flex-1"
                   onClick={() => window.open(socialShareUrls.linkedin, '_blank')}
                 >
-                  <Linkedin className="h-5 w-5 mr-2" />
+                  <FaLinkedin className="h-5 w-5 mr-2" />
                   LinkedIn
                 </Button>
                 <Button
@@ -247,7 +245,7 @@ export function EmbedSharePanel({
                   className="flex-1"
                   onClick={() => window.open(socialShareUrls.facebook, '_blank')}
                 >
-                  <Facebook className="h-5 w-5 mr-2" />
+                  <FaFacebook className="h-5 w-5 mr-2" />
                   Facebook
                 </Button>
               </div>

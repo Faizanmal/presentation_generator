@@ -25,7 +25,7 @@ const {
   size: 64,
   ignoredMethods: ['GET', 'HEAD', 'OPTIONS'],
   getCsrfTokenFromRequest: (req: Request) => {
-    return req.headers['x-csrf-token'] as string;
+    return req.headers['x-csrf-token'];
   },
 });
 

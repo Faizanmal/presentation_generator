@@ -55,6 +55,9 @@ import { StoryboardingModule } from './storyboarding/storyboarding.module';
 // Advanced Collaboration & Analytics modules
 import { AICopilotModule } from './ai-copilot/ai-copilot.module';
 
+// Multi-Agent Generation Pipeline
+import { AgentsModule } from './ai/agents/agents.module';
+
 // Accessibility & Enterprise modules
 import { UniversalDesignModule } from './universal-design/universal-design.module';
 import { PublicApiModule } from './public-api/public-api.module';
@@ -248,6 +251,9 @@ import featureFlagsConfig from './common/config/feature-flags.config';
 
     // Advanced Collaboration & Analytics
     AICopilotModule,
+
+    // Multi-Agent Generation Pipeline
+    AgentsModule,
 
     // Accessibility & Enterprise
     UniversalDesignModule,

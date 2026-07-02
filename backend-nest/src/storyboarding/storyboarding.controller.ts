@@ -24,7 +24,7 @@ import {
 class GenerateStoryboardDto {
   @IsString()
   @IsNotEmpty()
-  topic: string;
+  topic!: string;
 
   @IsOptional()
   @IsString()

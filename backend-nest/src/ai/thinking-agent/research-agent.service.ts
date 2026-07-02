@@ -122,7 +122,7 @@ Return only a JSON array of strings.`;
         }
       } catch (error) {
         this.logger.error(
-          `Search failed for query "${query}": ${error.message}`,
+          `Search failed for query "${query}": ${(error as Error).message}`,
         );
       }
     }
@@ -210,7 +210,7 @@ Return JSON:
         }
       } catch (extractError) {
         this.logger.warn(
-          `Failed to extract JSON from mixed response: ${extractError.message}`,
+          `Failed to extract JSON from mixed response: ${(extractError as Error).message}`,
         );
       }
 

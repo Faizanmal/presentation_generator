@@ -31,8 +31,6 @@ import {
   List,
   Target,
   Users,
-  Twitter,
-  Linkedin,
   Hash,
   Clock,
   BarChart2,
@@ -44,6 +42,7 @@ import {
   MessageSquare,
   BookOpen,
 } from 'lucide-react';
+import { FaTwitter, FaLinkedin } from 'react-icons/fa';
 
 interface SlideOverview {
   slideNumber: number;
@@ -452,7 +451,7 @@ export function AISummarizer({ presentationTitle, slideCount }: AISummarizerProp
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
-                      <Twitter className="h-4 w-4" />
+                      <FaTwitter className="h-4 w-4" />
                       Twitter / X Post
                     </CardTitle>
                   </CardHeader>
@@ -487,7 +486,7 @@ export function AISummarizer({ presentationTitle, slideCount }: AISummarizerProp
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
-                      <Linkedin className="h-4 w-4" />
+                      <FaLinkedin className="h-4 w-4" />
                       LinkedIn Post
                     </CardTitle>
                   </CardHeader>

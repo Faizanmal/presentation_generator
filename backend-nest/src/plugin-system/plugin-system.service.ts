@@ -6,6 +6,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import * as crypto from 'crypto';
 
@@ -209,7 +210,7 @@ export class PluginSystemService {
         name: manifest.name,
         description: manifest.description,
         version: manifest.version,
-        manifest: manifest as object,
+        manifest: manifest as unknown as Prisma.InputJsonValue,
         status: 'draft',
         permissions: manifest.permissions,
         hooks: manifest.hooks,
@@ -553,7 +554,7 @@ export class PluginSystemService {
 
     await this.prisma.pluginInstallation.update({
       where: { id: installationId },
-      data: { settings: settings as object },
+      data: { settings: settings as unknown as Prisma.InputJsonValue },
     });
   }
 

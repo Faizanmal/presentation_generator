@@ -103,8 +103,8 @@ const BlockRenderer = React.memo(({
   const isSpacious = presentationDensity < 34;
   const bodyLineHeight = isDense ? 1.55 : 1.72;
   const readableWidth = isDense ? '36rem' : '42rem';
-  const headingScale = isSpacious ? 'clamp(2.9rem, 5.5vw, 5.25rem)' : 'clamp(2.6rem, 5vw, 4.75rem)';
-  const subheadingScale = isSpacious ? 'clamp(1.7rem, 3vw, 2.5rem)' : 'clamp(1.45rem, 2.3vw, 2.25rem)';
+  const headingScale = isSpacious ? 'clamp(2rem, 3.5vw, 3.5rem)' : 'clamp(1.75rem, 3vw, 3rem)';
+  const subheadingScale = isSpacious ? 'clamp(1.2rem, 2vw, 1.75rem)' : 'clamp(1.1rem, 1.6vw, 1.5rem)';
   const bodyOpacity = presentationTone > 66 ? 0.9 : presentationTone < 34 ? 0.8 : 0.85;
 
   // Content state
@@ -196,14 +196,14 @@ const BlockRenderer = React.memo(({
               onInput={handleTextChange}
               onFocus={onFocus}
               onBlur={onBlur}
-              className="outline-none font-black leading-[0.95] tracking-tight transition-all duration-200 text-[clamp(2.6rem,5vw,4.75rem)]"
+              className="outline-none font-black leading-[0.95] tracking-tight transition-all duration-200"
               style={{
                 fontFamily: theme?.fonts?.heading || "'Inter', system-ui",
                 color: customColor?.startsWith('#') ? customColor : primaryColor,
                 textAlign,
                 fontSize: customFontSize || headingScale,
                 textShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                maxWidth: '11ch',
+                maxWidth: '18ch',
               }}
               dangerouslySetInnerHTML={{ __html: content?.text || "Heading" }}
             />
@@ -852,14 +852,16 @@ const BlockRenderer = React.memo(({
       style={{
         ...style,
       }}
-      initial={{ opacity: 0, y: 24, scale: 0.97 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -12, scale: 0.95, transition: { duration: 0.2 } }}
+      initial={{ opacity: 0, y: 30, scale: 0.98, filter: "blur(4px)" }}
+      whileInView={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+      viewport={{ once: true, margin: "-40px" }}
+      exit={{ opacity: 0, y: -12, scale: 0.95, filter: "blur(4px)", transition: { duration: 0.2 } }}
       transition={{
         delay: blockIndex * 0.05,
         type: "spring",
-        stiffness: 300,
-        damping: 24,
+        stiffness: 250,
+        damping: 25,
+        mass: 0.8,
         layout: { type: "spring", stiffness: 200, damping: 25 },
       }}
       className={`group relative rounded-xl transition-shadow duration-300 ${isActive

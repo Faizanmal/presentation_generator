@@ -306,7 +306,7 @@ export class DataConnectorService {
     }
 
     const credentials = connection.credentials
-      ? this.decryptCredentials(connection.credentials as object)
+      ? this.decryptCredentials(connection.credentials)
       : undefined;
 
     const config: DataSourceConfig = {
@@ -472,7 +472,7 @@ export class DataConnectorService {
     }
 
     // Infer columns from first record's fields
-    const firstFields = records[0].fields || ({} as Record<string, unknown>);
+    const firstFields = records[0].fields || {};
     const columns = Object.keys(firstFields).map((name) => ({
       name,
       type: this.inferColumnType(firstFields[name]),

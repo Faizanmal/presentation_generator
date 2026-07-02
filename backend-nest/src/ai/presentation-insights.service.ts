@@ -80,7 +80,7 @@ export class PresentationInsightsService {
     private prisma: PrismaService,
     private readonly aiService: AIService,
   ) {
-    this.db = this.prisma as unknown as PrismaClient;
+    this.db = this.prisma;
   }
 
   async analyzePresentation(projectId: string): Promise<ComprehensiveInsights> {

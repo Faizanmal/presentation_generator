@@ -389,13 +389,13 @@ export class MobileApiService {
 
     // Optimize content for mobile
     const optimizedContent = this.optimizeContentForMobile(
-      slide.content as unknown,
+      slide.content,
       quality,
     );
 
     // Extract and optimize assets
     const assets = includeAssets
-      ? this.getOptimizedAssets(slide.content as unknown, quality)
+      ? this.getOptimizedAssets(slide.content, quality)
       : [];
 
     return {

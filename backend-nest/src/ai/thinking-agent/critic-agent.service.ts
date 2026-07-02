@@ -720,7 +720,7 @@ Return JSON:
         tokens: response.usage?.total_tokens || 0,
       };
     } catch (error) {
-      this.logger.error(`AI call failed: ${error.message}`);
+      this.logger.error(`AI call failed: ${(error as Error).message}`);
       throw error;
     }
   }
@@ -744,7 +744,7 @@ Return JSON:
         }
       } catch (extractError) {
         this.logger.warn(
-          `Failed to extract JSON from mixed response: ${extractError.message}`,
+          `Failed to extract JSON from mixed response: ${(extractError as Error).message}`,
         );
       }
 

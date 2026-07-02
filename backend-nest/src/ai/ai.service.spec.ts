@@ -5,7 +5,6 @@ import {
   GenerationParams,
   GeneratedPresentation,
 } from './ai.service';
-import type { LayoutType } from '@shared/index';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealTimeDataService } from './realtime-data.service';
 
@@ -126,7 +125,7 @@ describe('AIService', () => {
             { type: 'bullet', content: 'Supervised learning' },
             { type: 'bullet', content: 'Unsupervised learning' },
           ],
-          layout: 'title-content' as LayoutType,
+          layout: 'title-content',
         },
         {
           heading: 'Applications',
@@ -134,7 +133,7 @@ describe('AIService', () => {
             { type: 'bullet', content: 'Natural language processing' },
             { type: 'bullet', content: 'Computer vision' },
           ],
-          layout: 'two-column' as LayoutType,
+          layout: 'two-column',
         },
       ],
     };
@@ -417,9 +416,7 @@ describe('AIService', () => {
 
       const presentation: GeneratedPresentation = {
         title: 'Test',
-        sections: [
-          { heading: 'Intro', blocks: [], layout: 'title' as LayoutType },
-        ],
+        sections: [{ heading: 'Intro', blocks: [], layout: 'title' }],
       };
 
       const result = await service.generateSuggestions(presentation);
@@ -464,13 +461,13 @@ describe('AIService', () => {
       const presentation: GeneratedPresentation = {
         title: 'Test Presentation',
         sections: [
-          { heading: 'Intro', blocks: [], layout: 'title' as LayoutType },
+          { heading: 'Intro', blocks: [], layout: 'title' },
           {
             heading: 'Main',
             blocks: [],
-            layout: 'title-content' as LayoutType,
+            layout: 'title-content',
           },
-          { heading: 'Conclusion', blocks: [], layout: 'title' as LayoutType },
+          { heading: 'Conclusion', blocks: [], layout: 'title' },
         ],
       };
 

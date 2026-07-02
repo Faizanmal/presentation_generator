@@ -22,22 +22,22 @@ class GenerateSpeakerNotesDto {
 }
 
 class GenerateNarrationDto {
-  voice: VoiceId;
+  voice!: VoiceId;
   speed?: number;
   slideIds?: string[];
 }
 
 class ExportVideoDto {
-  format: ExportFormat;
-  resolution: '720p' | '1080p' | '4k';
-  includeNarration: boolean;
+  format!: ExportFormat;
+  resolution!: '720p' | '1080p' | '4k';
+  includeNarration!: boolean;
   slideTransition?: 'none' | 'fade' | 'slide';
   slideDuration?: number;
   narrationProjectId?: string;
 }
 
 class UpdateSpeakerNotesDto {
-  speakerNotes: string;
+  speakerNotes!: string;
 }
 
 @Controller('narration')

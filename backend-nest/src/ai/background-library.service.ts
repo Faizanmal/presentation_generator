@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface GeneratedBackground {
@@ -54,7 +55,7 @@ export class BackgroundLibraryService {
         size: 0,
         description: prompt,
         tags: ['background', style, ...(colorScheme ? [colorScheme] : [])],
-        metadata: metadata as object,
+        metadata: metadata as unknown as Prisma.InputJsonValue,
       },
     });
 

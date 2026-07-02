@@ -106,7 +106,9 @@ export class RecaptchaGuard implements CanActivate {
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
 
-      this.logger.error(`reCAPTCHA verification error: ${error.message}`);
+      this.logger.error(
+        `reCAPTCHA verification error: ${(error as Error).message}`,
+      );
       // Fail open in case of API errors (configurable)
       const failOpen =
         this.configService.get<string>('RECAPTCHA_FAIL_OPEN') === 'true';

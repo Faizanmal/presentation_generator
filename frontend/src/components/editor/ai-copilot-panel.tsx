@@ -31,7 +31,12 @@ const quickActions = [
 export default function AICopilotPanel({ projectId, onClose }: { projectId: string; onClose?: () => void }) {
   const { createSession, sendMessage, executeAction } = useAICopilot(projectId);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>([{
+    id: 'welcome',
+    role: 'assistant',
+    content: "Hi! I'm your AI co-pilot. I can help you improve slides, generate content, create speaker notes, and more. What would you like to work on?",
+    timestamp: new Date().toISOString(),
+  }]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -41,25 +46,25 @@ export default function AICopilotPanel({ projectId, onClose }: { projectId: stri
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const initSession = useCallback(async () => {
+  const ensureSession = useCallback(async () => {
+    if (sessionId) {
+      return sessionId;
+    }
+
     try {
       const session = await createSession.mutateAsync();
       setSessionId(session.id);
-      setMessages([{
-        id: 'welcome',
-        role: 'assistant',
-        content: "Hi! I'm your AI co-pilot. I can help you improve slides, generate content, create speaker notes, and more. What would you like to work on?",
-        timestamp: new Date().toISOString(),
-      }]);
+      return session.id;
     } catch {
       toast.error('Failed to start AI session');
+      return null;
     }
-  }, [createSession]);
-
-  useEffect(() => { initSession(); }, [initSession]);
+  }, [createSession, sessionId]);
 
   const handleSend = async () => {
-    if (!input.trim() || !sessionId) { return; }
+    if (!input.trim()) { return; }
+    const activeSessionId = sessionId ?? await ensureSession();
+    if (!activeSessionId) { return; }
     const userMsg: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -71,7 +76,7 @@ export default function AICopilotPanel({ projectId, onClose }: { projectId: stri
     setIsTyping(true);
 
     try {
-      const response = await sendMessage.mutateAsync({ sessionId, message: input });
+      const response = await sendMessage.mutateAsync({ sessionId: activeSessionId, message: input });
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
@@ -86,7 +91,8 @@ export default function AICopilotPanel({ projectId, onClose }: { projectId: stri
   };
 
   const handleQuickAction = async (actionId: string) => {
-    if (!sessionId) { return; }
+    const activeSessionId = sessionId ?? await ensureSession();
+    if (!activeSessionId) { return; }
     setIsTyping(true);
     setMessages(prev => [...prev, {
       id: Date.now().toString(),
@@ -96,7 +102,7 @@ export default function AICopilotPanel({ projectId, onClose }: { projectId: stri
     }]);
 
     try {
-      const response = await executeAction.mutateAsync({ sessionId, action: actionId });
+      const response = await executeAction.mutateAsync({ sessionId: activeSessionId, action: actionId });
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'assistant',

@@ -1,5 +1,6 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AIService } from '../ai/ai.service';
 
@@ -279,9 +280,9 @@ export class StoryboardingService {
       const updatedStoryboard = await this.prisma.storyboard.update({
         where: { id: storyboard.id },
         data: {
-          narrativeArc: narrativeArc as unknown as object,
-          pacing: pacing as unknown as object,
-          transitions: transitions as unknown as object,
+          narrativeArc: narrativeArc as unknown as Prisma.InputJsonValue,
+          pacing: pacing as unknown as Prisma.InputJsonValue,
+          transitions: transitions as unknown as Prisma.InputJsonValue,
           status: 'completed',
         },
         include: {

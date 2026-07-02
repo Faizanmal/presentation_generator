@@ -19,15 +19,15 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 class GetPresignedUrlDto {
-  filename: string;
-  mimeType: string;
+  filename!: string;
+  mimeType!: string;
 }
 
 class ConfirmUploadDto {
-  key: string;
-  filename: string;
-  mimeType: string;
-  size: number;
+  key!: string;
+  filename!: string;
+  mimeType!: string;
+  size!: number;
 }
 
 @Controller('upload')

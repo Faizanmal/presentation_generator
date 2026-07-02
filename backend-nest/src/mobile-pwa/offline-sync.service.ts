@@ -67,8 +67,11 @@ export class OfflineSyncService {
           });
         }
       } catch (error) {
-        this.logger.error(`Sync operation failed: ${error.message}`);
-        result.errors.push({ operationId: op.id, error: error.message });
+        this.logger.error(`Sync operation failed: ${(error as Error).message}`);
+        result.errors.push({
+          operationId: op.id,
+          error: (error as Error).message,
+        });
       }
     }
 
@@ -128,7 +131,7 @@ export class OfflineSyncService {
           success: false,
           conflict: {
             clientOperation: op,
-            serverState: existing as Record<string, unknown>,
+            serverState: existing,
             serverTimestamp: existing.updatedAt.getTime(),
           },
         };
@@ -163,7 +166,7 @@ export class OfflineSyncService {
           success: false,
           conflict: {
             clientOperation: op,
-            serverState: existing as Record<string, unknown>,
+            serverState: existing,
             serverTimestamp: existing.updatedAt.getTime(),
           },
         };
@@ -228,7 +231,7 @@ export class OfflineSyncService {
           success: false,
           conflict: {
             clientOperation: op,
-            serverState: existing as Record<string, unknown>,
+            serverState: existing,
             serverTimestamp: existing.updatedAt.getTime(),
           },
         };
@@ -294,7 +297,7 @@ export class OfflineSyncService {
           success: false,
           conflict: {
             clientOperation: op,
-            serverState: existing as Record<string, unknown>,
+            serverState: existing,
             serverTimestamp: existing.updatedAt.getTime(),
           },
         };

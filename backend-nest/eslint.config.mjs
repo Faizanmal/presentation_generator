@@ -6,10 +6,15 @@ import tseslint from 'typescript-eslint';
 export default tseslint.config(
   {
     ignores: [
+      '*.js',
+      '*.ts',
       'eslint.config.mjs',
       'dist/**',
       'node_modules/**',
       'prisma/migrations/**',
+      'prisma/**/*.ts',
+      'scripts/**/*.js',
+      'src/scripts/**/*.js',
       'backups/**',
       'logs/**',
     ],

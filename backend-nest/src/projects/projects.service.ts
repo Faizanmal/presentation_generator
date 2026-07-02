@@ -10,7 +10,11 @@ import { AIService, GeneratedPresentation } from '../ai/ai.service';
 import { SlidesService } from '../slides/slides.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
-import { GenerateProjectDto, GenerationType } from './dto/generate-project.dto';
+import {
+  GenerateProjectDto,
+  GenerationDesignStyle,
+  GenerationType,
+} from './dto/generate-project.dto';
 import { ProjectType, BlockType, Prisma } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -177,6 +181,7 @@ export class ProjectsService {
       audience: generateDto.audience,
       length: generateDto.length,
       type: generateDto.type,
+      designStyle: generateDto.designStyle,
       generateImages: generateDto.generateImages,
       imageSource: generateDto.imageSource,
     });
@@ -239,6 +244,10 @@ export class ProjectsService {
     content: GeneratedPresentation,
     generateDto: GenerateProjectDto,
   ) {
+    this.applyDesignPolish(content, generateDto.tone);
+    const designStyle =
+      generateDto.designStyle || GenerationDesignStyle.EDITORIAL;
+
     // Get the default theme
     const defaultTheme = await this.prisma.theme.findFirst({
       where: { isDefault: true },
@@ -271,8 +280,11 @@ export class ProjectsService {
       const section = content.sections[slideIndex];
 
       // Use the AI-recommended layout, falling back to sensible defaults
-      const slideLayout =
-        slideIndex === 0 ? 'title' : section.layout || 'title-content';
+      const slideLayout = this.selectPolishedLayout(
+        content.sections,
+        slideIndex,
+        designStyle,
+      );
 
       const slide = await this.prisma.slide.create({
         data: {
@@ -291,16 +303,25 @@ export class ProjectsService {
           blockType:
             slideIndex === 0 ? BlockType.HEADING : BlockType.SUBHEADING,
           content: { text: section.heading },
+          style: this.getHeadingStyle(
+            slideIndex === 0 ? 'heading' : 'subheading',
+            designStyle,
+          ) as Prisma.InputJsonValue,
           order: 0,
         },
       });
 
       // Create content blocks - group consecutive bullets into lists
+      const sectionBlocks = this.composeVisuallyBalancedBlocks(
+        section.blocks,
+        slideIndex,
+        designStyle,
+      );
       let blockOrder = 1;
       let i = 0;
 
-      while (i < section.blocks.length) {
-        const block = section.blocks[i];
+      while (i < sectionBlocks.length) {
+        const block = sectionBlocks[i];
         const aiType = block.type?.toLowerCase() || 'paragraph';
         const blockType = this.mapBlockType(aiType);
 
@@ -314,10 +335,10 @@ export class ProjectsService {
           const currentType = blockType;
 
           while (
-            i < section.blocks.length &&
-            this.mapBlockType(section.blocks[i].type) === currentType
+            i < sectionBlocks.length &&
+            this.mapBlockType(sectionBlocks[i].type) === currentType
           ) {
-            items.push(section.blocks[i].content);
+            items.push(sectionBlocks[i].content);
             i++;
           }
 
@@ -328,6 +349,10 @@ export class ProjectsService {
               slideId: slide.id,
               blockType: currentType,
               content: { items },
+              style: this.getListStyle(
+                currentType,
+                designStyle,
+              ) as Prisma.InputJsonValue,
               order: blockOrder++,
             },
           });
@@ -368,6 +393,14 @@ export class ProjectsService {
             blockContent = { text: block.content };
           } else {
             blockContent = { text: block.content };
+          }
+
+          if (!blockStyle) {
+            blockStyle = this.getDefaultBlockStyle(
+              blockType,
+              aiType,
+              designStyle,
+            );
           }
 
           await this.prisma.block.create({
@@ -421,6 +454,351 @@ export class ProjectsService {
     };
 
     return typeMap[type.toLowerCase()] || BlockType.PARAGRAPH;
+  }
+
+  private applyDesignPolish(
+    content: GeneratedPresentation,
+    tone?: string,
+  ): void {
+    const needsFormalTone =
+      !!tone &&
+      ['professional', 'formal', 'corporate', 'executive'].includes(
+        tone.toLowerCase(),
+      );
+
+    for (const section of content.sections) {
+      // Reduce wall-of-text effect for readability.
+      section.blocks = section.blocks.map((block) => {
+        if (
+          ['paragraph', 'subheading', 'quote', 'callout', 'statistic'].includes(
+            block.type.toLowerCase(),
+          )
+        ) {
+          const cleaned = block.content.replace(/\s+/g, ' ').trim();
+          const short =
+            cleaned.length > 260
+              ? `${cleaned.slice(0, 257).trim()}...`
+              : cleaned;
+          return { ...block, content: short };
+        }
+        return block;
+      });
+
+      if (needsFormalTone) {
+        // Remove decorative emojis for formal decks.
+        section.heading = section.heading
+          .replace(/([\u{1F300}-\u{1FAFF}]|[\u{2600}-\u{27BF}])/gu, '')
+          .trim();
+      }
+    }
+  }
+
+  private composeVisuallyBalancedBlocks(
+    blocks: GeneratedPresentation['sections'][number]['blocks'],
+    slideIndex: number,
+    designStyle: GenerationDesignStyle,
+  ): GeneratedPresentation['sections'][number]['blocks'] {
+    const safeBlocks = blocks
+      .filter(
+        (b) => typeof b.content === 'string' && b.content.trim().length > 0,
+      )
+      .map((b) => ({ ...b, content: b.content.trim() }));
+
+    const nonBulletBlocks = safeBlocks.filter((b) => {
+      const t = b.type.toLowerCase();
+      return t !== 'bullet' && t !== 'bullet-list' && t !== 'numbered-list';
+    });
+    const bulletBlocks = safeBlocks.filter((b) => {
+      const t = b.type.toLowerCase();
+      return t === 'bullet' || t === 'bullet-list' || t === 'numbered-list';
+    });
+
+    const composed: GeneratedPresentation['sections'][number]['blocks'] = [];
+
+    // 1) Keep one framing paragraph/subheading early if available.
+    const framing = nonBulletBlocks.find((b) =>
+      ['subheading', 'paragraph'].includes(b.type.toLowerCase()),
+    );
+    if (framing) composed.push(framing);
+
+    // 2) Keep one high-emphasis block for visual anchor.
+    const emphasis = nonBulletBlocks.find((b) =>
+      [
+        'quote',
+        'callout',
+        'statistic',
+        'chart',
+        'comparison',
+        'timeline',
+      ].includes(b.type.toLowerCase()),
+    );
+    if (emphasis && !composed.includes(emphasis)) composed.push(emphasis);
+
+    // 3) Add a compact bullet block if we have lists.
+    if (bulletBlocks.length > 0) {
+      const chosenList = bulletBlocks[0];
+      composed.push(chosenList);
+    }
+
+    // 4) Fill remaining with diverse non-duplicate types.
+    for (const block of nonBulletBlocks) {
+      if (composed.length >= 5) break;
+      if (composed.includes(block)) continue;
+      const hasTypeAlready = composed.some(
+        (b) => b.type.toLowerCase() === block.type.toLowerCase(),
+      );
+      if (
+        hasTypeAlready &&
+        ['paragraph', 'subheading'].includes(block.type.toLowerCase())
+      ) {
+        continue;
+      }
+      composed.push(block);
+    }
+
+    // 5) If still too plain, inject a designed callout block.
+    const hasVisualAnchor = composed.some((b) =>
+      [
+        'quote',
+        'callout',
+        'statistic',
+        'chart',
+        'comparison',
+        'timeline',
+      ].includes(b.type.toLowerCase()),
+    );
+    if (!hasVisualAnchor && composed.length > 0) {
+      composed.splice(1, 0, {
+        type: 'callout',
+        content:
+          slideIndex === 0
+            ? 'Why this matters now: clear outcome and audience value.'
+            : 'Key takeaway: focus on one decisive insight before moving on.',
+      });
+    }
+
+    // 6) Enforce clean range with style-specific density.
+    const maxBlocks = designStyle === GenerationDesignStyle.MANIFESTO ? 4 : 6;
+    const minBlocks = designStyle === GenerationDesignStyle.MANIFESTO ? 2 : 3;
+    const deduped: GeneratedPresentation['sections'][number]['blocks'] = [];
+    const seen = new Set<string>();
+    for (const block of composed) {
+      const key = `${block.type}:${block.content.toLowerCase()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      deduped.push(block);
+      if (deduped.length >= maxBlocks) break;
+    }
+
+    return deduped.slice(
+      0,
+      Math.max(minBlocks, Math.min(maxBlocks, deduped.length)),
+    );
+  }
+
+  private selectPolishedLayout(
+    sections: GeneratedPresentation['sections'],
+    index: number,
+    designStyle: GenerationDesignStyle,
+  ): string {
+    if (index === 0) return 'title';
+
+    const fallbackSequence =
+      designStyle === GenerationDesignStyle.MANIFESTO
+        ? [
+            'title-content',
+            'quote-highlight',
+            'image-full',
+            'comparison',
+            'image-right',
+            'title-content',
+            'quote-highlight',
+          ]
+        : [
+            'title-content',
+            'two-column',
+            'image-right',
+            'comparison',
+            'three-column',
+            'chart-focus',
+            'quote-highlight',
+          ];
+
+    const aiLayout = sections[index].layout || 'title-content';
+    const prev = index > 0 ? sections[index - 1].layout : '';
+    const prev2 = index > 1 ? sections[index - 2].layout : '';
+
+    // If AI repeats same layout 3rd time in a row, rotate to a varied fallback.
+    if (aiLayout === prev && aiLayout === prev2) {
+      return fallbackSequence[index % fallbackSequence.length];
+    }
+
+    return aiLayout;
+  }
+
+  private getHeadingStyle(
+    kind: 'heading' | 'subheading',
+    designStyle: GenerationDesignStyle,
+  ): Record<string, unknown> {
+    const styleTokens = this.getDesignTokens(designStyle);
+    if (kind === 'heading') {
+      return {
+        fontFamily: styleTokens.headingFont,
+        fontSize:
+          designStyle === GenerationDesignStyle.BOLD
+            ? 50
+            : designStyle === GenerationDesignStyle.MANIFESTO
+              ? 54
+              : 46,
+        fontWeight: 700,
+        lineHeight: 1.12,
+        color: styleTokens.headingColor,
+        letterSpacing: -0.3,
+      };
+    }
+
+    return {
+      fontFamily: styleTokens.headingFont,
+      fontSize: 28,
+      fontWeight: 600,
+      lineHeight: 1.2,
+      color: styleTokens.subheadingColor,
+      letterSpacing: -0.1,
+    };
+  }
+
+  private getListStyle(
+    blockType: BlockType,
+    designStyle: GenerationDesignStyle,
+  ): Record<string, unknown> {
+    const styleTokens = this.getDesignTokens(designStyle);
+    return {
+      fontFamily: styleTokens.bodyFont,
+      fontSize: 22,
+      lineHeight: 1.4,
+      color: styleTokens.bodyColor,
+      marker:
+        blockType === BlockType.NUMBERED_LIST ? 'numeric-accent' : 'dot-accent',
+      spacing: 10,
+      markerColor: styleTokens.accentColor,
+    };
+  }
+
+  private getDefaultBlockStyle(
+    blockType: BlockType,
+    aiType: string,
+    designStyle: GenerationDesignStyle,
+  ): Record<string, unknown> {
+    const styleTokens = this.getDesignTokens(designStyle);
+    if (blockType === BlockType.QUOTE) {
+      return {
+        variant: 'quote-accent',
+        fontFamily: styleTokens.quoteFont,
+        fontSize: 24,
+        lineHeight: 1.35,
+        color: styleTokens.headingColor,
+        borderLeftColor: styleTokens.accentColor,
+        backgroundColor: styleTokens.softSurface,
+        padding: 16,
+      };
+    }
+
+    if (blockType === BlockType.CHART || aiType === 'statistic') {
+      return {
+        variant: 'data-emphasis',
+        titleColor: styleTokens.headingColor,
+        accentColor: styleTokens.accentColor,
+        gridColor: styleTokens.gridColor,
+        numberWeight: 700,
+      };
+    }
+
+    if (aiType === 'callout' || aiType === 'call-to-action') {
+      return {
+        variant: 'callout',
+        fontFamily: styleTokens.bodyFont,
+        fontSize: designStyle === GenerationDesignStyle.MANIFESTO ? 24 : 22,
+        color: styleTokens.headingColor,
+        backgroundColor: styleTokens.softSurface,
+        borderColor: styleTokens.accentColor,
+        borderRadius: 12,
+        padding: 16,
+      };
+    }
+
+    return {
+      fontFamily: styleTokens.bodyFont,
+      fontSize: 21,
+      lineHeight: 1.42,
+      color: styleTokens.bodyColor,
+      maxWidth: '88%',
+    };
+  }
+
+  private getDesignTokens(designStyle: GenerationDesignStyle): {
+    headingFont: string;
+    bodyFont: string;
+    quoteFont: string;
+    headingColor: string;
+    subheadingColor: string;
+    bodyColor: string;
+    accentColor: string;
+    softSurface: string;
+    gridColor: string;
+  } {
+    if (designStyle === GenerationDesignStyle.EXECUTIVE) {
+      return {
+        headingFont: 'IBM Plex Sans',
+        bodyFont: 'IBM Plex Sans',
+        quoteFont: 'IBM Plex Serif',
+        headingColor: '#0B1F3A',
+        subheadingColor: '#1D3557',
+        bodyColor: '#1F2937',
+        accentColor: '#0A84FF',
+        softSurface: '#EEF6FF',
+        gridColor: '#DCEAFB',
+      };
+    }
+
+    if (designStyle === GenerationDesignStyle.BOLD) {
+      return {
+        headingFont: 'Space Grotesk',
+        bodyFont: 'Manrope',
+        quoteFont: 'Fraunces',
+        headingColor: '#111827',
+        subheadingColor: '#1F2937',
+        bodyColor: '#111827',
+        accentColor: '#F97316',
+        softSurface: '#FFF7ED',
+        gridColor: '#FFEDD5',
+      };
+    }
+
+    if (designStyle === GenerationDesignStyle.MANIFESTO) {
+      return {
+        headingFont: 'Archivo Black',
+        bodyFont: 'Sora',
+        quoteFont: 'Merriweather',
+        headingColor: '#0A0A0A',
+        subheadingColor: '#171717',
+        bodyColor: '#262626',
+        accentColor: '#DC2626',
+        softSurface: '#FAFAFA',
+        gridColor: '#E5E5E5',
+      };
+    }
+
+    return {
+      headingFont: 'Poppins',
+      bodyFont: 'Source Sans 3',
+      quoteFont: 'Lora',
+      headingColor: '#0F172A',
+      subheadingColor: '#1E293B',
+      bodyColor: '#1F2937',
+      accentColor: '#0284C7',
+      softSurface: '#F0F9FF',
+      gridColor: '#E2E8F0',
+    };
   }
 
   /**

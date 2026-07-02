@@ -151,7 +151,7 @@ export class UniversalDesignService {
         readabilityScore: 0,
         issuesFound: issues.length + culturalIssues.length,
         issues: issues as unknown as Prisma.InputJsonValue,
-        suggestions: [] as unknown as Prisma.InputJsonValue,
+        suggestions: [],
         details: {
           issues,
           culturalIssues,
@@ -591,10 +591,10 @@ export class UniversalDesignService {
             where: { id: block.id },
             data: {
               ...(updates.style && {
-                style: updates.style as Prisma.InputJsonValue,
+                style: updates.style,
               }),
               ...(updates.content && {
-                content: updates.content as Prisma.InputJsonValue,
+                content: updates.content,
               }),
             },
           });

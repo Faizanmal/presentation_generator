@@ -27,7 +27,7 @@ export class ImageGenerationProcessor extends WorkerHost {
     private readonly aiService: AIService,
   ) {
     super();
-    this.db = this.prisma as unknown as PrismaClient;
+    this.db = this.prisma;
   }
 
   async process(job: Job<ImageGenerationJobData>) {

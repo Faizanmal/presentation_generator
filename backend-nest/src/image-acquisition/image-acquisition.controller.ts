@@ -37,7 +37,7 @@ import {
 
 class AcquireImageDto {
   @IsIn(['ai', 'unsplash', 'pexels', 'pixabay', 'url'])
-  source: ImageSource;
+  source!: ImageSource;
 
   @IsOptional()
   @IsString()
@@ -61,7 +61,7 @@ class AcquireImageDto {
 
   @IsString()
   @IsNotEmpty()
-  projectId: string;
+  projectId!: string;
 
   @IsOptional()
   @IsString()
@@ -75,16 +75,16 @@ class AcquireImageDto {
 class BulkAcquireDto {
   @IsString()
   @IsNotEmpty()
-  topic: string;
+  topic!: string;
 
   @IsInt()
   @Min(1)
   @Max(20)
-  count: number;
+  count!: number;
 
   @IsString()
   @IsNotEmpty()
-  projectId: string;
+  projectId!: string;
 
   @IsOptional()
   @IsBoolean()
@@ -94,11 +94,11 @@ class BulkAcquireDto {
 class SmartAcquireDto {
   @IsString()
   @IsNotEmpty()
-  query: string;
+  query!: string;
 
   @IsString()
   @IsNotEmpty()
-  projectId: string;
+  projectId!: string;
 
   @IsOptional()
   @IsString()
@@ -152,7 +152,7 @@ export class ImageAcquisitionController {
       };
     } catch (error) {
       this.logger.error('Image acquisition failed:', error);
-      throw new BadRequestException(error.message);
+      throw new BadRequestException((error as Error).message);
     }
   }
 
@@ -196,7 +196,7 @@ export class ImageAcquisitionController {
       };
     } catch (error) {
       this.logger.error('Failed to queue image acquisition:', error);
-      throw new BadRequestException(error.message);
+      throw new BadRequestException((error as Error).message);
     }
   }
 
@@ -221,7 +221,7 @@ export class ImageAcquisitionController {
       };
     } catch (error) {
       this.logger.error('Smart acquisition failed:', error);
-      throw new BadRequestException(error.message);
+      throw new BadRequestException((error as Error).message);
     }
   }
 
@@ -262,7 +262,7 @@ export class ImageAcquisitionController {
       };
     } catch (error) {
       this.logger.error('Bulk acquisition failed:', error);
-      throw new BadRequestException(error.message);
+      throw new BadRequestException((error as Error).message);
     }
   }
 
@@ -295,7 +295,7 @@ export class ImageAcquisitionController {
       };
     } catch (error) {
       this.logger.error('Failed to get job status:', error);
-      throw new BadRequestException(error.message);
+      throw new BadRequestException((error as Error).message);
     }
   }
 
@@ -383,7 +383,7 @@ export class ImageAcquisitionController {
     } catch (error) {
       return {
         success: false,
-        error: error.message,
+        error: (error as Error).message,
         message: `${source} test failed`,
       };
     }

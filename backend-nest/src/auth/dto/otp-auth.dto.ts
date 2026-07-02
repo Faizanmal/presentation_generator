@@ -15,42 +15,42 @@ export enum OtpChannelType {
 
 export class RequestOtpLoginDto {
   @IsEmail()
-  email: string;
+  email!: string;
 }
 
 export class VerifyOtpLoginDto {
   @IsEmail()
-  email: string;
+  email!: string;
 
   @IsString()
   @Length(6, 6)
   @Matches(/^\d{6}$/)
-  otp: string;
+  otp!: string;
 }
 
 export class RequestPasswordResetDto {
   @IsEmail()
-  email: string;
+  email!: string;
 }
 
 export class ResetPasswordDto {
   @IsEmail()
-  email: string;
+  email!: string;
 
   @IsString()
   @Length(6, 6)
   @Matches(/^\d{6}$/)
-  otp: string;
+  otp!: string;
 
   @IsString()
   @Length(8, 128)
-  newPassword: string;
+  newPassword!: string;
 }
 
 // Multi-channel OTP DTOs
 export class RequestOtpMultiChannelDto {
   @IsString()
-  identifier: string; // email or phone
+  identifier!: string; // email or phone
 
   @IsEnum(OtpChannelType)
   @IsOptional()
@@ -63,12 +63,12 @@ export class RequestOtpMultiChannelDto {
 
 export class VerifyOtpMultiChannelDto {
   @IsString()
-  identifier: string;
+  identifier!: string;
 
   @IsString()
   @Length(6, 6)
   @Matches(/^\d{6}$/)
-  otp: string;
+  otp!: string;
 
   @IsEnum(OtpChannelType)
   @IsOptional()

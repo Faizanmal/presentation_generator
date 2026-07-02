@@ -17,10 +17,10 @@ import {
 
 // DTOs
 class CreateWorkflowDto {
-  name: string;
+  name!: string;
   description?: string;
-  stages: WorkflowStage[];
-  requiredApprovers: Record<
+  stages!: WorkflowStage[];
+  requiredApprovers!: Record<
     WorkflowStage,
     { minApprovals: number; approverRoles: string[] }
   >;
@@ -28,23 +28,23 @@ class CreateWorkflowDto {
 }
 
 class SubmitApprovalDto {
-  workflowId: string;
+  workflowId!: string;
   message?: string;
 }
 
 class ProcessApprovalDto {
-  action: 'approve' | 'reject' | 'request_changes';
+  action!: 'approve' | 'reject' | 'request_changes';
   comment?: string;
 }
 
 class AddCommentDto {
-  content: string;
+  content!: string;
 }
 
 class CreateDisclaimerDto {
-  name: string;
-  content: string;
-  placement: 'first_slide' | 'last_slide' | 'all_slides' | 'custom';
+  name!: string;
+  content!: string;
+  placement!: 'first_slide' | 'last_slide' | 'all_slides' | 'custom';
   categories?: string[];
   isRequired?: boolean;
 }
@@ -52,14 +52,14 @@ class CreateDisclaimerDto {
 class LockContentDto {
   slideId?: string;
   blockId?: string;
-  lockType: ContentLockType;
+  lockType!: ContentLockType;
   reason?: string;
   expiresAt?: string;
 }
 
 class CreatePolicyDto {
-  name: string;
-  rules: Array<{
+  name!: string;
+  rules!: Array<{
     type:
       | 'required_fields'
       | 'forbidden_content'
@@ -67,7 +67,7 @@ class CreatePolicyDto {
       | 'approval_required';
     config: Record<string, unknown>;
   }>;
-  enforcementLevel: 'warn' | 'block';
+  enforcementLevel!: 'warn' | 'block';
 }
 
 @Controller('governance')

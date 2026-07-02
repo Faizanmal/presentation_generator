@@ -61,13 +61,6 @@ describe('AuthController', () => {
           picture: '',
           googleId: 'id',
         },
-      } as {
-        user: {
-          email: string;
-          name: string;
-          picture: string;
-          googleId: string;
-        };
       };
       const token = 'token123';
       (authService.googleAuth as jest.Mock).mockResolvedValue({
@@ -77,14 +70,7 @@ describe('AuthController', () => {
         unknown,
         Record<string, unknown>
       >;
-      const reqWithUser = req as unknown as {
-        user: {
-          email: string;
-          name: string;
-          picture: string;
-          googleId: string;
-        };
-      };
+      const reqWithUser = req;
 
       await controller.googleAuthCallback(req, res);
 
@@ -107,13 +93,6 @@ describe('AuthController', () => {
           picture: '',
           googleId: 'id',
         },
-      } as {
-        user: {
-          email: string;
-          name: string;
-          picture: string;
-          googleId: string;
-        };
       };
       const res = { redirect: jest.fn() } as unknown as Response<
         unknown,

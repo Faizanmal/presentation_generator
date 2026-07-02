@@ -2,7 +2,6 @@ import { Injectable, ExecutionContext } from '@nestjs/common';
 import {
   ThrottlerGuard as NestThrottlerGuard,
   ThrottlerStorage,
-  ThrottlerModuleOptions,
 } from '@nestjs/throttler';
 import { Reflector } from '@nestjs/core';
 
@@ -22,7 +21,7 @@ export class ThrottlerGuard extends NestThrottlerGuard {
         storage: storageService,
         throttlers: [{ name: 'default', limit: 100, ttl: 60 }],
         setHeaders: true,
-      } as ThrottlerModuleOptions,
+      },
       storageService,
       reflector,
     );

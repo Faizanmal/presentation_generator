@@ -304,7 +304,7 @@ export class EmailProcessor extends WorkerHost {
         results.push({
           to: recipient.to,
           success: false,
-          error: error.message,
+          error: (error as Error).message,
         });
       }
 
@@ -341,7 +341,7 @@ export class EmailProcessor extends WorkerHost {
       this.trackEmailSent(jobId, to, subject, jobName, 'primary');
     } catch (primaryError) {
       this.logger.warn(
-        `✗ Primary mailer failed → ${to} [${subject}]: ${primaryError.message}`,
+        `✗ Primary mailer failed → ${to} [${subject}]: ${(primaryError as Error).message}`,
       );
 
       // Fallback to multi-provider service
@@ -387,7 +387,7 @@ export class EmailProcessor extends WorkerHost {
         subject,
         jobName,
         'primary',
-        primaryError.message,
+        (primaryError as Error).message,
       );
       throw primaryError;
     }

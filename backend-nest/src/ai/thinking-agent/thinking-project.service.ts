@@ -32,7 +32,7 @@ export class ThinkingProjectService {
     private aiService: AIService,
     @InjectQueue('image-generation') private imageQueue: Queue,
   ) {
-    this.db = this.prisma as unknown as PrismaClient;
+    this.db = this.prisma;
   }
 
   /**

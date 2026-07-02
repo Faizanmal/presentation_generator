@@ -147,12 +147,6 @@ export function WebhookManager() {
     }
   }, []);
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchWebhooks();
-    }
-  }, [isOpen, fetchWebhooks]);
-
   // Create webhook form state
   const [newWebhook, setNewWebhook] = useState({
     name: '',
@@ -288,7 +282,12 @@ export function WebhookManager() {
     deliveries.filter((d) => d.webhookId === webhookId);
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={(nextOpen) => {
+      setIsOpen(nextOpen);
+      if (nextOpen) {
+        void fetchWebhooks();
+      }
+    }}>
       <DialogTrigger asChild>
         <Button variant="outline" className="gap-2">
           <Webhook className="h-4 w-4" />

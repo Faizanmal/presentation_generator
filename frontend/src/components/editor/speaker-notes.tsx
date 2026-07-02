@@ -50,11 +50,6 @@ export function SpeakerNotesPanel({
     const chunksRef = useRef<Blob[]>([]);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Update notes when initial value changes
-    useEffect(() => {
-        setNotes(initialNotes);
-    }, [initialNotes]);
-
     // Generate AI speaker notes
     const aiGenerateMutation = useMutation({
         mutationFn: async () => {

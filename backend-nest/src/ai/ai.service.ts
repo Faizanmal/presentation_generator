@@ -9,7 +9,7 @@ import type { LayoutType } from '@shared/index';
 import OpenAI from 'openai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { PrismaService } from '../prisma/prisma.service';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
 import { RealTimeDataService } from './realtime-data.service';
 import { HfInference, InferenceClient } from '@huggingface/inference';
@@ -20,12 +20,14 @@ import { ImageSuggestion } from './thinking-agent/thinking-agent.types';
 import { AICostOptimizerService } from './ai-cost-optimizer.service';
 
 // Types for AI generation
+type DesignStyle = 'editorial' | 'executive' | 'bold' | 'manifesto';
 export interface GenerationParams {
   topic: string;
   tone?: string;
   audience?: string;
   length?: number;
   type?: string;
+  designStyle?: DesignStyle | (string & {});
   generateImages?: boolean;
   imageSource?: 'ai' | 'stock';
   smartLayout?: boolean;
@@ -39,6 +41,7 @@ export interface GenerationParams {
     | 'keynote';
   templateStructure?: string[];
   contextData?: string;
+  themeId?: string;
 }
 
 export interface GeneratedBlock {
@@ -171,7 +174,7 @@ export class AIService {
     private readonly realTimeDataService: RealTimeDataService,
     private readonly costOptimizer: AICostOptimizerService,
   ) {
-    this.db = this.prisma as unknown as PrismaClient;
+    this.db = this.prisma;
     const features = this.configService.get<{ openAI?: boolean }>('features');
     const openAiKeyRaw = this.configService.get<string>('OPENAI_API_KEY');
     const openAiKey =
@@ -187,7 +190,7 @@ export class AIService {
       this.logger.log(
         'OpenAI support disabled via feature flag; AIService will not initialize client',
       );
-      // leave this.openai uninitialized (undefined) – calls should check
+      // leave this.openai uninitialized (undefined) â€“ calls should check
     } else if (!isOpenAiKeyConfigured) {
       this.logger.warn(
         'OpenAI API key is not configured or is using the placeholder value; OpenAI support will be disabled.',
@@ -846,12 +849,13 @@ export class AIService {
       audience = 'general',
       length = 5,
       type = 'presentation',
+      designStyle = 'editorial',
     } = params;
 
     // Try semantic cache first
-    const queryText = `${topic} ${tone} ${audience} ${length} ${type}`;
+    const queryText = `${topic} ${tone} ${audience} ${length} ${type} ${designStyle}`;
     const cacheKey =
-      `${topic}-${tone}-${audience}-${length}-${type}`.toLowerCase();
+      `${topic}-${tone}-${audience}-${length}-${type}-${designStyle}`.toLowerCase();
 
     // Check basic cache
     const cached = this.generationCache.get(cacheKey);
@@ -911,6 +915,7 @@ export class AIService {
       length,
       type,
       realtimeContext,
+      designStyle,
     );
 
     try {
@@ -1077,6 +1082,7 @@ ${
     length: number,
     type: string,
     realtimeContext: string = '',
+    designStyle: string = 'editorial',
   ): string {
     const emojiGuidance =
       tone === 'creative' || tone === 'casual'
@@ -1091,7 +1097,25 @@ SPECIFICATIONS:
 - Number of sections/slides: ${length}
 - Visual priority: strong hierarchy, deliberate whitespace, and a clear focal point per slide
 - Emoji guidance: ${emojiGuidance}
+- Design style: ${designStyle}
 `;
+
+    const designStyleGuide: Record<
+      'editorial' | 'executive' | 'bold' | 'manifesto',
+      string
+    > = {
+      editorial:
+        'Use refined editorial pacing: elegant whitespace, restrained accents, thoughtful typography contrast, and image-led storytelling.',
+      executive:
+        'Use executive briefing style: clean, data-forward slides, minimal decoration, decisive headings, and high-clarity chart/callout moments.',
+      bold: 'Use high-impact modern style: strong contrast, punchy callouts, decisive section breaks, and vivid but disciplined visual accents.',
+      manifesto:
+        'Use manifesto style: ultra-clear statements, high contrast, minimal text per slide, dramatic quote/callout moments, and cinematic visual direction.',
+    };
+
+    const guideString =
+      designStyleGuide[designStyle as keyof typeof designStyleGuide] ||
+      `Follow this custom design style direction: ${designStyle}`;
 
     if (realtimeContext) {
       prompt += `
@@ -1124,6 +1148,7 @@ ${realtimeContext}
     - End with a clear takeaway, recommendation, or call to action
 
   VISUAL EXCELLENCE REQUIREMENTS:
+  - Follow this style direction: ${guideString}
   - Never repeat the same layout more than twice consecutively
   - Each slide should have 3-6 blocks with at least 2 block types when appropriate
   - Use statistics only when specific and credible
@@ -1476,7 +1501,7 @@ Return as JSON: { "prompts": ["Prompt 1", "Prompt 2", ...] }`,
             status: 'success',
             sectionCount: result.sections.length,
             title: result.title,
-          } as unknown as Prisma.InputJsonValue,
+          },
           tokens,
           model,
         },
@@ -1652,7 +1677,7 @@ Return as JSON: { "prompts": ["Prompt 1", "Prompt 2", ...] }`,
         completion_tokens: completionTokens,
         total_tokens: totalTokens,
       },
-    } as OpenAI.Chat.Completions.ChatCompletion;
+    };
   }
 
   // ============================================
@@ -1672,6 +1697,7 @@ Return as JSON: { "prompts": ["Prompt 1", "Prompt 2", ...] }`,
     size: '1024x1024' | '1792x1024' | '1024x1792' = '1024x1024',
     // Optional: force a specific provider, otherwise follows strict priority
     preferredProvider?: ImageProvider,
+    referenceImageUrl?: string,
   ): Promise<ImageGenerationResult> {
     const providers: ImageProvider[] = [
       'pollinations',
@@ -1697,14 +1723,10 @@ Return as JSON: { "prompts": ["Prompt 1", "Prompt 2", ...] }`,
             return await this.generateImageHuggingFace(prompt);
           case 'replicate':
             if (!this.configService.get('REPLICATE_API_TOKEN')) continue;
-            return await this.generateImageReplicate(prompt);
+            return await this.generateImageReplicate(prompt, referenceImageUrl);
           case 'dall-e-3':
             if (!this.configService.get('OPENAI_API_KEY')) continue;
-            return await this.generateImageDallE(
-              prompt,
-              style,
-              size as OpenAI.ImageGenerateParams['size'],
-            );
+            return await this.generateImageDallE(prompt, style, size);
         }
       } catch (error) {
         this.logger.warn(
@@ -1791,13 +1813,22 @@ Return as JSON: { "prompts": ["Prompt 1", "Prompt 2", ...] }`,
   /**
    * 3. Replicate (Flux Pro or SDXL)
    */
-  async generateImageReplicate(prompt: string): Promise<ImageGenerationResult> {
+  async generateImageReplicate(
+    prompt: string,
+    referenceImageUrl?: string,
+  ): Promise<ImageGenerationResult> {
+    const input: Record<string, unknown> = {
+      prompt: `professional presentation visual, ${prompt}, 4k, minimalist`,
+      disable_safety_checker: true,
+      aspect_ratio: '16:9',
+    };
+
+    if (referenceImageUrl) {
+      input.image_prompt = referenceImageUrl;
+    }
+
     const output = await this.replicate.run('black-forest-labs/flux-schnell', {
-      input: {
-        prompt: `professional presentation visual, ${prompt}, 4k, minimalist`,
-        disable_safety_checker: true,
-        aspect_ratio: '16:9',
-      },
+      input,
     });
 
     const imageUrl = Array.isArray(output)
@@ -1854,6 +1885,8 @@ Return as JSON: { "prompts": ["Prompt 1", "Prompt 2", ...] }`,
       suggestedImage?: GeneratedSection['suggestedImage'];
       heading?: string;
     }[],
+    styleSeed?: string,
+    referenceImageUrl?: string,
   ): Promise<Map<number, ImageGenerationResult>> {
     const imageMap = new Map<number, ImageGenerationResult>();
 
@@ -1874,7 +1907,20 @@ Return as JSON: { "prompts": ["Prompt 1", "Prompt 2", ...] }`,
           const prompt = promptFromSuggestion(section.suggestedImage);
 
           if (prompt) {
-            const result = await this.generateImage(prompt);
+            const finalPrompt = styleSeed
+              ? `${prompt}. Art style requirements: ${styleSeed}. Do not include text. Maintain consistent lighting.`
+              : prompt;
+
+            const preferredProvider = referenceImageUrl
+              ? 'replicate'
+              : undefined;
+            const result = await this.generateImage(
+              finalPrompt,
+              'vivid',
+              '1024x1024',
+              preferredProvider,
+              referenceImageUrl,
+            );
             imageMap.set(index, result);
           }
         } catch (error) {
@@ -2141,8 +2187,29 @@ Generate realistic, plausible data that matches the description.`,
         const source =
           params.imageSource || (generateImages ? 'ai' : undefined);
 
+        let styleSeed: string | undefined = undefined;
+        let referenceImageUrl: string | undefined = undefined;
+
+        if (params.themeId) {
+          try {
+            const theme = await this.db.theme.findUnique({
+              where: { id: params.themeId },
+            });
+            if (theme) {
+              styleSeed = theme.styleSeed || undefined;
+              referenceImageUrl = theme.customReferenceImageUrl || undefined;
+            }
+          } catch (e) {
+            this.logger.warn('Failed to fetch theme for style seed', e);
+          }
+        }
+
         if (source === 'ai') {
-          imageMap = await this.generatePresentationImages(parsed.sections);
+          imageMap = await this.generatePresentationImages(
+            parsed.sections,
+            styleSeed,
+            referenceImageUrl,
+          );
         } else if (source === 'stock') {
           imageMap = await this.generateStockImages(parsed.sections);
         }

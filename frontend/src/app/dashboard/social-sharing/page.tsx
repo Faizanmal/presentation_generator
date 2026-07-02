@@ -12,14 +12,12 @@ import {
   ExternalLink,
   Eye,
   MousePointerClick,
-  Twitter,
-  Linkedin,
-  Facebook,
   Plus,
   Trash2,
   Globe,
   Check,
 } from "lucide-react";
+import { FaTwitter, FaLinkedin, FaFacebook } from 'react-icons/fa';
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -116,11 +114,11 @@ export default function SocialSharingPage() {
   const getPlatformIcon = (platform: string) => {
     switch (platform) {
       case "twitter":
-        return <Twitter className="h-4 w-4" />;
+        return <FaTwitter className="h-4 w-4" />;
       case "linkedin":
-        return <Linkedin className="h-4 w-4" />;
+        return <FaLinkedin className="h-4 w-4" />;
       case "facebook":
-        return <Facebook className="h-4 w-4" />;
+        return <FaFacebook className="h-4 w-4" />;
       default:
         return <Globe className="h-4 w-4" />;
     }

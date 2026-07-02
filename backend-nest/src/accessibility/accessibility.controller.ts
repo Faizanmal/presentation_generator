@@ -16,22 +16,22 @@ interface AuthRequest extends Request {
 
 // DTOs
 class CheckContrastDto {
-  foreground: string;
-  background: string;
+  foreground!: string;
+  background!: string;
 }
 
 class SuggestColorsDto {
-  foreground: string;
-  background: string;
+  foreground!: string;
+  background!: string;
   targetRatio?: number;
 }
 
 class GenerateAltTextDto {
-  imageUrl: string;
+  imageUrl!: string;
 }
 
 class AutoFixDto {
-  issueIds: string[];
+  issueIds!: string[];
 }
 
 @Controller('accessibility')

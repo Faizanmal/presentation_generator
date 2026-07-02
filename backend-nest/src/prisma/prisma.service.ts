@@ -138,7 +138,9 @@ export class PrismaService
       } catch (error) {
         lastError = error as Error;
 
-        const isRetryable = /connection timeout/i.test(error?.message || '');
+        const isRetryable = /connection timeout/i.test(
+          (error as Error)?.message || '',
+        );
         if (!isRetryable || attempt === maxRetries - 1) {
           throw error;
         }

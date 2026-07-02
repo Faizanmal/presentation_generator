@@ -1,6 +1,8 @@
 @import "tailwindcss";
+/* @config "../../tailwind.config.ts"; */
+@import "../styles/presentation-v2-tokens.css";
 
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+/* @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *)); */
 
 :root {
   --background: hsl(0, 0%, 100%);
@@ -205,8 +207,13 @@ body {
 
 /* utility aliases for legacy linear-to-* classes (formerly mis-typed gradients) */
 @layer utilities {
-  .bg-linear-to-br { @apply bg-gradient-to-br; }
-  .bg-linear-to-r { @apply bg-gradient-to-r; }
+  .bg-linear-to-br {
+    @apply bg-gradient-to-br;
+  }
+
+  .bg-linear-to-r {
+    @apply bg-gradient-to-r;
+  }
 }
 
 @keyframes draw-line {
@@ -308,9 +315,12 @@ body {
 
 /* Breathing glow for accent elements */
 @keyframes breathing-glow {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 20px 0 rgba(59, 130, 246, 0.1);
   }
+
   50% {
     box-shadow: 0 0 40px 8px rgba(59, 130, 246, 0.2);
   }
@@ -320,14 +330,16 @@ body {
   animation: breathing-glow 4s ease-in-out infinite;
 }
 
-/* Mesh gradient drift — subtle animated background */
+/* Mesh gradient drift - subtle animated background */
 @keyframes mesh-drift {
   0% {
     background-position: 0% 50%;
   }
+
   50% {
     background-position: 100% 50%;
   }
+
   100% {
     background-position: 0% 50%;
   }
@@ -343,9 +355,11 @@ body {
   0% {
     background-position: 0% 50%;
   }
+
   50% {
     background-position: 100% 50%;
   }
+
   100% {
     background-position: 0% 50%;
   }
@@ -363,6 +377,7 @@ body {
     filter: blur(12px);
     transform: scale(0.95);
   }
+
   to {
     opacity: 1;
     filter: blur(0);
@@ -381,6 +396,7 @@ body {
     transform: translateY(20px);
     letter-spacing: 0.1em;
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -398,10 +414,12 @@ body {
     transform: scale(0.8);
     opacity: 0;
   }
+
   60% {
     transform: scale(1.05);
     opacity: 1;
   }
+
   100% {
     transform: scale(1);
   }
@@ -413,6 +431,7 @@ body {
 
 /* Respect reduced motion preferences */
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {

@@ -534,7 +534,7 @@ Return JSON:
       const response = await this.aiService.chatCompletion(options);
       return response.choices[0]?.message?.content || '{}';
     } catch (error) {
-      this.logger.error(`AI call failed: ${error.message}`);
+      this.logger.error(`AI call failed: ${(error as Error).message}`);
       throw error;
     }
   }
@@ -558,7 +558,7 @@ Return JSON:
         }
       } catch (extractError) {
         this.logger.warn(
-          `Failed to extract JSON from mixed response: ${extractError.message}`,
+          `Failed to extract JSON from mixed response: ${(extractError as Error).message}`,
         );
       }
 

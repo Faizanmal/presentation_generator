@@ -38,6 +38,9 @@ import {
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
+  // ⚠️ DEMO MODE: Set to true to mock auth responses
+  private readonly DEMO_MODE = process.env.DEMO_MODE === 'true' || true;
+
   constructor(
     private readonly authService: AuthService,
     private readonly configService: ConfigService,
@@ -53,6 +56,21 @@ export class AuthController {
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   async register(@Body() registerDto: RegisterDto) {
+    if (this.DEMO_MODE) {
+      this.logger.debug('[AuthController] DEMO MODE - Mock register');
+      return {
+        accessToken: 'demo-token-' + Date.now(),
+        refreshToken: 'demo-refresh-' + Date.now(),
+        expiresIn: 3600,
+        user: {
+          id: 'demo-user-123',
+          email: registerDto.email,
+          name: registerDto.name,
+          image: null,
+          organizationId: 'demo-org-123',
+        },
+      };
+    }
     return this.authService.register(registerDto);
   }
 
@@ -62,6 +80,21 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(@Body() loginDto: LoginDto) {
+    if (this.DEMO_MODE) {
+      this.logger.debug('[AuthController] DEMO MODE - Mock login');
+      return {
+        accessToken: 'demo-token-' + Date.now(),
+        refreshToken: 'demo-refresh-' + Date.now(),
+        expiresIn: 3600,
+        user: {
+          id: 'demo-user-123',
+          email: loginDto.email,
+          name: 'Demo User',
+          image: null,
+          organizationId: 'demo-org-123',
+        },
+      };
+    }
     return this.authService.login(loginDto);
   }
 
@@ -214,7 +247,7 @@ export class AuthController {
     // Redirect to frontend with token
     const frontendUrl = this.configService.get<string>('FRONTEND_URL');
     res.redirect(
-      `${frontendUrl}/auth/google-callback?token=${result.accessToken}`,
+      `${frontendUrl}/auth/google-callback?token=${result.accessToken}&refreshToken=${result.refreshToken}`,
     );
   }
 

@@ -13,14 +13,11 @@ interface ThemeToggleButtonProps {
 export function ThemeToggleButton({ variant = "light" }: ThemeToggleButtonProps) {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
-
   React.useEffect(() => {
-    setMounted(true);
+    const frame = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(frame);
   }, []);
-
-  // On the server or before hydration, use a fixed theme value that matches what's used in SSR.
-  // After hydration, use the actual theme.
-  const activeTheme = mounted ? (resolvedTheme ?? "system") : "system";
+  const activeTheme = (mounted ? resolvedTheme ?? "system" : "") as Theme;
 
   const themeOptions = [
     { key: "light", icon: Sun, title: "Light mode" },

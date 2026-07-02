@@ -188,7 +188,7 @@ export class AudienceInsightsService {
       data: {
         userId: organizationId,
         name: segment.name,
-        criteria: segment.criteria as object,
+        criteria: segment.criteria,
         memberCount: size,
       },
     });

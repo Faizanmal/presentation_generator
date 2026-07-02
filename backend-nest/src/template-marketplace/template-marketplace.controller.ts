@@ -28,12 +28,12 @@ class ListTemplatesDto {
 }
 
 class SubmitTemplateDto {
-  projectId: string;
-  title: string;
-  description: string;
-  category: TemplateCategory;
-  tags: string[];
-  pricing: TemplatePricing;
+  projectId!: string;
+  title!: string;
+  description!: string;
+  category!: TemplateCategory;
+  tags!: string[];
+  pricing!: TemplatePricing;
   price?: number;
   thumbnail?: string;
   previewImages?: string[];
@@ -44,16 +44,16 @@ class UseTemplateDto {
 }
 
 class PurchaseTemplateDto {
-  paymentIntentId: string;
+  paymentIntentId!: string;
 }
 
 class AddReviewDto {
-  rating: number;
+  rating!: number;
   comment?: string;
 }
 
 class ModerateTemplateDto {
-  action: 'approve' | 'reject';
+  action!: 'approve' | 'reject';
   feedback?: string;
 }
 

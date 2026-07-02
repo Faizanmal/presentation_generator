@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -141,7 +142,7 @@ export class VideoRecordingService {
         projectId,
         userId,
         status: 'initializing',
-        settings: defaultSettings as object,
+        settings: defaultSettings as unknown as Prisma.InputJsonValue,
       },
     });
 

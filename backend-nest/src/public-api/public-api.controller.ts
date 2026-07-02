@@ -25,7 +25,7 @@ import { PrismaService } from '../prisma/prisma.service';
 export const RequireScope = (scope: string) => SetMetadata('apiScope', scope);
 
 class CreateApiKeyDto {
-  name: string;
+  name!: string;
   scopes?: string[];
   rateLimits?: {
     requestsPerMinute: number;
@@ -35,7 +35,7 @@ class CreateApiKeyDto {
 }
 
 class UpdateScopesDto {
-  scopes: string[];
+  scopes!: string[];
 }
 
 @ApiTags('Public API Management')

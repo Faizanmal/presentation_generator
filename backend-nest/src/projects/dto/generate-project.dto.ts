@@ -13,9 +13,16 @@ export enum GenerationType {
   DOCUMENT = 'document',
 }
 
+export enum GenerationDesignStyle {
+  EDITORIAL = 'editorial',
+  EXECUTIVE = 'executive',
+  BOLD = 'bold',
+  MANIFESTO = 'manifesto',
+}
+
 export class GenerateProjectDto {
   @IsString()
-  topic: string;
+  topic!: string;
 
   @IsEnum(GenerationTone)
   @IsOptional()
@@ -41,4 +48,8 @@ export class GenerateProjectDto {
   @IsString()
   @IsOptional()
   imageSource?: 'ai' | 'stock' = 'ai';
+
+  @IsEnum(GenerationDesignStyle)
+  @IsOptional()
+  designStyle?: GenerationDesignStyle = GenerationDesignStyle.EDITORIAL;
 }

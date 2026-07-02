@@ -28,20 +28,20 @@ import { Type } from 'class-transformer';
 
 class CreateBlockDto {
   @IsString()
-  projectId: string;
+  projectId!: string;
 
   @IsString()
   @IsOptional()
   slideId?: string;
 
   @IsEnum(BlockType)
-  blockType: BlockType;
+  blockType!: BlockType;
 
   @IsObject()
-  content: Record<string, unknown>;
+  content!: Record<string, unknown>;
 
   @IsNumber()
-  order: number;
+  order!: number;
 
   @IsObject()
   @IsOptional()
@@ -68,22 +68,22 @@ class UpdateBlockDto {
 
 class ReorderBlockItem {
   @IsString()
-  id: string;
+  id!: string;
 
   @IsNumber()
-  order: number;
+  order!: number;
 }
 
 class ReorderBlocksDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ReorderBlockItem)
-  blocks: Array<{ id: string; order: number }>;
+  blocks!: Array<{ id: string; order: number }>;
 }
 
 class BatchUpdateBlockItem {
   @IsString()
-  id: string;
+  id!: string;
 
   @IsObject()
   @IsOptional()
@@ -98,7 +98,7 @@ class BatchUpdateDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => BatchUpdateBlockItem)
-  blocks: Array<{
+  blocks!: Array<{
     id: string;
     content?: Record<string, unknown>;
     style?: Record<string, unknown>;

@@ -3,6 +3,7 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthenticatedRequest } from '../../common/types/user.types';
@@ -33,6 +34,9 @@ export const Roles = (...roles: string[]) => {
  */
 @Injectable()
 export class RolesGuard implements CanActivate {
+  private readonly logger = new Logger(RolesGuard.name);
+  private readonly DEMO_MODE = process.env.DEMO_MODE === 'true' || true;
+
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
@@ -53,6 +57,13 @@ export class RolesGuard implements CanActivate {
     }
 
     const userRole = user.role || 'USER';
+
+    // DEMO MODE: Allow ADMIN role for demo user
+    if (this.DEMO_MODE && userRole === 'ADMIN') {
+      this.logger.debug(`[RolesGuard] DEMO MODE - Allowing ADMIN access`);
+      return true;
+    }
+
     const hasRole = requiredRoles.some((role) => userRole === role);
 
     if (!hasRole) {
@@ -69,12 +80,21 @@ export class RolesGuard implements CanActivate {
  */
 @Injectable()
 export class AdminGuard implements CanActivate {
+  private readonly logger = new Logger(AdminGuard.name);
+  private readonly DEMO_MODE = process.env.DEMO_MODE === 'true' || true;
+
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const user = request.user;
 
     if (!user) {
       throw new ForbiddenException('Authentication required');
+    }
+
+    // DEMO MODE: Allow ADMIN access for demo user
+    if (this.DEMO_MODE && user.role === 'ADMIN') {
+      this.logger.debug(`[AdminGuard] DEMO MODE - Allowing ADMIN access`);
+      return true;
     }
 
     if (user.role !== 'ADMIN') {

@@ -1,6 +1,33 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-
+import { AIService } from '../ai/ai.service';
+export interface ThemeColors {
+  primary: string;
+  secondary: string;
+  background: string;
+  surface: string;
+  text: string;
+  textMuted: string;
+  accent: string;
+}
+export interface ThemeFonts {
+  heading: string;
+  body: string;
+}
+export interface ThemeSpacing {
+  base: number;
+  scale: number;
+}
+export interface CreateCustomThemeInput {
+  name: string;
+  description?: string;
+  colors: ThemeColors;
+  fonts: ThemeFonts;
+  spacing: ThemeSpacing;
+  styleSeed?: string;
+  customReferenceImageUrl?: string;
+}
 // Default theme configurations
 const DEFAULT_THEMES = [
   {
@@ -216,7 +243,10 @@ const DEFAULT_THEMES = [
 export class ThemesService {
   private readonly logger = new Logger(ThemesService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly aiService: AIService,
+  ) {}
 
   /**
    * Seed default themes into database
@@ -318,5 +348,71 @@ export class ThemesService {
     }
 
     return isPremiumUser;
+  }
+
+  /**
+   * Extract a detailed DALL-E / Midjourney style prompt from an image
+   */
+  async extractStyleSeed(imageUrl: string): Promise<string> {
+    try {
+      const response = await this.aiService.chatCompletion({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You are an expert prompt engineer and art director. Analyze the provided image and extract a highly detailed Midjourney/DALL-E style prompt. Focus entirely on the artistic medium, lighting, color palette, rendering engine, textures, and aesthetic keywords. Ignore the specific subject matter (e.g. if it is a picture of a dog, do not mention the dog, only mention the style like "3d isometric glassmorphism with vibrant neon lighting"). Return a JSON object with a single key "styleSeed" containing the extracted prompt string.',
+          },
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image_url',
+                image_url: { url: imageUrl },
+              },
+              {
+                type: 'text',
+                text: 'Extract the style seed from this image.',
+              },
+            ],
+          },
+        ],
+        response_format: { type: 'json_object' },
+        max_tokens: 500,
+      });
+
+      const content = response.choices[0]?.message?.content || '{}';
+      const result = JSON.parse(content) as { styleSeed?: string };
+      return (
+        result.styleSeed || 'Modern, clean, professional presentation design'
+      );
+    } catch (error) {
+      this.logger.error('Failed to extract style seed from image', error);
+      const cause = error instanceof Error ? error : new Error(String(error));
+      throw new Error('Could not extract style seed from image', { cause });
+    }
+  }
+
+  /**
+   * Create a custom brand theme
+   */
+  async createCustomTheme(
+    userId: string,
+    data: CreateCustomThemeInput,
+  ) {
+    return this.prisma.theme.create({
+      data: {
+        name: data.name,
+        description: data.description,
+        colors: data.colors as unknown as Prisma.InputJsonValue,
+        fonts: data.fonts as unknown as Prisma.InputJsonValue,
+        spacing: data.spacing as unknown as Prisma.InputJsonValue,
+        styleSeed: data.styleSeed,
+        customReferenceImageUrl: data.customReferenceImageUrl,
+        isDefault: false,
+        isPremium: false,
+        userId,
+      },
+    });
   }
 }

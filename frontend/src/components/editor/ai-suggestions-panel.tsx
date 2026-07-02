@@ -105,7 +105,6 @@ export function AISuggestionsPanel({
 
     // Store blocks in a ref so the effect doesn't need it as a dependency
     const blocksRef = useRef(blocks);
-    blocksRef.current = blocks;
 
     // Generate contextual suggestions based on slide content
     const generateSuggestionsMutation = useMutation({
@@ -133,7 +132,6 @@ export function AISuggestionsPanel({
 
     // Store mutation in a ref to avoid it as a dependency
     const generateSuggestionsMutationRef = useRef(generateSuggestionsMutation);
-    generateSuggestionsMutationRef.current = generateSuggestionsMutation;
 
     // Apply AI prompt mutation
     const applyPromptMutation = useMutation({
@@ -166,6 +164,14 @@ export function AISuggestionsPanel({
             }
         }
     }, [slideId]);
+
+    useEffect(() => {
+        blocksRef.current = blocks;
+    }, [blocks]);
+
+    useEffect(() => {
+        generateSuggestionsMutationRef.current = generateSuggestionsMutation;
+    }, [generateSuggestionsMutation]);
 
     const handleApplySuggestion = useCallback(async (suggestion: AISuggestion) => {
         setIsApplying(suggestion.id);

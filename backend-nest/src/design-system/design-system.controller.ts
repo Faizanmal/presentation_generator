@@ -20,7 +20,7 @@ import {
 
 // DTOs
 class CreateDesignSystemDto {
-  name: string;
+  name!: string;
   description?: string;
   organizationId?: string;
   presetId?: string;
@@ -35,13 +35,13 @@ class UpdateTokensDto {
 }
 
 class UpdateColorDto {
-  colorName: string;
-  newValue: string;
+  colorName!: string;
+  newValue!: string;
 }
 
 class GeneratePaletteDto {
-  baseColor: string;
-  name: string;
+  baseColor!: string;
+  name!: string;
 }
 
 @Controller('design-system')

@@ -145,9 +145,9 @@ export class AccessibilityService {
         totalIssues: issues.length,
 
         issues: issues as unknown as Prisma.InputJsonValue,
-        issuesByCategory: issuesByCategory as unknown as Prisma.InputJsonValue,
-        issuesBySeverity: issuesBySeverity as unknown as Prisma.InputJsonValue,
-        suggestions: [] as unknown as Prisma.InputJsonValue,
+        issuesByCategory: issuesByCategory,
+        issuesBySeverity: issuesBySeverity,
+        suggestions: [],
       },
     });
 
@@ -457,7 +457,12 @@ export class AccessibilityService {
 
     // Check images for alt text
     if (block.blockType === 'IMAGE') {
-      const altText = String((content.alt || content.altText || '') as unknown);
+      const altText =
+        typeof content.alt === 'string'
+          ? content.alt
+          : typeof content.altText === 'string'
+            ? content.altText
+            : '';
       if (!altText || altText.length < 5) {
         issues.push({
           id: `${block.id}_no_alt`,

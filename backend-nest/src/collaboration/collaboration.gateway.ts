@@ -94,7 +94,7 @@ export class CollaborationGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
   @WebSocketServer()
-  server: Server;
+  server!: Server;
 
   private readonly logger = new Logger(CollaborationGateway.name);
   private readonly userColors = [
@@ -522,7 +522,7 @@ export class CollaborationGateway
 
     const version = await this.collaborationService.createVersion({
       projectId,
-      snapshot: data.snapshot as Record<string, unknown>,
+      snapshot: data.snapshot,
       message: data.message,
       createdBy: userId,
     });

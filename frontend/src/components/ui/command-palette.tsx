@@ -69,6 +69,7 @@ export function CommandPalette({
     isEditorMode = false,
 }: CommandPaletteProps) {
     const [open, setOpen] = useState(false);
+    const [search, setSearch] = useState("");
     const router = useRouter();
     const { logout, user } = useAuthStore();
     const isMac = useMemo(() => {
@@ -111,10 +112,30 @@ export function CommandPalette({
 
     return (
         <CommandDialog open={open} onOpenChange={setOpen}>
-            <Command className="rounded-lg border shadow-md">
-                <CommandInput placeholder="Type a command or search..." />
+            <Command className="rounded-lg border shadow-md" shouldFilter>
+                <CommandInput 
+                    placeholder="Type a command, or ask AI to design something..." 
+                    value={search}
+                    onValueChange={setSearch}
+                />
                 <CommandList>
                     <CommandEmpty>No results found.</CommandEmpty>
+
+                    {search.trim().length > 0 && (
+                        <CommandGroup heading="✨ AI Assistant">
+                            <CommandItem 
+                                value={search}
+                                onSelect={() => {
+                                    runCommand(() => emitEditorCommand({ type: "ai-action", payload: { action: "prompt", prompt: search } }));
+                                    setSearch("");
+                                }}
+                                className="text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20 data-[selected=true]:bg-blue-100 dark:data-[selected=true]:bg-blue-900/40"
+                            >
+                                <Sparkles className="mr-2 h-4 w-4 text-blue-500" />
+                                <span className="font-medium">Generate: "{search}"</span>
+                            </CommandItem>
+                        </CommandGroup>
+                    )}
 
                     {/* Quick Actions */}
                     <CommandGroup heading="Quick Actions">

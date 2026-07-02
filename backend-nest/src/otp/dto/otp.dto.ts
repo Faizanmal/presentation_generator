@@ -23,10 +23,10 @@ export enum OtpPurpose {
 
 export class RequestOtpDto {
   @IsString()
-  identifier: string; // email or phone number
+  identifier!: string; // email or phone number
 
   @IsEnum(OtpChannel)
-  channel: OtpChannel;
+  channel!: OtpChannel;
 
   @IsEnum(OtpPurpose)
   @IsOptional()
@@ -35,12 +35,12 @@ export class RequestOtpDto {
 
 export class VerifyOtpDto {
   @IsString()
-  identifier: string;
+  identifier!: string;
 
   @IsString()
   @Length(6, 6, { message: 'OTP must be exactly 6 digits' })
   @Matches(/^\d{6}$/, { message: 'OTP must contain only digits' })
-  otp: string;
+  otp!: string;
 
   @IsEnum(OtpPurpose)
   @IsOptional()
@@ -49,7 +49,7 @@ export class VerifyOtpDto {
 
 export class RequestEmailOtpDto {
   @IsEmail()
-  email: string;
+  email!: string;
 
   @IsEnum(OtpPurpose)
   @IsOptional()
@@ -58,7 +58,7 @@ export class RequestEmailOtpDto {
 
 export class RequestSmsOtpDto {
   @IsString()
-  phone: string;
+  phone!: string;
 
   @IsEnum(OtpPurpose)
   @IsOptional()
@@ -67,12 +67,12 @@ export class RequestSmsOtpDto {
 
 export class VerifyEmailOtpDto {
   @IsEmail()
-  email: string;
+  email!: string;
 
   @IsString()
   @Length(6, 6)
   @Matches(/^\d{6}$/)
-  otp: string;
+  otp!: string;
 
   @IsEnum(OtpPurpose)
   @IsOptional()
@@ -81,12 +81,12 @@ export class VerifyEmailOtpDto {
 
 export class VerifySmsOtpDto {
   @IsString()
-  phone: string;
+  phone!: string;
 
   @IsString()
   @Length(6, 6)
   @Matches(/^\d{6}$/)
-  otp: string;
+  otp!: string;
 
   @IsEnum(OtpPurpose)
   @IsOptional()

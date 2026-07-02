@@ -9,7 +9,6 @@ import { Prisma, BlockType } from '@prisma/client';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
 type SyncOperation = 'CREATE' | 'UPDATE' | 'DELETE';
-type SyncStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
 
 interface SyncData {
   operation: SyncOperation;
@@ -229,7 +228,7 @@ export class SyncService {
         await this.prisma.syncQueue.update({
           where: { id: op.id },
           data: {
-            status: status as SyncStatus,
+            status: status,
             attempts,
             error: error instanceof Error ? error.message : 'Unknown error',
           },
@@ -408,7 +407,7 @@ export class SyncService {
 
     // Check if the same fields were modified
     const conflictingFields = this.findConflictingFields(
-      serverProject as unknown as Record<string, unknown>,
+      serverProject,
       clientData,
       (cache?.data as Record<string, unknown>) || {},
     );
@@ -419,10 +418,7 @@ export class SyncService {
         strategy: 'merge',
         serverVersion: serverProject as unknown as Record<string, unknown>,
         clientVersion: clientData,
-        mergedVersion: this.mergeVersions(
-          serverProject as unknown as Record<string, unknown>,
-          clientData,
-        ),
+        mergedVersion: this.mergeVersions(serverProject, clientData),
       };
     }
 
@@ -470,9 +466,9 @@ export class SyncService {
     return {
       ...server,
       ...client,
-      id: server.id as string,
-      createdAt: server.createdAt as Date,
-      ownerId: server.ownerId as string,
+      id: server.id,
+      createdAt: server.createdAt,
+      ownerId: server.ownerId,
     };
   }
 
@@ -505,7 +501,7 @@ export class SyncService {
         // Apply client changes to server
         await this.prisma.project.update({
           where: { id: projectId },
-          data: resolution.clientVersion as Prisma.ProjectUpdateInput,
+          data: resolution.clientVersion,
         });
         await this.cacheProject(
           userId,
@@ -522,7 +518,7 @@ export class SyncService {
         // Apply merged version
         await this.prisma.project.update({
           where: { id: projectId },
-          data: resolution.mergedVersion as Prisma.ProjectUpdateInput,
+          data: resolution.mergedVersion,
         });
         await this.cacheProject(
           userId,

@@ -49,7 +49,10 @@ export class EmailTemplateCacheService implements OnModuleInit {
         await this.compileTemplate(name);
         this.logger.debug(`✓ Template compiled: ${name}`);
       } catch (error) {
-        this.logger.error(`✗ Failed to compile template: ${name}`, error.stack);
+        this.logger.error(
+          `✗ Failed to compile template: ${name}`,
+          (error as Error).stack,
+        );
       }
     }
 
@@ -138,7 +141,10 @@ export class EmailTemplateCacheService implements OnModuleInit {
       this.logger.log(`Template reloaded: ${name}`);
       return true;
     } catch (error) {
-      this.logger.error(`Failed to reload template: ${name}`, error.stack);
+      this.logger.error(
+        `Failed to reload template: ${name}`,
+        (error as Error).stack,
+      );
       return false;
     }
   }

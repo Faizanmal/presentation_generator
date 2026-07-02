@@ -81,6 +81,7 @@ export function LivePresentationPanel({
   const [polls, setPolls] = useState<Poll[]>([]);
   const [isStarting, setIsStarting] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [currentTime, setCurrentTime] = useState(0);
 
   // Poll creation
   const [showPollDialog, setShowPollDialog] = useState(false);
@@ -183,6 +184,8 @@ export function LivePresentationPanel({
   useEffect(() => {
     if (!session) { return; }
 
+    const updateCurrentTime = () => setCurrentTime(Date.now());
+    const initialTimer = window.setTimeout(updateCurrentTime, 0);
     const interval = setInterval(async () => {
       try {
         const newQuestions = await api.getLiveSessionQuestions(session.sessionId);
@@ -193,7 +196,10 @@ export function LivePresentationPanel({
       }
     }, 5000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(interval);
+    };
   }, [session]);
 
   const formatTime = (isoString: string) => {
@@ -202,8 +208,8 @@ export function LivePresentationPanel({
   };
 
   const getElapsedTime = () => {
-    if (!session?.startedAt) { return '0:00'; }
-    const elapsed = Date.now() - new Date(session.startedAt).getTime();
+    if (!session?.startedAt || !currentTime) { return '0:00'; }
+    const elapsed = currentTime - new Date(session.startedAt).getTime();
     const minutes = Math.floor(elapsed / 60000);
     const seconds = Math.floor((elapsed % 60000) / 1000);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;

@@ -239,7 +239,7 @@ export class ThinkingAgentController {
             subscriber.next({
               data: JSON.stringify(item),
               type: item.type,
-            } as MessageEvent);
+            });
           }
           subscriber.complete();
         } catch (error) {
@@ -248,7 +248,7 @@ export class ThinkingAgentController {
               error: (error as Error).message,
             }),
             type: 'error',
-          } as MessageEvent);
+          });
           subscriber.complete();
         }
       })();

@@ -14,6 +14,7 @@ import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { CacheVeryLong } from '../common/decorators/cache.decorator';
+import type { CreateCustomThemeInput } from './themes.service';
 
 @Controller('themes')
 export class ThemesController {
@@ -126,5 +127,32 @@ export class ThemesController {
   @HttpCode(HttpStatus.OK)
   getPredefinedPalettes() {
     return this.colorPaletteService.getPredefinedPalettes();
+  }
+
+  /**
+   * Extract a style seed from an image for the Theme Engine
+   */
+  @Post('extract-style-seed')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async extractStyleSeed(
+    @Body() body: { imageUrl: string },
+  ): Promise<{ styleSeed: string }> {
+    const styleSeed = await this.themesService.extractStyleSeed(body.imageUrl);
+    return { styleSeed };
+  }
+
+  /**
+   * Create a custom brand theme
+   */
+  @Post('custom')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.CREATED)
+  async createCustomTheme(
+    @CurrentUser() user: { id: string },
+    @Body()
+    body: CreateCustomThemeInput,
+  ) {
+    return this.themesService.createCustomTheme(user.id, body);
   }
 }

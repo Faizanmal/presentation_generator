@@ -267,8 +267,7 @@ export function PresentationMode({
                         }}
                     >
                         <div
-                            className="w-full h-full max-w-480 max-h-270 bg-white shadow-2xl relative"
-                            style={{ aspectRatio: "16/9" }}
+                            className="w-full max-w-4xl min-h-[min(45rem,80vh)] h-fit bg-white shadow-2xl relative overflow-y-auto overflow-x-hidden pb-8"
                         >
                             <div className="absolute inset-0 flex items-center justify-center">
                                 <div className="text-center p-12">
@@ -292,8 +291,7 @@ export function PresentationMode({
                     }}
                 >
                     <div
-                        className="w-full h-full max-w-480 max-h-270 bg-white shadow-2xl relative"
-                        style={{ aspectRatio: "16/9" }}
+                        className="w-full max-w-4xl min-h-[min(45rem,80vh)] h-fit bg-white shadow-2xl relative overflow-y-auto overflow-x-hidden pb-8"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Render slide content here */}

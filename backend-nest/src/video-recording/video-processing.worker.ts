@@ -139,7 +139,7 @@ export class VideoProcessingWorker extends WorkerHost {
         where: { id: jobId },
         data: {
           status: 'FAILED',
-          error: error.message,
+          error: (error as Error).message,
         },
       });
 

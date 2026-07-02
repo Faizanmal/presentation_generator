@@ -259,8 +259,8 @@ export class TemplateMarketplaceService {
         price: data.price,
         authorId: userId,
         slideCount: project.slides.length,
-        content: content as Prisma.InputJsonValue,
-        templateData: content as Prisma.InputJsonValue,
+        content: content,
+        templateData: content,
         status: 'DRAFT',
       },
     });

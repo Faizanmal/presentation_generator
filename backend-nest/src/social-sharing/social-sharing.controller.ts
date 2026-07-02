@@ -49,7 +49,7 @@ export class SocialSharingController {
       res.redirect('/settings/integrations?connected=linkedin');
     } catch (error) {
       res.redirect(
-        `/settings/integrations?error=${encodeURIComponent(error.message)}`,
+        `/settings/integrations?error=${encodeURIComponent((error as Error).message)}`,
       );
     }
   }

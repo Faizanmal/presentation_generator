@@ -788,15 +788,15 @@ export class CDNService {
       ]);
 
       const requestsDataPoints =
-        ((requestsResult as { Datapoints?: Array<{ Sum?: number }> })
-          .Datapoints as Array<{ Sum?: number }> | undefined) || [];
+        (requestsResult as { Datapoints?: Array<{ Sum?: number }> })
+          .Datapoints || [];
       const totalRequests = requestsDataPoints.reduce(
         (sum: number, dp) => sum + (dp.Sum || 0),
         0,
       );
       const bytesDataPoints =
-        ((bytesResult as { Datapoints?: Array<{ Sum?: number }> })
-          .Datapoints as Array<{ Sum?: number }> | undefined) || [];
+        (bytesResult as { Datapoints?: Array<{ Sum?: number }> }).Datapoints ||
+        [];
       const totalBandwidth = bytesDataPoints.reduce(
         (sum: number, dp) => sum + (dp.Sum || 0),
         0,

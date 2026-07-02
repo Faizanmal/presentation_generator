@@ -10,7 +10,7 @@ class CheckProjectDto {
 }
 
 class AutoFixDto {
-  issueTypes: string[];
+  issueTypes!: string[];
 }
 
 @ApiTags('Universal Design')

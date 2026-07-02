@@ -69,7 +69,11 @@ async function fixBulletLists() {
               unknown
             >;
             if (blockContent?.text) {
-              items.push(String(blockContent.text as string));
+              items.push(
+                typeof blockContent.text === 'string'
+                  ? blockContent.text
+                  : JSON.stringify(blockContent.text),
+              );
               if (j > i) {
                 blocksToDelete.push(slideBlocks[j].id);
               }

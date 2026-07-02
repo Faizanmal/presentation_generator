@@ -768,7 +768,7 @@ ${JSON.stringify(parsedData.rows.slice(0, 5), null, 2)}
               const v = row[h];
               if (v == null) return '';
               if (typeof v === 'object') return JSON.stringify(v);
-              return String(v as string | number | boolean);
+              return this.toDisplayText(v, '');
             });
             return `| ${cells.join(' | ')} |`;
           })

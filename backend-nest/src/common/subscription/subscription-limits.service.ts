@@ -164,7 +164,7 @@ export class SubscriptionLimitsService {
       return 'FREE';
     }
 
-    return (subscription.plan as SubscriptionTier) || 'FREE';
+    return subscription.plan || 'FREE';
   }
 
   /**

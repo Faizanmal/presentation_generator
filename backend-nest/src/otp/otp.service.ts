@@ -166,7 +166,7 @@ export class OtpService {
       await this.redis.del(cooldownKey);
       this.logger.error(
         `Failed to send OTP to ${normalizedId} via ${channel}`,
-        error?.stack,
+        (error as Error)?.stack,
       );
       throw new BadRequestException(
         `Failed to send verification code via ${channel}. Please try again.`,

@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import * as crypto from 'crypto';
 
@@ -57,7 +58,7 @@ export class PublicApiService {
         rateLimits: (options.rateLimits || {
           requestsPerMinute: 60,
           requestsPerDay: 10000,
-        }) as object,
+        }) as unknown as Prisma.InputJsonValue,
         expiresAt: options.expiresAt,
         status: 'active',
       },

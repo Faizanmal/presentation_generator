@@ -216,7 +216,7 @@ Return the translated content as a JSON array with the same structure.`;
       ) as { path: string[]; text: string }[];
 
       const translatedContent = this.applyTranslations(
-        slideRecord.content as Record<string, unknown>,
+        slideRecord.content,
         textElements,
         translatedElements,
       );

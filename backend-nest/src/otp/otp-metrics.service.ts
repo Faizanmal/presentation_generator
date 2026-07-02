@@ -109,7 +109,9 @@ export class OtpMetricsService {
         `📊 OTP metric: ${event.event} [${event.channel}/${event.purpose}]`,
       );
     } catch (error) {
-      this.logger.error(`Failed to track OTP metric: ${error.message}`);
+      this.logger.error(
+        `Failed to track OTP metric: ${(error as Error).message}`,
+      );
     }
   }
 

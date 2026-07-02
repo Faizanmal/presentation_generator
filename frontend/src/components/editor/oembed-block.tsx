@@ -6,10 +6,11 @@ import {
     ExternalLink,
     Loader2,
     AlertCircle,
-    Youtube,
-    Figma,
-    Twitter,
+    Play,
+    PenTool,
+    X,
 } from 'lucide-react';
+import { FaYoutube, FaFigma, FaTwitter } from 'react-icons/fa';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -113,11 +114,11 @@ function getServiceIcon(service: EmbedServiceType) {
         case 'youtube':
         case 'vimeo':
         case 'loom':
-            return <Youtube className="h-4 w-4" />;
+            return <FaYoutube className="h-4 w-4" />;
         case 'figma':
-            return <Figma className="h-4 w-4" />;
+            return <FaFigma className="h-4 w-4" />;
         case 'twitter':
-            return <Twitter className="h-4 w-4" />;
+            return <FaTwitter className="h-4 w-4" />;
         default:
             return <Globe className="h-4 w-4" />;
     }

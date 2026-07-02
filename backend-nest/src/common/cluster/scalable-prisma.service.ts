@@ -82,7 +82,9 @@ export class ScalablePrismaService
         `Connection pool: ${connectionLimit} connections per instance`,
       );
     } catch (error) {
-      this.logger.error(`Failed to connect to database: ${error}`);
+      this.logger.error(
+        `Failed to connect to database: ${error instanceof Error ? error.message : String(error)}`,
+      );
       throw error;
     }
   }
@@ -165,7 +167,9 @@ export class ScalablePrismaService
         latencyMs: Date.now() - start,
       };
     } catch (error) {
-      this.logger.error(`Database health check failed: ${error}`);
+      this.logger.error(
+        `Database health check failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
       return {
         healthy: false,
         latencyMs: Date.now() - start,

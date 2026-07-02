@@ -3,7 +3,7 @@ import { ProjectType } from '@prisma/client';
 
 export class CreateProjectDto {
   @IsString()
-  title: string;
+  title!: string;
 
   @IsString()
   @IsOptional()

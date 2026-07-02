@@ -50,6 +50,7 @@ model User {
   imagePatterns       PresentationImagePattern?
   carbonOffsets       CarbonOffset[]
   auditLogs           AuditLog[]
+  themes              Theme[]
 
   @@index([createdAt])
   @@index([subscriptionTier])
@@ -326,11 +327,19 @@ model Theme {
   fonts   Json // { heading, body }
   spacing Json // { base, scale }
 
+  // Theme Engine / Brand Guidelines
+  styleSeed               String? @db.Text
+  customReferenceImageUrl String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   projects Project[]
 
+  @@index([userId])
   @@map("themes")
 }
 
@@ -1596,6 +1605,61 @@ model GovernancePolicy {
 
   @@index([organizationId])
   @@map("governance_policies")
+}
+
+// ============================================
+// A/B TESTING
+// ============================================
+
+model ABTest {
+  id          String   @id @default(cuid())
+  projectId   String
+  name        String
+  description String?
+  status      String   @default("active") // active, paused, completed
+  startDate   DateTime @default(now())
+  endDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  variants ABTestVariant[]
+
+  @@index([projectId])
+  @@map("ab_tests")
+}
+
+model ABTestVariant {
+  id          String   @id @default(cuid())
+  testId      String
+  name        String
+  content     Json // Variant content
+  weight      Float    @default(1.0) // Traffic weight
+  isControl   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  test    ABTest         @relation(fields: [testId], references: [id], onDelete: Cascade)
+  results ABTestResult[]
+
+  @@index([testId])
+  @@map("ab_test_variants")
+}
+
+model ABTestResult {
+  id         String   @id @default(cuid())
+  variantId  String
+  userId     String?
+  sessionId  String
+  viewTime   Int? // Time spent in seconds
+  completed  Boolean  @default(false)
+  converted  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  variant ABTestVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([variantId])
+  @@index([sessionId])
+  @@map("ab_test_results")
 }
 
 // ============================================
@@ -3417,4 +3481,56 @@ model NotificationSettings {
   updatedAt              DateTime @updatedAt
 
   @@map("notification_settings")
+}
+
+// ============================================
+// AI GENERATION PIPELINE
+// ============================================
+
+/// Tracks each execution of the multi-agent AI generation pipeline.
+/// Stores intermediate agent outputs and token usage for cost tracking.
+model GenerationSession {
+  id              String    @id @default(cuid())
+  projectId       String
+  userId          String
+  status          String    @default("idle") // idle, researching, outlining, narrating, layouting, designing, imaging, validating, complete, failed
+  progress        Int       @default(0) // 0-100
+  currentAgent    String?
+  qualityScore    Int?      // QA agent overall score (0-100)
+
+  // Pipeline data
+  tokenUsage      Json      @default("{}") // { agentName: tokenCount }
+  agentOutputs    Json      @default("{}") // Cached outputs from each agent
+  error           String?
+  request         Json      @default("{}") // Original GenerationRequest
+
+  // Timing
+  startedAt       DateTime  @default(now())
+  completedAt     DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([projectId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("generation_sessions")
+}
+
+/// Stores user corrections for AI-generated content.
+/// Enables "partial regeneration" where pinned edits are respected.
+model EditMemory {
+  id              String    @id @default(cuid())
+  projectId       String
+  slideId         String
+  blockId         String?
+  field           String    // e.g., "heading", "bodyContent", "bulletPoints"
+  previousValue   String    @db.Text
+  newValue        String    @db.Text
+  pinned          Boolean   @default(false) // If true, AI never overrides this
+  createdAt       DateTime  @default(now())
+
+  @@index([projectId])
+  @@index([slideId])
+  @@index([pinned])
+  @@map("edit_memory")
 }

@@ -10,10 +10,25 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
 
+type StripeClient = Stripe.Stripe;
+type StripeEvent = ReturnType<StripeClient['webhooks']['constructEvent']>;
+type CheckoutSession = Omit<
+  Awaited<ReturnType<StripeClient['checkout']['sessions']['create']>>,
+  'lastResponse'
+>;
+type StripeSubscription = Omit<
+  Awaited<ReturnType<StripeClient['subscriptions']['retrieve']>>,
+  'lastResponse'
+>;
+type StripeInvoice = Omit<
+  Awaited<ReturnType<StripeClient['invoices']['retrieve']>>,
+  'lastResponse'
+>;
+
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
-  private stripe: Stripe;
+  private stripe: StripeClient;
 
   constructor(
     private readonly configService: ConfigService,
@@ -25,7 +40,7 @@ export class PaymentsService {
       'dummy-key-to-prevent-crash';
     this.stripe = new Stripe(stripeKey, {
       // upgrade to the version allowed by current Stripe types
-      apiVersion: '2026-02-25.clover',
+      apiVersion: '2026-04-22.dahlia',
     });
   }
 
@@ -148,7 +163,7 @@ export class PaymentsService {
       'STRIPE_WEBHOOK_SECRET',
     );
 
-    let event: Stripe.Event;
+    let event: StripeEvent;
 
     try {
       event = this.stripe.webhooks.constructEvent(
@@ -157,7 +172,7 @@ export class PaymentsService {
         webhookSecret!,
       );
     } catch (error) {
-      this.logger.error('Webhook signature verification failed', error);
+      this.logger.error('Webhook signature verification fail  ed', error);
       throw new BadRequestException('Invalid webhook signature');
     }
 
@@ -191,7 +206,7 @@ export class PaymentsService {
   /**
    * Handle successful checkout
    */
-  private async handleCheckoutComplete(session: Stripe.Checkout.Session) {
+  private async handleCheckoutComplete(session: CheckoutSession) {
     const userId = session.metadata?.userId;
     const plan = session.metadata?.plan as 'pro' | 'enterprise';
 
@@ -231,7 +246,7 @@ export class PaymentsService {
   /**
    * Handle subscription updates
    */
-  private async handleSubscriptionUpdate(subscription: Stripe.Subscription) {
+  private async handleSubscriptionUpdate(subscription: StripeSubscription) {
     const customerId = subscription.customer as string;
     const userSubscription = await this.prisma.subscription.findFirst({
       where: { stripeCustomerId: customerId },
@@ -286,7 +301,7 @@ export class PaymentsService {
   /**
    * Handle subscription cancellation
    */
-  private async handleSubscriptionCanceled(subscription: Stripe.Subscription) {
+  private async handleSubscriptionCanceled(subscription: StripeSubscription) {
     const customerId = subscription.customer as string;
 
     const userSubscription = await this.prisma.subscription.findFirst({
@@ -313,7 +328,7 @@ export class PaymentsService {
   /**
    * Handle failed payment
    */
-  private async handlePaymentFailed(invoice: Stripe.Invoice) {
+  private async handlePaymentFailed(invoice: StripeInvoice) {
     const customerId = invoice.customer as string;
 
     const userSubscription = await this.prisma.subscription.findFirst({
@@ -336,7 +351,7 @@ export class PaymentsService {
    */
   async getStripeSubscription(
     userId: string,
-  ): Promise<Stripe.Subscription | null> {
+  ): Promise<StripeSubscription | null> {
     const subscription = await this.usersService.getSubscription(userId);
 
     if (!subscription.stripeSubscriptionId) {

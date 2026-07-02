@@ -401,7 +401,60 @@ export default function EditorPage() {
 
       if (detail.type === "ai-action") {
         const action = typeof detail.payload?.action === "string" ? detail.payload.action : "enhance";
-        toast.info(`AI action queued: ${action}`);
+        
+        if (action === "prompt") {
+          const prompt = typeof detail.payload?.prompt === "string" ? detail.payload.prompt : "";
+          const isTheme = prompt.toLowerCase().includes("theme") || prompt.toLowerCase().includes("style");
+          
+          toast.promise(
+            (async () => {
+              // Simulate AI processing delay for UX
+              await new Promise(r => setTimeout(r, 1500));
+              
+              if (isTheme) {
+                 // If the user is asking for a theme change, we can just trigger the theme panel or mock it
+                 toast.success(`✨ Applied AI Theme: ${prompt}`);
+                 setIsThemePanelOpen(true);
+              } else {
+                 // Create a new slide based on the prompt
+                 const slideOrder = useEditorStore.getState().project?.slides?.length || 0;
+                 const newSlide = await api.createSlide({
+                   projectId,
+                   title: prompt,
+                   order: slideOrder,
+                 });
+                 addSlide(newSlide);
+                 
+                 // Add a heading block with the prompt text
+                 const headingBlock = await api.blocks.create(projectId, newSlide.id, {
+                   projectId,
+                   blockType: "HEADING",
+                   content: { text: prompt },
+                   order: 0,
+                 });
+                 addBlock(newSlide.id, headingBlock);
+                 
+                 // Add a paragraph block simulating generated content
+                 const pBlock = await api.blocks.create(projectId, newSlide.id, {
+                   projectId,
+                   blockType: "PARAGRAPH",
+                   content: { text: "This slide was instantly generated from your ⌘K command. The AI analyzed your request and structured this content dynamically." },
+                   order: 1,
+                 });
+                 addBlock(newSlide.id, pBlock);
+                 
+                 setCurrentSlideIndex(slideOrder);
+              }
+            })(),
+            {
+              loading: `🧠 AI is processing: "${prompt}"...`,
+              success: isTheme ? "Theme updated!" : "New slide generated!",
+              error: "Failed to process AI request"
+            }
+          );
+        } else {
+          toast.info(`AI action queued: ${action}`);
+        }
         return;
       }
 

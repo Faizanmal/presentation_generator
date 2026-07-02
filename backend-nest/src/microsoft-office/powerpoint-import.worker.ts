@@ -129,7 +129,7 @@ export class PowerPointImportWorker extends WorkerHost {
         where: { id: jobId },
         data: {
           status: 'failed',
-          error: error.message,
+          error: (error as Error).message,
         },
       });
 
@@ -139,13 +139,13 @@ export class PowerPointImportWorker extends WorkerHost {
 
   private mapContentTypeToBlockType(type: string): BlockType {
     const typeMap: Record<string, BlockType> = {
-      text: 'PARAGRAPH' as BlockType,
-      image: 'IMAGE' as BlockType,
+      text: 'PARAGRAPH',
+      image: 'IMAGE',
       shape: 'SHAPE' as BlockType,
-      table: 'TABLE' as BlockType,
-      chart: 'CHART' as BlockType,
+      table: 'TABLE',
+      chart: 'CHART',
     };
-    return typeMap[type] || ('PARAGRAPH' as BlockType);
+    return typeMap[type] || 'PARAGRAPH';
   }
 
   @OnWorkerEvent('completed')

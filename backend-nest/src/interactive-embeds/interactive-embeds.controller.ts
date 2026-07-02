@@ -20,60 +20,60 @@ import {
 
 // DTOs
 class CreatePollDto {
-  question: string;
-  options: string[];
+  question!: string;
+  options!: string[];
   allowMultiple?: boolean;
   showResults?: boolean;
 }
 
 class VotePollDto {
-  optionIds: string[];
+  optionIds!: string[];
   voterId?: string;
 }
 
 class CreateQASessionDto {
-  title: string;
+  title!: string;
   allowAnonymous?: boolean;
   moderationEnabled?: boolean;
 }
 
 class SubmitQuestionDto {
-  question: string;
+  question!: string;
   authorName?: string;
 }
 
 class AnswerQuestionDto {
-  answer: string;
+  answer!: string;
 }
 
 class CreateFormDto {
-  title: string;
+  title!: string;
   description?: string;
-  fields: FormField[];
+  fields!: FormField[];
 }
 
 class SubmitFormDto {
-  responses: Record<string, unknown>;
+  responses!: Record<string, unknown>;
 }
 
 class CreateQuizDto {
-  title: string;
-  questions: Omit<QuizQuestion, 'id'>[];
+  title!: string;
+  questions!: Omit<QuizQuestion, 'id'>[];
   showCorrectAfterSubmit?: boolean;
   timeLimit?: number;
 }
 
 class SubmitQuizDto {
-  answers: Record<string, number>;
+  answers!: Record<string, number>;
 }
 
 class CreateWordCloudDto {
-  prompt: string;
+  prompt!: string;
   maxResponses?: number;
 }
 
 class SubmitWordsDto {
-  words: string[];
+  words!: string[];
 }
 
 @Controller('interactive')

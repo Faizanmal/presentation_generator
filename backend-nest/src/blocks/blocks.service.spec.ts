@@ -4,7 +4,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AdvancedCacheService } from '../common/cache/advanced-cache.service';
 import { CollaborationService } from '../collaboration/collaboration.service';
 import { ForbiddenException } from '@nestjs/common';
-import { BlockType } from '@prisma/client';
 
 describe('BlocksService (permissions)', () => {
   let service: BlocksService;
@@ -42,7 +41,7 @@ describe('BlocksService (permissions)', () => {
 
     const result = await service.create('editor-1', {
       projectId: 'proj-1',
-      blockType: 'PARAGRAPH' as BlockType,
+      blockType: 'PARAGRAPH',
       content: { text: 'hi' },
       order: 1,
     });
@@ -61,7 +60,7 @@ describe('BlocksService (permissions)', () => {
     await expect(
       service.create('viewer-1', {
         projectId: 'proj-1',
-        blockType: 'PARAGRAPH' as BlockType,
+        blockType: 'PARAGRAPH',
         content: { text: 'nope' },
         order: 1,
       }),

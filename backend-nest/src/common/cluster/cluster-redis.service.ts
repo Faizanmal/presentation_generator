@@ -12,8 +12,8 @@ export type RedisClient = Redis | RedisCluster;
 @Injectable()
 export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ClusterRedisService.name);
-  private client: RedisClient;
-  private subscriber: RedisClient;
+  private client!: RedisClient;
+  private subscriber!: RedisClient;
 
   constructor(private readonly configService: ConfigService) {}
 
@@ -194,7 +194,7 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
         try {
           handler(JSON.parse(msg) as Record<string, unknown>);
         } catch (e) {
-          this.logger.error(`Failed to parse message: ${e}`);
+          this.logger.error(`Failed to parse message: ${e instanceof Error ? e.message : String(e)}`);
         }
       }
     });

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from './audit-log.service';
 import { DataResidencyService } from './data-residency.service';
@@ -101,7 +102,7 @@ export class ComplianceReportService {
       data: {
         organizationId,
         framework,
-        reportData: report as object,
+        reportData: report as unknown as Prisma.InputJsonValue,
         overallScore,
         generatedAt: new Date(),
       },

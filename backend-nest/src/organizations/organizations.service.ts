@@ -278,7 +278,7 @@ export class OrganizationsService {
       'member',
       invitation.id,
       null as unknown as Prisma.InputJsonValue,
-      { email: dto.email, role: dto.role } as unknown as Prisma.InputJsonValue,
+      { email: dto.email, role: dto.role },
     );
 
     // In production, send email with invitation link
@@ -374,8 +374,8 @@ export class OrganizationsService {
       'UPDATE',
       'member',
       memberId,
-      { role: member.role } as unknown as Prisma.InputJsonValue,
-      { role } as unknown as Prisma.InputJsonValue,
+      { role: member.role },
+      { role },
     );
 
     return updated;
@@ -463,7 +463,7 @@ export class OrganizationsService {
       'sso',
       ssoConfig.id,
       null as unknown as Prisma.InputJsonValue,
-      { provider: dto.provider } as unknown as Prisma.InputJsonValue,
+      { provider: dto.provider },
     );
 
     return ssoConfig;

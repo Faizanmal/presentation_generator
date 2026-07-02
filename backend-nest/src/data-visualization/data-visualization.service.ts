@@ -401,20 +401,22 @@ export class DataVisualizationService {
 
     // Suggest metrics for numeric columns
     const numericColumns = data.columns.filter((c) => c.type === 'number');
-    const metrics = numericColumns.map((col) => {
+    const metrics: Array<{
+      column: string;
+      suggestion: Partial<MetricWidget>;
+    }> = numericColumns.map((col) => {
       const values = data.rows.map((r) => Number(r[col.name]) || 0);
       const sum = values.reduce((a, b) => a + b, 0);
+
+      const format: MetricWidget['format'] =
+        sum > 1000000 ? 'number' : sum < 1 ? 'percentage' : 'number';
 
       return {
         column: col.name,
         suggestion: {
           label: col.name,
           value: sum,
-          format: (sum > 1000000
-            ? 'number'
-            : sum < 1
-              ? 'percentage'
-              : 'number') as 'number' | 'percentage' | 'currency',
+          format,
         },
       };
     });

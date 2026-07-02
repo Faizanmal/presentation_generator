@@ -15,23 +15,23 @@ import { MultilingualService } from './multilingual.service';
 
 // DTOs
 class InitializeProjectDto {
-  primaryLanguage: LanguageCode;
+  primaryLanguage!: LanguageCode;
 }
 
 class TranslateProjectDto {
-  targetLanguage: LanguageCode;
+  targetLanguage!: LanguageCode;
 }
 
 class TranslateSlideDto {
-  targetLanguage: LanguageCode;
+  targetLanguage!: LanguageCode;
 }
 
 class UpdateTranslationDto {
-  translatedContent: Prisma.InputJsonValue;
+  translatedContent!: Prisma.InputJsonValue;
 }
 
 class DetectLanguageDto {
-  text: string;
+  text!: string;
 }
 
 @Controller('multilingual')

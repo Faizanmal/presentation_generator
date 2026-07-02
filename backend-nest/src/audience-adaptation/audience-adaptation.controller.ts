@@ -15,7 +15,7 @@ import type {
 import { AudienceAdaptationService } from './audience-adaptation.service';
 
 class AdaptPresentationDto {
-  targetAudience: AudienceType;
+  targetAudience!: AudienceType;
   adjustTone?: boolean = true;
   adjustLength?: boolean = true;
   adjustComplexity?: boolean = true;

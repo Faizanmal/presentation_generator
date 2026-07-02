@@ -15,8 +15,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 class CreateSlideDto {
-  projectId: string;
-  order: number;
+  projectId!: string;
+  order!: number;
   layout?: string;
 }
 
@@ -26,7 +26,7 @@ class UpdateSlideDto {
 }
 
 class ReorderSlidesDto {
-  slides: Array<{ id: string; order: number }>;
+  slides!: Array<{ id: string; order: number }>;
 }
 
 @Controller('slides')

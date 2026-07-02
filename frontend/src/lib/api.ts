@@ -46,7 +46,49 @@ import type {
   ThinkingPresentation,
 } from '@/types';
 
+// ⚠️ DEMO MODE: Set to true to use mock data
+const DEMO_MODE = true;
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+
+// Mock demo project
+const MOCK_PROJECT: Project = {
+  id: 'demo-project-1',
+  title: 'Welcome to Demo Presentation Designer',
+  description: 'This is a demo project to help you explore the features',
+  type: 'PRESENTATION',
+  status: 'DRAFT',
+  isPublic: false,
+  shareToken: null,
+  themeId: 'demo-theme-1',
+  theme: null,
+  ownerId: 'demo-user-123',
+  owner: {
+    id: 'demo-user-123',
+    name: 'Demo User',
+    image: null,
+  },
+  slides: [],
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  _count: {
+    slides: 3,
+    blocks: 12,
+  },
+};
+
+// Mock demo subscription
+const MOCK_SUBSCRIPTION: Subscription = {
+  id: 'demo-sub-123',
+  userId: 'demo-user-123',
+  plan: 'PRO',
+  status: 'ACTIVE',
+  currentPeriodStart: new Date().toISOString(),
+  currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+  cancelledAt: null,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+} as unknown as Subscription;
 
 class ApiClient {
   private client: AxiosInstance;
@@ -79,8 +121,14 @@ class ApiClient {
     // Request interceptor to add auth token
     this.client.interceptors.request.use(async (config) => {
       // Add Auth token
+      // Note: Refresh token from localStorage in case it was set after ApiClient init
+      if (!this.token && typeof window !== 'undefined') {
+        this.token = localStorage.getItem('token');
+      }
+      
       if (this.token) {
         config.headers.Authorization = `Bearer ${this.token}`;
+        console.log('[ApiClient] Adding Authorization header for request to:', config.url);
       }
 
       // Add CSRF token for mutation requests
@@ -114,10 +162,24 @@ class ApiClient {
         if (
           error.response?.status === 401 &&
           !originalRequest._retry &&
-          this.storedRefreshToken &&
+          (this.storedRefreshToken || (typeof window !== 'undefined' && localStorage.getItem('refreshToken'))) &&
           !originalRequest.url?.includes('/auth/refresh') &&
           !originalRequest.url?.includes('/auth/login')
         ) {
+          // Ensure we have the latest refresh token from localStorage
+          if (!this.storedRefreshToken && typeof window !== 'undefined') {
+            this.storedRefreshToken = localStorage.getItem('refreshToken');
+          }
+
+          if (!this.storedRefreshToken) {
+            // No refresh token available, clear and redirect
+            this.clearToken();
+            if (typeof window !== 'undefined') {
+              window.location.href = '/login';
+            }
+            return Promise.reject(error);
+          }
+
           if (this.isRefreshing) {
             // Queue requests that arrive while refresh is in-flight
             return new Promise<AxiosResponse>((resolve) => {
@@ -148,8 +210,9 @@ class ApiClient {
               originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
             }
             return this.client(originalRequest);
-          } catch {
+          } catch (refreshError) {
             // Refresh token is invalid — clear state and redirect to login
+            console.error('[ApiClient] Token refresh failed:', refreshError);
             this.clearToken();
             if (typeof window !== 'undefined') {
               window.location.href = '/login';
@@ -279,6 +342,27 @@ class ApiClient {
   // ============================================
 
   async register(credentials: RegisterCredentials): Promise<AuthResponse> {
+    if (DEMO_MODE) {
+      console.log('[ApiClient] DEMO MODE - Mock register:', credentials.email);
+      const response: AuthResponse = {
+        accessToken: `demo-token-${  Date.now()}`,
+        refreshToken: `demo-refresh-${  Date.now()}`,
+        expiresIn: 3600,
+        user: {
+          id: 'demo-user-123',
+          email: credentials.email,
+          name: credentials.name,
+          image: null,
+          organizationId: 'demo-org-123',
+        },
+      };
+      this.setToken(response.accessToken);
+      this.setRefreshToken(response.refreshToken || '');
+      this.csrfToken = null;
+      this.csrfPromise = null;
+      return response;
+    }
+
     const { data } = await this.client.post<AuthResponse>('/auth/register', credentials);
     this.setToken(data.accessToken);
     if (data.refreshToken) {
@@ -291,6 +375,27 @@ class ApiClient {
   }
 
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
+    if (DEMO_MODE) {
+      console.log('[ApiClient] DEMO MODE - Mock login:', credentials.email);
+      const response: AuthResponse = {
+        accessToken: `demo-token-${  Date.now()}`,
+        refreshToken: `demo-refresh-${  Date.now()}`,
+        expiresIn: 3600,
+        user: {
+          id: 'demo-user-123',
+          email: credentials.email,
+          name: credentials.email.split('@')[0],
+          image: null,
+          organizationId: 'demo-org-123',
+        },
+      };
+      this.setToken(response.accessToken);
+      this.setRefreshToken(response.refreshToken || '');
+      this.csrfToken = null;
+      this.csrfPromise = null;
+      return response;
+    }
+
     const { data } = await this.client.post<AuthResponse>('/auth/login', credentials);
     this.setToken(data.accessToken);
     if (data.refreshToken) {
@@ -303,16 +408,43 @@ class ApiClient {
   }
 
   async getProfile(): Promise<User> {
+    if (DEMO_MODE) {
+      console.log('[ApiClient] DEMO MODE - Mock profile');
+      return {
+        id: 'demo-user-123',
+        email: 'demo@example.com',
+        name: 'Demo User',
+        image: null,
+        organizationId: 'demo-org-123',
+      };
+    }
+
     const { data } = await this.client.get<User>('/auth/me');
     return data;
   }
 
   async patchProfile(payload: Partial<Pick<User, 'name' | 'email' | 'image'>>): Promise<User> {
+    if (DEMO_MODE) {
+      console.log('[ApiClient] DEMO MODE - Mock profile update:', payload);
+      return {
+        id: 'demo-user-123',
+        email: payload.email || 'demo@example.com',
+        name: payload.name || 'Demo User',
+        image: payload.image || null,
+        organizationId: 'demo-org-123',
+      };
+    }
+
     const { data } = await this.client.patch<User>('/auth/me', payload);
     return data;
   }
 
   async changePassword(currentPassword: string, newPassword: string): Promise<{ success: boolean; message: string }> {
+    if (DEMO_MODE) {
+      console.log('[ApiClient] DEMO MODE - Mock password change');
+      return { success: true, message: 'Password changed successfully' };
+    }
+
     const { data } = await this.client.post<{ success: boolean; message: string }>('/auth/password/change', {
       currentPassword,
       newPassword,
@@ -321,6 +453,13 @@ class ApiClient {
   }
 
   async refreshToken(): Promise<{ accessToken: string; refreshToken?: string }> {
+    if (DEMO_MODE) {
+      console.log('[ApiClient] DEMO MODE - Mock token refresh');
+      const newAccessToken = `demo-token-${  Date.now()}`;
+      this.setToken(newAccessToken);
+      return { accessToken: newAccessToken };
+    }
+
     const { data } = await this.client.post<{ accessToken: string; refreshToken?: string }>('/auth/refresh', {
       refreshToken: this.storedRefreshToken,
     });
@@ -332,6 +471,11 @@ class ApiClient {
   }
 
   async requestOtpLogin(email: string): Promise<{ success: boolean; message: string; expiresInSeconds?: number }> {
+    if (DEMO_MODE) {
+      console.log('[ApiClient] DEMO MODE - Mock OTP request for', email);
+      return { success: true, message: 'OTP sent successfully', expiresInSeconds: 600 };
+    }
+
     const { data } = await this.client.post<{ success: boolean; message: string; expiresInSeconds?: number }>('/auth/otp/request', { email });
     return data;
   }
@@ -347,6 +491,11 @@ class ApiClient {
     resendAfterSeconds?: number;
     retryAfterSeconds?: number;
   }> {
+    if (DEMO_MODE) {
+      console.log('[ApiClient] DEMO MODE - Mock OTP request via', channel, 'for', identifier);
+      return { success: true, message: `OTP sent via ${channel}`, expiresInSeconds: 600 };
+    }
+
     const { data } = await this.client.post<{
       success: boolean;
       message: string;
@@ -420,6 +569,33 @@ class ApiClient {
   // ============================================
 
   async getProjects(page = 1, limit = 20): Promise<PaginatedResponse<Project>> {
+    if (DEMO_MODE) {
+      console.log('[ApiClient] DEMO MODE - Mock projects list');
+      return {
+        data: [
+          MOCK_PROJECT,
+          {
+            ...MOCK_PROJECT,
+            id: 'demo-project-2',
+            title: 'Marketing Campaign Presentation',
+            updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+          },
+          {
+            ...MOCK_PROJECT,
+            id: 'demo-project-3',
+            title: 'Q1 Business Review',
+            updatedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+          },
+        ],
+        meta: {
+          total: 3,
+          page,
+          limit,
+          totalPages: 1,
+        },
+      };
+    }
+
     const { data } = await this.client.get<PaginatedResponse<Project>>('/projects', {
       params: { page, limit },
     });
@@ -427,27 +603,61 @@ class ApiClient {
   }
 
   async getProject(id: string): Promise<Project> {
+    if (DEMO_MODE) {
+      console.log('[ApiClient] DEMO MODE - Mock project:', id);
+      return MOCK_PROJECT;
+    }
+
     const { data } = await this.client.get<Project>(`/projects/${id}`);
     return data;
   }
 
   async getProjectByShareToken(shareToken: string): Promise<Project> {
+    if (DEMO_MODE) {
+      console.log('[ApiClient] DEMO MODE - Mock shared project:', shareToken);
+      return MOCK_PROJECT;
+    }
+
     const { data } = await this.client.get<Project>(`/projects/shared/${shareToken}`);
     return data;
   }
 
   async createProject(input: CreateProjectInput): Promise<Project> {
+    if (DEMO_MODE) {
+      console.log('[ApiClient] DEMO MODE - Mock project creation:', input.title);
+      return {
+        ...MOCK_PROJECT,
+        id: `demo-project-${  Date.now()}`,
+        title: input.title,
+        description: input.description || null,
+      };
+    }
+
     const { data } = await this.client.post<Project>('/projects', input);
     return data;
   }
 
   async generateProject(input: GenerateProjectInput): Promise<{ status: string; jobId: string; message?: string }> {
+    if (DEMO_MODE) {
+      console.log('[ApiClient] DEMO MODE - Mock project generation:', input.topic);
+      return { status: 'queued', jobId: `demo-job-${  Date.now()}`, message: 'Generating demo project...' };
+    }
+
     // Backend enqueues generation job and returns a job handle (queued)
     const { data } = await this.client.post<{ status: string; jobId: string; message?: string }>('/projects/generate', input);
     return data;
   }
 
   async getProjectGenerationStatus(jobId: string): Promise<{ id: string; state: string; result?: Project; failedReason?: string }> {
+    if (DEMO_MODE) {
+      console.log('[ApiClient] DEMO MODE - Mock project generation status:', jobId);
+      return {
+        id: jobId,
+        state: 'completed',
+        result: MOCK_PROJECT,
+      };
+    }
+
     const { data } = await this.client.get<{
       id: string;
       state: string;
@@ -546,16 +756,31 @@ class ApiClient {
   // ============================================
 
   async getSubscription(): Promise<Subscription> {
+    if (DEMO_MODE) {
+      console.log('[ApiClient] DEMO MODE - Mock subscription');
+      return MOCK_SUBSCRIPTION;
+    }
+
     const { data } = await this.client.get<Subscription>('/users/subscription');
     return data;
   }
 
   async createCheckout(plan: 'pro' | 'enterprise'): Promise<{ url: string }> {
+    if (DEMO_MODE) {
+      console.log('[ApiClient] DEMO MODE - Mock checkout for plan:', plan);
+      return { url: 'https://checkout.demo.local' };
+    }
+
     const { data } = await this.client.post<{ url: string }>('/payments/checkout', { plan });
     return data;
   }
 
   async createPortalSession(): Promise<{ url: string }> {
+    if (DEMO_MODE) {
+      console.log('[ApiClient] DEMO MODE - Mock portal session');
+      return { url: 'https://portal.demo.local' };
+    }
+
     const { data } = await this.client.post<{ url: string }>('/payments/portal');
     return data;
   }

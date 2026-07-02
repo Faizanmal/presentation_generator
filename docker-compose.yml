@@ -102,6 +102,35 @@ services:
       retries: 3
       start_period: 40s
 
+  # Dedicated AI generation worker
+  # Processes BullMQ jobs independently from the API server
+  worker:
+    build:
+      context: ./backend-nest
+      dockerfile: Dockerfile
+    container_name: presentation-designer-worker
+    environment:
+      DATABASE_URL: postgres://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-presentation_designer}?schema=public
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: production
+      WORKER_ONLY: "true"
+      # AI API keys (shared with backend)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GOOGLE_GENERATIVE_AI_API_KEY: ${GOOGLE_GENERATIVE_AI_API_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+
 volumes:
   postgres_data:
   redis_data:

@@ -5,12 +5,6 @@ import OpenAI from 'openai';
 /**
  * Supported file types for document ingestion
  */
-type SupportedMimeType =
-  | 'application/pdf'
-  | 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  | 'text/plain'
-  | 'text/markdown'
-  | 'text/html';
 
 interface DocumentChunk {
   index: number;
@@ -72,7 +66,7 @@ export class DocumentIngestionService {
     );
 
     // 1. Validate file type
-    this.validateMimeType(mimeType as SupportedMimeType);
+    this.validateMimeType(mimeType);
 
     // 2. Extract raw text from the document
     const rawText = this.extractText(fileBuffer, mimeType);
@@ -360,7 +354,7 @@ export class DocumentIngestionService {
             );
           } catch (error) {
             this.logger.warn(
-              `Failed to summarize chunk ${chunk.index}: ${error}`,
+              `Failed to summarize chunk ${chunk.index}: ${error instanceof Error ? error.message : String(error)}`,
             );
             return chunk.text.slice(0, 500);
           }
@@ -459,9 +453,9 @@ Respond with a valid JSON array of slide objects. No markdown, no explanation, j
 
       const content = response.choices[0]?.message?.content || '{"slides":[]}';
       const parsed = JSON.parse(content);
-      const slidesArray: object[] = Array.isArray(parsed)
-        ? parsed
-        : parsed.slides || [];
+      const slidesArray: Record<string, unknown>[] = Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>[])
+        : (parsed.slides as Record<string, unknown>[]) || [];
 
       return slidesArray.map(
         (slide: Record<string, unknown>, index: number) => ({
@@ -474,9 +468,9 @@ Respond with a valid JSON array of slide objects. No markdown, no explanation, j
                     (block.blockType as string) ||
                     (block.type as string) ||
                     'PARAGRAPH',
-                  content:
-                    (block.content as Record<string, unknown>) ||
-                    ({ text: '' } as Record<string, unknown>),
+                  content: (block.content as Record<string, unknown>) || {
+                    text: '',
+                  },
                   order: bIdx,
                 }),
               )

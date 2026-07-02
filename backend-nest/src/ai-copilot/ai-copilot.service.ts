@@ -67,7 +67,7 @@ export class AICopilotService {
         userId,
         projectId: options?.projectId,
         slideId: options?.slideId,
-        context: context as object,
+        context: context as unknown as Prisma.InputJsonValue,
         status: 'active',
       },
     });

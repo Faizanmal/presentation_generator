@@ -646,15 +646,34 @@ export class AuthService {
 
   // ─── Validate JWT Payload ──────────────────────────────────
   async validateJwtPayload(payload: JwtPayload) {
-    const user = await this.usersService.findById(payload.sub);
-    if (!user) {
+    try {
+      if (!payload.sub) {
+        this.logger.warn('[JWT Validation] Payload missing user ID (sub)');
+        return null;
+      }
+
+      const user = await this.usersService.findById(payload.sub);
+      if (!user) {
+        this.logger.warn(
+          `[JWT Validation] User not found for ID: ${payload.sub}`,
+        );
+        return null;
+      }
+
+      this.logger.debug(
+        `[JWT Validation] Successfully validated user: ${user.email}`,
+      );
+      return {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      };
+    } catch (error) {
+      this.logger.error(
+        `[JWT Validation] Error validating JWT payload: ${error instanceof Error ? error.message : String(error)}`,
+      );
       return null;
     }
-    return {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-    };
   }
 
   // ─── Change Password ───────────────────────────────────────

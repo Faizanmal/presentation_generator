@@ -546,7 +546,7 @@ export class ExportService {
 
           const fontSize = this.getFontSizeForBlockType(
             block.blockType,
-            style.fontSize as number | undefined,
+            style.fontSize,
           );
 
           if (
@@ -876,7 +876,7 @@ export class ExportService {
             block.blockType === 'subheading';
           const fontSize = this.getFontSizeForBlockType(
             block.blockType,
-            style.fontSize as number | undefined,
+            style.fontSize,
           );
 
           if (

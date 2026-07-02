@@ -55,7 +55,7 @@ export class MetricsService implements OnModuleInit {
       this.logger.log('✓ Prometheus metrics initialized');
     } catch (error) {
       this.logger.warn(
-        `⚠ Prometheus metrics not available: ${error.message}. Install prom-client for metrics.`,
+        `⚠ Prometheus metrics not available: ${(error as Error).message}. Install prom-client for metrics.`,
       );
     }
   }
