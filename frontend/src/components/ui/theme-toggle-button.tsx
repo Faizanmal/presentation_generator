@@ -13,11 +13,12 @@ interface ThemeToggleButtonProps {
 export function ThemeToggleButton({ variant = "light" }: ThemeToggleButtonProps) {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
+
   React.useEffect(() => {
-    const frame = requestAnimationFrame(() => setMounted(true));
-    return () => cancelAnimationFrame(frame);
+    setMounted(true);
   }, []);
-  const activeTheme = (mounted ? resolvedTheme ?? "system" : "") as Theme;
+
+  const activeTheme = mounted ? (resolvedTheme ?? "system") : "system";
 
   const themeOptions = [
     { key: "light", icon: Sun, title: "Light mode" },

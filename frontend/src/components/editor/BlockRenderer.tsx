@@ -103,8 +103,8 @@ const BlockRenderer = React.memo(({
   const isSpacious = presentationDensity < 34;
   const bodyLineHeight = isDense ? 1.55 : 1.72;
   const readableWidth = isDense ? '36rem' : '42rem';
-  const headingScale = isSpacious ? 'clamp(2rem, 3.5vw, 3.5rem)' : 'clamp(1.75rem, 3vw, 3rem)';
-  const subheadingScale = isSpacious ? 'clamp(1.2rem, 2vw, 1.75rem)' : 'clamp(1.1rem, 1.6vw, 1.5rem)';
+  const headingScale = isSpacious ? 'clamp(2.9rem, 5.5vw, 5.25rem)' : 'clamp(2.6rem, 5vw, 4.75rem)';
+  const subheadingScale = isSpacious ? 'clamp(1.7rem, 3vw, 2.5rem)' : 'clamp(1.45rem, 2.3vw, 2.25rem)';
   const bodyOpacity = presentationTone > 66 ? 0.9 : presentationTone < 34 ? 0.8 : 0.85;
 
   // Content state
@@ -203,7 +203,7 @@ const BlockRenderer = React.memo(({
                 textAlign,
                 fontSize: customFontSize || headingScale,
                 textShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                maxWidth: '18ch',
+                maxWidth: '11ch',
               }}
               dangerouslySetInnerHTML={{ __html: content?.text || "Heading" }}
             />

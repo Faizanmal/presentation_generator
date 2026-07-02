@@ -24,7 +24,7 @@
     "noImplicitAny": false,
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
-    "types": ["jest","multer"],
+    "types": ["jest", "multer"],
     "paths": {
       "@shared/*": ["../shared/*"]
     }

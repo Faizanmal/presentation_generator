@@ -2,7 +2,7 @@
 /* @config "../../tailwind.config.ts"; */
 @import "../styles/presentation-v2-tokens.css";
 
-/* @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *)); */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 :root {
   --background: hsl(0, 0%, 100%);

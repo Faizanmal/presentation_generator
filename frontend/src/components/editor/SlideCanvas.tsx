@@ -426,51 +426,45 @@ export default function SlideCanvas({
         )}
 
         <div
-          className={`absolute inset-0 overflow-hidden relative z-10 ${isTitleSlide
+          className={`h-full overflow-y-auto relative z-10 ${isTitleSlide
             ? `flex flex-col items-center justify-center ${canvasPaddingClass}`
             : canvasPaddingClass
             }`}
         >
-          <SortableContext
-            items={sortedBlocks.map((b) => b.id)}
-            strategy={verticalListSortingStrategy}
-          >
-            {sortedBlocks.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-slate-400">
-                <div className="text-center space-y-3">
-                  <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-4">
-                    <span className="text-2xl">✨</span>
-                  </div>
-                  <p className="text-lg font-medium text-slate-500 dark:text-slate-400">
-                    Click the + button above to add content
-                  </p>
-                  <p className="text-sm text-slate-400 dark:text-slate-500">
-                    or type{" "}
-                    <span className="inline-flex items-center bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 font-mono text-xs shadow-sm">
-                      /
-                    </span>{" "}
-                    for commands
-                  </p>
+          {sortedBlocks.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-slate-400">
+              <div className="text-center space-y-3">
+                <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-4">
+                  <span className="text-2xl">✨</span>
                 </div>
+                <p className="text-lg font-medium text-slate-500 dark:text-slate-400">
+                  Click the + button above to add content
+                </p>
+                <p className="text-sm text-slate-400 dark:text-slate-500">
+                  or type{" "}
+                  <span className="inline-flex items-center bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 font-mono text-xs shadow-sm">
+                    /
+                  </span>{" "}
+                  for commands
+                </p>
               </div>
-            ) : (
-              <div className="w-full h-full">
-                <LayoutCompiler
-                  layoutType={slideLayout}
-                  blocks={sortedBlocks}
-                  theme={theme}
-                  presentationDensity={presentationDensity}
-                  presentationTone={presentationTone}
-                  activeBlockId={activeBlockId}
-                  onFocus={setActiveBlockId}
-                  onBlur={() => setActiveBlockId(null)}
-                  onChange={handleBlockChange}
-                  onDelete={handleBlockDelete}
-                />
-
-
-              </div>
-            )}
+            </div>
+          ) : (
+            <div className="w-full h-full">
+              <LayoutCompiler
+                layoutType={slideLayout}
+                blocks={sortedBlocks}
+                theme={theme}
+                presentationDensity={presentationDensity}
+                presentationTone={presentationTone}
+                activeBlockId={activeBlockId}
+                onFocus={setActiveBlockId}
+                onBlur={() => setActiveBlockId(null)}
+                onChange={handleBlockChange}
+                onDelete={handleBlockDelete}
+              />
+            </div>
+          )}
           </SortableContext>
         </div>
 
