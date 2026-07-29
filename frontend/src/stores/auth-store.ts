@@ -3,8 +3,8 @@ import { persist } from 'zustand/middleware';
 import type { User, Subscription } from '@/types';
 import { api } from '@/lib/api';
 
-// ⚠️ DEMO MODE: Set to true to skip authentication
-const DEMO_MODE = true;
+// Demo mode only when explicitly enabled (must be off for production)
+const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 
 // Mock demo user
 const MOCK_USER: User = {
@@ -44,6 +44,8 @@ interface AuthState {
   fetchProfile: () => Promise<void>;
   fetchSubscription: () => Promise<void>;
   setUser: (user: User | null) => void;
+  impersonate: (userId: string) => Promise<void>;
+  unimpersonate: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -236,6 +238,53 @@ export const useAuthStore = create<AuthState>()(
           user,
           isAuthenticated: !!user,
         });
+      },
+
+      impersonate: async (userId: string) => {
+        if (DEMO_MODE) {
+          console.log('[AuthStore] DEMO MODE - Mock impersonate');
+          const currentUser = get().user;
+          set({
+            user: { ...MOCK_USER, id: userId, email: `impersonated-${userId}@example.com`, name: 'Impersonated User', impersonatorId: currentUser?.id },
+          });
+          return;
+        }
+
+        set({ isLoading: true });
+        try {
+          const response = await api.impersonateUser(userId);
+          set({
+            user: response.user,
+            isLoading: false,
+          });
+          get().fetchSubscription();
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
+
+      unimpersonate: async () => {
+        if (DEMO_MODE) {
+          console.log('[AuthStore] DEMO MODE - Mock unimpersonate');
+          set({
+            user: MOCK_USER,
+          });
+          return;
+        }
+
+        set({ isLoading: true });
+        try {
+          const response = await api.unimpersonateUser();
+          set({
+            user: response.user,
+            isLoading: false,
+          });
+          get().fetchSubscription();
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
+        }
       },
     }),
     {

@@ -24,6 +24,7 @@ export interface JwtPayload {
   sub: string;
   email: string;
   name: string;
+  impersonatorId?: string;
 }
 
 export interface AuthResponse {
@@ -36,6 +37,7 @@ export interface AuthResponse {
     name: string | null;
     image: string | null;
     role?: string;
+    impersonatorId?: string;
   };
 }
 
@@ -667,6 +669,8 @@ export class AuthService {
         id: user.id,
         email: user.email,
         name: user.name,
+        role: user.role,
+        impersonatorId: payload.impersonatorId,
       };
     } catch (error) {
       this.logger.error(
@@ -729,18 +733,75 @@ export class AuthService {
     }
   }
 
+  // ─── Impersonation ─────────────────────────────────────────
+  async impersonateUser(
+    adminId: string,
+    targetUserId: string,
+  ): Promise<AuthResponse> {
+    const admin = await this.usersService.findById(adminId);
+    if (!admin || admin.role !== 'ADMIN') {
+      throw new UnauthorizedException('Only admins can impersonate users');
+    }
+
+    const targetUser = await this.usersService.findById(targetUserId);
+    if (!targetUser) {
+      throw new BadRequestException('Target user not found');
+    }
+
+    this.logger.log(
+      `Admin ${admin.email} is impersonating ${targetUser.email}`,
+    );
+    this.auditLog({
+      userId: admin.id,
+      email: admin.email,
+      action: 'IMPERSONATE_USER',
+      success: true,
+      metadata: {
+        targetUserId: targetUser.id,
+        targetUserEmail: targetUser.email,
+      },
+    });
+
+    return this.generateAuthResponse(targetUser, admin.id);
+  }
+
+  async unimpersonateUser(adminId: string): Promise<AuthResponse> {
+    const admin = await this.usersService.findById(adminId);
+    if (!admin || admin.role !== 'ADMIN') {
+      throw new UnauthorizedException('Only admins can unimpersonate');
+    }
+
+    this.logger.log(`Admin ${admin.email} stopped impersonating`);
+    this.auditLog({
+      userId: admin.id,
+      email: admin.email,
+      action: 'UNIMPERSONATE_USER',
+      success: true,
+    });
+
+    return this.generateAuthResponse(admin);
+  }
+
   // ─── JWT Generation ────────────────────────────────────────
-  private generateAuthResponse(user: {
-    id: string;
-    email: string;
-    name: string | null;
-    image: string | null;
-  }): AuthResponse {
+  private generateAuthResponse(
+    user: {
+      id: string;
+      email: string;
+      name: string | null;
+      image: string | null;
+      role?: string | null;
+    },
+    impersonatorId?: string,
+  ): AuthResponse {
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
       name: user.name || '',
     };
+
+    if (impersonatorId) {
+      payload.impersonatorId = impersonatorId;
+    }
 
     const accessToken = this.jwtService.sign(payload, {
       expiresIn: this.ACCESS_TOKEN_EXPIRY,
@@ -762,6 +823,8 @@ export class AuthService {
         email: user.email,
         name: user.name,
         image: user.image,
+        role: user.role ?? undefined,
+        impersonatorId,
       },
     };
   }

@@ -57,8 +57,21 @@ export class ImageAgentService {
       this.STYLE_SUFFIX_MAP[request.style || 'professional'] ||
       this.STYLE_SUFFIX_MAP.professional;
 
-    // Color context for style consistency
-    const colorContext = `Color palette: ${design.theme.colors.primary}, ${design.theme.colors.secondary}, ${design.theme.colors.accent}.`;
+    const brand = request.brandGuidelines;
+    const colorContext = brand?.colors?.length
+      ? `Brand color palette ONLY: ${brand.colors.join(', ')}. Match these colors closely.`
+      : `Color palette: ${design.theme.colors.primary}, ${design.theme.colors.secondary}, ${design.theme.colors.accent}.`;
+
+    const brandConstraints = [
+      'No text overlays in the image.',
+      'Do not invent logos or competitor brand marks.',
+      ...(brand?.restrictions || []).map((r) => `Restriction: ${r}`),
+      brand?.logos?.length
+        ? 'Leave clean negative space suitable for brand logo placement; do not draw a logo.'
+        : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
 
     const imagePromises: Promise<GeneratedImage | null>[] = [];
     let slideGlobalIndex = 0;
@@ -72,7 +85,7 @@ export class ImageAgentService {
         imagePromises.push(
           this.generateSingleImage(
             slide.suggestedVisual,
-            styleSuffix,
+            `${styleSuffix} ${brandConstraints}`,
             colorContext,
             currentIndex,
             request.imageSource || 'ai',
@@ -90,7 +103,7 @@ export class ImageAgentService {
       .map((r) => r.value!);
 
     this.logger.log(
-      `Ã°Å¸â€“Â¼Ã¯Â¸Â Generated ${images.length}/${imagePromises.length} images successfully`,
+      `Generated ${images.length}/${imagePromises.length} images successfully`,
     );
 
     return { images };
@@ -153,7 +166,9 @@ export class ImageAgentService {
     // This integrates with the existing ImageAcquisitionModule
     // For now, return a placeholder URL Ã¢â‚¬â€ the real implementation
     // calls the unsplash/pexels APIs via the existing service
-    this.logger.log(`Ã°Å¸â€œÂ· Using stock photo fallback for slide ${slideIndex}`);
+    this.logger.log(
+      `Ã°Å¸â€œÂ· Using stock photo fallback for slide ${slideIndex}`,
+    );
     return Promise.resolve(null);
   }
 }

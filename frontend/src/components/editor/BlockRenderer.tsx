@@ -103,9 +103,17 @@ const BlockRenderer = React.memo(({
   const isSpacious = presentationDensity < 34;
   const bodyLineHeight = isDense ? 1.55 : 1.72;
   const readableWidth = isDense ? '36rem' : '42rem';
-  const headingScale = isSpacious ? 'clamp(2.9rem, 5.5vw, 5.25rem)' : 'clamp(2.6rem, 5vw, 4.75rem)';
-  const subheadingScale = isSpacious ? 'clamp(1.7rem, 3vw, 2.5rem)' : 'clamp(1.45rem, 2.3vw, 2.25rem)';
-  const bodyOpacity = presentationTone > 66 ? 0.9 : presentationTone < 34 ? 0.8 : 0.85;
+  const headingScale = isSpacious
+    ? 'clamp(2.4rem, 4.8vw, 4.25rem)'
+    : isDense
+      ? 'clamp(1.85rem, 3.2vw, 2.75rem)'
+      : 'clamp(2.1rem, 4vw, 3.5rem)';
+  const subheadingScale = isSpacious
+    ? 'clamp(1.35rem, 2.4vw, 1.85rem)'
+    : isDense
+      ? 'clamp(1.15rem, 1.8vw, 1.45rem)'
+      : 'clamp(1.25rem, 2vw, 1.65rem)';
+  const bodyOpacity = presentationTone > 66 ? 0.92 : presentationTone < 34 ? 0.82 : 0.88;
 
   // Content state
   const [content, setContent] = useState(block.content);
@@ -185,25 +193,25 @@ const BlockRenderer = React.memo(({
       case "HEADING":
         return (
           <div className="relative">
-            {/* Decorative accent bar */}
-            <div
-              className="absolute -left-4 top-1 bottom-1 w-1 rounded-full opacity-80"
-              style={{ background: gradientFromColor(primaryColor, '180deg') }}
-            />
+            {!isDense && textAlign !== 'center' && (
+              <div
+                className="absolute -left-3 top-1.5 bottom-1.5 w-0.5 rounded-full opacity-70"
+                style={{ background: primaryColor }}
+              />
+            )}
             <h1
               ref={contentRef}
               contentEditable
               onInput={handleTextChange}
               onFocus={onFocus}
               onBlur={onBlur}
-              className="outline-none font-black leading-[0.95] tracking-tight transition-all duration-200"
+              className="outline-none font-extrabold leading-[1.08] tracking-[-0.025em] transition-all duration-200"
               style={{
-                fontFamily: theme?.fonts?.heading || "'Inter', system-ui",
-                color: customColor?.startsWith('#') ? customColor : primaryColor,
+                fontFamily: theme?.fonts?.heading || 'var(--font-dm-sans), system-ui, sans-serif',
+                color: customColor?.startsWith('#') ? customColor : (theme?.colors?.text || primaryColor),
                 textAlign,
                 fontSize: customFontSize || headingScale,
-                textShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                maxWidth: '11ch',
+                maxWidth: textAlign === 'center' ? '22ch' : '28ch',
               }}
               dangerouslySetInnerHTML={{ __html: content?.text || "Heading" }}
             />
@@ -220,7 +228,7 @@ const BlockRenderer = React.memo(({
             onBlur={onBlur}
             className="outline-none font-semibold leading-snug transition-all duration-200 text-[clamp(1.45rem,2.3vw,2.25rem)]"
             style={{
-              fontFamily: theme?.fonts?.heading || "'Inter', system-ui",
+              fontFamily: theme?.fonts?.heading || 'var(--font-dm-sans), system-ui, sans-serif',
               color: customColor?.startsWith('#') ? customColor : undefined,
               textAlign,
               fontSize: customFontSize || subheadingScale,
@@ -261,7 +269,7 @@ const BlockRenderer = React.memo(({
                 onBlur={onBlur}
                 className="outline-none relative z-10 font-medium text-[1.05rem] leading-8"
                 style={{
-                  fontFamily: theme?.fonts?.body || "'Inter', system-ui",
+                  fontFamily: theme?.fonts?.body || 'var(--font-dm-sans), system-ui, sans-serif',
                   color: customColor?.startsWith('#') ? customColor : undefined,
                   textAlign,
                   lineHeight: bodyLineHeight,
@@ -295,7 +303,7 @@ const BlockRenderer = React.memo(({
                 onBlur={onBlur}
                 className="outline-none flex-1 pt-1.5 text-[1.05rem] leading-8"
                 style={{
-                  fontFamily: theme?.fonts?.body || "'Inter', system-ui",
+                  fontFamily: theme?.fonts?.body || 'var(--font-dm-sans), system-ui, sans-serif',
                   color: customColor?.startsWith('#') ? customColor : undefined,
                   lineHeight: bodyLineHeight,
                   opacity: bodyOpacity,
@@ -320,7 +328,7 @@ const BlockRenderer = React.memo(({
                 onBlur={onBlur}
                 className="outline-none font-extrabold tracking-tight bg-clip-text text-transparent"
                 style={{
-                  fontFamily: theme?.fonts?.heading || "'Inter', system-ui",
+                  fontFamily: theme?.fonts?.heading || 'var(--font-dm-sans), system-ui, sans-serif',
                   fontSize: customFontSize || (isDense ? '3.1rem' : '3.75rem'),
                   lineHeight: 1.1,
                   backgroundImage: gradientFromColor(primaryColor),
@@ -343,7 +351,7 @@ const BlockRenderer = React.memo(({
             onBlur={onBlur}
             className="outline-none transition-colors duration-200 text-[1.05rem] leading-8"
             style={{
-              fontFamily: theme?.fonts?.body || "'Inter', system-ui",
+              fontFamily: theme?.fonts?.body || 'var(--font-dm-sans), system-ui, sans-serif',
               color: customColor?.startsWith('#') ? customColor : undefined,
               textAlign,
               fontSize: customFontSize || undefined,
@@ -384,7 +392,7 @@ const BlockRenderer = React.memo(({
                     onBlur={onBlur}
                     className="outline-none flex-1 text-[1.02rem] leading-8"
                     style={{
-                      fontFamily: theme?.fonts?.body || "'Inter', system-ui",
+                      fontFamily: theme?.fonts?.body || 'var(--font-dm-sans), system-ui, sans-serif',
                       lineHeight: bodyLineHeight,
                       opacity: bodyOpacity,
                     }}
@@ -426,7 +434,7 @@ const BlockRenderer = React.memo(({
                     onBlur={onBlur}
                     className="outline-none flex-1 pt-0.5 text-[1.02rem] leading-8"
                     style={{
-                      fontFamily: theme?.fonts?.body || "'Inter', system-ui",
+                      fontFamily: theme?.fonts?.body || 'var(--font-dm-sans), system-ui, sans-serif',
                       lineHeight: bodyLineHeight,
                       opacity: bodyOpacity,
                     }}
@@ -687,7 +695,7 @@ const BlockRenderer = React.memo(({
                     onBlur={onBlur}
                     className="outline-none font-medium text-[1.02rem] leading-8"
                     style={{
-                      fontFamily: theme?.fonts?.body || "'Inter', system-ui",
+                      fontFamily: theme?.fonts?.body || 'var(--font-dm-sans), system-ui, sans-serif',
                       lineHeight: bodyLineHeight,
                       opacity: bodyOpacity,
                     }}
@@ -736,9 +744,9 @@ const BlockRenderer = React.memo(({
                     }}
                     onFocus={onFocus}
                     onBlur={onBlur}
-                    className="text-xl font-black outline-none relative z-10 tracking-tight"
+                    className="text-xl font-extrabold outline-none relative z-10 tracking-tight"
                     style={{
-                      fontFamily: theme?.fonts?.heading || "'Inter', system-ui",
+                      fontFamily: theme?.fonts?.heading || 'var(--font-dm-sans), system-ui, sans-serif',
                       lineHeight: 1.1,
                     }}
                     dangerouslySetInnerHTML={{ __html: entry.text }}
@@ -778,8 +786,8 @@ const BlockRenderer = React.memo(({
               onInput={handleTextChange}
               onFocus={onFocus}
               onBlur={onBlur}
-              className="text-3xl md:text-4xl font-black text-white outline-none relative z-10 drop-shadow-sm leading-tight"
-              style={{ fontFamily: theme?.fonts?.heading || "'Inter', system-ui" }}
+              className="text-3xl md:text-4xl font-extrabold text-white outline-none relative z-10 drop-shadow-sm leading-tight"
+              style={{ fontFamily: theme?.fonts?.heading || 'var(--font-dm-sans), system-ui, sans-serif' }}
               dangerouslySetInnerHTML={{ __html: ctaText }}
             />
           </div>

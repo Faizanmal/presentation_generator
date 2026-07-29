@@ -100,6 +100,31 @@ export class ProjectsController {
   }
 
   /**
+   * Get persisted DSL document (for pin / partial regen)
+   */
+  @Get(':id/dsl')
+  @UseGuards(JwtAuthGuard)
+  async getDsl(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+  ) {
+    return this.projectsService.getDslDocument(id, user.id);
+  }
+
+  /**
+   * Save DSL document (editMemory, pins, regenerated slides)
+   */
+  @Patch(':id/dsl')
+  @UseGuards(JwtAuthGuard)
+  async saveDsl(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+    @Body() body: { dslDocument: Record<string, unknown> },
+  ) {
+    return this.projectsService.saveDslDocument(id, user.id, body.dslDocument);
+  }
+
+  /**
    * Delete a project
    */
   @Delete(':id')

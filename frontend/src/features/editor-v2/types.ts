@@ -25,6 +25,8 @@ export interface EditorBlock {
   type: EditorBlockType;
   frame: BlockFrame;
   locked?: boolean;
+  /** Layout zone from DSL (multi-column / media) */
+  zone?: number;
   content: {
     text?: string;
     url?: string;
@@ -42,6 +44,8 @@ export interface EditorSlide {
   order: number;
   transition: PresentationTransition;
   durationMs: number;
+  /** DSL layout preset when available */
+  layoutPreset?: string;
   blocks: EditorBlock[];
 }
 

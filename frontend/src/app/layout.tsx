@@ -12,12 +12,14 @@ import {
 import { Toaster } from "@/components/ui/sooner";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { AuthProvider } from "@/components/providers/auth-provider";
+import { ColdStartProvider } from "@/components/providers/cold-start-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { ErrorBoundary } from "@/components/providers/error-boundary";
 import { NotificationProvider } from "@/components/ui/enhanced-ui";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { setupErrorTracking } from "@/lib/sentry";
 import { GoogleAnalytics, GoogleTagManager, GoogleTagManagerNoScript } from "@/components/analytics";
+import { ImpersonationBanner } from "@/components/admin/ImpersonationBanner";
 import "./globals.css";
 
 // Initialize error tracking
@@ -63,16 +65,19 @@ export default function RootLayout({
           storageKey="presentation-theme"
         >
           <QueryProvider>
-            <AuthProvider>
-              <ErrorBoundary>
-                <NotificationProvider>
-                  <TooltipProvider>
-                    {children}
-                    <Toaster position="top-right" richColors />
-                  </TooltipProvider>
-                </NotificationProvider>
-              </ErrorBoundary>
-            </AuthProvider>
+            <ColdStartProvider>
+              <AuthProvider>
+                <ErrorBoundary>
+                  <NotificationProvider>
+                    <TooltipProvider>
+                      <ImpersonationBanner />
+                      {children}
+                      <Toaster position="top-right" richColors />
+                    </TooltipProvider>
+                  </NotificationProvider>
+                </ErrorBoundary>
+              </AuthProvider>
+            </ColdStartProvider>
           </QueryProvider>
         </ThemeProvider>
         <GoogleAnalytics />

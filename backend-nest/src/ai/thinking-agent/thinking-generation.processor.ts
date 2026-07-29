@@ -52,6 +52,9 @@ export class ThinkingGenerationProcessor extends WorkerHost {
             thinkingResult.presentation.metadata.summary,
           themeId: createProjectOptions?.themeId,
           generateImages: params.generateImages,
+          audience: params.audience,
+          tone: params.tone,
+          qualityScore: thinkingResult.qualityReport.overallScore,
         },
       );
 
@@ -66,6 +69,7 @@ export class ThinkingGenerationProcessor extends WorkerHost {
         qualityScore: thinkingResult.qualityReport.overallScore,
         generationTimeMs: thinkingResult.metadata.totalTimeMs,
         tokensUsed: thinkingResult.metadata.totalTokensUsed,
+        hasDslDocument: Boolean(projectResult.dslDocument),
       },
     };
   }

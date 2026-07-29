@@ -1,0 +1,76 @@
+"use client";
+
+import { useState } from "react";
+import { Sidebar } from "@/components/dashboard/sidebar";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { Menu } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { ThemeToggleSimple } from "@/components/ui/enhanced-ui";
+
+export default function AdminLayout({
+    children,
+}: {
+    children: React.ReactNode;
+}) {
+    const [isCollapsed, setIsCollapsed] = useState(false);
+    const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+    return (
+        <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-900">
+            {/* Desktop Sidebar */}
+            <aside
+                className={cn(
+                    "hidden md:flex flex-col border-r h-full transition-all duration-300 ease-in-out",
+                    isCollapsed ? "w-17.5" : "w-64"
+                )}
+            >
+                <Sidebar
+                    isCollapsed={isCollapsed}
+                    onCollapse={setIsCollapsed}
+                    className="h-full border-none"
+                />
+            </aside>
+
+            {/* Mobile Sidebar */}
+            <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
+                <SheetContent side="left" className="p-0 w-72">
+                    <Sidebar
+                        className="h-full border-none"
+                        onLinkClick={() => setIsMobileOpen(false)}
+                    />
+                </SheetContent>
+            </Sheet>
+
+            {/* Main Content */}
+            <div className="flex-1 flex flex-col h-full overflow-hidden">
+                {/* Mobile Header */}
+                <header className="md:hidden flex items-center justify-between p-4 border-b bg-white/50 dark:bg-slate-950/50 backdrop-blur-sm">
+                    <div className="flex items-center gap-2 font-bold text-lg">
+                        <span className="text-xl">Present.AI Admin</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <ThemeToggleSimple />
+                        <Button variant="ghost" size="icon" onClick={() => setIsMobileOpen(true)}>
+                            <Menu className="h-6 w-6" />
+                        </Button>
+                    </div>
+                </header>
+
+                {/* Desktop Header */}
+                <header className="hidden md:flex items-center justify-between px-8 py-4 border-b bg-white/50 dark:bg-slate-950/50 backdrop-blur-sm z-10 sticky top-0">
+                    <div className="flex items-center gap-2">
+                        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Admin Dashboard</h1>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <ThemeToggleSimple />
+                    </div>
+                </header>
+
+                <main className="flex-1 overflow-y-auto p-4 md:p-8 relative z-0">
+                    {children}
+                </main>
+            </div>
+        </div>
+    );
+}

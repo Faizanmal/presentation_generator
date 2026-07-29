@@ -3,7 +3,7 @@
  * Utilities for integrating the advanced canvas with the existing editor system
  */
 
-import type { CanvasElement } from './canvas-drawing-engine';
+import type { CanvasElement, Point } from './canvas-drawing-engine';
 import type { Block, BlockType } from '../../../types';
 import type { EditorBlock, EditorBlockType, EditorSlide } from '../types';
 
@@ -19,16 +19,16 @@ type CanvasBlockLike = {
     fontFamily?: string;
     textAlign?: 'left' | 'center' | 'right';
     opacity?: number;
-  };
+  } | null;
   content?: {
     text?: string;
     url?: string;
-  };
+  } | null;
   data?: {
     text?: string;
     url?: string;
-    points?: unknown[];
-  };
+    points?: Point[];
+  } | null;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -109,7 +109,7 @@ export function blockToCanvasElement(block: Block | EditorBlock): CanvasElement 
 /**
  * Convert a CanvasElement back to Block
  */
-export function canvasElementToBlock(element: CanvasElement, slideId: string): EditorBlock {
+export function canvasElementToBlock(element: CanvasElement, _slideId: string): EditorBlock {
   return {
     id: element.id,
     type: mapCanvasTypeToEditorBlockType(element.type),
@@ -248,8 +248,8 @@ function getBlockUrl(block: CanvasBlockLike): string | undefined {
   return block.content?.url || block.data?.url;
 }
 
-function getBlockPoints(block: CanvasBlockLike): unknown[] | undefined {
-  return block.data?.points;
+function getBlockPoints(block: CanvasBlockLike): Point[] | undefined {
+  return block.data?.points as Point[] | undefined;
 }
 
 /**

@@ -5,11 +5,14 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { EnhancedPresentation, EnhancedSection } from './thinking-agent.types';
 import { AIService } from '../ai.service';
+import { enhancedToPresentationDocument } from '../agents/enhanced-to-dsl.mapper';
+import type { PresentationDocument, SlideBlock } from '@shared/presentation-dsl';
 
 interface CreateProjectFromThinkingResult {
   projectId: string;
   slideCount: number;
   blockCount: number;
+  dslDocument: PresentationDocument;
 }
 
 type DraftBlock = {
@@ -46,6 +49,9 @@ export class ThinkingProjectService {
       description?: string;
       themeId?: string;
       generateImages?: boolean;
+      audience?: string;
+      tone?: string;
+      qualityScore?: number;
     },
   ): Promise<CreateProjectFromThinkingResult> {
     this.logger.log(`Creating project from thinking result for user ${userId}`);
@@ -67,74 +73,81 @@ export class ThinkingProjectService {
           status: 'DRAFT',
           ownerId: userId,
           themeId: options?.themeId || null,
+          tone: options?.tone,
+          audience: options?.audience,
+        },
+      });
+
+      // Map thinking output → DSL document (pin/partial regen path)
+      const dslDocument = enhancedToPresentationDocument(presentation, {
+        documentId: project.id,
+        audience: options?.audience,
+        tone: options?.tone,
+        qualityScore: options?.qualityScore,
+      });
+
+      await tx.project.update({
+        where: { id: project.id },
+        data: {
+          dslDocument: dslDocument as unknown as Prisma.InputJsonValue,
         },
       });
 
       let totalBlockCount = 0;
+      const dslSlides = dslDocument.sections.flatMap((s) => s.slides);
 
-      // 2. Create slides from sections
-      for (
-        let slideIndex = 0;
-        slideIndex < presentation.sections.length;
-        slideIndex++
-      ) {
+      // Materialize relational slides/blocks FROM DSL so zones + presets survive
+      for (let slideIndex = 0; slideIndex < dslSlides.length; slideIndex++) {
+        const dslSlide = dslSlides[slideIndex];
         const section = presentation.sections[slideIndex];
 
         const slide = await tx.slide.create({
           data: {
             projectId: project.id,
             order: slideIndex,
-            layout: this.mapLayoutType(section.layout),
+            layout: dslSlide.layout?.preset || this.mapLayoutType(section?.layout),
+            speakerNotes: dslSlide.speakerNotes || section?.speakerNotes || null,
           },
         });
 
-        // 3. Create blocks for this slide
-        const blocks = this.convertSectionToBlocks(section, slideIndex);
+        for (let blockIndex = 0; blockIndex < dslSlide.blocks.length; blockIndex++) {
+          const dslBlock = dslSlide.blocks[blockIndex];
+          const style = this.styleFromDslBlock(dslBlock);
 
-        // Prepare generated image placeholder if requested
-        if (options?.generateImages && section.suggestedImage) {
-          // Insert after heading/subheading (index 1 or 2)
-          let insertIndex = 0;
-          if (blocks.length > 0 && blocks[0].type === 'heading') insertIndex++;
-          if (blocks.length > 1 && blocks[1].type === 'subheading')
-            insertIndex++;
+          // Mark empty AI image placeholders for generation queue
+          const isGeneratedImage =
+            Boolean(options?.generateImages) &&
+            dslBlock.kind === 'image' &&
+            !dslBlock.content?.url &&
+            Boolean(dslBlock.content?.generationPrompt);
 
-          const generatedImageBlock: DraftBlock = {
-            type: 'image',
-            content: {
-              url: '', // Placeholder
-              alt: section.suggestedImage.prompt,
-              status: 'generating',
-            },
-            style: { width: '100%', borderRadius: '8px' },
-            isGeneratedImage: true,
-            generationPrompt: section.suggestedImage.prompt,
-            generationStyle:
-              section.suggestedImage.style === 'natural' ? 'natural' : 'vivid',
-          };
-          blocks.splice(insertIndex, 0, generatedImageBlock);
-        }
+          if (isGeneratedImage) {
+            style.status = 'generating';
+          }
 
-        for (let blockIndex = 0; blockIndex < blocks.length; blockIndex++) {
-          const block = blocks[blockIndex];
           const createdBlock = await tx.block.create({
             data: {
               projectId: project.id,
               slideId: slide.id,
-              blockType: this.mapToBlockType(block.type),
-              content: block.content as Prisma.InputJsonValue,
-              style: block.style as Prisma.InputJsonValue,
-              order: blockIndex,
+              blockType: this.mapToBlockType(dslBlock.kind),
+              content: {
+                ...dslBlock.content,
+                ...(isGeneratedImage ? { status: 'generating' } : {}),
+              } as Prisma.InputJsonValue,
+              style: style as Prisma.InputJsonValue,
+              order: dslBlock.order ?? blockIndex,
             },
           });
           totalBlockCount++;
 
-          // Collect job info if this was our placeholder
-          if (block.isGeneratedImage) {
+          if (isGeneratedImage) {
+            const prompt = String(dslBlock.content?.generationPrompt || '');
+            const genStyle =
+              section?.suggestedImage?.style === 'natural' ? 'natural' : 'vivid';
             imageGenerationJobs.push({
               blockId: createdBlock.id,
-              prompt: block.generationPrompt || '',
-              style: block.generationStyle || 'vivid',
+              prompt,
+              style: genStyle,
             });
           }
         }
@@ -142,8 +155,9 @@ export class ThinkingProjectService {
 
       return {
         projectId: project.id,
-        slideCount: presentation.sections.length,
+        slideCount: dslSlides.length,
         blockCount: totalBlockCount,
+        dslDocument,
       };
     });
 
@@ -344,29 +358,42 @@ export class ThinkingProjectService {
   }
 
   /**
-   * Map layout type to a standardized layout name
+   * Map layout type to a standardized layout name (DSL presets preferred)
    */
   private mapLayoutType(layout: string): string {
     const layoutMap: Record<string, string> = {
-      'title-slide': 'title',
-      'content-slide': 'title-content',
-      content: 'title-content',
+      'title-slide': 'title-hero',
+      title: 'title-hero',
+      'content-slide': 'single-column',
+      content: 'single-column',
       'two-column': 'two-column',
       twocolumn: 'two-column',
+      'three-column': 'three-column',
       'image-left': 'image-left',
       imageleft: 'image-left',
       'image-right': 'image-right',
       imageright: 'image-right',
-      'full-image': 'full-image',
-      fullimage: 'full-image',
+      'full-image': 'image-full',
+      fullimage: 'image-full',
+      full: 'image-full',
       comparison: 'comparison',
       timeline: 'timeline',
-      quote: 'quote',
-      chart: 'chart',
-      list: 'list',
+      quote: 'quote-centered',
+      chart: 'chart-focus',
+      stats: 'stats-grid',
+      grid: 'bento-grid',
+      list: 'single-column',
     };
 
-    return layoutMap[layout?.toLowerCase()] || layout || 'title-content';
+    return layoutMap[layout?.toLowerCase()] || layout || 'single-column';
+  }
+
+  /** Persist DSL style + zone onto relational Block.style JSON */
+  private styleFromDslBlock(block: SlideBlock): Record<string, unknown> {
+    return {
+      ...(block.style || {}),
+      ...(typeof block.zone === 'number' ? { zone: block.zone } : {}),
+    };
   }
 
   /**

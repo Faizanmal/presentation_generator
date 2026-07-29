@@ -2,7 +2,7 @@
  * Generation Pipeline Orchestrator
  *
  * Coordinates the full multi-agent pipeline:
- * Research ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ Outline ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ Narrative ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ Layout ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ Design ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ Images ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ QA
+ * Research -> Outline -> Narrative -> Layout -> Design -> Images -> QA
  *
  * Supports:
  * - Full generation
@@ -15,6 +15,7 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import Redis from 'ioredis';
+import { Prisma } from '@prisma/client';
 import { ResearchAgentService } from '../thinking-agent/research-agent.service';
 import { OutlineAgentService } from './outline-agent.service';
 import { NarrativeAgentService } from './narrative-agent.service';
@@ -22,6 +23,8 @@ import { LayoutAgentService } from './layout-agent.service';
 import { DesignAgentService } from './design-agent.service';
 import { ImageAgentService } from './image-agent.service';
 import { QAAgentService } from './qa-agent.service';
+import { BrandKitService } from '../../brand-kit/brand-kit.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import type {
   GenerationRequest,
   GenerationState,
@@ -38,7 +41,11 @@ import type {
   ImageOutput,
   QAOutput,
   PresentationMeta,
+  EditMemoryEntry,
+  BrandGuidelines,
 } from '@shared/presentation-dsl';
+import { getBlockFontSize, getSlidePadding } from '@shared/layout-engine';
+import { assignZonesToBlocks } from './enhanced-to-dsl.mapper';
 
 /** Event emitted during generation for real-time progress tracking */
 export interface GenerationProgressEvent {
@@ -82,6 +89,8 @@ export class GenerationPipelineService {
     private readonly designAgent: DesignAgentService,
     private readonly imageAgent: ImageAgentService,
     private readonly qaAgent: QAAgentService,
+    private readonly brandKitService: BrandKitService,
+    private readonly prisma: PrismaService,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
   ) {}
 
@@ -93,6 +102,7 @@ export class GenerationPipelineService {
     const startTime = Date.now();
     const events: GenerationProgressEvent[] = [];
     const tokenUsage: Record<string, number> = {};
+    request = await this.resolveBrandGuidelines(request);
     const tokenBudget = TOKEN_BUDGETS[request.qualityTier || 'balanced'];
     let totalTokens = 0;
 
@@ -139,7 +149,9 @@ export class GenerationPipelineService {
           /* Redis may be unavailable */
         });
 
-      this.logger.log(`[${sessionId}] ${progress}% ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â ${agent}: ${message}`);
+      this.logger.log(
+        `[${sessionId}] ${progress}% ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â ${agent}: ${message}`,
+      );
     };
 
     try {
@@ -257,7 +269,10 @@ export class GenerationPipelineService {
         outline,
         slideCount: totalSlides,
       });
-      const design: DesignOutput = designResult.data;
+      const design: DesignOutput = this.forceBrandTheme(
+        designResult.data,
+        request.brandGuidelines,
+      );
       tokenUsage['DesignAgent'] = designResult.tokensUsed;
       totalTokens += designResult.tokensUsed;
 
@@ -296,7 +311,7 @@ export class GenerationPipelineService {
       // ============================
       emit('validating', 'Assembler', 'Assembling presentation...', 88);
 
-      const document = this.assembleDocument(
+      let document = this.assembleDocument(
         sessionId,
         request,
         outline,
@@ -305,6 +320,7 @@ export class GenerationPipelineService {
         design,
         images,
       );
+      document = this.applyEditMemory(document, request.editMemory || []);
 
       // ============================
       // STAGE 7: QA (100%)
@@ -331,17 +347,27 @@ export class GenerationPipelineService {
       state.status = 'complete';
       state.completedAt = new Date().toISOString();
       state.tokenUsage = tokenUsage;
+      state.regeneratedSlides = request.regenerateSlideIds || [];
+
+      // Prefer stable project id when persisting
+      if (request.projectId) {
+        document = {
+          ...document,
+          id: request.projectId,
+        };
+      }
 
       // Cache the result in Redis for 1 hour
-      await this.redis
-        .setex(
-          `gen:result:${sessionId}`,
-          3600,
-          JSON.stringify({ document, qa }),
-        )
-        .catch(() => {
-          /* Redis may be unavailable */
-        });
+      await this.cacheResult(document.id, document, qa);
+
+      // Partial regen persists the merged document itself
+      if (!request.regenerateSlideIds?.length) {
+        await this.persistDocument(
+          request.projectId || document.id,
+          document,
+          request.userId,
+        );
+      }
 
       return {
         document,
@@ -374,6 +400,188 @@ export class GenerationPipelineService {
   }
 
   /**
+   * Load a cached generation result by session / document / project id.
+   * Checks Redis first, then Project.dslDocument.
+   */
+  async getCachedDocument(
+    documentId: string,
+  ): Promise<PresentationDocument | null> {
+    try {
+      const raw = await this.redis.get(`gen:result:${documentId}`);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { document?: PresentationDocument };
+        if (parsed.document) {
+          return parsed.document;
+        }
+      }
+    } catch {
+      /* Redis may be unavailable */
+    }
+
+    return this.loadPersistedDocument(documentId);
+  }
+
+  /**
+   * Load PresentationDocument from Project.dslDocument.
+   */
+  async loadPersistedDocument(
+    projectId: string,
+  ): Promise<PresentationDocument | null> {
+    try {
+      const project = await this.prisma.project.findUnique({
+        where: { id: projectId },
+        select: { id: true, dslDocument: true },
+      });
+      if (!project?.dslDocument) {
+        return null;
+      }
+      const doc = project.dslDocument as unknown as PresentationDocument;
+      return { ...doc, id: project.id };
+    } catch (error) {
+      this.logger.warn(
+        `Failed to load dslDocument for ${projectId}: ${(error as Error).message}`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Persist PresentationDocument onto a project (creates thin project if needed).
+   */
+  async persistDocument(
+    projectId: string | undefined,
+    document: PresentationDocument,
+    userId?: string,
+  ): Promise<string | null> {
+    if (!projectId && !userId) {
+      return null;
+    }
+
+    try {
+      if (projectId) {
+        const existing = await this.prisma.project.findUnique({
+          where: { id: projectId },
+          select: { id: true, ownerId: true },
+        });
+
+        if (existing) {
+          if (userId && existing.ownerId !== userId) {
+            this.logger.warn(
+              `Skip dsl persist: user ${userId} does not own ${projectId}`,
+            );
+            return null;
+          }
+
+          await this.prisma.project.update({
+            where: { id: projectId },
+            data: {
+              dslDocument: document as unknown as Prisma.InputJsonValue,
+              title: document.title || undefined,
+              description: document.subtitle || document.metadata.summary,
+              tone: document.metadata.tone,
+              audience: document.metadata.audience,
+            },
+          });
+          return projectId;
+        }
+      }
+
+      if (!userId) {
+        return null;
+      }
+
+      // Create a project shell to own the DSL document
+      const created = await this.prisma.project.create({
+        data: {
+          id: projectId || undefined,
+          title: document.title,
+          description: document.subtitle || document.metadata.summary,
+          type: 'PRESENTATION',
+          status: 'DRAFT',
+          ownerId: userId,
+          tone: document.metadata.tone,
+          audience: document.metadata.audience,
+          dslDocument: document as unknown as Prisma.InputJsonValue,
+        },
+      });
+
+      // Align document id with project id
+      if (created.id !== document.id) {
+        const aligned = { ...document, id: created.id };
+        await this.prisma.project.update({
+          where: { id: created.id },
+          data: {
+            dslDocument: aligned as unknown as Prisma.InputJsonValue,
+          },
+        });
+      }
+
+      return created.id;
+    } catch (error) {
+      this.logger.warn(
+        `Failed to persist dslDocument: ${(error as Error).message}`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Regenerate specific slides while preserving pinned blocks and edit memory.
+   */
+  async regeneratePartial(
+    request: GenerationRequest,
+    existingDocument: PresentationDocument,
+  ): Promise<PipelineResult> {
+    const slideIds = request.regenerateSlideIds || [];
+    if (!slideIds.length) {
+      throw new Error('regenerateSlideIds required for partial regeneration');
+    }
+
+    const mergedMemory = this.mergeEditMemory(
+      existingDocument.editMemory || [],
+      request.editMemory || [],
+    );
+
+    const enrichedRequest: GenerationRequest = {
+      ...request,
+      projectId: request.projectId || existingDocument.id,
+      editMemory: mergedMemory,
+      topic: request.topic || existingDocument.title,
+      length: request.length || existingDocument.metadata.totalSlides,
+      brandGuidelines:
+        request.brandGuidelines ||
+        this.themeToBrandGuidelines(existingDocument.theme),
+    };
+
+    const result = await this.generate(enrichedRequest);
+    const merged = this.mergePartialDocument(
+      existingDocument,
+      result.document,
+      new Set(slideIds),
+      mergedMemory,
+    );
+
+    const documentId = existingDocument.id;
+    const finalDocument = {
+      ...merged,
+      id: documentId,
+      version: existingDocument.version + 1,
+    };
+
+    await this.cacheResult(documentId, finalDocument, result.qa);
+    await this.persistDocument(
+      request.projectId || documentId,
+      finalDocument,
+      request.userId,
+    );
+
+    return {
+      ...result,
+      document: finalDocument,
+    };
+  }
+
+  /**
    * Assemble all agent outputs into a unified PresentationDocument.
    */
   private assembleDocument(
@@ -385,6 +593,18 @@ export class GenerationPipelineService {
     design: DesignOutput,
     images: ImageOutput,
   ): PresentationDocument {
+    const editMemory = request.editMemory || [];
+    const pinnedByBlock = new Map(
+      editMemory
+        .filter((e) => e.pinned && e.blockId)
+        .map((e) => [e.blockId!, e]),
+    );
+    const pinnedBySlideField = new Map(
+      editMemory
+        .filter((e) => e.pinned && !e.blockId)
+        .map((e) => [`${e.slideId}:${e.field}`, e]),
+    );
+
     let slideGlobalIndex = 0;
 
     const sections: PresentationSection[] = narrative.sections.map(
@@ -394,133 +614,151 @@ export class GenerationPipelineService {
         const slides: PresentationSlide[] = narrativeSection.slides.map(
           (narrativeSlide) => {
             const currentGlobalIdx = slideGlobalIndex++;
+            const slideId = `slide-${currentGlobalIdx}`;
             const layoutDecision = layout.slides[currentGlobalIdx];
 
-            // Build blocks from narrative content
             const blocks: SlideBlock[] = [];
             let blockOrder = 0;
+            const usedPlacementIndexes = new Set<number>();
 
-            // Heading block
-            blocks.push({
-              id: `block-${currentGlobalIdx}-${blockOrder}`,
-              slideId: `slide-${currentGlobalIdx}`,
-              kind: 'heading',
-              content: { text: narrativeSlide.heading },
-              style: {
-                fontSize: '2rem',
+            const pushBlock = (
+              kind: SlideBlock['kind'],
+              content: SlideBlock['content'],
+              style: SlideBlock['style'],
+              fieldHint: string,
+            ) => {
+              const blockId = `block-${currentGlobalIdx}-${blockOrder}`;
+              const pinnedEntry =
+                pinnedByBlock.get(blockId) ||
+                pinnedBySlideField.get(`${slideId}:${fieldHint}`);
+              const placements = layoutDecision?.blockPlacements || [];
+              const placementIdx = placements.findIndex(
+                (bp, i) => bp.blockKind === kind && !usedPlacementIndexes.has(i),
+              );
+              if (placementIdx >= 0) {
+                usedPlacementIndexes.add(placementIdx);
+              }
+              const density = layoutDecision?.layout?.density || 'balanced';
+              blocks.push({
+                id: blockId,
+                slideId,
+                kind,
+                content: pinnedEntry
+                  ? { ...content, text: pinnedEntry.newValue }
+                  : content,
+                style: {
+                  ...style,
+                  fontSize: style.fontSize || getBlockFontSize(kind, density, design.theme),
+                },
+                order: blockOrder++,
+                zone: placementIdx >= 0 ? placements[placementIdx].zone : undefined,
+                source: pinnedEntry ? 'user' : 'ai',
+                pinned: Boolean(pinnedEntry),
+              });
+            };
+
+            const density = layoutDecision?.layout?.density || 'balanced';
+            const slidePadding = getSlidePadding(
+              density,
+              design.theme.spacing?.base || 8,
+            );
+
+            pushBlock(
+              'heading',
+              { text: narrativeSlide.heading },
+              {
                 fontWeight: 'bold',
                 color: design.theme.colors.text,
               },
-              order: blockOrder++,
-              source: 'ai',
-              pinned: false,
-            });
+              'heading',
+            );
 
-            // Body content
             if (narrativeSlide.bodyContent) {
-              blocks.push({
-                id: `block-${currentGlobalIdx}-${blockOrder}`,
-                slideId: `slide-${currentGlobalIdx}`,
-                kind: 'paragraph',
-                content: { text: narrativeSlide.bodyContent },
-                style: {
-                  fontSize: '1.125rem',
+              pushBlock(
+                'paragraph',
+                { text: narrativeSlide.bodyContent },
+                {
                   color: design.theme.colors.text,
                 },
-                order: blockOrder++,
-                source: 'ai',
-                pinned: false,
-              });
+                'body',
+              );
             }
 
-            // Bullet points
             if (narrativeSlide.bulletPoints?.length) {
-              blocks.push({
-                id: `block-${currentGlobalIdx}-${blockOrder}`,
-                slideId: `slide-${currentGlobalIdx}`,
-                kind: 'bullet-list',
-                content: { items: narrativeSlide.bulletPoints },
-                style: { color: design.theme.colors.text },
-                order: blockOrder++,
-                source: 'ai',
-                pinned: false,
-              });
+              pushBlock(
+                'bullet-list',
+                { items: narrativeSlide.bulletPoints },
+                { color: design.theme.colors.text },
+                'bullets',
+              );
             }
 
-            // Statistic highlight
             if (narrativeSlide.statisticHighlight) {
-              blocks.push({
-                id: `block-${currentGlobalIdx}-${blockOrder}`,
-                slideId: `slide-${currentGlobalIdx}`,
-                kind: 'statistic',
-                content: {
+              pushBlock(
+                'statistic',
+                {
                   label: narrativeSlide.statisticHighlight.label,
                   value: narrativeSlide.statisticHighlight.value,
                 },
-                style: {
+                {
                   color: design.theme.colors.primary,
-                  fontSize: '3rem',
                   fontWeight: 'bold',
                 },
-                order: blockOrder++,
-                source: 'ai',
-                pinned: false,
-              });
+                'statistic',
+              );
             }
 
-            // Callout
             if (narrativeSlide.calloutText) {
-              blocks.push({
-                id: `block-${currentGlobalIdx}-${blockOrder}`,
-                slideId: `slide-${currentGlobalIdx}`,
-                kind: 'callout',
-                content: { text: narrativeSlide.calloutText },
-                style: {
+              pushBlock(
+                'callout',
+                { text: narrativeSlide.calloutText },
+                {
                   backgroundColor: design.theme.colors.surface,
                   borderRadius: design.theme.effects.borderRadius,
-                  padding: '1rem',
+                  padding: `${design.theme.spacing?.base || 8}px`,
                 },
-                order: blockOrder++,
-                source: 'ai',
-                pinned: false,
-              });
+                'callout',
+              );
             }
 
-            // Image block
             const matchingImage = images.images.find(
               (img) => img.slideIndex === currentGlobalIdx,
             );
             if (matchingImage) {
-              blocks.push({
-                id: `block-${currentGlobalIdx}-${blockOrder}`,
-                slideId: `slide-${currentGlobalIdx}`,
-                kind: 'image',
-                content: {
+              pushBlock(
+                'image',
+                {
                   url: matchingImage.imageUrl,
                   alt: narrativeSlide.suggestedVisual || narrativeSlide.heading,
                   generationPrompt: matchingImage.prompt,
                 },
-                style: {},
-                order: blockOrder,
-                source: 'ai',
-                pinned: false,
-              });
+                {},
+                'image',
+              );
             }
 
+            const baseLayout = layoutDecision?.layout || {
+              preset: 'single-column' as const,
+              zones: 1,
+              density: 'balanced' as const,
+            };
+
+            // Fill any missing zones from layout geometry (placements may be incomplete)
+            assignZonesToBlocks(blocks, baseLayout);
+
             return {
-              id: `slide-${currentGlobalIdx}`,
+              id: slideId,
               sectionId: `section-${sIdx}`,
               order: currentGlobalIdx,
-              layout: layoutDecision?.layout || {
-                preset: 'single-column' as const,
-                zones: 1,
-                density: 'balanced' as const,
+              layout: {
+                ...baseLayout,
+                padding: baseLayout.padding || slidePadding,
               },
               blocks,
               speakerNotes: narrativeSlide.speakerNotes,
               transition: { type: 'fade' as const, duration: 300 },
               aiConfidence: layoutDecision?.fitScore || 0.7,
-              userEdited: false,
+              userEdited: blocks.some((b) => b.pinned),
             };
           },
         );
@@ -535,6 +773,30 @@ export class GenerationPipelineService {
         };
       },
     );
+
+    // Place brand logo on title (first) and closing (last) slides when available
+    const logoUrl = request.brandGuidelines?.logos?.[0];
+    if (logoUrl) {
+      const allSlides = sections.flatMap((s) => s.slides);
+      const targets = [allSlides[0], allSlides[allSlides.length - 1]].filter(
+        Boolean,
+      ) as PresentationSlide[];
+      for (const slide of targets) {
+        if (slide.blocks.some((b) => b.kind === 'image' && b.content.url === logoUrl)) {
+          continue;
+        }
+        slide.blocks.push({
+          id: `block-logo-${slide.id}`,
+          slideId: slide.id,
+          kind: 'image',
+          content: { url: logoUrl, alt: 'Brand logo' },
+          style: {},
+          order: slide.blocks.length,
+          source: 'user',
+          pinned: true,
+        });
+      }
+    }
 
     const totalSlides = sections.reduce((sum, s) => sum + s.slides.length, 0);
 
@@ -566,11 +828,274 @@ export class GenerationPipelineService {
         completedAt: new Date().toISOString(),
         error: null,
         tokenUsage: {},
-        regeneratedSlides: [],
+        regeneratedSlides: request.regenerateSlideIds || [],
       },
-      editMemory: [],
+      editMemory: [...editMemory],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
+  }
+
+  private async resolveBrandGuidelines(
+    request: GenerationRequest,
+  ): Promise<GenerationRequest> {
+    if (request.brandGuidelines?.colors?.length) {
+      return request;
+    }
+
+    try {
+      const kit = request.brandKitId
+        ? await this.brandKitService.findOne(request.brandKitId, request.userId)
+        : await this.brandKitService.getDefault(request.userId);
+
+      if (!kit) {
+        return request;
+      }
+
+      const dontList = Array.isArray(kit.dontList)
+        ? (kit.dontList as string[])
+        : [];
+
+      const brandGuidelines: BrandGuidelines = {
+        colors: [
+          kit.primaryColor,
+          kit.secondaryColor,
+          kit.accentColor,
+          kit.backgroundColor,
+          kit.textColor,
+        ].filter((c): c is string => Boolean(c)),
+        fonts: [kit.headingFont, kit.bodyFont].filter(
+          (f): f is string => Boolean(f),
+        ),
+        tone:
+          kit.voiceDescription ||
+          (Array.isArray(kit.toneKeywords)
+            ? (kit.toneKeywords as string[])[0]
+            : undefined),
+        logos: [kit.logoUrl, kit.logoLight, kit.logoDark].filter(
+          (u): u is string => Boolean(u),
+        ),
+        restrictions: dontList,
+      };
+
+      return { ...request, brandGuidelines };
+    } catch (error) {
+      this.logger.warn(
+        `Brand kit resolve skipped: ${(error as Error).message}`,
+      );
+      return request;
+    }
+  }
+
+  private forceBrandTheme(
+    design: DesignOutput,
+    guidelines?: BrandGuidelines,
+  ): DesignOutput {
+    if (!guidelines?.colors?.length) {
+      return design;
+    }
+
+    const [primary, secondary, accent, background, text] = guidelines.colors;
+
+    return {
+      ...design,
+      theme: {
+        ...design.theme,
+        name: design.theme.name?.includes('Brand')
+          ? design.theme.name
+          : `${design.theme.name} (Brand)`,
+        colors: {
+          ...design.theme.colors,
+          ...(primary && { primary }),
+          ...(secondary && { secondary }),
+          ...(accent && { accent }),
+          ...(background && { background }),
+          ...(text && { text }),
+          chart: guidelines.colors.slice(0, 5).length
+            ? [
+                ...guidelines.colors.slice(0, 5),
+                ...design.theme.colors.chart,
+              ].slice(0, 5)
+            : design.theme.colors.chart,
+        },
+        typography: {
+          ...design.theme.typography,
+          ...(guidelines.fonts?.[0] && {
+            headingFont: guidelines.fonts[0],
+          }),
+          ...(guidelines.fonts?.[1] && { bodyFont: guidelines.fonts[1] }),
+        },
+      },
+    };
+  }
+
+  private themeToBrandGuidelines(
+    theme: PresentationDocument['theme'],
+  ): BrandGuidelines {
+    return {
+      colors: [
+        theme.colors.primary,
+        theme.colors.secondary,
+        theme.colors.accent,
+        theme.colors.background,
+        theme.colors.text,
+      ],
+      fonts: [theme.typography.headingFont, theme.typography.bodyFont],
+    };
+  }
+
+  private mergeEditMemory(
+    existing: EditMemoryEntry[],
+    incoming: EditMemoryEntry[],
+  ): EditMemoryEntry[] {
+    const map = new Map<string, EditMemoryEntry>();
+    for (const entry of [...existing, ...incoming]) {
+      const key = `${entry.slideId}:${entry.blockId || ''}:${entry.field}`;
+      map.set(key, entry);
+    }
+    return [...map.values()];
+  }
+
+  /**
+   * Hard-apply pinned edit memory onto block content after generation.
+   */
+  private applyEditMemory(
+    document: PresentationDocument,
+    editMemory: EditMemoryEntry[],
+  ): PresentationDocument {
+    const pinned = editMemory.filter((e) => e.pinned);
+    if (!pinned.length) {
+      return { ...document, editMemory };
+    }
+
+    const sections = document.sections.map((section) => ({
+      ...section,
+      slides: section.slides.map((slide) => {
+        const slideEntries = pinned.filter((e) => e.slideId === slide.id);
+        if (!slideEntries.length) {
+          return slide;
+        }
+
+        return {
+          ...slide,
+          userEdited: true,
+          blocks: slide.blocks.map((block) => {
+            const entry = slideEntries.find(
+              (e) =>
+                e.blockId === block.id ||
+                (!e.blockId &&
+                  ((e.field === 'heading' && block.kind === 'heading') ||
+                    (e.field === 'body' && block.kind === 'paragraph') ||
+                    (e.field === 'content' && Boolean(block.content.text)))),
+            );
+            if (!entry) {
+              return block;
+            }
+
+            return {
+              ...block,
+              pinned: true,
+              source: 'user' as const,
+              content: {
+                ...block.content,
+                text: entry.newValue,
+              },
+            };
+          }),
+        };
+      }),
+    }));
+
+    return {
+      ...document,
+      sections,
+      editMemory,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Keep non-target slides from the existing deck; merge regenerated slides
+   * while preserving pinned blocks.
+   */
+  private mergePartialDocument(
+    existing: PresentationDocument,
+    generated: PresentationDocument,
+    regenerateIds: Set<string>,
+    editMemory: EditMemoryEntry[],
+  ): PresentationDocument {
+    const generatedByOrder = new Map(
+      generated.sections
+        .flatMap((s) => s.slides)
+        .map((slide) => [slide.order, slide]),
+    );
+
+    const sections = existing.sections.map((section) => ({
+      ...section,
+      slides: section.slides.map((slide) => {
+        if (!regenerateIds.has(slide.id)) {
+          return slide;
+        }
+
+        const replacement = generatedByOrder.get(slide.order);
+        if (!replacement) {
+          return slide;
+        }
+
+        const pinnedBlocks = slide.blocks.filter((b) => b.pinned);
+        const mergedBlocks = replacement.blocks.map((block) => {
+          const pinned =
+            pinnedBlocks.find((p) => p.id === block.id) ||
+            pinnedBlocks.find((p) => p.kind === block.kind);
+          if (pinned) {
+            return { ...pinned, slideId: slide.id };
+          }
+          return { ...block, slideId: slide.id };
+        });
+
+        for (const pinned of pinnedBlocks) {
+          if (!mergedBlocks.some((b) => b.id === pinned.id)) {
+            mergedBlocks.push({ ...pinned, slideId: slide.id });
+          }
+        }
+
+        return {
+          ...replacement,
+          id: slide.id,
+          sectionId: slide.sectionId,
+          order: slide.order,
+          blocks: mergedBlocks,
+          userEdited: slide.userEdited || pinnedBlocks.length > 0,
+        };
+      }),
+    }));
+
+    return this.applyEditMemory(
+      {
+        ...existing,
+        sections,
+        theme: existing.theme,
+        version: existing.version + 1,
+        updatedAt: new Date().toISOString(),
+        generationState: {
+          ...generated.generationState,
+          regeneratedSlides: [...regenerateIds],
+        },
+        editMemory,
+      },
+      editMemory,
+    );
+  }
+
+  private async cacheResult(
+    documentId: string,
+    document: PresentationDocument,
+    qa: QAOutput,
+  ): Promise<void> {
+    await this.redis
+      .setex(`gen:result:${documentId}`, 3600, JSON.stringify({ document, qa }))
+      .catch(() => {
+        /* Redis may be unavailable */
+      });
   }
 }

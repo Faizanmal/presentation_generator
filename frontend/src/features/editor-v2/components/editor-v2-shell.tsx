@@ -18,6 +18,8 @@ import { useCollaborationStore } from "../stores/use-collaboration-store";
 import { useCommandPaletteStore } from "../stores/use-command-palette-store";
 import { useEditorV2Store } from "../stores/use-editor-v2-store";
 import type { EditorBlock, EditorDocument } from "../types";
+import { useGeneration } from "@/hooks/use-generation";
+import { api } from "@/lib/api";
 import { AppSidebar } from "./app-sidebar";
 import { CanvasStage } from "./canvas-stage";
 import { EditorCommandPalette } from "./editor-command-palette";
@@ -70,11 +72,18 @@ export function EditorV2Shell({ document }: EditorV2ShellProps) {
   const reorderSlides = useEditorV2Store((state) => state.reorderSlides);
   const updateBlockContent = useEditorV2Store((state) => state.updateBlockContent);
   const updateBlockFrame = useEditorV2Store((state) => state.updateBlockFrame);
+  const toggleBlockLocked = useEditorV2Store((state) => state.toggleBlockLocked);
   const addBlock = useEditorV2Store((state) => state.addBlock);
   const setPresenterMode = useEditorV2Store((state) => state.setPresenterMode);
   const setShowNotes = useEditorV2Store((state) => state.setShowNotes);
   const setLaserEnabled = useEditorV2Store((state) => state.setLaserEnabled);
   const setPlaybackSlide = useEditorV2Store((state) => state.setPlaybackSlide);
+
+  const {
+    regeneratePartial,
+    isGenerating: isRegeneratingSlide,
+    addEditMemory,
+  } = useGeneration();
 
   const aiState = useAIGenerationStore((state) => state.state);
   const setAIPhase = useAIGenerationStore((state) => state.setPhase);
@@ -119,6 +128,130 @@ export function EditorV2Shell({ document }: EditorV2ShellProps) {
     return activeSlide.blocks.find((block) => block.id === selection.blockId) ?? null;
   }, [activeSlide, selection.blockId]);
 
+  const persistPinsToDsl = useCallback(
+    async (documentSnapshot: EditorDocument) => {
+      try {
+        const dsl = await editorV2Api.getDslDocument(documentSnapshot.id);
+        if (!dsl) {
+          return;
+        }
+        const pinnedMemory = documentSnapshot.slides.flatMap((slide) =>
+          slide.blocks
+            .filter((block) => block.locked)
+            .map((block) => ({
+              slideId: slide.id,
+              blockId: block.id,
+              field: "content",
+              previousValue: block.content.text ?? "",
+              newValue: block.content.text ?? "",
+              timestamp: new Date().toISOString(),
+              pinned: true,
+            })),
+        );
+        await editorV2Api.saveDslDocument(documentSnapshot.id, {
+          ...dsl,
+          editMemory: pinnedMemory,
+          updatedAt: new Date().toISOString(),
+        });
+      } catch {
+        // Non-blocking — in-session edit memory still works
+      }
+    },
+    [],
+  );
+
+  const handleUpdateBlockContent = useCallback(
+    (blockId: string, text: string) => {
+      if (!activeSlide) {
+        return;
+      }
+
+      const previous =
+        activeSlide.blocks.find((block) => block.id === blockId)?.content?.text ?? "";
+
+      updateBlockContent(activeSlide.id, blockId, text);
+      addEditMemory({
+        slideId: activeSlide.id,
+        blockId,
+        field: "content",
+        previousValue: previous,
+        newValue: text,
+        timestamp: new Date().toISOString(),
+        pinned: true,
+      });
+    },
+    [activeSlide, addEditMemory, updateBlockContent],
+  );
+
+  const handleToggleBlockLock = useCallback(() => {
+    if (!activeSlide || !selectedBlock || !currentDocument) {
+      return;
+    }
+
+    const willPin = !selectedBlock.locked;
+    toggleBlockLocked(activeSlide.id, selectedBlock.id);
+    addEditMemory({
+      slideId: activeSlide.id,
+      blockId: selectedBlock.id,
+      field: "content",
+      previousValue: selectedBlock.content?.text ?? "",
+      newValue: selectedBlock.content?.text ?? "",
+      timestamp: new Date().toISOString(),
+      pinned: willPin,
+    });
+
+    const nextDoc: EditorDocument = {
+      ...currentDocument,
+      slides: currentDocument.slides.map((slide) =>
+        slide.id !== activeSlide.id
+          ? slide
+          : {
+              ...slide,
+              blocks: slide.blocks.map((block) =>
+                block.id === selectedBlock.id
+                  ? { ...block, locked: willPin }
+                  : block,
+              ),
+            },
+      ),
+    };
+    void persistPinsToDsl(nextDoc);
+
+    toast.success(
+      willPin
+        ? "Pinned — AI will keep this block on regenerate"
+        : "Unpinned — AI may rewrite this block",
+    );
+  }, [
+    activeSlide,
+    addEditMemory,
+    currentDocument,
+    persistPinsToDsl,
+    selectedBlock,
+    toggleBlockLocked,
+  ]);
+
+  const handleRegenerateSlide = useCallback(async () => {
+    if (!activeSlide || !currentDocument) {
+      return;
+    }
+
+    try {
+      await regeneratePartial(
+        {
+          slideIds: [activeSlide.id],
+          topic: currentDocument.title,
+          projectId: currentDocument.id,
+        },
+        api.getToken() ?? undefined,
+      );
+      const refreshed = await editorV2Api.loadProject(currentDocument.id);
+      loadDocument(refreshed);
+      toast.success("Slide regenerated — pinned blocks preserved");
+    } catch (error) {
+      toast.error((error as Error).message || "Could not regenerate slide");
+    }
+  }, [activeSlide, currentDocument, loadDocument, regeneratePartial]);
   useCollaborationChannel(document.id, activeSlide?.id ?? null);
 
   useEffect(() => {
@@ -196,8 +329,13 @@ export function EditorV2Shell({ document }: EditorV2ShellProps) {
   }, [addSlideLocal, currentDocument]);
 
   const layoutBlueprint = useMemo(
-    () => buildLayoutBlueprint(EDITOR_LIMITS.canvasWidth, EDITOR_LIMITS.canvasHeight),
-    [],
+    () =>
+      buildLayoutBlueprint(
+        EDITOR_LIMITS.canvasWidth,
+        EDITOR_LIMITS.canvasHeight,
+        activeSlide?.layoutPreset,
+      ),
+    [activeSlide?.layoutPreset],
   );
 
   const applyAutoLayout = useCallback(() => {
@@ -205,7 +343,11 @@ export function EditorV2Shell({ document }: EditorV2ShellProps) {
       return;
     }
 
-    const nextFrames = computeBalancedFrames(activeSlide.blocks, layoutBlueprint);
+    const nextFrames = computeBalancedFrames(
+      activeSlide.blocks,
+      layoutBlueprint,
+      activeSlide.layoutPreset,
+    );
 
     activeSlide.blocks.forEach((block) => {
       const frame = nextFrames[block.id];
@@ -370,7 +512,7 @@ export function EditorV2Shell({ document }: EditorV2ShellProps) {
                 onPan={panBy}
                 onZoomDelta={zoomBy}
                 onSelectBlock={(blockId) => selectBlock(activeSlide.id, blockId)}
-                onUpdateBlockContent={(blockId, text) => updateBlockContent(activeSlide.id, blockId, text)}
+                onUpdateBlockContent={handleUpdateBlockContent}
                 onUpdateBlockFrame={(blockId, frame) => updateBlockFrame(activeSlide.id, blockId, frame)}
                 onAutoLayout={applyAutoLayout}
               />
@@ -429,6 +571,9 @@ export function EditorV2Shell({ document }: EditorV2ShellProps) {
                       });
                     }}
                     onResolveComment={resolveComment}
+                    onToggleBlockLock={handleToggleBlockLock}
+                    onRegenerateSlide={handleRegenerateSlide}
+                    isRegenerating={isRegeneratingSlide}
                   />
                 </motion.div>
               )}
@@ -455,7 +600,7 @@ export function EditorV2Shell({ document }: EditorV2ShellProps) {
         onApplySuggestion={(suggestion) => {
           const text = applySuggestion(suggestion);
           if (selectedBlock?.id) {
-            updateBlockContent(activeSlide.id, selectedBlock.id, text);
+            handleUpdateBlockContent(selectedBlock.id, text);
           } else {
             insertBlock("paragraph");
           }

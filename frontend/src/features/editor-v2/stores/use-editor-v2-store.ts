@@ -35,6 +35,7 @@ interface EditorV2State {
   reorderSlides: (slideIds: string[]) => void;
   updateBlockContent: (slideId: string, blockId: string, text: string) => void;
   updateBlockFrame: (slideId: string, blockId: string, frame: Partial<EditorBlock["frame"]>) => void;
+  toggleBlockLocked: (slideId: string, blockId: string) => void;
   addBlock: (slideId: string, block: EditorBlock) => void;
 
   setPresenterMode: (enabled: boolean) => void;
@@ -240,6 +241,26 @@ export const useEditorV2Store = create<EditorV2State>()((set) => ({
                     },
                   }
                 : block,
+            ),
+          })),
+          updatedAt: new Date().toISOString(),
+        },
+      };
+    }),
+
+  toggleBlockLocked: (slideId, blockId) =>
+    set((state) => {
+      if (!state.document) {
+        return state;
+      }
+
+      return {
+        document: {
+          ...state.document,
+          slides: updateSlide(state.document.slides, slideId, (slide) => ({
+            ...slide,
+            blocks: slide.blocks.map((block) =>
+              block.id === blockId ? { ...block, locked: !block.locked } : block,
             ),
           })),
           updatedAt: new Date().toISOString(),

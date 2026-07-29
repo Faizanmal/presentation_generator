@@ -347,6 +347,8 @@ export interface GenerationRequest {
   themeId?: string;
   additionalContext?: string;
   brandGuidelines?: BrandGuidelines;
+  /** Optional BrandKit id — pipeline resolves colors/fonts/logos when guidelines omitted */
+  brandKitId?: string;
   /** Quality tier determines iteration count and token budget */
   qualityTier?: 'fast' | 'balanced' | 'premium';
   /** IDs of slides to regenerate (partial regeneration) */

@@ -283,7 +283,7 @@ function SlideView({ slide, theme }: { slide: Slide; theme?: Theme }) {
       style={{
         backgroundColor: bgColor,
         color: textColor,
-        fontFamily: (theme?.fonts as Theme['fonts'] | undefined)?.body || "system-ui",
+        fontFamily: (theme?.fonts as Theme['fonts'] | undefined)?.body || "var(--font-dm-sans), system-ui, sans-serif",
       }}
     >
       <div className="w-full h-full">
@@ -311,8 +311,8 @@ function SlideView({ slide, theme }: { slide: Slide; theme?: Theme }) {
 
 // Block View Component (read-only)
 function BlockView({ block, theme }: { block: Block; theme?: Theme }) {
-  const primaryColor = (theme?.colors as Theme['colors'] | undefined)?.primary || "#3b82f6";
-  const accentColor = (theme?.colors as Theme['colors'] | undefined)?.accent || "#10b981";
+  const primaryColor = (theme?.colors as Theme['colors'] | undefined)?.primary || "#0F172A";
+  const accentColor = (theme?.colors as Theme['colors'] | undefined)?.accent || "#0D9488";
   const content = block.content as Record<string, unknown> & {
     text?: string;
     items?: string[];
@@ -330,7 +330,7 @@ function BlockView({ block, theme }: { block: Block; theme?: Theme }) {
         <h1
           className="text-6xl font-bold"
           style={{
-            fontFamily: (theme?.fonts as Theme['fonts'] | undefined)?.heading || "system-ui",
+            fontFamily: (theme?.fonts as Theme['fonts'] | undefined)?.heading || 'var(--font-dm-sans), system-ui, sans-serif',
             color: primaryColor,
           }}
         >
@@ -342,7 +342,7 @@ function BlockView({ block, theme }: { block: Block; theme?: Theme }) {
       return (
         <h2
           className="text-3xl font-semibold"
-          style={{ fontFamily: (theme?.fonts as Theme['fonts'] | undefined)?.heading || "system-ui" }}
+          style={{ fontFamily: (theme?.fonts as Theme['fonts'] | undefined)?.heading || "var(--font-dm-sans), system-ui, sans-serif" }}
         >
           {content?.text || ""}
         </h2>
@@ -352,7 +352,7 @@ function BlockView({ block, theme }: { block: Block; theme?: Theme }) {
       return (
         <p
           className="text-2xl leading-relaxed"
-          style={{ fontFamily: (theme?.fonts as Theme['fonts'] | undefined)?.body || "system-ui" }}
+          style={{ fontFamily: (theme?.fonts as Theme['fonts'] | undefined)?.body || "var(--font-dm-sans), system-ui, sans-serif" }}
         >
           {content?.text || ""}
         </p>
@@ -422,7 +422,7 @@ function BlockView({ block, theme }: { block: Block; theme?: Theme }) {
             className="tiptap-content prose dark:prose-invert max-w-none prose-table:w-full prose-table:border-collapse prose-td:border prose-td:p-3 prose-th:border prose-th:p-3 prose-th:bg-slate-100 dark:prose-th:bg-slate-800 text-xl prose-table:my-0 pb-6 [&>table]:w-full [&>table]:border-collapse [&_td]:border [&_th]:border [&_td]:p-3 [&_th]:p-3 [&_th]:bg-slate-100 dark:[&_th]:bg-slate-800"
             dangerouslySetInnerHTML={{ __html: content.html }}
             style={{
-              fontFamily: (theme?.fonts as Theme['fonts'] | undefined)?.body || "system-ui",
+              fontFamily: (theme?.fonts as Theme['fonts'] | undefined)?.body || "var(--font-dm-sans), system-ui, sans-serif",
               '--tw-prose-border': (theme?.colors as Theme['colors'] | undefined)?.secondary || "#e2e8f0"
             } as React.CSSProperties}
           />

@@ -24,8 +24,8 @@ interface AuthenticatedRequest extends Request {
 export class JwtAuthGuard extends AuthGuard('jwt') {
   private readonly logger = new Logger(JwtAuthGuard.name);
 
-  // Demo mode: set to true to bypass auth
-  private readonly DEMO_MODE = process.env.DEMO_MODE === 'true' || true;
+  // Demo mode: only when DEMO_MODE=true (never force-on in production)
+  private readonly DEMO_MODE = process.env.DEMO_MODE === 'true';
 
   canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
@@ -73,7 +73,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   ): TUser {
     if (err) {
       this.logger.warn(
-        `[JwtAuthGuard] Authentication error: ${err instanceof Error ? err.message : String(err)}`,
+        `[JwtAuthGuard] Authentication error: ${err instanceof Error ? err.message : JSON.stringify(err)}`,
       );
       throw err instanceof Error
         ? err

@@ -11,7 +11,7 @@ export class OptionalJwtAuthGuard extends AuthGuard('jwt') {
   private readonly logger = new Logger(OptionalJwtAuthGuard.name);
 
   // ⚠️ DEMO MODE: Set to true to auto-attach mock user
-  private readonly DEMO_MODE = process.env.DEMO_MODE === 'true' || true;
+  private readonly DEMO_MODE = process.env.DEMO_MODE === 'true';
 
   canActivate(context: ExecutionContext) {
     // DEMO MODE: Always attach mock user

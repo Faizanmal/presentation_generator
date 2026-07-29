@@ -15,13 +15,18 @@ import {
   Req,
   BadRequestException,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { Observable, Subject, filter, map, takeUntil, timer } from 'rxjs';
 import { GenerationPipelineService } from './generation-pipeline.service';
 import { PromptInjectionGuard } from '../../security/prompt-injection.guard';
 import { AIGenerationRateLimiter } from '../../security/ai-rate-limiter.guard';
-import type { GenerationRequest } from '@shared/presentation-dsl';
+import type {
+  EditMemoryEntry,
+  GenerationRequest,
+  PresentationDocument,
+} from '@shared/presentation-dsl';
 
 interface AuthenticatedRequest extends Request {
   user?: { id: string; email: string; subscriptionTier?: string };
@@ -44,9 +49,13 @@ interface GenerateDto {
   generateImages?: boolean;
   imageSource?: 'ai' | 'stock';
   themeId?: string;
+  brandKitId?: string;
+  projectId?: string;
+  persist?: boolean;
   additionalContext?: string;
   qualityTier?: 'fast' | 'balanced' | 'premium';
   regenerateSlideIds?: string[];
+  editMemory?: EditMemoryEntry[];
   brandGuidelines?: {
     colors?: string[];
     fonts?: string[];
@@ -72,7 +81,6 @@ export class GenerationPipelineController {
   /**
    * POST /api/v2/generate
    * Start a new presentation generation.
-   * Protected by prompt injection guard and AI rate limiter.
    */
   @Post()
   @UseGuards(PromptInjectionGuard, AIGenerationRateLimiter)
@@ -90,19 +98,33 @@ export class GenerationPipelineController {
     const request: GenerationRequest = {
       ...dto,
       topic: dto.topic.trim(),
-      length: Math.min(dto.length || 10, 30), // cap at 30 slides
+      length: Math.min(dto.length || 10, 30),
+      editMemory: dto.editMemory || [],
+      projectId: dto.projectId,
       userId,
     };
 
     this.logger.log(
-      `🚀 Generation started for user ${userId}: "${request.topic}"`,
+      `Generation started for user ${userId}: "${request.topic}"`,
     );
 
     const result = await this.pipeline.generate(request);
 
+    this.eventBus.next({
+      sessionId: result.document.id,
+      userId,
+      event: {
+        status: 'complete',
+        progress: 100,
+        agent: 'Pipeline',
+        message: `Complete! Quality: ${result.qa.overallScore}/100`,
+      },
+    });
+
     return {
       success: true,
       sessionId: result.document.id,
+      projectId: result.document.id,
       document: result.document,
       quality: result.qa,
       metrics: {
@@ -116,13 +138,18 @@ export class GenerationPipelineController {
 
   /**
    * POST /api/v2/generate/partial
-   * Regenerate specific slides while preserving the rest.
+   * Regenerate specific slides while preserving pinned blocks and edit memory.
    */
   @Post('partial')
   @UseGuards(PromptInjectionGuard, AIGenerationRateLimiter)
   async regeneratePartial(
     @Body()
-    dto: GenerateDto & { slideIds: string[]; existingDocumentId: string },
+    dto: GenerateDto & {
+      slideIds: string[];
+      existingDocumentId?: string;
+      existingDocument?: PresentationDocument;
+      projectId?: string;
+    },
     @Req() req: AuthenticatedRequest,
   ) {
     if (!dto.slideIds?.length) {
@@ -131,33 +158,66 @@ export class GenerationPipelineController {
       );
     }
 
+    const projectId = dto.projectId || dto.existingDocumentId;
+    let existingDocument = dto.existingDocument;
+    if (!existingDocument && projectId) {
+      existingDocument =
+        (await this.pipeline.getCachedDocument(projectId)) || undefined;
+    }
+
+    if (!existingDocument) {
+      throw new NotFoundException(
+        'existingDocument, projectId, or cached existingDocumentId required',
+      );
+    }
+
     const userId = req.user?.id || 'anonymous';
+    const topic =
+      dto.topic?.trim() ||
+      existingDocument.title ||
+      existingDocument.metadata.summary;
+
+    if (!topic || topic.length < 3) {
+      throw new BadRequestException(
+        'Topic must be at least 3 characters for regeneration',
+      );
+    }
 
     const request: GenerationRequest = {
       ...dto,
-      topic: dto.topic.trim(),
-      length: dto.length || 10,
+      topic,
+      length: dto.length || existingDocument.metadata.totalSlides,
       regenerateSlideIds: dto.slideIds,
+      editMemory: dto.editMemory || existingDocument.editMemory || [],
+      projectId: projectId || existingDocument.id,
       userId,
     };
 
     this.logger.log(
-      `🔄 Partial regeneration for user ${userId}: ${dto.slideIds.length} slides`,
+      `Partial regeneration for user ${userId}: ${dto.slideIds.length} slides`,
     );
 
-    const result = await this.pipeline.generate(request);
+    const result = await this.pipeline.regeneratePartial(
+      request,
+      existingDocument,
+    );
 
     return {
       success: true,
+      projectId: result.document.id,
       document: result.document,
       quality: result.qa,
       regeneratedSlides: dto.slideIds,
+      metrics: {
+        totalDurationMs: result.totalDurationMs,
+        tokenUsage: result.tokenUsage,
+        qualityScore: result.qa.overallScore,
+      },
     };
   }
 
   /**
    * GET /api/v2/generate/:sessionId/progress
-   * Get the current progress of a generation session.
    */
   @Get(':sessionId/progress')
   getProgress(@Param('sessionId') sessionId: string) {
@@ -176,7 +236,7 @@ export class GenerationPipelineController {
   streamProgress(
     @Param('sessionId') sessionId: string,
   ): Observable<MessageEvent> {
-    const timeout$ = timer(5 * 60 * 1000); // 5 minute timeout
+    const timeout$ = timer(5 * 60 * 1000);
 
     return this.eventBus.pipe(
       filter((e) => e.sessionId === sessionId),

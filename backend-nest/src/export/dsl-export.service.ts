@@ -234,10 +234,10 @@ export class DslExportService {
   ${slidesHtml}
 
   <div class="controls">
-    <button onclick="prevSlide()" title="Previous (ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â)">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬</button>
+    <button onclick="prevSlide()" title="Previous (Left Arrow)">&larr;</button>
     <span class="slide-counter" id="slideCounter">1 / ${allSlides.length}</span>
-    <button onclick="nextSlide()" title="Next (ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢)">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¶</button>
-    <button onclick="toggleFullscreen()" title="Fullscreen (F)">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂºÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¶</button>
+    <button onclick="nextSlide()" title="Next (Right Arrow)">&rarr;</button>
+    <button onclick="toggleFullscreen()" title="Fullscreen (F)">&#x26F6;</button>
   </div>
 
   <script>
@@ -328,10 +328,7 @@ export class DslExportService {
   // PRIVATE HELPERS
   // ============================================
 
-  private renderSlideToHtml(
-    slide: PresentationSlide,
-    index: number,
-  ): string {
+  private renderSlideToHtml(slide: PresentationSlide, index: number): string {
     const blocksHtml = slide.blocks
       .sort((a, b) => a.order - b.order)
       .map((block) => this.renderBlockToHtml(block))

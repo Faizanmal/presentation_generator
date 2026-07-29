@@ -27,6 +27,7 @@ import {
   VerifyOtpMultiChannelDto,
 } from './dto/otp-auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { AdminGuard } from './guards/roles.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import {
   RecaptchaGuard,
@@ -39,7 +40,7 @@ export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
   // ⚠️ DEMO MODE: Set to true to mock auth responses
-  private readonly DEMO_MODE = process.env.DEMO_MODE === 'true' || true;
+  private readonly DEMO_MODE = process.env.DEMO_MODE === 'true';
 
   constructor(
     private readonly authService: AuthService,
@@ -287,5 +288,36 @@ export class AuthController {
   ): Promise<{ accessToken: string; refreshToken: string; expiresIn: number }> {
     // The refreshToken method will validate and extract userId from the refresh token
     return this.authService.refreshToken(refreshToken);
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  Impersonation
+  // ═══════════════════════════════════════════════════════════
+
+  /**
+   * Impersonate a user (Admin only)
+   */
+  @Post('impersonate')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  async impersonate(
+    @CurrentUser() admin: { id: string },
+    @Body('targetUserId') targetUserId: string,
+  ) {
+    if (!targetUserId) {
+      throw new BadRequestException('targetUserId is required');
+    }
+    return this.authService.impersonateUser(admin.id, targetUserId);
+  }
+
+  /**
+   * Stop impersonating and revert to admin session
+   */
+  @Post('unimpersonate')
+  @UseGuards(JwtAuthGuard)
+  async unimpersonate(@CurrentUser() user: { impersonatorId?: string }) {
+    if (!user.impersonatorId) {
+      throw new BadRequestException('Not currently impersonating');
+    }
+    return this.authService.unimpersonateUser(user.impersonatorId);
   }
 }

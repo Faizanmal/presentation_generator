@@ -961,6 +961,12 @@ export class ProjectsService {
         status: updateProjectDto.status,
         isPublic: updateProjectDto.isPublic,
         themeId: updateProjectDto.themeId,
+        ...(updateProjectDto.dslDocument
+          ? {
+              dslDocument:
+                updateProjectDto.dslDocument as unknown as import('@prisma/client').Prisma.InputJsonValue,
+            }
+          : {}),
       },
       include: {
         slides: {
@@ -974,6 +980,53 @@ export class ProjectsService {
         theme: true,
       },
     });
+  }
+
+  /**
+   * Get the persisted DSL PresentationDocument for a project.
+   */
+  async getDslDocument(id: string, userId: string) {
+    const project = await this.findOne(id, userId);
+    return {
+      projectId: project.id,
+      dslDocument: (project as { dslDocument?: unknown }).dslDocument ?? null,
+    };
+  }
+
+  /**
+   * Replace the persisted DSL PresentationDocument (editMemory / pins).
+   */
+  async saveDslDocument(
+    id: string,
+    userId: string,
+    dslDocument: Record<string, unknown>,
+  ) {
+    const project = await this.findOne(id, userId);
+
+    if (project.ownerId !== userId) {
+      throw new ForbiddenException('You cannot edit this project');
+    }
+
+    const updated = await this.prisma.project.update({
+      where: { id },
+      data: {
+        dslDocument:
+          dslDocument as unknown as import('@prisma/client').Prisma.InputJsonValue,
+        title:
+          typeof dslDocument.title === 'string'
+            ? dslDocument.title
+            : undefined,
+        updatedAt: new Date(),
+      },
+      select: {
+        id: true,
+        title: true,
+        updatedAt: true,
+        dslDocument: true,
+      },
+    });
+
+    return updated;
   }
 
   /**

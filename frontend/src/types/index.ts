@@ -7,6 +7,8 @@ export interface User {
   email: string;
   name: string | null;
   image: string | null;
+  role?: string;
+  impersonatorId?: string;
   organizationId?: string;
 }
 
@@ -52,6 +54,8 @@ export interface Project {
     image: string | null;
   };
   slides: Slide[];
+  /** Canonical AI PresentationDocument for pin / partial regen */
+  dslDocument?: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
   _count?: {
@@ -201,6 +205,8 @@ export interface Block {
     }[];
   };
   order: number;
+  /** Layout zone (multi-column / DSL layouts) */
+  zone?: number;
   createdAt: string;
   updatedAt: string;
 }

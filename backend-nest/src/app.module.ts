@@ -8,6 +8,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
+import { AdminModule } from './admin/admin.module';
 import { ProjectsModule } from './projects/projects.module';
 import { SlidesModule } from './slides/slides.module';
 import { BlocksModule } from './blocks/blocks.module';
@@ -202,9 +203,10 @@ import featureFlagsConfig from './common/config/feature-flags.config';
     // Scheduling
     ScheduleModule.forRoot(),
 
-    // Feature modules
+    // Core modules
     AuthModule,
     UsersModule,
+    AdminModule,
     ProjectsModule,
     SlidesModule,
     BlocksModule,

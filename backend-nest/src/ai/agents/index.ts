@@ -22,3 +22,4 @@ export {
   type GenerationProgressEvent,
   type PipelineResult,
 } from './generation-pipeline.service';
+export { enhancedToPresentationDocument } from './enhanced-to-dsl.mapper';

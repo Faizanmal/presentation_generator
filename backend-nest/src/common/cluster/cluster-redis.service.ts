@@ -194,7 +194,9 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
         try {
           handler(JSON.parse(msg) as Record<string, unknown>);
         } catch (e) {
-          this.logger.error(`Failed to parse message: ${e instanceof Error ? e.message : String(e)}`);
+          this.logger.error(
+            `Failed to parse message: ${e instanceof Error ? e.message : String(e)}`,
+          );
         }
       }
     });

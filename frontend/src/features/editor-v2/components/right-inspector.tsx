@@ -26,6 +26,9 @@ interface RightInspectorProps {
   comments: EditorComment[];
   onAddInlineComment: (content: string) => void;
   onResolveComment?: (commentId: string) => void;
+  onToggleBlockLock?: () => void;
+  onRegenerateSlide?: () => void;
+  isRegenerating?: boolean;
 }
 
 const tabs = [
@@ -63,6 +66,9 @@ export function RightInspector({
   comments,
   onAddInlineComment,
   onResolveComment,
+  onToggleBlockLock,
+  onRegenerateSlide,
+  isRegenerating = false,
 }: RightInspectorProps) {
   const [activeTab, setActiveTab] = useState<InspectorTab>("design");
   const [draftComment, setDraftComment] = useState("");
@@ -186,11 +192,21 @@ export function RightInspector({
                       </span>
                       <button
                         type="button"
+                        onClick={onToggleBlockLock}
                         className="rounded-md p-1 text-pd-muted transition hover:bg-pd-elevated hover:text-pd-text"
-                        aria-label={selectedBlock.locked ? "Unlock" : "Lock"}
+                        aria-label={
+                          selectedBlock.locked
+                            ? "Unpin from AI regeneration"
+                            : "Pin — AI will not change this block"
+                        }
+                        title={
+                          selectedBlock.locked
+                            ? "Pinned: AI will keep this on regenerate"
+                            : "Pin so AI keeps this on regenerate"
+                        }
                       >
                         {selectedBlock.locked ? (
-                          <Lock className="h-3 w-3" />
+                          <Lock className="h-3 w-3 text-pd-accent" />
                         ) : (
                           <Unlock className="h-3 w-3" />
                         )}
@@ -232,7 +248,31 @@ export function RightInspector({
               <div className="rounded-xl border border-pd-border bg-pd-elevated p-3">
                 <p className="text-[10px] uppercase tracking-[0.12em] text-pd-muted">AI Quick Actions</p>
                 <div className="mt-2 space-y-1.5">
-                  {["Rewrite for clarity", "Expand with data", "Simplify language", "Add visual emphasis"].map((action) => (
+                  <motion.button
+                    type="button"
+                    {...buttonPress}
+                    onClick={onRegenerateSlide}
+                    disabled={isRegenerating || !onRegenerateSlide}
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-pd-text-secondary transition hover:bg-pd-accent-ultra-soft hover:text-pd-text disabled:opacity-40"
+                  >
+                    <RotateCw className={cn("h-3 w-3 text-pd-accent", isRegenerating && "animate-spin")} />
+                    {isRegenerating ? "Regenerating slide…" : "Regenerate this slide"}
+                  </motion.button>
+                  <motion.button
+                    type="button"
+                    {...buttonPress}
+                    onClick={onToggleBlockLock}
+                    disabled={!selectedBlock || !onToggleBlockLock}
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-pd-text-secondary transition hover:bg-pd-accent-ultra-soft hover:text-pd-text disabled:opacity-40"
+                  >
+                    {selectedBlock?.locked ? (
+                      <Unlock className="h-3 w-3 text-pd-accent" />
+                    ) : (
+                      <Lock className="h-3 w-3 text-pd-accent" />
+                    )}
+                    {selectedBlock?.locked ? "Unpin block from AI" : "Pin block from AI"}
+                  </motion.button>
+                  {["Rewrite for clarity", "Expand with data", "Simplify language"].map((action) => (
                     <motion.button
                       key={action}
                       type="button"

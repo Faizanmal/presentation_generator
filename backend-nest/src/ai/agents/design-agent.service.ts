@@ -44,11 +44,12 @@ DESIGN PRINCIPLES:
 6. Slide-level overrides should be subtle — don't break visual consistency
 
 FONT PAIRING RULES:
-- Professional: Inter + Source Serif Pro
+- Professional / Executive: DM Sans + Source Serif 4
 - Creative: Outfit + DM Sans
-- Academic: Merriweather + Source Sans Pro
-- Bold/Startup: Space Grotesk + Inter
+- Academic: Merriweather + Source Sans 3
+- Bold / Startup: Space Grotesk + DM Sans
 - Elegant: Playfair Display + Lato
+Avoid defaulting to Inter + Tailwind blue (#3B82F6) unless the style is explicitly "modern SaaS". Prefer slate/charcoal primaries with one clear accent.
 
 Always respond with valid JSON.`;
 
@@ -60,7 +61,7 @@ Always respond with valid JSON.`;
     const { request, outline, slideCount } = input;
 
     const brandBlock = request.brandGuidelines
-      ? `\nBRAND GUIDELINES:\nColors: ${request.brandGuidelines.colors?.join(', ') || 'none'}\nFonts: ${request.brandGuidelines.fonts?.join(', ') || 'none'}\nTone: ${request.brandGuidelines.tone || 'none'}`
+      ? `\nBRAND GUIDELINES (MANDATORY — use these exact colors/fonts):\nColors: ${request.brandGuidelines.colors?.join(', ') || 'none'}\nFonts: ${request.brandGuidelines.fonts?.join(', ') || 'none'}\nTone: ${request.brandGuidelines.tone || 'none'}\nRestrictions: ${request.brandGuidelines.restrictions?.join('; ') || 'none'}\nIf brand colors are provided, set theme.colors.primary/secondary/accent/background/text to those values.`
       : '';
 
     return `Design a visual system for this presentation:
@@ -121,30 +122,30 @@ Respond with:
       slideStyles: SlideDesign[];
     }>(raw);
 
-    // Validate and provide defaults
+    // Editorial defaults — avoid generic Inter + Tailwind blue "AI deck" look
     const theme: PresentationTheme = {
       id: parsed.theme?.id || 'generated-theme',
       name: parsed.theme?.name || 'Generated Theme',
       colors: {
-        primary: parsed.theme?.colors?.primary || '#3B82F6',
-        secondary: parsed.theme?.colors?.secondary || '#8B5CF6',
-        accent: parsed.theme?.colors?.accent || '#F59E0B',
+        primary: parsed.theme?.colors?.primary || '#0F172A',
+        secondary: parsed.theme?.colors?.secondary || '#334155',
+        accent: parsed.theme?.colors?.accent || '#0D9488',
         background: parsed.theme?.colors?.background || '#FFFFFF',
-        surface: parsed.theme?.colors?.surface || '#F8FAFC',
-        text: parsed.theme?.colors?.text || '#1E293B',
+        surface: parsed.theme?.colors?.surface || '#F1F5F9',
+        text: parsed.theme?.colors?.text || '#0F172A',
         textMuted: parsed.theme?.colors?.textMuted || '#64748B',
         chart: parsed.theme?.colors?.chart || [
-          '#3B82F6',
-          '#8B5CF6',
-          '#F59E0B',
-          '#10B981',
-          '#EF4444',
+          '#0F172A',
+          '#0D9488',
+          '#0369A1',
+          '#B45309',
+          '#BE123C',
         ],
       },
       typography: {
-        headingFont: parsed.theme?.typography?.headingFont || 'Inter',
-        bodyFont: parsed.theme?.typography?.bodyFont || 'Inter',
-        monoFont: parsed.theme?.typography?.monoFont || 'JetBrains Mono',
+        headingFont: parsed.theme?.typography?.headingFont || 'DM Sans',
+        bodyFont: parsed.theme?.typography?.bodyFont || 'DM Sans',
+        monoFont: parsed.theme?.typography?.monoFont || 'IBM Plex Mono',
         baseSize: parsed.theme?.typography?.baseSize || 16,
         scale: parsed.theme?.typography?.scale || 1.25,
       },
@@ -153,8 +154,8 @@ Respond with:
         scale: parsed.theme?.spacing?.scale || 1.5,
       },
       effects: {
-        borderRadius: parsed.theme?.effects?.borderRadius || '12px',
-        shadow: parsed.theme?.effects?.shadow || '0 4px 24px rgba(0,0,0,0.08)',
+        borderRadius: parsed.theme?.effects?.borderRadius || '10px',
+        shadow: parsed.theme?.effects?.shadow || '0 4px 24px rgba(15,23,42,0.08)',
         glassmorphism: parsed.theme?.effects?.glassmorphism || false,
         gradientOverlay: parsed.theme?.effects?.gradientOverlay,
       },

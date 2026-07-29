@@ -1,5 +1,6 @@
 import type { AxiosInstance, AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
 import axios from 'axios';
+import { ensureServerAwake, isLikelyColdStartError, isColdStartHandlingEnabled } from '@/lib/server-wakeup';
 import type {
   AuthResponse,
   LoginCredentials,
@@ -46,8 +47,8 @@ import type {
   ThinkingPresentation,
 } from '@/types';
 
-// ⚠️ DEMO MODE: Set to true to use mock data
-const DEMO_MODE = true;
+// Demo mode only when explicitly enabled (must be off for Vercel → Render)
+const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
@@ -116,6 +117,8 @@ class ApiClient {
         'Content-Type': 'application/json',
       },
       withCredentials: true,
+      // Allow time for Render Free cold starts on the first request
+      timeout: 60_000,
     });
 
     // Request interceptor to add auth token
@@ -156,7 +159,29 @@ class ApiClient {
     this.client.interceptors.response.use(
       (response) => response,
       async (error: AxiosError) => {
-        const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
+        const originalRequest = error.config as AxiosRequestConfig & {
+          _retry?: boolean;
+          _coldStartRetry?: boolean;
+        };
+
+        if (!originalRequest) {
+          return Promise.reject(error);
+        }
+
+        // Render Free cold start: wait for wake, then retry the original request once
+        if (
+          typeof window !== 'undefined' &&
+          !DEMO_MODE &&
+          isColdStartHandlingEnabled() &&
+          !originalRequest._coldStartRetry &&
+          isLikelyColdStartError(error)
+        ) {
+          originalRequest._coldStartRetry = true;
+          const awake = await ensureServerAwake();
+          if (awake) {
+            return this.client(originalRequest);
+          }
+        }
 
         // Attempt a silent token refresh on the first 401 (access token expired)
         if (
@@ -554,6 +579,28 @@ class ApiClient {
     return data;
   }
 
+  async impersonateUser(targetUserId: string): Promise<AuthResponse> {
+    const { data } = await this.client.post<AuthResponse>('/auth/impersonate', { targetUserId });
+    if (data.accessToken) {
+      this.setToken(data.accessToken);
+      if (data.refreshToken) {
+        this.setRefreshToken(data.refreshToken);
+      }
+    }
+    return data;
+  }
+
+  async unimpersonateUser(): Promise<AuthResponse> {
+    const { data } = await this.client.post<AuthResponse>('/auth/unimpersonate');
+    if (data.accessToken) {
+      this.setToken(data.accessToken);
+      if (data.refreshToken) {
+        this.setRefreshToken(data.refreshToken);
+      }
+    }
+    return data;
+  }
+
   logout() {
     // Best-effort server-side token blacklisting (non-blocking)
     if (this.token) {
@@ -926,6 +973,84 @@ class ApiClient {
       message?: string;
     }>('/ai/thinking/generate', params);
     return this.waitForThinkingJob<ThinkingGenerationResult>(data.jobId);
+  }
+
+  /**
+   * Multi-agent DSL generation (v2) — supports edit memory + brand kit.
+   */
+  async generateV2Presentation(params: {
+    topic: string;
+    audience?: string;
+    tone?: string;
+    length?: number;
+    style?: string;
+    templateType?: string;
+    generateImages?: boolean;
+    imageSource?: 'ai' | 'stock';
+    qualityTier?: 'fast' | 'balanced' | 'premium';
+    brandKitId?: string;
+    projectId?: string;
+    brandGuidelines?: {
+      colors?: string[];
+      fonts?: string[];
+      tone?: string;
+      logos?: string[];
+      restrictions?: string[];
+    };
+    editMemory?: Array<{
+      slideId: string;
+      blockId?: string;
+      field: string;
+      previousValue: string;
+      newValue: string;
+      timestamp: string;
+      pinned: boolean;
+    }>;
+  }): Promise<{
+    success: boolean;
+    sessionId: string;
+    projectId?: string;
+    document: unknown;
+    quality: unknown;
+    metrics: Record<string, unknown>;
+  }> {
+    const { data } = await this.client.post('/api/v2/generate', params);
+    return data;
+  }
+
+  /**
+   * Partial regenerate unlocked slides while preserving pinned edit memory.
+   */
+  async regenerateV2Slides(params: {
+    slideIds: string[];
+    topic?: string;
+    projectId?: string;
+    existingDocumentId?: string;
+    existingDocument?: unknown;
+    editMemory?: unknown[];
+    brandKitId?: string;
+    generateImages?: boolean;
+  }): Promise<{
+    success: boolean;
+    projectId?: string;
+    document: unknown;
+    quality: unknown;
+    regeneratedSlides: string[];
+  }> {
+    const { data } = await this.client.post('/api/v2/generate/partial', params);
+    return data;
+  }
+
+  /**
+   * Export a DSL PresentationDocument to standalone HTML.
+   */
+  async exportDslHtml(document: unknown): Promise<Blob> {
+    const { data } = await this.client.post(
+      '/export/dsl/html',
+      { document },
+      { responseType: 'blob' },
+    );
+    return data;
   }
 
   /**
@@ -3576,6 +3701,17 @@ class ApiClient {
       this.generateVoiceNarration(text, options),
     generateSpeakerNotes: (content: string) => this.generateSpeakerNotes(content),
     suggestImages: (topic: string, count?: number) => this.suggestImages(topic, count),
+    generateV2: (params: Parameters<typeof this.generateV2Presentation>[0]) =>
+      this.generateV2Presentation(params),
+    regenerateV2Slides: (params: Parameters<typeof this.regenerateV2Slides>[0]) =>
+      this.regenerateV2Slides(params),
+    exportDslHtml: (document: unknown) => this.exportDslHtml(document),
+    getDsl: (projectId: string) =>
+      this.get<{ projectId: string; dslDocument: unknown | null }>(
+        `/projects/${projectId}/dsl`,
+      ),
+    saveDsl: (projectId: string, dslDocument: unknown) =>
+      this.patch(`/projects/${projectId}/dsl`, { dslDocument }),
   };
 
   readonly live = {
@@ -4400,6 +4536,20 @@ class ApiClient {
     requestDataDeletion: () => this.requestPersonalDataDeletion(),
     enforcePolicy: (orgId: string, policy: string) => this.enforceCompliancePolicy(orgId, policy),
   };
+
+  // ============================================
+  // ADMIN ENDPOINTS
+  // ============================================
+
+  async adminGetUsers(page = 1, limit = 20, search = ''): Promise<PaginatedResponse<User & { role: string; createdAt: string; subscriptionTier: string }>> {
+    const { data } = await this.client.get('/admin/users', { params: { page, limit, search } });
+    return data;
+  }
+
+  async adminGetStats(): Promise<{ totalUsers: number; totalProjects: number; usersByTier: { tier: string; count: number }[] }> {
+    const { data } = await this.client.get('/admin/stats');
+    return data;
+  }
 
   readonly plugins = {
     registerDeveloper: () => this.registerPluginDeveloper(),

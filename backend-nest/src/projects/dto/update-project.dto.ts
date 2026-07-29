@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsBoolean, IsObject } from 'class-validator';
 import { ProjectStatus } from '@prisma/client';
 
 export class UpdateProjectDto {
@@ -21,4 +21,9 @@ export class UpdateProjectDto {
   @IsString()
   @IsOptional()
   themeId?: string;
+
+  /** Canonical AI PresentationDocument (includes editMemory) */
+  @IsObject()
+  @IsOptional()
+  dslDocument?: Record<string, unknown>;
 }

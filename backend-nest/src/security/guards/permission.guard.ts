@@ -15,7 +15,7 @@ import { RbacService, Permission } from '../rbac.service';
 @Injectable()
 export class PermissionGuard implements CanActivate {
   private readonly logger = new Logger(PermissionGuard.name);
-  private readonly DEMO_MODE = process.env.DEMO_MODE === 'true' || true;
+  private readonly DEMO_MODE = process.env.DEMO_MODE === 'true';
 
   constructor(
     private readonly reflector: Reflector,

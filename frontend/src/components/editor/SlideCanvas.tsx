@@ -379,21 +379,45 @@ export default function SlideCanvas({
     [slide.id, slide.blocks, updateBlock, queueBlockSync]
   );
 
-  // Sort blocks by order
-  const sortedBlocks = useMemo(() => [...(slide.blocks || [])].sort((a, b) => a.order - b.order), [slide.blocks]);
+  // Hydrate zone from style JSON so LayoutCompiler can split columns
+  const sortedBlocks = useMemo(
+    () =>
+      [...(slide.blocks || [])]
+        .sort((a, b) => a.order - b.order)
+        .map((block) => {
+          const zoneFromStyle =
+            typeof block.style?.zone === "number" ? block.style.zone : undefined;
+          if (zoneFromStyle === undefined || block.zone !== undefined) return block;
+          return { ...block, zone: zoneFromStyle };
+        }),
+    [slide.blocks]
+  );
 
   // Expose position handler for advanced canvas mode (used by WhiteboardCanvas integration)
   void handleBlockPositionChange;
 
-  // Determine layout for decorative treatment
-  const slideLayout = slide.layout || 'content';
+  // Normalize DSL + legacy layout names for chrome / deco
+  const rawLayout = slide.layout || 'content';
+  const slideLayout =
+    rawLayout === 'title-hero' || rawLayout === 'title-subtitle' ? 'title' :
+    rawLayout === 'quote-centered' ? 'quote-highlight' :
+    rawLayout === 'single-column' || rawLayout === 'title-content' ? 'content' :
+    rawLayout;
   const isDenseCanvas = presentationDensity >= 66;
-  const canvasPaddingClass = isDenseCanvas ? 'p-8' : presentationDensity < 34 ? 'p-12' : 'p-10';
+  // Asymmetric safe margins (wider L/R) read more editorial than uniform padding
+  const canvasPaddingClass = isDenseCanvas
+    ? 'px-10 py-7'
+    : presentationDensity < 34
+      ? 'px-14 py-11'
+      : 'px-12 py-9';
 
-  // Determine if this is a title slide (first slide usually)
-  const isTitleSlide = slideLayout === 'title' || sortedBlocks.some(
-    b => (b.type || b.blockType) === 'HEADING' && b.order === 0 && sortedBlocks.length <= 3
-  );
+  const isTitleSlide =
+    slideLayout === 'title' ||
+    rawLayout === 'title-hero' ||
+    rawLayout === 'title-subtitle' ||
+    sortedBlocks.some(
+      (b) => (b.type || b.blockType) === 'HEADING' && b.order === 0 && sortedBlocks.length <= 3
+    );
 
   return (
     <DndContext
@@ -408,25 +432,25 @@ export default function SlideCanvas({
           aspectRatio: '16 / 9',
           backgroundColor: bgColor,
           color: textColor,
-          fontFamily: theme?.fonts?.body || "'Inter', system-ui",
+          fontFamily: theme?.fonts?.body || 'var(--font-dm-sans), system-ui, sans-serif',
           boxShadow: `0 25px 50px -12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05)`,
         }}
       >
         {/* Decorative background pattern based on layout */}
         {getDecoPattern(primaryColor, accentColor, isTitleSlide ? 'title' : slideLayout)}
 
-        {/* Premium 3D ambient background for title slides */}
+        {/* Quieter 3D ambient — title/hero only */}
         {isTitleSlide && (
           <Ambient3DBackground
             primaryColor={primaryColor}
             accentColor={accentColor}
             variant="floating-spheres"
-            intensity={0.45}
+            intensity={0.28}
           />
         )}
 
         <div
-          className={`h-full overflow-y-auto relative z-10 ${isTitleSlide
+          className={`h-full overflow-hidden relative z-10 ${isTitleSlide
             ? `flex flex-col items-center justify-center ${canvasPaddingClass}`
             : canvasPaddingClass
             }`}
@@ -452,7 +476,7 @@ export default function SlideCanvas({
           ) : (
             <div className="w-full h-full">
               <LayoutCompiler
-                layoutType={slideLayout}
+                layoutType={rawLayout}
                 blocks={sortedBlocks}
                 theme={theme}
                 presentationDensity={presentationDensity}
@@ -465,7 +489,6 @@ export default function SlideCanvas({
               />
             </div>
           )}
-          </SortableContext>
         </div>
 
         {/* Slash Command Menu */}

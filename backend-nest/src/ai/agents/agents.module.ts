@@ -9,6 +9,8 @@ import { Module, forwardRef } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { AIModule } from '../ai.module';
 import { ThinkingAgentModule } from '../thinking-agent/thinking-agent.module';
+import { BrandKitModule } from '../../brand-kit/brand-kit.module';
+import { PrismaModule } from '../../prisma/prisma.module';
 import { OutlineAgentService } from './outline-agent.service';
 import { NarrativeAgentService } from './narrative-agent.service';
 import { LayoutAgentService } from './layout-agent.service';
@@ -26,6 +28,8 @@ import {
   imports: [
     forwardRef(() => AIModule),
     forwardRef(() => ThinkingAgentModule),
+    BrandKitModule,
+    PrismaModule,
     BullModule.registerQueue({
       name: GENERATION_QUEUE,
     }),

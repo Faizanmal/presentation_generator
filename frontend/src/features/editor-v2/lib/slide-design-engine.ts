@@ -20,13 +20,101 @@ export function computeTypographyScale(canvasWidth: number): TypographyScale {
   };
 }
 
-export function buildLayoutBlueprint(canvasWidth: number, canvasHeight: number): SlideLayoutBlueprint {
+export function buildLayoutBlueprint(
+  canvasWidth: number,
+  canvasHeight: number,
+  layoutPreset?: string,
+): SlideLayoutBlueprint {
   const safeMargin = Math.round(canvasWidth * 0.06);
   const innerWidth = canvasWidth - safeMargin * 2;
   const innerHeight = canvasHeight - safeMargin * 2;
 
   const titleHeight = Math.round(innerHeight * 0.2);
   const bodyHeight = Math.round(innerHeight * 0.47);
+  const preset = layoutPreset || 'single-column';
+
+  // Image-left: media on left, body on right
+  if (preset === 'image-left') {
+    return {
+      titleArea: {
+        x: safeMargin + Math.round(innerWidth * 0.42),
+        y: safeMargin,
+        width: Math.round(innerWidth * 0.58),
+        height: titleHeight,
+        rotation: 0,
+      },
+      bodyArea: {
+        x: safeMargin + Math.round(innerWidth * 0.42),
+        y: safeMargin + titleHeight + Math.round(innerHeight * 0.04),
+        width: Math.round(innerWidth * 0.58),
+        height: bodyHeight,
+        rotation: 0,
+      },
+      mediaArea: {
+        x: safeMargin,
+        y: safeMargin,
+        width: Math.round(innerWidth * 0.38),
+        height: innerHeight,
+        rotation: 0,
+      },
+    };
+  }
+
+  // Hero / quote: centered title + body
+  if (preset === 'title-hero' || preset === 'title-subtitle' || preset === 'quote-centered') {
+    const centeredWidth = Math.round(innerWidth * 0.72);
+    const centeredX = safeMargin + Math.round((innerWidth - centeredWidth) / 2);
+    return {
+      titleArea: {
+        x: centeredX,
+        y: safeMargin + Math.round(innerHeight * 0.22),
+        width: centeredWidth,
+        height: Math.round(innerHeight * 0.28),
+        rotation: 0,
+      },
+      bodyArea: {
+        x: centeredX,
+        y: safeMargin + Math.round(innerHeight * 0.52),
+        width: centeredWidth,
+        height: Math.round(innerHeight * 0.28),
+        rotation: 0,
+      },
+      mediaArea: {
+        x: centeredX,
+        y: safeMargin + Math.round(innerHeight * 0.72),
+        width: centeredWidth,
+        height: Math.round(innerHeight * 0.18),
+        rotation: 0,
+      },
+    };
+  }
+
+  // Two-column / comparison: split body
+  if (preset === 'two-column' || preset === 'comparison') {
+    return {
+      titleArea: {
+        x: safeMargin,
+        y: safeMargin,
+        width: innerWidth,
+        height: titleHeight,
+        rotation: 0,
+      },
+      bodyArea: {
+        x: safeMargin,
+        y: safeMargin + titleHeight + Math.round(innerHeight * 0.05),
+        width: Math.round(innerWidth * 0.48),
+        height: bodyHeight,
+        rotation: 0,
+      },
+      mediaArea: {
+        x: safeMargin + Math.round(innerWidth * 0.52),
+        y: safeMargin + titleHeight + Math.round(innerHeight * 0.05),
+        width: Math.round(innerWidth * 0.48),
+        height: bodyHeight,
+        rotation: 0,
+      },
+    };
+  }
 
   return {
     titleArea: {
@@ -66,12 +154,17 @@ const withPadding = (area: BlockFrame, padding: number): BlockFrame => ({
   rotation: area.rotation,
 });
 
-export function computeBalancedFrames(blocks: EditorBlock[], blueprint: SlideLayoutBlueprint): Record<string, BlockFrame> {
+export function computeBalancedFrames(
+  blocks: EditorBlock[],
+  blueprint: SlideLayoutBlueprint,
+  layoutPreset?: string,
+): Record<string, BlockFrame> {
   const result: Record<string, BlockFrame> = {};
+  const preset = layoutPreset || 'single-column';
 
   const heading = blocks.find((block) => block.type === "heading");
-  const paragraph = blocks.find((block) => block.type === "paragraph");
-  const media = blocks.find((block) => block.type === "image" || block.type === "chart");
+  const paragraphs = blocks.filter((block) => block.type === "paragraph" || block.type === "quote" || block.type === "stat");
+  const media = blocks.filter((block) => block.type === "image" || block.type === "chart");
 
   if (heading) {
     const frame = withPadding(blueprint.titleArea, 8);
@@ -79,15 +172,52 @@ export function computeBalancedFrames(blocks: EditorBlock[], blueprint: SlideLay
     result[heading.id] = frame;
   }
 
-  if (paragraph) {
-    const frame = withPadding(blueprint.bodyArea, 10);
-    frame.height = clamp(resolveTextHeight(paragraph.content.text) + 90, 140, blueprint.bodyArea.height);
-    result[paragraph.id] = frame;
+  // Zone-aware two-column placement
+  if (preset === 'two-column' || preset === 'comparison') {
+    const colBlocks = paragraphs.filter((b) => !(b.id in result));
+    const left = colBlocks.filter((b) => (b.zone ?? 0) === 0);
+    const right = colBlocks.filter((b) => (b.zone ?? 0) !== 0);
+    const leftPool = left.length ? left : colBlocks.slice(0, Math.ceil(colBlocks.length / 2));
+    const rightPool = right.length ? right : colBlocks.slice(Math.ceil(colBlocks.length / 2));
+
+    leftPool.forEach((block, idx) => {
+      const rowH = Math.max(80, Math.floor(blueprint.bodyArea.height / Math.max(1, leftPool.length)));
+      result[block.id] = {
+        x: blueprint.bodyArea.x + 8,
+        y: blueprint.bodyArea.y + idx * rowH,
+        width: blueprint.bodyArea.width - 16,
+        height: rowH - 10,
+        rotation: 0,
+      };
+    });
+    rightPool.forEach((block, idx) => {
+      const rowH = Math.max(80, Math.floor(blueprint.mediaArea.height / Math.max(1, rightPool.length)));
+      result[block.id] = {
+        x: blueprint.mediaArea.x + 8,
+        y: blueprint.mediaArea.y + idx * rowH,
+        width: blueprint.mediaArea.width - 16,
+        height: rowH - 10,
+        rotation: 0,
+      };
+    });
+  } else {
+    const paragraph = paragraphs[0];
+    if (paragraph) {
+      const frame = withPadding(blueprint.bodyArea, 10);
+      frame.height = clamp(resolveTextHeight(paragraph.content.text) + 90, 140, blueprint.bodyArea.height);
+      result[paragraph.id] = frame;
+    }
   }
 
-  if (media) {
-    result[media.id] = withPadding(blueprint.mediaArea, 10);
-  }
+  media.forEach((block, idx) => {
+    if (result[block.id]) return;
+    const frame = withPadding(blueprint.mediaArea, 10);
+    if (idx > 0) {
+      frame.y += idx * 24;
+      frame.height = Math.max(48, frame.height - idx * 24);
+    }
+    result[block.id] = frame;
+  });
 
   const remaining = blocks.filter((block) => !(block.id in result));
   const rowHeight = Math.max(80, Math.floor(blueprint.bodyArea.height / Math.max(1, remaining.length)));

@@ -35,7 +35,7 @@ export const Roles = (...roles: string[]) => {
 @Injectable()
 export class RolesGuard implements CanActivate {
   private readonly logger = new Logger(RolesGuard.name);
-  private readonly DEMO_MODE = process.env.DEMO_MODE === 'true' || true;
+  private readonly DEMO_MODE = process.env.DEMO_MODE === 'true';
 
   constructor(private reflector: Reflector) {}
 
@@ -81,7 +81,7 @@ export class RolesGuard implements CanActivate {
 @Injectable()
 export class AdminGuard implements CanActivate {
   private readonly logger = new Logger(AdminGuard.name);
-  private readonly DEMO_MODE = process.env.DEMO_MODE === 'true' || true;
+  private readonly DEMO_MODE = process.env.DEMO_MODE === 'true';
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();

@@ -473,6 +473,7 @@ export class ThinkingAgentController {
     projectId: string;
     slideCount: number;
     blockCount: number;
+    dslDocument: unknown;
   }> {
     const canCreate = await this.usersService.canCreateProject(user.id);
     if (!canCreate) {

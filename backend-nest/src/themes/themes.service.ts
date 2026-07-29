@@ -388,18 +388,16 @@ export class ThemesService {
       );
     } catch (error) {
       this.logger.error('Failed to extract style seed from image', error);
-      const cause = error instanceof Error ? error : new Error(String(error));
-      throw new Error('Could not extract style seed from image', { cause });
+      throw new Error('Could not extract style seed from image', {
+        cause: error,
+      });
     }
   }
 
   /**
    * Create a custom brand theme
    */
-  async createCustomTheme(
-    userId: string,
-    data: CreateCustomThemeInput,
-  ) {
+  async createCustomTheme(userId: string, data: CreateCustomThemeInput) {
     return this.prisma.theme.create({
       data: {
         name: data.name,

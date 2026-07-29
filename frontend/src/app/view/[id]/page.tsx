@@ -403,7 +403,7 @@ function SlideView({ slide, theme }: { slide: Slide; theme?: Theme }) {
       style={{
         backgroundColor: bgColor,
         color: textColor,
-        fontFamily: (theme?.fonts as Theme['fonts'] | undefined)?.body || "'Inter', system-ui",
+        fontFamily: (theme?.fonts as Theme['fonts'] | undefined)?.body || 'var(--font-dm-sans), system-ui, sans-serif',
         boxShadow: `0 30px 60px -15px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255,255,255,0.06)`,
       }}
     >
@@ -458,9 +458,9 @@ function SlideView({ slide, theme }: { slide: Slide; theme?: Theme }) {
 // Block View Component (read-only, PREMIUM styled)
 // ====================================================
 function BlockView({ block, theme }: { block: Block; theme?: Theme }) {
-  const primaryColor = (theme?.colors as Theme['colors'] | undefined)?.primary || "#3b82f6";
-  const accentColor = (theme?.colors as Theme['colors'] | undefined)?.accent || "#10b981";
-  const secondaryColor = (theme?.colors as Theme['colors'] | undefined)?.secondary || "#8b5cf6";
+  const primaryColor = (theme?.colors as Theme['colors'] | undefined)?.primary || "#0F172A";
+  const accentColor = (theme?.colors as Theme['colors'] | undefined)?.accent || "#0D9488";
+  const secondaryColor = (theme?.colors as Theme['colors'] | undefined)?.secondary || "#334155";
   const content = block.content as Record<string, unknown> & {
     text?: string;
     items?: string[];
@@ -484,7 +484,7 @@ function BlockView({ block, theme }: { block: Block; theme?: Theme }) {
           <h1
             className="text-7xl font-bold leading-[1.1] tracking-tight"
             style={{
-              fontFamily: (theme?.fonts as Theme['fonts'] | undefined)?.heading || "'Inter', system-ui",
+              fontFamily: (theme?.fonts as Theme['fonts'] | undefined)?.heading || 'var(--font-dm-sans), system-ui, sans-serif',
               color: primaryColor,
               textShadow: '0 2px 4px rgba(0,0,0,0.06)',
             }}
@@ -499,7 +499,7 @@ function BlockView({ block, theme }: { block: Block; theme?: Theme }) {
         <h2
           className="text-4xl font-semibold leading-snug"
           style={{
-            fontFamily: (theme?.fonts as Theme['fonts'] | undefined)?.heading || "'Inter', system-ui",
+            fontFamily: (theme?.fonts as Theme['fonts'] | undefined)?.heading || 'var(--font-dm-sans), system-ui, sans-serif',
             opacity: 0.85,
           }}
         >
@@ -518,7 +518,7 @@ function BlockView({ block, theme }: { block: Block; theme?: Theme }) {
             <p
               className="font-extrabold tracking-tight bg-clip-text text-transparent"
               style={{
-                fontFamily: (theme?.fonts as Theme['fonts'] | undefined)?.heading || "'Inter', system-ui",
+                fontFamily: (theme?.fonts as Theme['fonts'] | undefined)?.heading || 'var(--font-dm-sans), system-ui, sans-serif',
                 fontSize: 'clamp(3rem, 6vw, 5rem)',
                 lineHeight: 1.1,
                 backgroundImage: gradientFromColor(primaryColor),
@@ -536,7 +536,7 @@ function BlockView({ block, theme }: { block: Block; theme?: Theme }) {
         <p
           className="text-2xl leading-relaxed"
           style={{
-            fontFamily: (theme?.fonts as Theme['fonts'] | undefined)?.body || "'Inter', system-ui",
+            fontFamily: (theme?.fonts as Theme['fonts'] | undefined)?.body || 'var(--font-dm-sans), system-ui, sans-serif',
             opacity: 0.9,
           }}
         >
@@ -680,7 +680,7 @@ function BlockView({ block, theme }: { block: Block; theme?: Theme }) {
             className="tiptap-content prose dark:prose-invert max-w-none prose-table:w-full prose-table:border-collapse prose-td:border prose-td:p-4 prose-th:border prose-th:p-4 prose-th:bg-slate-100 dark:prose-th:bg-slate-800 text-xl prose-table:my-0 pb-6 [&>table]:w-full [&>table]:border-collapse [&_td]:border [&_th]:border [&_td]:p-4 [&_th]:p-4 [&_th]:bg-slate-100 dark:[&_th]:bg-slate-800 rounded-xl overflow-hidden"
             dangerouslySetInnerHTML={{ __html: content.html }}
             style={{
-              fontFamily: (theme?.fonts as Theme['fonts'] | undefined)?.body || "system-ui",
+              fontFamily: (theme?.fonts as Theme['fonts'] | undefined)?.body || 'var(--font-dm-sans), system-ui, sans-serif',
             }}
           />
         );

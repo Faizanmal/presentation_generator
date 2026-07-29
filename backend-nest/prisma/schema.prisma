@@ -186,6 +186,8 @@ model Project {
   aiProvider          String?    // The provider used (e.g., NVIDIA, OpenAI)
   metadata            Json?
   analytics           Json? // Analytics data
+  /// Canonical AI PresentationDocument (includes editMemory) for pin/partial regen
+  dslDocument         Json?
 
   // Timestamps
   createdAt   DateTime @default(now())
