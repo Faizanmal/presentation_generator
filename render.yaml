@@ -10,7 +10,7 @@ services:
     runtime: node
     plan: free
     rootDir: backend-nest
-    buildCommand: npm ci && npx prisma generate && npm run build
+    buildCommand: npm ci --include=dev && npx prisma generate && npx nest build
     startCommand: npx prisma migrate deploy && npm run start:prod
     healthCheckPath: /health/liveness
     envVars:

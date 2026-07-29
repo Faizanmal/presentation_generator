@@ -9,7 +9,7 @@
     "node": ">=24.12.0"
   },
   "scripts": {
-    "build": "nest build",
+    "build": "npx nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch --exec \"node dist/backend-nest/src/main.js\"",
