@@ -1,4 +1,9 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 
@@ -44,12 +49,28 @@ interface IngestionOptions {
 @Injectable()
 export class DocumentIngestionService {
   private readonly logger = new Logger(DocumentIngestionService.name);
-  private openai: OpenAI;
+  private readonly openaiClient: OpenAI | null;
 
   constructor(private readonly configService: ConfigService) {
-    this.openai = new OpenAI({
-      apiKey: this.configService.get<string>('OPENAI_API_KEY'),
-    });
+    // The OpenAI SDK throws when constructed without a key, which would crash
+    // the app on boot, so stay uninitialized and fail only when actually used.
+    const apiKey = this.configService.get<string>('OPENAI_API_KEY');
+    this.openaiClient = apiKey ? new OpenAI({ apiKey }) : null;
+
+    if (!this.openaiClient) {
+      this.logger.warn(
+        'OPENAI_API_KEY not configured — document ingestion is unavailable',
+      );
+    }
+  }
+
+  private get openai(): OpenAI {
+    if (!this.openaiClient) {
+      throw new ServiceUnavailableException(
+        'Document ingestion requires OPENAI_API_KEY to be configured',
+      );
+    }
+    return this.openaiClient;
   }
 
   /**

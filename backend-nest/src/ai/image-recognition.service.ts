@@ -2,6 +2,7 @@ import {
   Injectable,
   Logger,
   InternalServerErrorException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ImageAnnotatorClient } from '@google-cloud/vision';
@@ -24,7 +25,7 @@ export interface ImageAnalysisResult {
 export class ImageRecognitionService {
   private readonly logger = new Logger(ImageRecognitionService.name);
   private client: ImageAnnotatorClient | null;
-  private openai: OpenAI;
+  private readonly openaiClient: OpenAI | null;
 
   constructor(private readonly configService: ConfigService) {
     // Initialize Google Cloud Vision Client
@@ -39,9 +40,23 @@ export class ImageRecognitionService {
       this.client = null;
     }
 
-    this.openai = new OpenAI({
-      apiKey: this.configService.get<string>('OPENAI_API_KEY'),
-    });
+    // The OpenAI SDK throws when constructed without a key, which would crash
+    // the app on boot, so stay uninitialized and fail only when actually used.
+    const openaiKey = this.configService.get<string>('OPENAI_API_KEY');
+    this.openaiClient = openaiKey ? new OpenAI({ apiKey: openaiKey }) : null;
+
+    if (!this.openaiClient) {
+      this.logger.warn('OPENAI_API_KEY not configured — image analysis is unavailable');
+    }
+  }
+
+  private get openai(): OpenAI {
+    if (!this.openaiClient) {
+      throw new ServiceUnavailableException(
+        'Image analysis requires OPENAI_API_KEY to be configured',
+      );
+    }
+    return this.openaiClient;
   }
 
   /**

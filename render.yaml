@@ -43,7 +43,16 @@ services:
         generateValue: true
       - key: CSRF_SECRET
         generateValue: true
-      # Set these in Render dashboard after first deploy
+      # Optional integrations — disabled so missing credentials cannot break boot
+      - key: MAIL_ENABLED
+        value: "false"
+      - key: RECAPTCHA_ENABLED
+        value: "false"
+      - key: SENTRY_ENABLED
+        value: "false"
+      - key: METRICS_ENABLED
+        value: "true"
+      # Set these in the Render dashboard after the first deploy
       - key: FRONTEND_URL
         sync: false
       - key: BACKEND_URL
@@ -53,6 +62,15 @@ services:
       - key: NVIDIA_API_KEY
         sync: false
       - key: OPENAI_API_KEY
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+      # Google OAuth is skipped entirely unless all three are present
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_CALLBACK_URL
         sync: false
 
   - type: keyvalue
