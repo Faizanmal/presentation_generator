@@ -559,6 +559,12 @@ export class RateLimitMiddleware implements NestMiddleware {
   ) {}
 
   async use(req: Request, res: Response, next: NextFunction) {
+    // Platform health checks poll every few seconds; counting them would waste
+    // Redis calls and could starve real traffic of its quota.
+    if (req.path === '/health' || req.path.startsWith('/health/')) {
+      return next();
+    }
+
     const config: RateLimitConfig = {
       max: this.configService.get<number>('RATE_LIMIT_MAX', 100),
       window: this.configService.get<number>('RATE_LIMIT_WINDOW', 60),

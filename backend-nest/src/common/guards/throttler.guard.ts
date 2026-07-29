@@ -63,7 +63,7 @@ export class ThrottlerGuard extends NestThrottlerGuard {
     const request = context.switchToHttp().getRequest();
 
     // Skip rate limiting for health checks
-    if (request.path === '/health' || request.path === '/api/health') {
+    if (request.path === '/health' || request.path.startsWith('/health/')) {
       return true;
     }
 

@@ -180,9 +180,11 @@ async function bootstrap() {
   // ROUTES CONFIGURATION
   // ========================================
 
-  // Global prefix for all routes
+  // Global prefix for all routes. Each health route must be listed explicitly —
+  // excluding 'health' alone does not cover its sub-routes, and platform health
+  // checks probe /health/liveness directly.
   app.setGlobalPrefix('api', {
-    exclude: ['health', 'metrics'], // Health check endpoints
+    exclude: ['health', 'health/liveness', 'health/readiness', 'metrics'],
   });
 
   // ========================================
