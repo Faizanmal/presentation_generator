@@ -69,13 +69,13 @@ export class ImageAcquisitionService implements OnModuleDestroy {
   private cacheCleanupTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(private readonly configService: ConfigService) {
-    const isProd = process.env.NODE_ENV === 'production';
-    // Use absolute path in production to avoid ambiguity with CWD
-    const defaultDir = isProd
-      ? '/app/uploads/acquired-images'
-      : './uploads/acquired-images';
+    // Resolve against the working directory rather than a fixed absolute path:
+    // container images use /app, but other hosts run from elsewhere and cannot
+    // write outside the project directory.
+    const defaultDir = path.join(process.cwd(), 'uploads', 'acquired-images');
 
-    this.uploadDir = this.configService.get('UPLOAD_DIR') || defaultDir;
+    this.uploadDir =
+      this.configService.get<string>('UPLOAD_DIR') || defaultDir;
 
     // We don't await this as it's called in a constructor, but we handle errors inside
     void this.ensureUploadDir();

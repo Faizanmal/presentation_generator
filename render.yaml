@@ -76,7 +76,9 @@ services:
   - type: keyvalue
     name: presentation-designer-redis
     plan: free
-    maxmemoryPolicy: allkeys-lru
+    # BullMQ requires noeviction — under any other policy Redis can drop keys
+    # mid-job and queued work disappears silently.
+    maxmemoryPolicy: noeviction
     ipAllowList: []
 
 databases:
