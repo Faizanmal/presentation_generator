@@ -10,7 +10,7 @@ services:
     runtime: node
     plan: free
     rootDir: backend-nest
-    buildCommand: npm ci --include=dev && npx prisma generate && npx nest build
+    buildCommand: npm ci --include=dev && npx prisma generate && npm run build
     startCommand: npx prisma migrate deploy && npm run start:prod
     healthCheckPath: /health/liveness
     envVars:
@@ -18,6 +18,10 @@ services:
         value: production
       - key: NODE_VERSION
         value: "24.12.0"
+      # NODE_ENV=production makes npm skip devDependencies, but the Nest CLI,
+      # TypeScript and Prisma CLI all live there and are needed to build/migrate.
+      - key: NPM_CONFIG_INCLUDE
+        value: dev
       - key: PORT
         value: "10000"
       - key: DEMO_MODE
