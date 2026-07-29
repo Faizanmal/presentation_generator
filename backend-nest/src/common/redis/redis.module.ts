@@ -22,19 +22,16 @@ import Redis from 'ioredis';
         const redisOptions: Record<string, unknown> = {
           db,
           keyPrefix,
+          // Never stop retrying: managed Redis instances restart without notice,
+          // and giving up leaves Redis features dead until the app redeploys.
+          // Back off up to 30s so a long outage stays quiet in the logs.
           retryStrategy(times: number) {
-            const maxRetries =
-              configService.get<number>('REDIS_MAX_RETRIES') || 5;
-            if (times > maxRetries) {
-              logger.error(
-                `Redis unavailable after ${maxRetries} attempts. Continuing without Redis features.`,
+            const delay = Math.min(times * 5000, 30_000);
+            if (times <= 5 || times % 10 === 0) {
+              logger.warn(
+                `Redis reconnecting... (attempt ${times}, next retry in ${delay}ms)`,
               );
-              return null;
             }
-            const delay = 5000; // Fixed 5s delay to keep logs extremely quiet
-            logger.warn(
-              `Redis reconnecting... (attempt ${times}/${maxRetries})`,
-            );
             return delay;
           },
           maxRetriesPerRequest: null, // Critical for robust error handling with reconnections

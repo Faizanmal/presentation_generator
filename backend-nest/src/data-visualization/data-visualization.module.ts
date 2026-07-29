@@ -1,18 +1,13 @@
 import { Module } from '@nestjs/common';
-import { BullModule } from '@nestjs/bullmq';
 import { PrismaModule } from '../prisma/prisma.module';
 import { DataVisualizationService } from './data-visualization.service';
 import { DataConnectorService } from './data-connector.service';
 import { ChartGeneratorService } from './chart-generator.service';
 import { DataVisualizationController } from './data-visualization.controller';
+import { optionalBullQueue } from '../common/config/optional-bull-queue';
 
 @Module({
-  imports: [
-    PrismaModule,
-    BullModule.registerQueue({
-      name: 'data-sync',
-    }),
-  ],
+  imports: [PrismaModule, ...optionalBullQueue('data-sync')],
   controllers: [DataVisualizationController],
   providers: [
     DataVisualizationService,

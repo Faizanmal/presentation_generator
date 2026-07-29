@@ -7,6 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Queue, Worker, Job, QueueEvents } from 'bullmq';
 import { Redis } from 'ioredis';
+import { isRedisLowLoad } from '../config/redis-load.config';
 
 export interface QueueJob<T = unknown> {
   id?: string;
@@ -45,7 +46,16 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
   private readonly queueEnabled: boolean;
 
   constructor(private readonly configService: ConfigService) {
-    this.queueEnabled = this.configService.get<boolean>('QUEUE_ENABLED', true);
+    // Parallel QueueService opens its own Redis connection and is unused by
+    // feature modules — keep it off under free-tier Redis limits.
+    const explicit = this.configService.get<string>('QUEUE_ENABLED');
+    if (explicit === 'true' || explicit === '1') {
+      this.queueEnabled = true;
+    } else if (explicit === 'false' || explicit === '0') {
+      this.queueEnabled = false;
+    } else {
+      this.queueEnabled = !isRedisLowLoad();
+    }
   }
 
   onModuleInit(): void {
@@ -63,10 +73,10 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       maxRetriesPerRequest: null,
       enableReadyCheck: false,
       lazyConnect: true,
+      // Keep reconnecting indefinitely — a managed Redis restart must not
+      // permanently disable the queues.
       retryStrategy(times: number) {
-        const maxRetries = 5;
-        if (times > maxRetries) return null;
-        return 5000;
+        return Math.min(times * 5000, 30_000);
       },
     };
 

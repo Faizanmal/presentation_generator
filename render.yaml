@@ -26,6 +26,15 @@ services:
         value: "10000"
       - key: DEMO_MODE
         value: "false"
+      # Free Key Value (~50 connections): keep Redis quiet
+      - key: REDIS_LOW_LOAD
+        value: "true"
+      - key: QUEUE_ENABLED
+        value: "false"
+      - key: RATE_LIMIT_USE_REDIS
+        value: "false"
+      - key: CLUSTER_REDIS_ENABLED
+        value: "false"
       - key: DATABASE_URL
         fromDatabase:
           name: presentation-designer-db

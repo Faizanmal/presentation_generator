@@ -116,19 +116,21 @@ import featureFlagsConfig from './common/config/feature-flags.config';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
         const url = configService.get<string>('REDIS_URL');
+        const lowLoad =
+          configService.get<string>('REDIS_LOW_LOAD') === 'true' ||
+          (configService.get<string>('REDIS_LOW_LOAD') !== 'false' &&
+            configService.get<string>('NODE_ENV') === 'production');
 
         const commonOptions = {
-          maxRetriesPerRequest: null,
-          // CRITICAL: Reduce Redis command count for free tiers
-          // Increase lock duration and staggered check intervals to minimize heartbeat 'chatter'
-          lockDuration: 300000, // 5 minutes (standard is 30s)
-          stalledInterval: 300000, // Check for stalled jobs every 5 mins
-          maxStalledCount: 1, // Don't keep retrying stalled jobs too much
-
-          retryStrategy: (times: number) => {
-            if (times > 5) return null; // stop retrying after 5 attempts
-            return 10000; // wait 10s between reconnects
-          },
+          maxRetriesPerRequest: null as null,
+          enableReadyCheck: !lowLoad,
+          // Free Key Value: fewer heartbeats = fewer commands + less churn
+          lockDuration: lowLoad ? 600_000 : 300_000,
+          stalledInterval: lowLoad ? 600_000 : 300_000,
+          maxStalledCount: 1,
+          // Reconnect forever with backoff; abandoning the connection would
+          // leave every queue permanently broken after a Redis restart.
+          retryStrategy: (times: number) => Math.min(times * 5000, 30_000),
         };
 
         const connection = url
@@ -169,8 +171,10 @@ import featureFlagsConfig from './common/config/feature-flags.config';
         return {
           connection: connection,
           defaultJobOptions: {
-            removeOnComplete: true, // Auto-clean finished jobs to save memory/commands
-            removeOnFail: { count: 10 },
+            removeOnComplete: lowLoad
+              ? { count: 20 }
+              : true, // Auto-clean finished jobs to save memory/commands
+            removeOnFail: { count: lowLoad ? 5 : 10 },
             attempts: 1, // Minimize retries that burn through limits
           },
         };

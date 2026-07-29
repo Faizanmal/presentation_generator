@@ -3,6 +3,8 @@ import {
   Logger,
   BadRequestException,
   NotFoundException,
+  Optional,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
@@ -80,7 +82,9 @@ export class VideoRecordingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
-    @InjectQueue('video-processing') private readonly videoQueue: Queue,
+    @Optional()
+    @InjectQueue('video-processing')
+    private readonly videoQueue?: Queue,
   ) {
     this.s3Client = new S3Client({
       region: this.configService.get('AWS_REGION'),
@@ -290,6 +294,11 @@ export class VideoRecordingService {
       ...exportOptions,
     };
 
+    if (!this.videoQueue) {
+      throw new ServiceUnavailableException(
+        'Video queue disabled under REDIS_LOW_LOAD — set REDIS_LOW_LOAD=false to enable',
+      );
+    }
     const job = await this.videoQueue.add(
       'process-recording',
       {

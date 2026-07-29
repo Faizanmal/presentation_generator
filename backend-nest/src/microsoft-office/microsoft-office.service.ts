@@ -3,6 +3,8 @@ import {
   Logger,
   BadRequestException,
   NotFoundException,
+  Optional,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
@@ -83,7 +85,9 @@ export class MicrosoftOfficeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
-    @InjectQueue('powerpoint-processing') private readonly pptxQueue: Queue,
+    @Optional()
+    @InjectQueue('powerpoint-processing')
+    private readonly pptxQueue?: Queue,
   ) {
     this.s3Client = new S3Client({
       region: this.configService.get('AWS_REGION'),
@@ -339,6 +343,11 @@ export class MicrosoftOfficeService {
     });
 
     // Queue processing
+    if (!this.pptxQueue) {
+      throw new ServiceUnavailableException(
+        'PowerPoint queue disabled under REDIS_LOW_LOAD — set REDIS_LOW_LOAD=false to enable',
+      );
+    }
     await this.pptxQueue.add(
       'import-pptx',
       {

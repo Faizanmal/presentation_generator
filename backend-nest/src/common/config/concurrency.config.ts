@@ -3,75 +3,79 @@
  * Optimized for handling maximum concurrent users
  */
 
+import { isRedisLowLoad, redisAwareConcurrency } from './redis-load.config';
+
+const lowLoad = isRedisLowLoad();
+
 export const ConcurrencyConfig = {
   // AI Generation Queue
   aiGeneration: {
-    concurrency: Number.parseInt(
-      process.env.AI_GENERATION_CONCURRENCY || '10',
-      10,
+    concurrency: redisAwareConcurrency(
+      Number.parseInt(process.env.AI_GENERATION_CONCURRENCY || '10', 10),
     ),
-    maxJobsPerWorker: 100,
+    maxJobsPerWorker: lowLoad ? 20 : 100,
     limiter: {
-      max: 50, // Max jobs processed
-      duration: 60000, // Per 60 seconds
+      max: lowLoad ? 5 : 50,
+      duration: 60000,
     },
   },
 
   // Thinking Agent Queue (Most resource-intensive)
   thinkingGeneration: {
-    concurrency: Number.parseInt(
-      process.env.THINKING_QUEUE_CONCURRENCY || '5',
-      10,
+    concurrency: redisAwareConcurrency(
+      Number.parseInt(process.env.THINKING_QUEUE_CONCURRENCY || '5', 10),
     ),
-    maxJobsPerWorker: 50,
+    maxJobsPerWorker: lowLoad ? 10 : 50,
     limiter: {
-      max: 20,
+      max: lowLoad ? 3 : 20,
       duration: 60000,
     },
   },
 
   // Image Generation Queue (External API limited)
   imageGeneration: {
-    concurrency: Number.parseInt(
-      process.env.IMAGE_GENERATION_CONCURRENCY || '3',
-      10,
+    concurrency: redisAwareConcurrency(
+      Number.parseInt(process.env.IMAGE_GENERATION_CONCURRENCY || '3', 10),
     ),
-    maxJobsPerWorker: 30,
+    maxJobsPerWorker: lowLoad ? 10 : 30,
     limiter: {
-      max: 10,
+      max: lowLoad ? 3 : 10,
       duration: 60000,
     },
   },
 
   // Export Queue (CPU intensive)
   export: {
-    concurrency: Number.parseInt(process.env.EXPORT_CONCURRENCY || '8', 10),
-    maxJobsPerWorker: 100,
+    concurrency: redisAwareConcurrency(
+      Number.parseInt(process.env.EXPORT_CONCURRENCY || '8', 10),
+    ),
+    maxJobsPerWorker: lowLoad ? 20 : 100,
     limiter: {
-      max: 40,
+      max: lowLoad ? 5 : 40,
       duration: 60000,
     },
   },
 
   // Email Queue (External service)
   email: {
-    concurrency: Number.parseInt(process.env.EMAIL_CONCURRENCY || '20', 10),
-    maxJobsPerWorker: 200,
+    concurrency: redisAwareConcurrency(
+      Number.parseInt(process.env.EMAIL_CONCURRENCY || '20', 10),
+    ),
+    maxJobsPerWorker: lowLoad ? 20 : 200,
     limiter: {
-      max: 100,
+      max: lowLoad ? 10 : 100,
       duration: 60000,
     },
   },
 
   // Collaboration Update Queue (High throughput)
   collaboration: {
-    concurrency: Number.parseInt(
-      process.env.COLLABORATION_CONCURRENCY || '50',
-      10,
+    concurrency: redisAwareConcurrency(
+      Number.parseInt(process.env.COLLABORATION_CONCURRENCY || '50', 10),
     ),
-    maxJobsPerWorker: 500,
+    maxJobsPerWorker: lowLoad ? 50 : 500,
     limiter: {
-      max: 500,
+      max: lowLoad ? 50 : 500,
       duration: 60000,
     },
   },

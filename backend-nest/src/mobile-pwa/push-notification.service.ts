@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { Prisma } from '@prisma/client';
@@ -51,7 +51,9 @@ export class PushNotificationService {
 
   constructor(
     private readonly prisma: PrismaService,
-    @InjectQueue('push-notifications') private pushQueue: Queue,
+    @Optional()
+    @InjectQueue('push-notifications')
+    private pushQueue?: Queue,
   ) {
     // Initialize web-push with VAPID keys
     const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
@@ -160,6 +162,11 @@ export class PushNotificationService {
     }
 
     // Queue the notifications
+    if (!this.pushQueue) {
+      throw new ServiceUnavailableException(
+        'Push queue disabled under REDIS_LOW_LOAD — set REDIS_LOW_LOAD=false to enable',
+      );
+    }
     await this.pushQueue.add('send-notification', {
       subscriptions: subscriptions.map((s) => ({
         id: s.id,

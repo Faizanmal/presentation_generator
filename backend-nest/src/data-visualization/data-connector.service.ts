@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
@@ -61,7 +61,7 @@ export class DataConnectorService {
 
   constructor(
     private readonly prisma: PrismaService,
-    @InjectQueue('data-sync') private dataSyncQueue: Queue,
+    @Optional() @InjectQueue('data-sync') private dataSyncQueue?: Queue,
   ) {}
 
   /**
@@ -666,6 +666,12 @@ export class DataConnectorService {
     const interval = intervalMinutes || config.refreshInterval || 60;
 
     // Add to sync queue with repeat
+    if (!this.dataSyncQueue) {
+      this.logger.warn(
+        'Data sync queue disabled under REDIS_LOW_LOAD — skipping scheduled sync',
+      );
+      return;
+    }
     await this.dataSyncQueue.add(
       'sync-data',
       { connectionId },
@@ -680,6 +686,11 @@ export class DataConnectorService {
    * Trigger manual sync
    */
   async triggerSync(connectionId: string): Promise<void> {
+    if (!this.dataSyncQueue) {
+      throw new ServiceUnavailableException(
+        'Data sync queue disabled under REDIS_LOW_LOAD — set REDIS_LOW_LOAD=false to enable',
+      );
+    }
     await this.dataSyncQueue.add('sync-data', { connectionId });
   }
 

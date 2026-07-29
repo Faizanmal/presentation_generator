@@ -7,6 +7,7 @@ import {
   AcquiredImage,
 } from './image-acquisition.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { redisAwareConcurrency } from '../common/config/redis-load.config';
 
 export interface AcquireImageJobData {
   projectId: string;
@@ -25,7 +26,7 @@ export interface BulkAcquireJobData {
 }
 
 @Processor('image-acquisition', {
-  concurrency: 3, // Process 3 image acquisitions concurrently
+  concurrency: redisAwareConcurrency(3),
 })
 export class ImageAcquisitionProcessor extends WorkerHost {
   private readonly logger = new Logger(ImageAcquisitionProcessor.name);

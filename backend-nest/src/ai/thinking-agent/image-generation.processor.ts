@@ -4,6 +4,7 @@ import { Job } from 'bullmq';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PrismaClient } from '@prisma/client';
 import { AIService } from '../ai.service';
+import { ConcurrencyConfig } from '../../common/config/concurrency.config';
 
 export interface ImageGenerationJobData {
   blockId: string;
@@ -13,10 +14,8 @@ export interface ImageGenerationJobData {
 }
 
 @Processor('image-generation', {
-  concurrency: Number.parseInt(
-    process.env.IMAGE_GENERATION_CONCURRENCY || '3',
-    10,
-  ),
+  concurrency: ConcurrencyConfig.imageGeneration.concurrency,
+  limiter: ConcurrencyConfig.imageGeneration.limiter,
 })
 export class ImageGenerationProcessor extends WorkerHost {
   private readonly logger = new Logger(ImageGenerationProcessor.name);

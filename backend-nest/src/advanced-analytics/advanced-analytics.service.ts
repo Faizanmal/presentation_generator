@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
@@ -42,7 +42,9 @@ export class AdvancedAnalyticsService {
     private readonly prisma: PrismaService,
     private readonly audienceService: AudienceInsightsService,
     private readonly predictiveService: PredictiveAnalyticsService,
-    @InjectQueue('analytics-processing') private analyticsQueue: Queue,
+    @Optional()
+    @InjectQueue('analytics-processing')
+    private analyticsQueue?: Queue,
   ) {}
 
   /**
@@ -355,6 +357,11 @@ export class AdvancedAnalyticsService {
   ): Promise<{ reportId: string; status: 'processing' }> {
     const reportId = `report-${Date.now()}`;
 
+    if (!this.analyticsQueue) {
+      throw new ServiceUnavailableException(
+        'Analytics queue disabled under REDIS_LOW_LOAD — set REDIS_LOW_LOAD=false to enable',
+      );
+    }
     await this.analyticsQueue.add('generate-report', {
       reportId,
       userId,

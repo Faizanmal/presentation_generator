@@ -12,8 +12,8 @@ export type RedisClient = Redis | RedisCluster;
 @Injectable()
 export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ClusterRedisService.name);
-  private client!: RedisClient;
-  private subscriber!: RedisClient;
+  private client?: RedisClient;
+  private subscriber?: RedisClient;
 
   constructor(private readonly configService: ConfigService) {}
 
@@ -22,6 +22,18 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
     const clusterMode =
       this.configService.get<string>('REDIS_CLUSTER_MODE') === 'true';
     const clusterNodes = this.configService.get<string>('REDIS_CLUSTER_NODES');
+    const enabled =
+      this.configService.get<string>('CLUSTER_REDIS_ENABLED') === 'true' ||
+      clusterMode;
+
+    // Extra client+subscriber pair is unused by the rest of the app and burns
+    // two of the ~50 free Key Value connections — stay off unless explicitly needed.
+    if (!enabled) {
+      this.logger.log(
+        'ClusterRedisService idle (set CLUSTER_REDIS_ENABLED=true to activate)',
+      );
+      return;
+    }
 
     if (clusterMode && clusterNodes) {
       // Redis Cluster mode for high availability
@@ -38,7 +50,7 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
               ? {}
               : undefined,
         },
-        scaleReads: 'slave', // Read from replicas for better performance
+        scaleReads: 'slave',
         enableReadyCheck: true,
         maxRedirections: 16,
         retryDelayOnFailover: 100,
@@ -56,49 +68,42 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
       });
 
       this.logger.log(`Connected to Redis Cluster with ${nodes.length} nodes`);
-    } else {
-      // Single Redis instance mode
-      const isRediss = redisUrl && redisUrl.startsWith('rediss://');
-      const retryStrategy = (times: number) => {
-        if (times > 5) return null;
-        return 5000;
-      };
-
-      const baseOptions: import('ioredis').RedisOptions = {
-        password: this.configService.get<string>('REDIS_PASSWORD'),
-        retryStrategy,
-        maxRetriesPerRequest: null,
-        enableReadyCheck: true,
-        lazyConnect: true,
-      };
-
-      if (isRediss) {
-        baseOptions.tls = { rejectUnauthorized: false };
-      }
-
-      this.client = new Redis(
-        redisUrl || 'redis://localhost:6379',
-        baseOptions,
-      );
-      this.subscriber = new Redis(redisUrl || 'redis://localhost:6379', {
-        ...baseOptions,
-        maxRetriesPerRequest: 0,
-      });
-
-      // Event handlers attached immediately
-      this.client.on('error', (err) => {
-        this.logger.error(`Redis client error: ${err.message}`);
-      });
-      this.subscriber.on('error', (err) => {
-        this.logger.error(`Redis subscriber error: ${err.message}`);
-      });
-
-      // Initiation
-      void this.client.connect().catch(() => {});
-      void this.subscriber.connect().catch(() => {});
-
-      this.logger.log('Connected to Redis single instance (lazy-load)');
+      return;
     }
+
+    // Single Redis instance mode
+    const isRediss = redisUrl && redisUrl.startsWith('rediss://');
+    const retryStrategy = (times: number) => Math.min(times * 5000, 30_000);
+
+    const baseOptions: import('ioredis').RedisOptions = {
+      password: this.configService.get<string>('REDIS_PASSWORD'),
+      retryStrategy,
+      maxRetriesPerRequest: null,
+      enableReadyCheck: true,
+      lazyConnect: true,
+    };
+
+    if (isRediss) {
+      baseOptions.tls = { rejectUnauthorized: false };
+    }
+
+    this.client = new Redis(redisUrl || 'redis://localhost:6379', baseOptions);
+    this.subscriber = new Redis(redisUrl || 'redis://localhost:6379', {
+      ...baseOptions,
+      maxRetriesPerRequest: 0,
+    });
+
+    this.client.on('error', (err) => {
+      this.logger.error(`Redis client error: ${err.message}`);
+    });
+    this.subscriber.on('error', (err) => {
+      this.logger.error(`Redis subscriber error: ${err.message}`);
+    });
+
+    void this.client.connect().catch(() => {});
+    void this.subscriber.connect().catch(() => {});
+
+    this.logger.log('Connected to Redis single instance (lazy-load)');
   }
 
   async onModuleDestroy() {
@@ -108,10 +113,20 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   getClient(): RedisClient {
+    if (!this.client) {
+      throw new Error(
+        'ClusterRedisService is not active — set CLUSTER_REDIS_ENABLED=true',
+      );
+    }
     return this.client;
   }
 
   getSubscriber(): RedisClient {
+    if (!this.subscriber) {
+      throw new Error(
+        'ClusterRedisService is not active — set CLUSTER_REDIS_ENABLED=true',
+      );
+    }
     return this.subscriber;
   }
 
@@ -121,7 +136,7 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
     data: Record<string, unknown>,
     ttlSeconds: number = 86400,
   ) {
-    await this.client.setex(
+    await this.getClient().setex(
       `session:${sessionId}`,
       ttlSeconds,
       JSON.stringify(data),
@@ -129,22 +144,22 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async getSession(sessionId: string): Promise<Record<string, unknown> | null> {
-    const data = await this.client.get(`session:${sessionId}`);
+    const data = await this.getClient().get(`session:${sessionId}`);
     return data ? (JSON.parse(data) as Record<string, unknown>) : null;
   }
 
   async deleteSession(sessionId: string) {
-    await this.client.del(`session:${sessionId}`);
+    await this.getClient().del(`session:${sessionId}`);
   }
 
   async refreshSession(sessionId: string, ttlSeconds: number = 86400) {
-    await this.client.expire(`session:${sessionId}`, ttlSeconds);
+    await this.getClient().expire(`session:${sessionId}`, ttlSeconds);
   }
 
   // Distributed lock methods for cluster coordination
   async acquireLock(lockKey: string, ttlMs: number = 30000): Promise<boolean> {
     const lockValue = `${process.pid}-${Date.now()}`;
-    const result = await this.client.set(
+    const result = await this.getClient().set(
       `lock:${lockKey}`,
       lockValue,
       'PX',
@@ -155,7 +170,7 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async releaseLock(lockKey: string): Promise<void> {
-    await this.client.del(`lock:${lockKey}`);
+    await this.getClient().del(`lock:${lockKey}`);
   }
 
   // Rate limiting methods
@@ -166,10 +181,11 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
   ): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
     const now = Math.floor(Date.now() / 1000);
     const windowKey = `ratelimit:${key}:${Math.floor(now / windowSeconds)}`;
+    const client = this.getClient();
 
-    const current = await this.client.incr(windowKey);
+    const current = await client.incr(windowKey);
     if (current === 1) {
-      await this.client.expire(windowKey, windowSeconds);
+      await client.expire(windowKey, windowSeconds);
     }
 
     const allowed = current <= limit;
@@ -181,15 +197,16 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
 
   // Pub/Sub for cross-instance communication
   async publish(channel: string, message: Record<string, unknown>) {
-    await this.client.publish(channel, JSON.stringify(message));
+    await this.getClient().publish(channel, JSON.stringify(message));
   }
 
   async subscribe(
     channel: string,
     handler: (message: Record<string, unknown>) => void,
   ) {
-    await this.subscriber.subscribe(channel);
-    this.subscriber.on('message', (ch, msg) => {
+    const subscriber = this.getSubscriber();
+    await subscriber.subscribe(channel);
+    subscriber.on('message', (ch, msg) => {
       if (ch === channel) {
         try {
           handler(JSON.parse(msg) as Record<string, unknown>);
@@ -204,22 +221,27 @@ export class ClusterRedisService implements OnModuleInit, OnModuleDestroy {
 
   // Cache methods
   async cacheGet<T>(key: string): Promise<T | null> {
-    const data = await this.client.get(`cache:${key}`);
+    const data = await this.getClient().get(`cache:${key}`);
     return data ? (JSON.parse(data) as T) : null;
   }
 
   async cacheSet<T>(key: string, value: T, ttlSeconds: number = 300) {
-    await this.client.setex(`cache:${key}`, ttlSeconds, JSON.stringify(value));
+    await this.getClient().setex(
+      `cache:${key}`,
+      ttlSeconds,
+      JSON.stringify(value),
+    );
   }
 
   async cacheDelete(key: string) {
-    await this.client.del(`cache:${key}`);
+    await this.getClient().del(`cache:${key}`);
   }
 
   async cacheDeletePattern(pattern: string) {
-    const keys = await this.client.keys(`cache:${pattern}`);
+    const client = this.getClient();
+    const keys = await client.keys(`cache:${pattern}`);
     if (keys.length > 0) {
-      await this.client.del(...keys);
+      await client.del(...keys);
     }
   }
 }

@@ -9,6 +9,10 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { GenerationPipelineService } from '../agents/generation-pipeline.service';
 import type { GenerationRequest } from '@shared/presentation-dsl';
+import {
+  isRedisLowLoad,
+  redisAwareConcurrency,
+} from '../../common/config/redis-load.config';
 
 export const GENERATION_QUEUE = 'presentation-generation';
 
@@ -26,8 +30,8 @@ export interface GenerationJobResult {
 }
 
 @Processor(GENERATION_QUEUE, {
-  concurrency: 2,
-  limiter: { max: 5, duration: 60000 }, // Max 5 jobs per minute
+  concurrency: redisAwareConcurrency(2),
+  limiter: { max: isRedisLowLoad() ? 2 : 5, duration: 60000 },
 })
 export class GenerationQueueProcessor extends WorkerHost {
   private readonly logger = new Logger(GenerationQueueProcessor.name);

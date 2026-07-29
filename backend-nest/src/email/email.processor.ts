@@ -5,6 +5,7 @@ import { EmailProviderService } from './email-provider.service';
 import { EmailTrackingService } from './email-tracking.service';
 import { MonitoringService } from '../common/monitoring/monitoring.service';
 import { SendgridMailerService } from './sendgrid-mailer.service';
+import { ConcurrencyConfig } from '../common/config/concurrency.config';
 
 export interface SendEmailJobData {
   to: string;
@@ -22,11 +23,8 @@ export interface BulkEmailJobData {
 }
 
 @Processor('email', {
-  concurrency: 5,
-  limiter: {
-    max: 30,
-    duration: 60_000, // 30 emails per minute
-  },
+  concurrency: ConcurrencyConfig.email.concurrency,
+  limiter: ConcurrencyConfig.email.limiter,
 })
 export class EmailProcessor extends WorkerHost {
   private readonly logger = new Logger(EmailProcessor.name);

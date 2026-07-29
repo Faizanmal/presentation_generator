@@ -90,8 +90,7 @@ export class RateLimitService {
         lazyConnect: true,
         maxRetriesPerRequest: null,
         retryStrategy(times: number) {
-          if (times > 5) return null;
-          return 5000;
+          return Math.min(times * 5000, 30_000);
         },
       };
 

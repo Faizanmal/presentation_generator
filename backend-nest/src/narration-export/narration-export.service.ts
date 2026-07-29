@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AIService } from '../ai/ai.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -110,7 +110,7 @@ export class NarrationExportService {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly aiService: AIService,
-    @InjectQueue('narration') private readonly narrationQueue: Queue,
+    @Optional() @InjectQueue('narration') private readonly narrationQueue?: Queue,
   ) {
     // Initialize S3 client
     this.s3Client = new S3Client({
@@ -288,6 +288,11 @@ Return only the speaker notes, ready to be read aloud.
     });
 
     // Enqueue narration job (processed by worker)
+    if (!this.narrationQueue) {
+      throw new ServiceUnavailableException(
+        'Narration queue disabled under REDIS_LOW_LOAD — set REDIS_LOW_LOAD=false to enable',
+      );
+    }
     await this.narrationQueue.add(
       'generate-narration',
       {
