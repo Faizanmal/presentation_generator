@@ -51,8 +51,9 @@ export class LoggingInterceptor implements NestInterceptor {
 
     // Determine if info-level logging is enabled (used for requests/responses).
     const logInfo = this.logger.isLevelEnabled('info');
+    const isHealthCheck = (url as string)?.includes('/health');
 
-    if (logInfo) {
+    if (logInfo && !isHealthCheck) {
       this.logger.log(
         `Incoming ${method as string} ${url as string}`,
         JSON.stringify({
@@ -74,7 +75,7 @@ export class LoggingInterceptor implements NestInterceptor {
             .statusCode as number;
           const responseTime = Date.now() - startTime;
 
-          if (logInfo) {
+          if (logInfo && !isHealthCheck) {
             this.logger.log(
               `Completed ${method as string} ${url as string} ${statusCode} - ${responseTime}ms`,
               JSON.stringify({

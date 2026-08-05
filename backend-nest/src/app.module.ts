@@ -90,6 +90,7 @@ import { QueueModule } from './common/queue/queue.module';
 import { RateLimitModule } from './common/rate-limit/rate-limit.module';
 
 import { WorkersModule } from './workers/workers.module';
+import { HealthModule } from './health/health.module';
 
 // Services for seeding
 import { ThemesService } from './themes/themes.service';
@@ -285,6 +286,7 @@ import featureFlagsConfig from './common/config/feature-flags.config';
     CsrfModule,
     AdvancedRateLimitModule,
     WorkersModule,
+    HealthModule,
 
     // New Infrastructure modules
     CDNModule,
