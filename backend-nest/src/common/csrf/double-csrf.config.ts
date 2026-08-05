@@ -17,9 +17,9 @@ const {
   },
   cookieName: isProduction ? '__Host-psifi.x-csrf-token' : 'psifi.x-csrf-token',
   cookieOptions: {
-    sameSite: 'strict',
+    sameSite: 'none', // Changed from strict to allow cross-origin (Render backend -> Vercel frontend)
     path: '/',
-    secure: isProduction,
+    secure: true, // Must be true for sameSite: none
     httpOnly: true,
   },
   size: 64,
