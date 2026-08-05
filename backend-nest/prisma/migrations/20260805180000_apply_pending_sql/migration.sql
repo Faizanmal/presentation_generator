@@ -1,4 +1,4 @@
-﻿-- Persist canonical AI PresentationDocument (includes editMemory) on projects
+-- Persist canonical AI PresentationDocument (includes editMemory) on projects
 ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "dslDocument" JSONB;
 -- Migration: Add Enhanced Block Support
 -- Description: Adds columns and types to support enhanced blocks with charts, emojis, and rich styling
