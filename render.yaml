@@ -11,7 +11,7 @@ services:
     plan: free
     rootDir: backend-nest
     buildCommand: npm ci --include=dev && npx prisma generate && npm run build
-    startCommand: npx prisma migrate resolve --rolled-back "20260805180000_apply_pending_sql" || true && npx prisma migrate deploy && npm run start:prod
+    startCommand: npx prisma migrate resolve --applied "20260805180000_apply_pending_sql" || true && npx prisma migrate deploy && npm run start:prod
     healthCheckPath: /health/liveness
     envVars:
       - key: NODE_ENV
