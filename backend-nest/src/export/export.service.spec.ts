@@ -4,6 +4,39 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../users/users.service';
 
+// Mock PptxGenJS so PPTX generation doesn't trigger a native dynamic import
+// (which Jest's default transform cannot handle) and stays deterministic.
+jest.mock('pptxgenjs', () => {
+  return {
+    __esModule: true,
+    default: jest.fn().mockImplementation(() => {
+      const slide = {
+        background: undefined as unknown,
+        addText: jest.fn(),
+        addImage: jest.fn(),
+        addNotes: jest.fn(),
+      };
+      return {
+        author: '',
+        title: '',
+        subject: '',
+        company: '',
+        layout: '',
+        defineLayout: jest.fn(),
+        addSlide: jest.fn(() => slide),
+        write: jest
+          .fn()
+          .mockResolvedValue(
+            Buffer.concat([
+              Buffer.from('PK'),
+              Buffer.from('mock-pptx-content'),
+            ]),
+          ),
+      };
+    }),
+  };
+});
+
 describe('ExportService', () => {
   let service: ExportService;
 
@@ -152,14 +185,14 @@ describe('ExportService', () => {
   });
 
   describe('exportToPDF', () => {
-    it('should generate PDF buffer (fallback to HTML)', async () => {
+    it('should generate PDF buffer', async () => {
       mockPrismaService.project.findUnique.mockResolvedValue(mockProject);
 
       const result = await service.exportToPDF('project-1');
 
       expect(Buffer.isBuffer(result)).toBe(true);
-      // Currently falls back to HTML
-      expect(result.toString('utf-8')).toContain('<!DOCTYPE html>');
+      // PDF files start with "%PDF"
+      expect(result.toString('utf-8', 0, 4)).toBe('%PDF');
     });
 
     it('should include options in PDF generation', async () => {

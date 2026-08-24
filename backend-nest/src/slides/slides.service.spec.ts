@@ -8,7 +8,7 @@ describe('SlidesService (permissions)', () => {
   let service: SlidesService;
 
   const mockPrisma: {
-    project: { findUnique: jest.Mock };
+    project: { findUnique: jest.Mock; update: jest.Mock };
     slide: {
       create: jest.Mock;
       findUnique: jest.Mock;
@@ -16,8 +16,9 @@ describe('SlidesService (permissions)', () => {
       delete: jest.Mock;
       updateMany: jest.Mock;
     };
+    block: { create: jest.Mock };
   } = {
-    project: { findUnique: jest.fn() },
+    project: { findUnique: jest.fn(), update: jest.fn() },
     slide: {
       create: jest.fn(),
       findUnique: jest.fn(),
@@ -25,6 +26,7 @@ describe('SlidesService (permissions)', () => {
       delete: jest.fn(),
       updateMany: jest.fn(),
     },
+    block: { create: jest.fn() },
   };
   const mockCollab: { getUserRole: jest.Mock } = { getUserRole: jest.fn() };
 
@@ -47,8 +49,10 @@ describe('SlidesService (permissions)', () => {
       ownerId: 'owner',
     });
     mockCollab.getUserRole.mockResolvedValue('EDITOR');
-    mockPrisma.slide.create.mockResolvedValue({ id: 'slide-1', blocks: [] });
     mockPrisma.slide.updateMany.mockResolvedValue({});
+    mockPrisma.slide.create.mockResolvedValue({ id: 'slide-1', blocks: [] });
+    mockPrisma.block.create.mockResolvedValue({});
+    mockPrisma.project.update.mockResolvedValue({});
 
     const slide = await service.create('editor-1', {
       projectId: 'proj-1',

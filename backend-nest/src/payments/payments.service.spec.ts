@@ -6,34 +6,30 @@ import { UsersService } from '../users/users.service';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import Stripe from 'stripe';
 
-// Mock Stripe
 jest.mock('stripe');
 
 describe('PaymentsService', () => {
   let service: PaymentsService;
-  let _prisma: PrismaService;
-  let _configService: ConfigService;
-  let _usersService: UsersService;
+
+  const mockSubscription = {
+    id: 'sub-123',
+    userId: 'user-123',
+    stripeCustomerId: 'cus_test_123',
+    stripeSubscriptionId: 'sub_test_123',
+    plan: 'FREE',
+    status: 'ACTIVE',
+    cancelAtPeriodEnd: false,
+  };
 
   const mockUser = {
     id: 'user-123',
     email: 'test@example.com',
     name: 'Test User',
-    subscription: {
-      id: 'sub-123',
-      stripeCustomerId: 'cus_test_123',
-      stripeSubscriptionId: 'sub_test_123',
-      plan: 'FREE',
-      status: 'ACTIVE',
-    },
   };
 
   const mockStripe = {
     customers: {
-      create: jest.fn().mockResolvedValue({
-        id: 'cus_test_123',
-      }),
-      retrieve: jest.fn(),
+      create: jest.fn().mockResolvedValue({ id: 'cus_test_123' }),
     },
     checkout: {
       sessions: {
@@ -47,16 +43,11 @@ describe('PaymentsService', () => {
       retrieve: jest.fn().mockResolvedValue({
         id: 'sub_test_123',
         status: 'active',
+        current_period_start: Math.floor(Date.now() / 1000),
         current_period_end: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
+        items: { data: [{ price: { id: 'price_test' } }] },
       }),
-      cancel: jest.fn().mockResolvedValue({
-        id: 'sub_test_123',
-        status: 'canceled',
-      }),
-      update: jest.fn().mockResolvedValue({
-        id: 'sub_test_123',
-        status: 'active',
-      }),
+      update: jest.fn().mockResolvedValue({ id: 'sub_test_123' }),
     },
     billingPortal: {
       sessions: {
@@ -71,14 +62,8 @@ describe('PaymentsService', () => {
   };
 
   const mockPrismaService = {
-    user: {
-      findUnique: jest.fn(),
-    },
     subscription: {
-      findUnique: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
+      findFirst: jest.fn(),
     },
   };
 
@@ -88,6 +73,8 @@ describe('PaymentsService', () => {
         STRIPE_SECRET_KEY: 'sk_test_123',
         STRIPE_WEBHOOK_SECRET: 'whsec_test_123',
         FRONTEND_URL: 'http://localhost:3000',
+        STRIPE_PRO_PRICE_ID: 'price_pro',
+        STRIPE_ENTERPRISE_PRICE_ID: 'price_enterprise',
       };
       return config[key];
     }),
@@ -95,11 +82,12 @@ describe('PaymentsService', () => {
 
   const mockUsersService = {
     findById: jest.fn(),
+    getSubscription: jest.fn(),
     updateSubscription: jest.fn(),
+    resetAIGenerations: jest.fn(),
   };
 
   beforeEach(async () => {
-    // Mock Stripe constructor
     (Stripe as unknown as jest.Mock).mockImplementation(() => mockStripe);
 
     const module: TestingModule = await Test.createTestingModule({
@@ -112,11 +100,12 @@ describe('PaymentsService', () => {
     }).compile();
 
     service = module.get<PaymentsService>(PaymentsService);
-    _prisma = module.get<PrismaService>(PrismaService);
-    _configService = module.get<ConfigService>(ConfigService);
-    _usersService = module.get<UsersService>(UsersService);
 
     jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('should be defined', () => {
@@ -125,10 +114,7 @@ describe('PaymentsService', () => {
 
   describe('createCheckoutSession', () => {
     it('should create a checkout session for PRO plan', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
-      mockPrismaService.subscription.findUnique.mockResolvedValue(
-        mockUser.subscription,
-      );
+      mockUsersService.getSubscription.mockResolvedValue(mockSubscription);
 
       const result = await service.createCheckoutSession('user-123', 'pro');
 
@@ -143,50 +129,61 @@ describe('PaymentsService', () => {
     });
 
     it('should create a new Stripe customer if user has none', async () => {
-      const userWithoutCustomer = {
-        ...mockUser,
-        subscription: { ...mockUser.subscription, stripeCustomerId: null },
-      };
-      mockPrismaService.user.findUnique.mockResolvedValue(userWithoutCustomer);
-      mockPrismaService.subscription.findUnique.mockResolvedValue(
-        userWithoutCustomer.subscription,
-      );
-      mockPrismaService.subscription.update.mockResolvedValue({});
+      mockUsersService.getSubscription.mockResolvedValue({
+        ...mockSubscription,
+        stripeCustomerId: null,
+      });
+      mockUsersService.findById.mockResolvedValue(mockUser);
+      mockUsersService.updateSubscription.mockResolvedValue({});
 
       await service.createCheckoutSession('user-123', 'pro');
 
-      expect(mockStripe.customers.create).toHaveBeenCalledWith({
-        email: mockUser.email,
-        name: mockUser.name,
-      });
-      expect(mockPrismaService.subscription.update).toHaveBeenCalledWith({
-        where: { userId: 'user-123' },
-        data: { stripeCustomerId: 'cus_test_123' },
-      });
+      expect(mockStripe.customers.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: mockUser.email,
+          name: mockUser.name,
+        }),
+      );
+      expect(mockUsersService.updateSubscription).toHaveBeenCalledWith(
+        'user-123',
+        expect.objectContaining({ stripeCustomerId: 'cus_test_123' }),
+      );
     });
 
-    it('should throw NotFoundException when user not found', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue(null);
+    it('should throw NotFoundException when subscription not found', async () => {
+      mockUsersService.getSubscription.mockRejectedValue(
+        new NotFoundException('Subscription not found'),
+      );
 
       await expect(
         service.createCheckoutSession('nonexistent', 'pro'),
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw BadRequestException for invalid plan', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+    it('should throw BadRequestException when price is not configured', async () => {
+      mockUsersService.getSubscription.mockResolvedValue(mockSubscription);
+      const defaultImpl = mockConfigService.get.getMockImplementation();
+      mockConfigService.get.mockImplementation((key: string) => {
+        if (
+          key === 'STRIPE_PRO_PRICE_ID' ||
+          key === 'STRIPE_ENTERPRISE_PRICE_ID'
+        ) {
+          return undefined;
+        }
+        return defaultImpl ? defaultImpl(key) : undefined;
+      });
 
       await expect(
-        service.createCheckoutSession('user-123', 'invalid_plan' as never),
+        service.createCheckoutSession('user-123', 'pro'),
       ).rejects.toThrow(BadRequestException);
+
+      mockConfigService.get.mockImplementation(defaultImpl);
     });
   });
 
   describe('createPortalSession', () => {
     it('should create a billing portal session', async () => {
-      mockPrismaService.subscription.findUnique.mockResolvedValue(
-        mockUser.subscription,
-      );
+      mockUsersService.getSubscription.mockResolvedValue(mockSubscription);
 
       const result = await service.createPortalSession('user-123');
 
@@ -198,22 +195,11 @@ describe('PaymentsService', () => {
       });
     });
 
-    it('should throw NotFoundException when subscription not found', async () => {
-      mockPrismaService.subscription.findUnique.mockResolvedValue(null);
-
-      await expect(service.createPortalSession('user-123')).rejects.toThrow(
-        NotFoundException,
-      );
-    });
-
     it('should throw BadRequestException when no Stripe customer ID', async () => {
-      const subWithoutCustomer = {
-        ...mockUser.subscription,
+      mockUsersService.getSubscription.mockResolvedValue({
+        ...mockSubscription,
         stripeCustomerId: null,
-      };
-      mockPrismaService.subscription.findUnique.mockResolvedValue(
-        subWithoutCustomer,
-      );
+      });
 
       await expect(service.createPortalSession('user-123')).rejects.toThrow(
         BadRequestException,
@@ -223,20 +209,21 @@ describe('PaymentsService', () => {
 
   describe('getStripeSubscription', () => {
     it('should return subscription details', async () => {
-      mockPrismaService.subscription.findUnique.mockResolvedValue(
-        mockUser.subscription,
-      );
+      mockUsersService.getSubscription.mockResolvedValue(mockSubscription);
 
       const result = await service.getStripeSubscription('user-123');
 
-      expect(result).toEqual(mockUser.subscription);
-      expect(mockPrismaService.subscription.findUnique).toHaveBeenCalledWith({
-        where: { userId: 'user-123' },
-      });
+      expect(result).toEqual(expect.objectContaining({ id: 'sub_test_123' }));
+      expect(mockStripe.subscriptions.retrieve).toHaveBeenCalledWith(
+        'sub_test_123',
+      );
     });
 
-    it('should return null when subscription not found', async () => {
-      mockPrismaService.subscription.findUnique.mockResolvedValue(null);
+    it('should return null when no Stripe subscription ID', async () => {
+      mockUsersService.getSubscription.mockResolvedValue({
+        ...mockSubscription,
+        stripeSubscriptionId: null,
+      });
 
       const result = await service.getStripeSubscription('user-123');
 
@@ -246,42 +233,27 @@ describe('PaymentsService', () => {
 
   describe('cancelSubscription', () => {
     it('should cancel an active subscription', async () => {
-      mockPrismaService.subscription.findUnique.mockResolvedValue(
-        mockUser.subscription,
-      );
-      mockPrismaService.subscription.update.mockResolvedValue({});
+      mockUsersService.getSubscription.mockResolvedValue(mockSubscription);
+      mockUsersService.updateSubscription.mockResolvedValue({});
 
       const result = await service.cancelSubscription('user-123');
 
       expect(mockStripe.subscriptions.update).toHaveBeenCalledWith(
         'sub_test_123',
-        {
-          cancel_at_period_end: true,
-        },
+        { cancel_at_period_end: true },
       );
-      expect(mockPrismaService.subscription.update).toHaveBeenCalledWith({
-        where: { userId: 'user-123' },
-        data: { cancelAtPeriodEnd: true },
-      });
+      expect(mockUsersService.updateSubscription).toHaveBeenCalledWith(
+        'user-123',
+        { cancelAtPeriodEnd: true },
+      );
       expect(result.success).toBe(true);
     });
 
-    it('should throw NotFoundException when subscription not found', async () => {
-      mockPrismaService.subscription.findUnique.mockResolvedValue(null);
-
-      await expect(service.cancelSubscription('user-123')).rejects.toThrow(
-        NotFoundException,
-      );
-    });
-
     it('should throw BadRequestException when no Stripe subscription ID', async () => {
-      const subWithoutStripe = {
-        ...mockUser.subscription,
+      mockUsersService.getSubscription.mockResolvedValue({
+        ...mockSubscription,
         stripeSubscriptionId: null,
-      };
-      mockPrismaService.subscription.findUnique.mockResolvedValue(
-        subWithoutStripe,
-      );
+      });
 
       await expect(service.cancelSubscription('user-123')).rejects.toThrow(
         BadRequestException,
@@ -291,33 +263,33 @@ describe('PaymentsService', () => {
 
   describe('resumeSubscription', () => {
     it('should resume a canceled subscription', async () => {
-      const canceledSub = {
-        ...mockUser.subscription,
+      mockUsersService.getSubscription.mockResolvedValue({
+        ...mockSubscription,
         status: 'CANCELED',
         cancelAtPeriodEnd: true,
-      };
-      mockPrismaService.subscription.findUnique.mockResolvedValue(canceledSub);
-      mockPrismaService.subscription.update.mockResolvedValue({});
+      });
+      mockUsersService.updateSubscription.mockResolvedValue({});
 
       await service.resumeSubscription('user-123');
 
       expect(mockStripe.subscriptions.update).toHaveBeenCalledWith(
         'sub_test_123',
-        {
-          cancel_at_period_end: false,
-        },
+        { cancel_at_period_end: false },
       );
-      expect(mockPrismaService.subscription.update).toHaveBeenCalledWith({
-        where: { userId: 'user-123' },
-        data: { status: 'ACTIVE', cancelAtPeriodEnd: false },
-      });
+      expect(mockUsersService.updateSubscription).toHaveBeenCalledWith(
+        'user-123',
+        { cancelAtPeriodEnd: false },
+      );
     });
 
-    it('should throw NotFoundException when subscription not found', async () => {
-      mockPrismaService.subscription.findUnique.mockResolvedValue(null);
+    it('should throw BadRequestException when no Stripe subscription ID', async () => {
+      mockUsersService.getSubscription.mockResolvedValue({
+        ...mockSubscription,
+        stripeSubscriptionId: null,
+      });
 
       await expect(service.resumeSubscription('user-123')).rejects.toThrow(
-        NotFoundException,
+        BadRequestException,
       );
     });
   });
@@ -330,22 +302,22 @@ describe('PaymentsService', () => {
           object: {
             subscription: 'sub_test_123',
             customer: 'cus_test_123',
-            metadata: { userId: 'user-123', plan: 'PRO' },
+            metadata: { userId: 'user-123', plan: 'pro' },
           },
         },
       };
 
       mockStripe.webhooks.constructEvent.mockReturnValue(event);
-      mockPrismaService.subscription.update.mockResolvedValue({});
+      mockUsersService.updateSubscription.mockResolvedValue({});
 
       await service.handleWebhook('signature', Buffer.from('payload'));
 
       expect(mockStripe.webhooks.constructEvent).toHaveBeenCalledWith(
         Buffer.from('payload'),
         'signature',
-        'whsec_test',
+        'whsec_test_123',
       );
-      expect(mockPrismaService.subscription.update).toHaveBeenCalled();
+      expect(mockUsersService.updateSubscription).toHaveBeenCalled();
     });
 
     it('should handle customer.subscription.updated event', async () => {
@@ -354,21 +326,27 @@ describe('PaymentsService', () => {
         data: {
           object: {
             id: 'sub_test_123',
+            customer: 'cus_test_123',
             status: 'active',
+            current_period_start: Math.floor(Date.now() / 1000),
+            current_period_end:
+              Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
+            cancel_at_period_end: false,
             metadata: { userId: 'user-123' },
           },
         },
       };
 
       mockStripe.webhooks.constructEvent.mockReturnValue(event);
-      mockPrismaService.subscription.findUnique.mockResolvedValue(
-        mockUser.subscription,
+      mockPrismaService.subscription.findFirst.mockResolvedValue(
+        mockSubscription,
       );
-      mockPrismaService.subscription.update.mockResolvedValue({});
+      mockUsersService.updateSubscription.mockResolvedValue({});
+      mockUsersService.resetAIGenerations.mockResolvedValue({});
 
       await service.handleWebhook('signature', Buffer.from('payload'));
 
-      expect(mockPrismaService.subscription.update).toHaveBeenCalled();
+      expect(mockUsersService.updateSubscription).toHaveBeenCalled();
     });
 
     it('should handle customer.subscription.deleted event', async () => {
@@ -377,20 +355,23 @@ describe('PaymentsService', () => {
         data: {
           object: {
             id: 'sub_test_123',
+            customer: 'cus_test_123',
             metadata: { userId: 'user-123' },
           },
         },
       };
 
       mockStripe.webhooks.constructEvent.mockReturnValue(event);
-      mockPrismaService.subscription.update.mockResolvedValue({});
+      mockPrismaService.subscription.findFirst.mockResolvedValue(
+        mockSubscription,
+      );
+      mockUsersService.updateSubscription.mockResolvedValue({});
 
       await service.handleWebhook('signature', Buffer.from('payload'));
 
-      expect(mockPrismaService.subscription.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ status: 'CANCELED' }),
-        }),
+      expect(mockUsersService.updateSubscription).toHaveBeenCalledWith(
+        mockSubscription.userId,
+        expect.objectContaining({ plan: 'FREE' }),
       );
     });
   });

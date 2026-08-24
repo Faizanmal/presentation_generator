@@ -60,7 +60,9 @@ export class ThrottlerGuard extends NestThrottlerGuard {
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<{
+      path: string;
+    }>();
 
     // Skip rate limiting for health checks
     if (request.path === '/health' || request.path.startsWith('/health/')) {

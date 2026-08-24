@@ -7,6 +7,7 @@ import {
 } from './ai.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealTimeDataService } from './realtime-data.service';
+import { AICostOptimizerService } from './ai-cost-optimizer.service';
 
 // Mock OpenAI
 const mockOpenAI = {
@@ -81,7 +82,8 @@ describe('AIService', () => {
     get: jest.fn((key: string) => {
       const config: Record<string, string> = {
         OPENAI_API_KEY: 'test-api-key',
-        GOOGLE_GENERATIVE_AI_API_KEY: 'test-google-key',
+        // GOOGLE_GENERATIVE_AI_API_KEY intentionally omitted so the Google
+        // provider is not initialized and the OpenAI path is exercised.
         // OLLAMA_BASE_URL: 'http://localhost:11434', // Disabled for tests
         // OLLAMA_MODEL: 'llama2',
       };
@@ -94,6 +96,20 @@ describe('AIService', () => {
     fetchRealTimeData: jest.fn().mockResolvedValue([]),
   };
 
+  const mockAICostOptimizerService = {
+    dedupedRequest: jest.fn((_key: string, fn: () => Promise<unknown>) => fn()),
+    selectModelByCost: jest.fn().mockReturnValue({
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+      costPerToken: 0,
+      speed: 'fast',
+      quality: 'high',
+    }),
+    canAffordOperation: jest.fn().mockReturnValue(true),
+    calculateCost: jest.fn().mockReturnValue(0),
+    trackCost: jest.fn().mockReturnValue(undefined),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -101,6 +117,10 @@ describe('AIService', () => {
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: RealTimeDataService, useValue: mockRealTimeDataService },
+        {
+          provide: AICostOptimizerService,
+          useValue: mockAICostOptimizerService,
+        },
       ],
     }).compile();
 
@@ -109,6 +129,17 @@ describe('AIService', () => {
 
     // Reset mocks
     jest.clearAllMocks();
+
+    // Disable the Pollinations provider so image-generation tests exercise the
+    // mocked DALL-E path deterministically instead of making real HTTP calls.
+    jest
+      .spyOn(service, 'generateImagePollinations')
+      .mockRejectedValue(new Error('Pollinations disabled in tests'));
+  });
+
+  afterEach(() => {
+    // Clear the periodic cache-cleanup interval so Jest can exit cleanly.
+    service.onModuleDestroy();
   });
 
   describe('generatePresentation', () => {

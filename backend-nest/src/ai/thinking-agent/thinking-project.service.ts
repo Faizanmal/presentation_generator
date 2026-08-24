@@ -6,7 +6,10 @@ import { Prisma, PrismaClient } from '@prisma/client';
 import { EnhancedPresentation, EnhancedSection } from './thinking-agent.types';
 import { AIService } from '../ai.service';
 import { enhancedToPresentationDocument } from '../agents/enhanced-to-dsl.mapper';
-import type { PresentationDocument, SlideBlock } from '@shared/presentation-dsl';
+import type {
+  PresentationDocument,
+  SlideBlock,
+} from '@shared/presentation-dsl';
 
 interface CreateProjectFromThinkingResult {
   projectId: string;
@@ -105,12 +108,18 @@ export class ThinkingProjectService {
           data: {
             projectId: project.id,
             order: slideIndex,
-            layout: dslSlide.layout?.preset || this.mapLayoutType(section?.layout),
-            speakerNotes: dslSlide.speakerNotes || section?.speakerNotes || null,
+            layout:
+              dslSlide.layout?.preset || this.mapLayoutType(section?.layout),
+            speakerNotes:
+              dslSlide.speakerNotes || section?.speakerNotes || null,
           },
         });
 
-        for (let blockIndex = 0; blockIndex < dslSlide.blocks.length; blockIndex++) {
+        for (
+          let blockIndex = 0;
+          blockIndex < dslSlide.blocks.length;
+          blockIndex++
+        ) {
           const dslBlock = dslSlide.blocks[blockIndex];
           const style = this.styleFromDslBlock(dslBlock);
 
@@ -143,7 +152,9 @@ export class ThinkingProjectService {
           if (isGeneratedImage) {
             const prompt = String(dslBlock.content?.generationPrompt || '');
             const genStyle =
-              section?.suggestedImage?.style === 'natural' ? 'natural' : 'vivid';
+              section?.suggestedImage?.style === 'natural'
+                ? 'natural'
+                : 'vivid';
             imageGenerationJobs.push({
               blockId: createdBlock.id,
               prompt,

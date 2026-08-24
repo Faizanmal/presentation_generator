@@ -72,12 +72,12 @@ describe('UsersService', () => {
         email: 'test@example.com',
         subscription: {},
       };
-      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockPrismaService.user.findFirst.mockResolvedValue(mockUser);
 
       const result = await service.findById('user1');
 
       expect(result).toEqual(mockUser);
-      expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
+      expect(mockPrismaService.user.findFirst).toHaveBeenCalledWith({
         where: { id: 'user1' },
         include: { subscription: true },
       });
@@ -149,7 +149,12 @@ describe('UsersService', () => {
 
       expect(result).toEqual(mockCreatedUser);
       expect(mockPrismaService.user.create).toHaveBeenCalledWith({
-        data: createUserDto,
+        data: {
+          email: createUserDto.email,
+          name: undefined,
+          password: createUserDto.password,
+          image: undefined,
+        },
         include: { subscription: true },
       });
     });
@@ -198,9 +203,9 @@ describe('UsersService', () => {
 
   describe('canGenerateAI', () => {
     it('should return true if development mode or unlimited plan', async () => {
-      // NOTE: Current implementation forces true for development
-      // const mockSub = { plan: SubscriptionPlan.PRO };
-      // mockPrismaService.subscription.findUnique.mockResolvedValue(mockSub);
+      mockConfigService.get.mockImplementation((key: string) =>
+        key === 'NODE_ENV' ? 'development' : undefined,
+      );
 
       const result = await service.canGenerateAI('user1');
       expect(result).toBe(true);
@@ -218,9 +223,7 @@ describe('UsersService', () => {
         securityAlerts: true,
         productUpdates: false,
       };
-      mockPrismaService.emailPreferences.findUnique.mockResolvedValue(
-        mockPrefs,
-      );
+      mockPrismaService.emailPreferences.findFirst.mockResolvedValue(mockPrefs);
 
       const result = await service.getEmailPreferences('user1');
 
@@ -228,7 +231,7 @@ describe('UsersService', () => {
     });
 
     it('should return defaults if no preferences exist', async () => {
-      mockPrismaService.emailPreferences.findUnique.mockResolvedValue(null);
+      mockPrismaService.emailPreferences.findFirst.mockResolvedValue(null);
 
       const result = await service.getEmailPreferences('user1');
 

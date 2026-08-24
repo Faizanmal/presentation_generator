@@ -51,7 +51,7 @@ const getBlockType = (block: Block) => {
 
 const getBlockZone = (block: Block): number | undefined => {
   const direct = (block as Block & { zone?: number }).zone;
-  if (typeof direct === 'number') return direct;
+  if (typeof direct === 'number') {return direct;}
   const fromStyle = block.style?.zone;
   return typeof fromStyle === 'number' ? fromStyle : undefined;
 };
@@ -72,7 +72,7 @@ const blockTextWeight = (block: Block): number => {
 
 /** Split body blocks by explicit zone, else by balanced text weight */
 function splitIntoColumns(blocks: Block[], columnCount: number): Block[][] {
-  if (columnCount <= 1) return [blocks];
+  if (columnCount <= 1) {return [blocks];}
 
   const zoned = blocks.filter((b) => getBlockZone(b) !== undefined);
   if (zoned.length >= Math.min(2, blocks.length)) {
@@ -84,7 +84,7 @@ function splitIntoColumns(blocks: Block[], columnCount: number): Block[][] {
         : 0;
       cols[idx].push(block);
     }
-    if (cols.some((c) => c.length > 0)) return cols;
+    if (cols.some((c) => c.length > 0)) {return cols;}
   }
 
   // Weight-balanced greedy fill (avoids naive midpoint split)
@@ -93,7 +93,7 @@ function splitIntoColumns(blocks: Block[], columnCount: number): Block[][] {
   for (const block of blocks) {
     let lightest = 0;
     for (let i = 1; i < columnCount; i++) {
-      if (weights[i] < weights[lightest]) lightest = i;
+      if (weights[i] < weights[lightest]) {lightest = i;}
     }
     cols[lightest].push(block);
     weights[lightest] += blockTextWeight(block);
@@ -205,7 +205,7 @@ export function LayoutCompiler({
             </div>
           )}
           {mediaBlocks.length > 0 && (
-            <div className={`w-full mt-4 max-w-2xl opacity-90`}>{renderBlockList(mediaBlocks, 'm-')}</div>
+            <div className="w-full mt-4 max-w-2xl opacity-90">{renderBlockList(mediaBlocks, 'm-')}</div>
           )}
         </div>
       );
@@ -264,6 +264,7 @@ export function LayoutCompiler({
           <div className={`flex-1 grid grid-cols-1 md:grid-cols-3 ${columnGap} items-start min-h-0`}>
             {cols.map((col, i) => (
               <div
+                // eslint-disable-next-line react/no-array-index-key
                 key={`col-${i}`}
                 className={`flex flex-col min-w-0 ${isDense ? 'gap-3' : 'gap-4'} ${borderSubtle} rounded-2xl p-4`}
                 style={{ background: surface, opacity: bodyOpacity }}
@@ -371,7 +372,7 @@ export function LayoutCompiler({
         <div className={`w-full h-full flex flex-col ${contentPad} ${verticalGap} relative z-10 overflow-hidden`}>
           {titleBlocks.length > 0 && <div className="shrink-0 max-w-4xl">{renderBlockList(titleBlocks, 't-')}</div>}
           <div
-            className={`flex-1 grid gap-4 min-h-0 content-center`}
+            className="flex-1 grid gap-4 min-h-0 content-center"
             style={{
               gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
               opacity: bodyOpacity,

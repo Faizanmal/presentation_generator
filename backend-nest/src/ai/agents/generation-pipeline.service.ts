@@ -633,7 +633,8 @@ export class GenerationPipelineService {
                 pinnedBySlideField.get(`${slideId}:${fieldHint}`);
               const placements = layoutDecision?.blockPlacements || [];
               const placementIdx = placements.findIndex(
-                (bp, i) => bp.blockKind === kind && !usedPlacementIndexes.has(i),
+                (bp, i) =>
+                  bp.blockKind === kind && !usedPlacementIndexes.has(i),
               );
               if (placementIdx >= 0) {
                 usedPlacementIndexes.add(placementIdx);
@@ -648,10 +649,13 @@ export class GenerationPipelineService {
                   : content,
                 style: {
                   ...style,
-                  fontSize: style.fontSize || getBlockFontSize(kind, density, design.theme),
+                  fontSize:
+                    style.fontSize ||
+                    getBlockFontSize(kind, density, design.theme),
                 },
                 order: blockOrder++,
-                zone: placementIdx >= 0 ? placements[placementIdx].zone : undefined,
+                zone:
+                  placementIdx >= 0 ? placements[placementIdx].zone : undefined,
                 source: pinnedEntry ? 'user' : 'ai',
                 pinned: Boolean(pinnedEntry),
               });
@@ -780,9 +784,13 @@ export class GenerationPipelineService {
       const allSlides = sections.flatMap((s) => s.slides);
       const targets = [allSlides[0], allSlides[allSlides.length - 1]].filter(
         Boolean,
-      ) as PresentationSlide[];
+      );
       for (const slide of targets) {
-        if (slide.blocks.some((b) => b.kind === 'image' && b.content.url === logoUrl)) {
+        if (
+          slide.blocks.some(
+            (b) => b.kind === 'image' && b.content.url === logoUrl,
+          )
+        ) {
           continue;
         }
         slide.blocks.push({
@@ -864,8 +872,8 @@ export class GenerationPipelineService {
           kit.backgroundColor,
           kit.textColor,
         ].filter((c): c is string => Boolean(c)),
-        fonts: [kit.headingFont, kit.bodyFont].filter(
-          (f): f is string => Boolean(f),
+        fonts: [kit.headingFont, kit.bodyFont].filter((f): f is string =>
+          Boolean(f),
         ),
         tone:
           kit.voiceDescription ||

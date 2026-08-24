@@ -163,6 +163,19 @@ export class CollaborationService {
     role: 'VIEWER' | 'COMMENTER' | 'EDITOR',
     invitedBy: string,
   ) {
+    // Only the project owner can invite collaborators
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+    });
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+    if (project.ownerId !== invitedBy) {
+      throw new ForbiddenException(
+        'Only the project owner can add collaborators',
+      );
+    }
+
     // Check if user exists (handles both ID and Email)
     const userRecord = await this.prisma.user.findUnique({
       where: userId.includes('@') ? { email: userId } : { id: userId },

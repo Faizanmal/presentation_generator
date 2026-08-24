@@ -124,7 +124,7 @@ describe('AccessibilityService', () => {
             blocks: [
               {
                 id: 'block-img',
-                type: 'IMAGE',
+                blockType: 'IMAGE',
                 content: { url: 'https://example.com/image.jpg' }, // No alt
                 style: {},
               },
@@ -155,7 +155,7 @@ describe('AccessibilityService', () => {
             blocks: [
               {
                 id: 'block-text',
-                type: 'TEXT',
+                blockType: 'PARAGRAPH',
                 content: { text: 'Hard to read' },
                 style: {
                   fontSize: 14,
@@ -190,7 +190,7 @@ describe('AccessibilityService', () => {
             blocks: [
               {
                 id: 'block-text',
-                type: 'TEXT',
+                blockType: 'PARAGRAPH',
                 content: { text: 'Tiny text' },
                 style: { fontSize: 10 }, // Too small
               },

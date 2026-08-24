@@ -18,8 +18,8 @@ const LIVENESS_URL = `${API_ORIGIN}/health/liveness`;
 
 /** Skip wake logic for local backends — cold start only applies to hosted Free tiers */
 export function isColdStartHandlingEnabled(): boolean {
-  if (typeof window === 'undefined') return false;
-  if (process.env.NEXT_PUBLIC_SKIP_COLD_START === 'true') return false;
+  if (typeof window === 'undefined') {return false;}
+  if (process.env.NEXT_PUBLIC_SKIP_COLD_START === 'true') {return false;}
   try {
     const host = new URL(API_ORIGIN).hostname;
     return host !== 'localhost' && host !== '127.0.0.1';
@@ -91,16 +91,16 @@ async function pingOnce(): Promise<boolean> {
  * Ensures the Render backend is awake. Concurrent callers share one attempt.
  */
 export async function ensureServerAwake(): Promise<boolean> {
-  if (typeof window === 'undefined') return true;
-  if (!isColdStartHandlingEnabled()) return true;
+  if (typeof window === 'undefined') {return true;}
+  if (!isColdStartHandlingEnabled()) {return true;}
   if (status === 'ready') {
     // Cheap re-check — if still up, return fast; if not, wake again
     const ok = await pingOnce();
-    if (ok) return true;
+    if (ok) {return true;}
     status = 'idle';
   }
 
-  if (wakePromise) return wakePromise;
+  if (wakePromise) {return wakePromise;}
 
   wakePromise = (async () => {
     status = 'waking';
@@ -135,8 +135,8 @@ export async function ensureServerAwake(): Promise<boolean> {
 
 /** Start wake in the background (app boot). Does not throw. */
 export function warmupServerInBackground(): void {
-  if (typeof window === 'undefined') return;
-  if (!isColdStartHandlingEnabled()) return;
+  if (typeof window === 'undefined') {return;}
+  if (!isColdStartHandlingEnabled()) {return;}
   void ensureServerAwake();
 }
 
@@ -144,7 +144,7 @@ export function warmupServerInBackground(): void {
  * True when an Axios/network error looks like a cold/sleeping host.
  */
 export function isLikelyColdStartError(error: unknown): boolean {
-  if (!error || typeof error !== 'object') return false;
+  if (!error || typeof error !== 'object') {return false;}
 
   const err = error as {
     code?: string;
@@ -154,7 +154,7 @@ export function isLikelyColdStartError(error: unknown): boolean {
   };
 
   // No response = network / DNS / connection reset / Render still booting
-  if (!err.response && err.request) return true;
+  if (!err.response && err.request) {return true;}
 
   const code = err.code || '';
   if (

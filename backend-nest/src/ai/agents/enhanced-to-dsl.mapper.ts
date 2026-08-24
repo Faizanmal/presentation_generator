@@ -176,7 +176,14 @@ function mapLayoutPreset(
 
   return {
     preset,
-    zones: preset === 'three-column' ? 3 : preset === 'bento-grid' || preset === 'stats-grid' ? 4 : multiZone ? 2 : 1,
+    zones:
+      preset === 'three-column'
+        ? 3
+        : preset === 'bento-grid' || preset === 'stats-grid'
+          ? 4
+          : multiZone
+            ? 2
+            : 1,
     density: 'balanced',
   };
 }
@@ -301,7 +308,7 @@ export function enhancedToPresentationDocument(
             generationPrompt: String(section.suggestedImage.prompt),
           },
           style: {},
-          order: order++,
+          order: order,
           source: 'ai',
           pinned: false,
         });

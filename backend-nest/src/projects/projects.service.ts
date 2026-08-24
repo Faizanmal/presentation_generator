@@ -1013,9 +1013,7 @@ export class ProjectsService {
         dslDocument:
           dslDocument as unknown as import('@prisma/client').Prisma.InputJsonValue,
         title:
-          typeof dslDocument.title === 'string'
-            ? dslDocument.title
-            : undefined,
+          typeof dslDocument.title === 'string' ? dslDocument.title : undefined,
         updatedAt: new Date(),
       },
       select: {

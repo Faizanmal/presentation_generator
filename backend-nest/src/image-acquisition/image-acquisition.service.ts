@@ -74,8 +74,7 @@ export class ImageAcquisitionService implements OnModuleDestroy {
     // write outside the project directory.
     const defaultDir = path.join(process.cwd(), 'uploads', 'acquired-images');
 
-    this.uploadDir =
-      this.configService.get<string>('UPLOAD_DIR') || defaultDir;
+    this.uploadDir = this.configService.get<string>('UPLOAD_DIR') || defaultDir;
 
     // We don't await this as it's called in a constructor, but we handle errors inside
     void this.ensureUploadDir();

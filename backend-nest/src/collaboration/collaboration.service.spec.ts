@@ -64,11 +64,22 @@ describe('CollaborationService', () => {
     },
   };
 
+  const mockRedis = {
+    hdel: jest.fn().mockResolvedValue(1),
+    hgetall: jest.fn().mockResolvedValue({}),
+    pipeline: jest.fn().mockReturnValue({
+      hset: jest.fn().mockReturnThis(),
+      expire: jest.fn().mockReturnThis(),
+      exec: jest.fn().mockResolvedValue([]),
+    }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CollaborationService,
         { provide: PrismaService, useValue: mockPrismaService },
+        { provide: 'REDIS_CLIENT', useValue: mockRedis },
       ],
     }).compile();
 
@@ -194,19 +205,21 @@ describe('CollaborationService', () => {
       expect(result.role).toBe('EDITOR');
     });
 
-    it('should throw if performedBy is not project owner', async () => {
-      mockPrismaService.projectCollaborator.findUnique.mockResolvedValue({
+    it('should update the role by collaborator id', async () => {
+      mockPrismaService.projectCollaborator.update.mockResolvedValue({
         id: 'collab-1',
-        projectId: 'project-1',
-      });
-      mockPrismaService.project.findUnique.mockResolvedValue({
-        id: 'project-1',
-        ownerId: 'owner-id',
+        role: 'EDITOR',
       });
 
-      await expect(
-        service.updateCollaboratorRole('collab-1', 'EDITOR'),
-      ).rejects.toThrow();
+      const result = await service.updateCollaboratorRole('collab-1', 'EDITOR');
+
+      expect(result.role).toBe('EDITOR');
+      expect(mockPrismaService.projectCollaborator.update).toHaveBeenCalledWith(
+        {
+          where: { id: 'collab-1' },
+          data: { role: 'EDITOR' },
+        },
+      );
     });
   });
 

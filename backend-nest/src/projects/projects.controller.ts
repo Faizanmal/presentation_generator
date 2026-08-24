@@ -104,10 +104,7 @@ export class ProjectsController {
    */
   @Get(':id/dsl')
   @UseGuards(JwtAuthGuard)
-  async getDsl(
-    @CurrentUser() user: { id: string },
-    @Param('id') id: string,
-  ) {
+  async getDsl(@CurrentUser() user: { id: string }, @Param('id') id: string) {
     return this.projectsService.getDslDocument(id, user.id);
   }
 

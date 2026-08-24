@@ -18,9 +18,7 @@ import { shouldRegisterProcessor } from '../common/config/redis-load.config';
   controllers: [NarrationExportController],
   providers: [
     NarrationExportService,
-    ...(shouldRegisterProcessor('narration')
-      ? [NarrationExportProcessor]
-      : []),
+    ...(shouldRegisterProcessor('narration') ? [NarrationExportProcessor] : []),
   ],
   exports: [NarrationExportService],
 })

@@ -1,4 +1,10 @@
-import { Injectable, Logger, NotFoundException, Optional, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  Optional,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AIService } from '../ai/ai.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -110,7 +116,9 @@ export class NarrationExportService {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly aiService: AIService,
-    @Optional() @InjectQueue('narration') private readonly narrationQueue?: Queue,
+    @Optional()
+    @InjectQueue('narration')
+    private readonly narrationQueue?: Queue,
   ) {
     // Initialize S3 client
     this.s3Client = new S3Client({

@@ -123,7 +123,7 @@ import featureFlagsConfig from './common/config/feature-flags.config';
             configService.get<string>('NODE_ENV') === 'production');
 
         const commonOptions = {
-          maxRetriesPerRequest: null as null,
+          maxRetriesPerRequest: null,
           enableReadyCheck: !lowLoad,
           // Free Key Value: fewer heartbeats = fewer commands + less churn
           lockDuration: lowLoad ? 600_000 : 300_000,
@@ -172,9 +172,7 @@ import featureFlagsConfig from './common/config/feature-flags.config';
         return {
           connection: connection,
           defaultJobOptions: {
-            removeOnComplete: lowLoad
-              ? { count: 20 }
-              : true, // Auto-clean finished jobs to save memory/commands
+            removeOnComplete: lowLoad ? { count: 20 } : true, // Auto-clean finished jobs to save memory/commands
             removeOnFail: { count: lowLoad ? 5 : 10 },
             attempts: 1, // Minimize retries that burn through limits
           },

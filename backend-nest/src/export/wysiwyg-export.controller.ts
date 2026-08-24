@@ -115,7 +115,7 @@ export class WysiwygExportController {
           deviceScaleFactor,
         });
         await page.setContent(slidePage.html, {
-          waitUntil: 'networkidle0',
+          waitUntil: 'load',
           timeout: 15000,
         });
 

@@ -387,7 +387,7 @@ export default function SlideCanvas({
         .map((block) => {
           const zoneFromStyle =
             typeof block.style?.zone === "number" ? block.style.zone : undefined;
-          if (zoneFromStyle === undefined || block.zone !== undefined) return block;
+          if (zoneFromStyle === undefined || block.zone !== undefined) {return block;}
           return { ...block, zone: zoneFromStyle };
         }),
     [slide.blocks]

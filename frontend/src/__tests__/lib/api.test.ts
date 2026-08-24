@@ -57,9 +57,10 @@ describe('API Client', () => {
         it('creates axios instance with correct config', async () => {
             // Re-import to trigger initialization
             jest.resetModules();
+            const axiosMock = (await import('axios')) as typeof axios;
             await import('@/lib/api');
 
-            expect(axios.create).toHaveBeenCalledWith(
+            expect(axiosMock.create).toHaveBeenCalledWith(
                 expect.objectContaining({
                     baseURL: expect.any(String),
                     headers: expect.objectContaining({

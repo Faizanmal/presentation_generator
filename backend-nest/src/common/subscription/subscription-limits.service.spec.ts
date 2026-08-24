@@ -1,12 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { SubscriptionLimitsService } from './subscription-limits.service';
+import { PrismaService } from '../../prisma/prisma.service';
 
 describe('SubscriptionLimitsService', () => {
   let service: SubscriptionLimitsService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [SubscriptionLimitsService],
+      providers: [
+        SubscriptionLimitsService,
+        { provide: PrismaService, useValue: {} },
+      ],
     }).compile();
 
     service = module.get<SubscriptionLimitsService>(SubscriptionLimitsService);
@@ -32,7 +36,7 @@ describe('SubscriptionLimitsService', () => {
 
       expect(limits.maxProjects).toBe(50);
       expect(limits.maxSlidesPerProject).toBe(100);
-      expect(limits.aiGenerationsPerMonth).toBe(500);
+      expect(limits.aiGenerationsPerMonth).toBe(200);
       expect(limits.features.customBranding).toBe(true);
       expect(limits.features.advancedExport).toBe(true);
     });

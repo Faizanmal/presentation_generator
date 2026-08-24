@@ -155,7 +155,8 @@ Respond with:
       },
       effects: {
         borderRadius: parsed.theme?.effects?.borderRadius || '10px',
-        shadow: parsed.theme?.effects?.shadow || '0 4px 24px rgba(15,23,42,0.08)',
+        shadow:
+          parsed.theme?.effects?.shadow || '0 4px 24px rgba(15,23,42,0.08)',
         glassmorphism: parsed.theme?.effects?.glassmorphism || false,
         gradientOverlay: parsed.theme?.effects?.gradientOverlay,
       },

@@ -62,6 +62,10 @@ jest.mock('@/components/editor/chart-block', () => ({
     ChartBlock: () => <div data-testid="chart-block" />,
 }));
 
+jest.mock('@/components/editor/three-d-block', () => ({
+    ThreeDBlock: () => <div data-testid="three-d-block" />,
+}));
+
 jest.mock('@/components/editor/image-ai-controls', () => ({
     ImageAIControls: ({ imageUrl, imageAlt }: { imageUrl?: string; imageAlt?: string }) =>
         imageUrl ? <Image src={imageUrl} alt={imageAlt || 'Image'} /> : null,
@@ -162,7 +166,7 @@ describe('BlockRenderer', () => {
 
         expect(screen.getByText('Item 1')).toBeInTheDocument();
         expect(screen.getByText('Item 2')).toBeInTheDocument();
-        expect(screen.getByRole('list')).toHaveClass('space-y-3');
+        expect(screen.getByRole('list')).toHaveClass('space-y-4');
     });
 
     it('renders an image with URL', () => {
@@ -181,8 +185,9 @@ describe('BlockRenderer', () => {
             />
         );
 
-        const img = screen.getByAltText('Test Image');
-        expect(img).toHaveAttribute('src', 'https://example.com/image.png');
+        const img = screen.getByTestId('next-image');
+        expect(img).toHaveAttribute('data-src', 'https://example.com/image.png');
+        expect(img).toHaveAttribute('data-alt', 'Test Image');
     });
 
     it('renders image placeholder when no URL', () => {

@@ -46,7 +46,9 @@ export class ImageRecognitionService {
     this.openaiClient = openaiKey ? new OpenAI({ apiKey: openaiKey }) : null;
 
     if (!this.openaiClient) {
-      this.logger.warn('OPENAI_API_KEY not configured — image analysis is unavailable');
+      this.logger.warn(
+        'OPENAI_API_KEY not configured — image analysis is unavailable',
+      );
     }
   }
 

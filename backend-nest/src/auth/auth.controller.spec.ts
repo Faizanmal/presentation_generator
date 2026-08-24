@@ -3,6 +3,8 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { ConfigService } from '@nestjs/config';
 import { BadRequestException } from '@nestjs/common';
+import { ThrottlerGuard } from '@nestjs/throttler';
+import { RecaptchaGuard } from '../common/guards/recaptcha.guard';
 import type { Request, Response } from 'express';
 
 describe('AuthController', () => {
@@ -23,7 +25,12 @@ describe('AuthController', () => {
           useValue: { get: jest.fn(() => 'http://example.com') },
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(ThrottlerGuard)
+      .useValue({ canActivate: () => true })
+      .overrideGuard(RecaptchaGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<AuthController>(AuthController);
   });

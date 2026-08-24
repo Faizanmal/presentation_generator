@@ -210,7 +210,7 @@ export function computeBalancedFrames(
   }
 
   media.forEach((block, idx) => {
-    if (result[block.id]) return;
+    if (result[block.id]) {return;}
     const frame = withPadding(blueprint.mediaArea, 10);
     if (idx > 0) {
       frame.y += idx * 24;

@@ -181,7 +181,7 @@ const applyBalancedLayout = (slide: EditorSlide): EditorSlide => {
     slide.blocks.every((b, i) => b.frame.x === 80 && b.frame.y === 80 + i * 40) ||
     slide.blocks.every((b) => b.frame.x === 80 && b.frame.y === 80);
 
-  if (!looksStacked) return slide;
+  if (!looksStacked) {return slide;}
 
   const blueprint = buildLayoutBlueprint(
     EDITOR_LIMITS.canvasWidth,

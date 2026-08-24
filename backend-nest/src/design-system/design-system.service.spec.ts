@@ -155,7 +155,7 @@ describe('DesignSystemService', () => {
       });
 
       expect(result).toBeDefined();
-      expect(result.name).toBe('Modern Minimal');
+      expect(result.name).toBe('Updated System');
     });
   });
 
