@@ -109,9 +109,15 @@ export class EmailProviderService implements OnModuleInit {
     }
 
     if (this.providers.size === 0) {
-      this.logger.warn(
-        '⚠ No email providers configured! Email sending will fail. Configure SMTP settings in .env',
-      );
+      const mailOff =
+        this.configService.get<string>('MAIL_ENABLED') === 'false';
+      if (mailOff) {
+        this.logger.debug('Email disabled (MAIL_ENABLED=false)');
+      } else {
+        this.logger.warn(
+          'No email providers configured. Set SMTP or SENDGRID_API_KEY to send mail.',
+        );
+      }
     } else {
       this.logger.log(
         `Initialized ${this.providers.size} email provider(s): ${[...this.providers.keys()].join(', ')}`,

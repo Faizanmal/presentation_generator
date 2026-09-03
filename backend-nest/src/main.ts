@@ -2,6 +2,11 @@ import { NestFactory, Reflector } from '@nestjs/core';
 import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import {
+  ExpressAdapter,
+  NestExpressApplication,
+} from '@nestjs/platform-express';
+import express from 'express';
 import helmet from 'helmet';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
@@ -28,10 +33,25 @@ async function bootstrap() {
   // Create logger first
   const logger = new LoggerService('Bootstrap');
 
-  const app = await NestFactory.create(AppModule, {
-    rawBody: true, // Enable raw body for Stripe webhooks
-    logger: logger, // Use custom logger
+  // Register GET/HEAD / on Express before Nest's router. Render port scans
+  // `/`; the API prefix would otherwise 404 those probes.
+  const expressApp = express();
+  expressApp.get('/', (_req, res) => {
+    res.status(200).json({ status: 'ok' });
   });
+  expressApp.head('/', (_req, res) => {
+    res.status(200).end();
+  });
+
+  const app = await NestFactory.create<NestExpressApplication>(
+    AppModule,
+    new ExpressAdapter(expressApp),
+    {
+      rawBody: true, // Enable raw body for Stripe webhooks
+      logger: logger, // Use custom logger
+    },
+  );
+  app.set('trust proxy', 1);
 
   const configService = app.get(ConfigService);
 

@@ -19,25 +19,37 @@ loadEnv({ path: resolve(__dirname, '.env') });
 // already present. This keeps your deployment working even if the var is
 // defined without SSL info.
 
-if (process.env.DATABASE_URL) {
-  const url = process.env.DATABASE_URL;
-  if (!/sslmode=/.test(url)) {
-    // Append uselibpqcompat=true to help with 'self-signed certificate' errors on modern pg drivers
-    process.env.DATABASE_URL =
-      url +
-      (url.includes('?') ? '&' : '?') +
-      'sslmode=require&uselibpqcompat=true';
+function withPgSslCompat(url: string): string {
+  if (!url || url.includes('localhost') || url.includes('127.0.0.1')) {
+    return url;
   }
+  const extra: string[] = [];
+  const hasSslMode = /sslmode=/i.test(url);
+  if (process.env.NODE_ENV === 'production' && !hasSslMode) {
+    extra.push('sslmode=require');
+  }
+  const sslMode = (
+    url.match(/sslmode=([^&]+)/i)?.[1] ||
+    (extra.includes('sslmode=require') ? 'require' : '')
+  ).toLowerCase();
+  if (
+    ['require', 'prefer', 'verify-ca'].includes(sslMode) &&
+    !/uselibpqcompat=/i.test(url)
+  ) {
+    extra.push('uselibpqcompat=true');
+  }
+  if (extra.length === 0) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}${extra.join('&')}`;
+}
+
+if (process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = withPgSslCompat(process.env.DATABASE_URL);
 }
 
 if (process.env.DIRECT_DATABASE_URL) {
-  const url = process.env.DIRECT_DATABASE_URL;
-  if (!/sslmode=/.test(url)) {
-    process.env.DIRECT_DATABASE_URL =
-      url +
-      (url.includes('?') ? '&' : '?') +
-      'sslmode=require&uselibpqcompat=true';
-  }
+  process.env.DIRECT_DATABASE_URL = withPgSslCompat(
+    process.env.DIRECT_DATABASE_URL,
+  );
 }
 
 export default defineConfig({

@@ -39,6 +39,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
         error = (responseObj.error as string) || error;
         details = responseObj.details;
       }
+    } else if (
+      exception instanceof Error &&
+      (exception.name === 'ForbiddenError' ||
+        /csrf/i.test(exception.message))
+    ) {
+      status = HttpStatus.FORBIDDEN;
+      message = 'Invalid CSRF token';
+      error = 'Forbidden';
     } else if (exception instanceof Error) {
       message = exception.message;
       error = exception.name;
@@ -74,11 +82,27 @@ export class AllExceptionsFilter implements ExceptionFilter {
         }),
     };
 
-    // Log error details
-    this.logger.error(
-      `${request.method} ${request.url} ${status} - ${message}`,
-      exception instanceof Error ? exception.stack : undefined,
-    );
+    // Log based on severity. 404s on / are Render port scans, not app errors.
+    const path = request.path || request.url.split('?')[0];
+    const isPortScan =
+      status === HttpStatus.NOT_FOUND &&
+      (request.method === 'GET' || request.method === 'HEAD') &&
+      (path === '/' || path === '');
+
+    if (!isPortScan) {
+      if (status >= 500) {
+        this.logger.error(
+          `${request.method} ${request.url} ${status} - ${message}`,
+          exception instanceof Error ? exception.stack : undefined,
+          'ExceptionFilter',
+        );
+      } else {
+        this.logger.warn(
+          `${request.method} ${request.url} ${status} - ${message}`,
+          'ExceptionFilter',
+        );
+      }
+    }
 
     response.status(status).json(errorResponse);
   }

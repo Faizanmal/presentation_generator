@@ -60,6 +60,8 @@ services:
       # Optional integrations — disabled so missing credentials cannot break boot
       - key: MAIL_ENABLED
         value: "false"
+      - key: CHECKPOINT_DISABLE
+        value: "1"
       - key: RECAPTCHA_ENABLED
         value: "false"
       - key: SENTRY_ENABLED

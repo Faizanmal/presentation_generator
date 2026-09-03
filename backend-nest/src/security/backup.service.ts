@@ -4,7 +4,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import * as fs from 'fs';
 import * as path from 'path';
-import archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 import { createReadStream, createWriteStream } from 'fs';
 
 export interface BackupResult {
@@ -140,7 +140,7 @@ export class BackupService {
 
     // Create zip archive
     const output = createWriteStream(backupPath);
-    const archive = archiver('zip', { zlib: { level: 9 } });
+    const archive = new ZipArchive({ zlib: { level: 9 } });
 
     return new Promise((resolve, reject) => {
       output.on('close', () => resolve());
@@ -173,7 +173,7 @@ export class BackupService {
     const data = await this.exportDatabaseSince(since);
 
     const output = createWriteStream(backupPath);
-    const archive = archiver('zip', { zlib: { level: 9 } });
+    const archive = new ZipArchive({ zlib: { level: 9 } });
 
     return new Promise((resolve, reject) => {
       output.on('close', () => resolve());

@@ -216,7 +216,7 @@ export class AIService {
       );
       // leave this.openai uninitialized (undefined) â€“ calls should check
     } else if (!isOpenAiKeyConfigured) {
-      this.logger.warn(
+      this.logger.debug(
         'OpenAI API key is not configured or is using the placeholder value; OpenAI support will be disabled.',
       );
       // leave this.openai uninitialized; this avoids invalid key errors

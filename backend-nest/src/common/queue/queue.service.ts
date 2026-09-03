@@ -480,12 +480,13 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
   ): Promise<void> {
     const queue = this.getQueue(queueName);
 
-    await queue.add(jobName, data, {
-      repeat: {
-        pattern: cronExpression,
-      },
-      jobId: `recurring_${jobName}`,
-    });
+    // BullMQ v6: recurring jobs are managed via upsertJobScheduler, not
+    // the deprecated `repeat` field on queue.add().
+    await queue.upsertJobScheduler(
+      `recurring_${jobName}`,
+      { pattern: cronExpression },
+      { name: jobName, data },
+    );
 
     this.logger.log(
       `Recurring job scheduled: ${jobName} with pattern ${cronExpression}`,
@@ -497,11 +498,14 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
    */
   async removeRecurringJob(queueName: string, jobName: string): Promise<void> {
     const queue = this.getQueue(queueName);
-    const repeatableJobs = await queue.getRepeatableJobs();
+    // BullMQ v6: use JobScheduler API instead of the removed getRepeatableJobs.
+    const scheduler = await queue.jobScheduler;
+    const schedulers = await scheduler.getJobSchedulers();
 
-    for (const job of repeatableJobs) {
-      if (job.name === jobName || job.id === `recurring_${jobName}`) {
-        await queue.removeRepeatableByKey(job.key);
+    for (const s of schedulers) {
+      const schedulerId = s.id ?? s.key;
+      if (s.name === jobName || schedulerId === `recurring_${jobName}`) {
+        await scheduler.removeJobScheduler(schedulerId);
         this.logger.log(`Recurring job removed: ${jobName}`);
       }
     }

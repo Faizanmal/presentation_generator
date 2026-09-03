@@ -43,6 +43,13 @@ export class EmailProcessor extends WorkerHost {
   }
 
   async process(job: Job<unknown, unknown, string>): Promise<unknown> {
+    if (process.env.MAIL_ENABLED === 'false') {
+      this.logger.debug(
+        `Skipping email job ${job.id} (${job.name}) — MAIL_ENABLED=false`,
+      );
+      return { skipped: true };
+    }
+
     this.logger.log(
       `Processing email job ${job.id} | type: ${job.name} | attempt: ${job.attemptsMade + 1}`,
     );

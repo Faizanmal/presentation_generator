@@ -677,13 +677,12 @@ export class DataConnectorService {
       );
       return;
     }
-    await this.dataSyncQueue.add(
-      'sync-data',
-      { connectionId },
-      {
-        repeat: { every: interval * 60 * 1000 },
-        jobId: `sync-${connectionId}`,
-      },
+    // BullMQ v6: recurring jobs use upsertJobScheduler instead of
+    // the removed `repeat` option on queue.add().
+    await this.dataSyncQueue.upsertJobScheduler(
+      `sync-${connectionId}`,
+      { every: interval * 60 * 1000 },
+      { name: 'sync-data', data: { connectionId } },
     );
   }
 

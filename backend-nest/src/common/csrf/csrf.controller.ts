@@ -24,12 +24,6 @@ export class CsrfController {
   getCsrfToken(@Req() req: Request, @Res() res: Response) {
     try {
       const token = generateCsrfToken(req, res);
-
-      console.log('[CsrfController] Generated token:', {
-        token: token ? token.substring(0, 10) + '...' : 'null',
-        cookies: req.cookies,
-      });
-
       return res.json({ token });
     } catch (err) {
       console.error('[CsrfController] Error generating token:', err);

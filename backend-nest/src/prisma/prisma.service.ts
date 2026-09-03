@@ -10,6 +10,30 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 
+/** Quiet pg's sslmode=require warning and ensure production SSL. */
+export function withPgSslCompat(url: string): string {
+  if (!url || url.includes('localhost') || url.includes('127.0.0.1')) {
+    return url;
+  }
+  const extra: string[] = [];
+  const hasSslMode = /sslmode=/i.test(url);
+  if (process.env.NODE_ENV === 'production' && !hasSslMode) {
+    extra.push('sslmode=require');
+  }
+  const sslMode = (
+    url.match(/sslmode=([^&]+)/i)?.[1] ||
+    (extra.includes('sslmode=require') ? 'require' : '')
+  ).toLowerCase();
+  if (
+    ['require', 'prefer', 'verify-ca'].includes(sslMode) &&
+    !/uselibpqcompat=/i.test(url)
+  ) {
+    extra.push('uselibpqcompat=true');
+  }
+  if (extra.length === 0) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}${extra.join('&')}`;
+}
+
 @Injectable()
 export class PrismaService
   extends PrismaClient
@@ -24,17 +48,7 @@ export class PrismaService
       throw new Error('DATABASE_URL must be set');
     }
 
-    // Automatically append sslmode=require for production environments if not present
-    // This resolves P1001 errors on Railway/managed Postgres providers
-    if (
-      process.env.NODE_ENV === 'production' &&
-      !connectionString.includes('sslmode=') &&
-      !connectionString.includes('localhost') &&
-      !connectionString.includes('127.0.0.1')
-    ) {
-      connectionString += connectionString.includes('?') ? '&' : '?';
-      connectionString += 'sslmode=require&uselibpqcompat=true';
-    }
+    connectionString = withPgSslCompat(connectionString);
 
     const isProd = process.env.NODE_ENV === 'production';
     const isSupabase =

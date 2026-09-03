@@ -178,7 +178,6 @@ class ApiClient {
       
       if (this.token && !this.skipAuthHeader(config.url)) {
         config.headers.Authorization = `Bearer ${this.token}`;
-        console.warn('[ApiClient] Adding Authorization header for request to:', config.url);
       }
 
       // Add CSRF token for mutation requests (login/refresh are token-authenticated)

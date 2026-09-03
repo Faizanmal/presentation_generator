@@ -3,6 +3,7 @@ import {
   NestInterceptor,
   ExecutionContext,
   CallHandler,
+  HttpException,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { Observable } from 'rxjs';
@@ -91,21 +92,38 @@ export class LoggingInterceptor implements NestInterceptor {
           const responseTime = Date.now() - startTime;
           const errorMessage =
             error instanceof Error ? error.message : 'Unknown error';
-          const errorStack = error instanceof Error ? error.stack : '';
+          const status =
+            error instanceof HttpException ? error.getStatus() : 500;
+          const path = (url as string)?.split('?')[0] || '';
+          const isPortScan =
+            status === 404 &&
+            (method === 'GET' || method === 'HEAD') &&
+            (path === '/' || path === '');
 
-          // always log errors regardless of level, they will obey the
-          // transport settings (e.g. appear in error.log) if level is
-          // higher than 'info'.
-          this.logger.error(
-            `Failed ${method as string} ${url as string} - ${responseTime}ms`,
-            errorStack,
-            JSON.stringify({
-              requestId,
-              userId,
-              error: errorMessage,
-              responseTime,
-            }),
-          );
+          if (isPortScan) {
+            return;
+          }
+
+          const payload = JSON.stringify({
+            requestId,
+            userId,
+            error: errorMessage,
+            responseTime,
+            status,
+          });
+
+          if (status >= 500) {
+            this.logger.error(
+              `Failed ${method as string} ${url as string} - ${responseTime}ms`,
+              error instanceof Error ? error.stack : '',
+              payload,
+            );
+          } else {
+            this.logger.warn(
+              `Failed ${method as string} ${url as string} ${status} - ${responseTime}ms`,
+              payload,
+            );
+          }
         },
       }),
     );

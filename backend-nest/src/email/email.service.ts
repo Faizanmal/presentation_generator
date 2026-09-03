@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 
@@ -19,8 +20,38 @@ const DEFAULT_JOB_OPTIONS: EmailJobOptions = {
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
+  private readonly mailEnabled: boolean;
 
-  constructor(@InjectQueue('email') private readonly emailQueue: Queue) {}
+  constructor(
+    @InjectQueue('email') private readonly emailQueue: Queue,
+    private readonly configService: ConfigService,
+  ) {
+    this.mailEnabled =
+      this.configService.get<string>('MAIL_ENABLED') !== 'false' &&
+      Boolean(
+        this.configService.get<string>('SENDGRID_API_KEY') ||
+          this.configService.get<string>('MAIL_HOST'),
+      );
+  }
+
+  private async enqueue(
+    name: string,
+    data: unknown,
+    options: EmailJobOptions & {
+      backoff?: { type: string; delay: number };
+    } = {},
+  ): Promise<string> {
+    if (!this.mailEnabled) {
+      this.logger.debug(`Skipping ${name} — mail is disabled`);
+      return 'skipped';
+    }
+    const job = await this.emailQueue.add(name, data, {
+      ...DEFAULT_JOB_OPTIONS,
+      ...options,
+    });
+    this.logger.log(`Queued ${name} job ${job.id}`);
+    return job.id!;
+  }
 
   // ─── Generic Email ─────────────────────────────────────────
   async sendEmail(
@@ -30,17 +61,14 @@ export class EmailService {
     context: Record<string, unknown>,
     options?: EmailJobOptions,
   ): Promise<string> {
-    const job = await this.emailQueue.add(
+    return this.enqueue(
       'send-email',
       { to, subject, template, context },
       {
-        ...DEFAULT_JOB_OPTIONS,
         ...options,
         backoff: { type: 'exponential', delay: 2000 },
       },
     );
-    this.logger.log(`Queued email job ${job.id} → ${to}`);
-    return job.id!;
   }
 
   // ─── OTP Email (High Priority) ─────────────────────────────
@@ -49,18 +77,15 @@ export class EmailService {
     otp: string,
     expiresInMinutes: number = 5,
   ): Promise<string> {
-    const job = await this.emailQueue.add(
+    return this.enqueue(
       'send-otp',
       { to: email, otp, expiresInMinutes },
       {
-        ...DEFAULT_JOB_OPTIONS,
-        priority: 1, // Highest priority
+        priority: 1,
         attempts: 5,
         backoff: { type: 'exponential', delay: 1000 },
       },
     );
-    this.logger.log(`Queued OTP email job ${job.id} → ${email}`);
-    return job.id!;
   }
 
   // ─── Welcome Email ─────────────────────────────────────────
@@ -69,17 +94,14 @@ export class EmailService {
     name: string,
     loginUrl: string,
   ): Promise<string> {
-    const job = await this.emailQueue.add(
+    return this.enqueue(
       'send-welcome',
       { to: email, name, loginUrl },
       {
-        ...DEFAULT_JOB_OPTIONS,
         priority: 3,
         backoff: { type: 'exponential', delay: 3000 },
       },
     );
-    this.logger.log(`Queued welcome email job ${job.id} → ${email}`);
-    return job.id!;
   }
 
   // ─── Password Reset Email (High Priority) ──────────────────
@@ -89,18 +111,15 @@ export class EmailService {
     resetUrl: string,
     expiresInMinutes: number = 30,
   ): Promise<string> {
-    const job = await this.emailQueue.add(
+    return this.enqueue(
       'send-password-reset',
       { to: email, name, resetUrl, expiresInMinutes },
       {
-        ...DEFAULT_JOB_OPTIONS,
         priority: 1,
         attempts: 5,
         backoff: { type: 'exponential', delay: 1000 },
       },
     );
-    this.logger.log(`Queued password-reset email job ${job.id} → ${email}`);
-    return job.id!;
   }
 
   // ─── Email Verification ────────────────────────────────────
@@ -109,18 +128,15 @@ export class EmailService {
     name: string,
     verificationUrl: string,
   ): Promise<string> {
-    const job = await this.emailQueue.add(
+    return this.enqueue(
       'send-verification',
       { to: email, name, verificationUrl },
       {
-        ...DEFAULT_JOB_OPTIONS,
         priority: 2,
         attempts: 5,
         backoff: { type: 'exponential', delay: 2000 },
       },
     );
-    this.logger.log(`Queued verification email job ${job.id} → ${email}`);
-    return job.id!;
   }
 
   // ─── General Notification ──────────────────────────────────
@@ -132,17 +148,14 @@ export class EmailService {
     actionUrl?: string,
     actionLabel?: string,
   ): Promise<string> {
-    const job = await this.emailQueue.add(
+    return this.enqueue(
       'send-notification',
       { to: email, name, title, message, actionUrl, actionLabel },
       {
-        ...DEFAULT_JOB_OPTIONS,
         priority: 5,
         backoff: { type: 'exponential', delay: 3000 },
       },
     );
-    this.logger.log(`Queued notification email job ${job.id} → ${email}`);
-    return job.id!;
   }
 
   // ─── Project Shared ────────────────────────────────────────
@@ -153,17 +166,14 @@ export class EmailService {
     projectUrl: string,
     role: string,
   ): Promise<string> {
-    const job = await this.emailQueue.add(
+    return this.enqueue(
       'send-project-shared',
       { to: email, sharedBy, projectName, projectUrl, role },
       {
-        ...DEFAULT_JOB_OPTIONS,
         priority: 3,
         backoff: { type: 'exponential', delay: 2000 },
       },
     );
-    this.logger.log(`Queued project-shared email job ${job.id} → ${email}`);
-    return job.id!;
   }
 
   // ─── Team Invite ───────────────────────────────────────────
@@ -173,17 +183,14 @@ export class EmailService {
     teamName: string,
     inviteUrl: string,
   ): Promise<string> {
-    const job = await this.emailQueue.add(
+    return this.enqueue(
       'send-team-invite',
       { to: email, inviterName, teamName, inviteUrl },
       {
-        ...DEFAULT_JOB_OPTIONS,
         priority: 3,
         backoff: { type: 'exponential', delay: 2000 },
       },
     );
-    this.logger.log(`Queued team-invite email job ${job.id} → ${email}`);
-    return job.id!;
   }
 
   // ─── Bulk Email (Low Priority) ─────────────────────────────
@@ -193,20 +200,15 @@ export class EmailService {
     template: string,
     baseContext?: Record<string, unknown>,
   ): Promise<string> {
-    const job = await this.emailQueue.add(
+    return this.enqueue(
       'send-bulk',
       { recipients, subject, template, baseContext },
       {
-        ...DEFAULT_JOB_OPTIONS,
-        priority: 10, // Lowest priority
+        priority: 10,
         attempts: 2,
         backoff: { type: 'exponential', delay: 5000 },
       },
     );
-    this.logger.log(
-      `Queued bulk email job ${job.id} → ${recipients.length} recipients`,
-    );
-    return job.id!;
   }
 
   // ─── Queue Health ──────────────────────────────────────────

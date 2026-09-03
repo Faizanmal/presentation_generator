@@ -58,7 +58,7 @@ export class DocumentIngestionService {
     this.openaiClient = apiKey ? new OpenAI({ apiKey }) : null;
 
     if (!this.openaiClient) {
-      this.logger.warn(
+      this.logger.debug(
         'OPENAI_API_KEY not configured — document ingestion is unavailable',
       );
     }
