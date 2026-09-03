@@ -5,4 +5,4 @@ export declare enum GenerationTone {
     CREATIVE = "creative",
     PERSUASIVE = "persuasive"
 }
-export type LayoutType = 'title' | 'title-subtitle' | 'title-content' | 'two-column' | 'three-column' | 'image-left' | 'image-right' | 'image-full' | 'comparison' | 'timeline' | 'quote-highlight' | 'stats-grid' | 'chart-focus' | 'gallery' | 'agenda' | 'content';
+export type LayoutType = 'title' | 'title-hero' | 'title-subtitle' | 'title-content' | 'two-column' | 'two-column-image' | 'three-column' | 'image-left' | 'image-right' | 'image-full' | 'comparison' | 'timeline' | 'quote-highlight' | 'stats-grid' | 'chart-focus' | 'bento-grid' | 'gallery' | 'agenda' | 'content';

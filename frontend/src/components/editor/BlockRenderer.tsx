@@ -211,14 +211,34 @@ const BlockRenderer = React.memo(({
                 color: customColor?.startsWith('#') ? customColor : (theme?.colors?.text || primaryColor),
                 textAlign,
                 fontSize: customFontSize || headingScale,
-                maxWidth: textAlign === 'center' ? '22ch' : '28ch',
+                maxWidth: textAlign === 'center' ? '18ch' : 'none',
               }}
               dangerouslySetInnerHTML={{ __html: content?.text || "Heading" }}
             />
           </div>
         );
 
-      case "SUBHEADING":
+      case "SUBHEADING": {
+        const variant = blockStyle.variant || block.formatting?.variant;
+        if (variant === 'kicker') {
+          const kickerText = String(content?.text || '').trim();
+          if (/^(editorial|executive|bold|manifesto|comparison|quote|timeline|history|basics|evidence|use cases|look ahead|call to action|cta)$/i.test(kickerText)) {
+            return null;
+          }
+          return (
+            <div
+              className="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold tracking-[0.16em] uppercase"
+              style={{
+                color: primaryColor,
+                background: colorWithAlpha(primaryColor, 0.08),
+                border: `1px solid ${colorWithAlpha(primaryColor, 0.2)}`,
+                fontFamily: theme?.fonts?.body || 'var(--font-dm-sans), system-ui, sans-serif',
+              }}
+            >
+              {content?.text || "Kicker"}
+            </div>
+          );
+        }
         return (
           <h2
             ref={contentRef}
@@ -233,11 +253,12 @@ const BlockRenderer = React.memo(({
               textAlign,
               fontSize: customFontSize || subheadingScale,
               opacity: 0.9,
-              maxWidth: '16ch',
+              maxWidth: '36ch',
             }}
             dangerouslySetInnerHTML={{ __html: content?.text || "Subheading" }}
           />
         );
+      }
 
       case "PARAGRAPH": {
         const variant = blockStyle.variant || block.formatting?.variant;
@@ -659,13 +680,13 @@ const BlockRenderer = React.memo(({
           "Option B: Powerful and flexible",
         ]).map((text, idx) => ({ id: text || `cmp-${idx}`, text }));
         return (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-5xl">
+          <div className="grid grid-cols-2 gap-5">
             {comparisonItems.map((entry, i) => {
               const colors = [primaryColor, accentColor, secondaryColor];
               const color = colors[i % colors.length];
               return (
                 <div
-                  key={entry.id}
+                  key={`${entry.id}-${i}`}
                   className="p-6 rounded-2xl transition-all duration-300 hover:shadow-xl hover:-translate-y-1 relative overflow-hidden"
                   style={{
                     background: `linear-gradient(135deg, ${colorWithAlpha(color, 0.08)}, ${colorWithAlpha(color, 0.03)})`,
@@ -709,48 +730,55 @@ const BlockRenderer = React.memo(({
       }
 
       case "STATS_GRID": {
-        const statsItems = ((content?.items as string[]) || [
-          "📊 98% Accuracy",
-          "⚡ 2x Faster",
-          "🎯 500+ Users",
-          "💰 $1.2M Saved",
-        ]).map((text, idx) => ({ id: text || `stat-${idx}`, text }));
+        const rawItems = (content?.stats as Array<{ value?: string; label?: string }>) ||
+          (content?.items as Array<string | { value?: string; label?: string; text?: string }>) ||
+          [];
+        const statsItems = (rawItems.length
+          ? rawItems
+          : ["Named proof point", "Specific outcome", "Measurable change"]
+        ).map((item, idx) => {
+          if (typeof item === 'string') {
+            return { id: `${item}-${idx}`, value: item, label: '' };
+          }
+          return {
+            id: `${item.value || item.label || item.text || idx}`,
+            value: item.value || item.text || '',
+            label: item.label || '',
+          };
+        });
         return (
-          <div className="grid grid-cols-2 gap-4 max-w-5xl">
+          <div className="grid grid-cols-3 gap-4">
             {statsItems.map((entry, i) => {
               const colors = [primaryColor, accentColor, secondaryColor, '#f59e0b'];
               const color = colors[i % colors.length];
               return (
                 <div
-                  key={entry.id}
+                  key={`${entry.id}-${i}`}
                   className="relative p-6 rounded-2xl text-center transition-all duration-300 hover:shadow-xl hover:-translate-y-1 overflow-hidden group/stat"
                   style={{
                     background: `linear-gradient(135deg, ${colorWithAlpha(color, 0.06)}, ${colorWithAlpha(color, 0.02)})`,
                     border: `1px solid ${colorWithAlpha(color, 0.12)}`,
                   }}
                 >
-                  {/* Decorative ring */}
                   <div
                     className="absolute -top-8 -right-8 w-20 h-20 rounded-full opacity-10 group-hover/stat:opacity-20 transition-opacity"
                     style={{ background: gradientFromColor(color) }}
                   />
                   <p
-                    contentEditable
-                    onInput={(e) => {
-                      const items = [...statsItems];
-                      items[i].text = (e.target as HTMLElement).innerText;
-                      const stringItems = items.map((o) => o.text);
-                      setContent({ ...content, items: stringItems });
-                    }}
-                    onFocus={onFocus}
-                    onBlur={onBlur}
-                    className="text-xl font-extrabold outline-none relative z-10 tracking-tight"
+                    className="text-3xl font-extrabold outline-none relative z-10 tracking-tight"
                     style={{
                       fontFamily: theme?.fonts?.heading || 'var(--font-dm-sans), system-ui, sans-serif',
+                      color: color,
                       lineHeight: 1.1,
                     }}
-                    dangerouslySetInnerHTML={{ __html: entry.text }}
-                  />
+                  >
+                    {entry.value}
+                  </p>
+                  {entry.label ? (
+                    <p className="mt-2 text-sm relative z-10" style={{ opacity: 0.72 }}>
+                      {entry.label}
+                    </p>
+                  ) : null}
                 </div>
               );
             })}

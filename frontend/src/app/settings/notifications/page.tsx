@@ -160,8 +160,9 @@ export default function NotificationsSettingsPage() {
     loadPreferences();
   }, [reset]);
 
-  // Track changes
+  // Track changes via react-hook-form subscription (not a React-managed observable)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/incompatible-library -- watch() callback subscription API
     const subscription = watch(() => setHasChanges(true));
     return () => subscription.unsubscribe();
   }, [watch]);

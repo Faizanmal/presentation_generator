@@ -127,7 +127,7 @@ export default function DashboardPage() {
 
   // Generate project mutation
   const generateProjectMutation = useMutation({
-    mutationFn: (data: { topic: string; tone: string; audience: string; length: number; type: string; generateImages?: boolean; imageSource?: 'ai' | 'stock' }) =>
+    mutationFn: (data: { topic: string; tone: string; audience: string; length: number; type: string; generateImages?: boolean; imageSource?: 'ai' | 'stock'; qualityMode?: boolean }) =>
       api.projects.generate(data),
     onSuccess: (job, variables) => {
       setIsCreateModalOpen(false);
@@ -153,13 +153,14 @@ export default function DashboardPage() {
       // the backend hasn’t yet persisted the new project. instead we merge up front and
       // then perform one delayed refresh.
       if (job?.jobId) {
+        let attempts = 0;
         const poll = async () => {
+          attempts += 1;
           try {
             const status = await api.getProjectGenerationStatus(job.jobId);
 
             if (status.state === 'completed') {
               if (status.result) {
-                // update cache now so the project appears regardless of later refetches
                 const result = status.result as Project;
                 queryClient.setQueryData<Project[] | undefined>(["projects"], (old) => {
                   const existing = old as Project[] | undefined;
@@ -173,9 +174,6 @@ export default function DashboardPage() {
                   description: `"${result.title}" has been added to your list.`,
                 });
 
-                // give the backend a moment to finish storing before refetching. after
-                // the refetch completes we merge the same result again so it can’t be
-                // wiped out if the server response didn’t include it yet.
                 setTimeout(() => {
                   queryClient
                     .invalidateQueries({ queryKey: ["projects"] })
@@ -189,27 +187,44 @@ export default function DashboardPage() {
                       });
                     });
                 }, 3000);
-
-                // stop polling now that we handled completion
-                return;
-              } else {
-                // job finished but result not attached yet – try again shortly
-                setTimeout(poll, 2000);
                 return;
               }
-            }
 
-            if (['failed', 'stalled', 'error'].includes(status.state)) {
-              // a failure should still refresh the list so stale jobs don’t linger
               queryClient.invalidateQueries({ queryKey: ["projects"] });
-              toast.error('Presentation generation failed.');
+              toast.success('Your presentation is ready.');
               return;
             }
 
-            // still queued/running, poll again
+            if (status.state === 'not_found') {
+              // Job may not be visible in Redis for the first poll.
+              if (attempts < 6) {
+                setTimeout(poll, 2000);
+                return;
+              }
+              queryClient.invalidateQueries({ queryKey: ["projects"] });
+              return;
+            }
+
+            if (['failed', 'stalled', 'error'].includes(status.state)) {
+              queryClient.invalidateQueries({ queryKey: ["projects"] });
+              toast.error(status.failedReason || 'Presentation generation failed.');
+              return;
+            }
+
+            if (attempts >= 120) {
+              queryClient.invalidateQueries({ queryKey: ["projects"] });
+              toast.error('Generation is taking longer than expected. Refresh the dashboard.');
+              return;
+            }
+
             setTimeout(poll, 5000);
-          } catch (_err) {
-            // transient error – retry
+          } catch (err) {
+            const statusCode = (err as { response?: { status?: number } })
+              ?.response?.status;
+            if (statusCode === 404 || attempts >= 120) {
+              queryClient.invalidateQueries({ queryKey: ["projects"] });
+              return;
+            }
             setTimeout(poll, 5000);
           }
         };
@@ -544,15 +559,16 @@ function CreateProjectModal({
   isOpen: boolean;
   onClose: () => void;
   onCreateBlank: () => void;
-  onGenerate: (data: { topic: string; tone: string; audience: string; length: number; type: string; generateImages?: boolean; imageSource?: 'ai' | 'stock' }) => void;
+  onGenerate: (data: { topic: string; tone: string; audience: string; length: number; type: string; generateImages?: boolean; imageSource?: 'ai' | 'stock'; qualityMode?: boolean }) => void;
   isGenerating: boolean;
 }) {
   const [mode, setMode] = useState<"select" | "generate">("select");
   const [topic, setTopic] = useState("");
   const [tone, setTone] = useState("professional");
   const [audience, setAudience] = useState("general");
-  const [length, setLength] = useState(5);
-  const [generateImages, setGenerateImages] = useState(false);
+  const [length, setLength] = useState(10);
+  const [generateImages, setGenerateImages] = useState(true);
+  const [qualityMode, setQualityMode] = useState(false);
 
   const handleGenerate = () => {
     if (!topic.trim()) {
@@ -566,7 +582,8 @@ function CreateProjectModal({
       length,
       type: "presentation",
       generateImages,
-      imageSource: "ai"
+      imageSource: "stock",
+      qualityMode,
     });
   };
 
@@ -575,8 +592,9 @@ function CreateProjectModal({
     setTopic("");
     setTone("professional");
     setAudience("general");
-    setLength(5);
-    setGenerateImages(false);
+    setLength(10);
+    setGenerateImages(true);
+    setQualityMode(false);
   };
 
   return (
@@ -719,14 +737,27 @@ function CreateProjectModal({
 
               <div className="flex items-center justify-between rounded-lg border border-slate-200 p-4 bg-white dark:bg-gray-800 dark:border-slate-800">
                 <div className="space-y-0.5">
-                  <Label className="text-base">Generate Images</Label>
+                  <Label className="text-base">Generate images</Label>
                   <p className="text-sm text-slate-500 dark:text-slate-400">
-                    Use AI to generate relevant images for each slide
+                    Add stock photography to hero, proof, and closing slides
                   </p>
                 </div>
                 <Switch
                   checked={generateImages}
                   onCheckedChange={setGenerateImages}
+                />
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-slate-200 p-4 bg-white dark:bg-gray-800 dark:border-slate-800">
+                <div className="space-y-0.5">
+                  <Label className="text-base">Higher quality</Label>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    Use the research and critic loop. Slower, denser decks.
+                  </p>
+                </div>
+                <Switch
+                  checked={qualityMode}
+                  onCheckedChange={setQualityMode}
                 />
               </div>
 

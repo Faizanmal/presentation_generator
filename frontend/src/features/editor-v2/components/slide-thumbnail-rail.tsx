@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, GripVertical, Copy, Trash2, MoreHorizontal, Eye } from "lucide-react";
+import { Plus, GripVertical, Copy, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { hoverLift, motionTiming, motionEase, springSnappy, buttonPress } from "../lib/motion";
+import { motionTiming, springSnappy, buttonPress } from "../lib/motion";
 import type { EditorSlide } from "../types";
 
 interface SlideThumbnailRailProps {

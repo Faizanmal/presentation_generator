@@ -8,9 +8,11 @@ export enum GenerationTone {
 
 export type LayoutType =
   | 'title'
+  | 'title-hero'
   | 'title-subtitle'
   | 'title-content'
   | 'two-column'
+  | 'two-column-image'
   | 'three-column'
   | 'image-left'
   | 'image-right'
@@ -20,6 +22,7 @@ export type LayoutType =
   | 'quote-highlight'
   | 'stats-grid'
   | 'chart-focus'
+  | 'bento-grid'
   | 'gallery'
   | 'agenda'
   | 'content';

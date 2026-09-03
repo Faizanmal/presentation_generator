@@ -49,7 +49,7 @@ export function AICommandPalette({ isOpen, onClose, editorActions }: CommandPale
   const [generationTopic, setGenerationTopic] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const { generate, isGenerating } = useGeneration();
+  const { generate } = useGeneration();
 
   // Focus input when opened
   useEffect(() => {
@@ -381,7 +381,7 @@ export function AICommandPalette({ isOpen, onClose, editorActions }: CommandPale
               </div>
             ))}
             {filteredCommands.length === 0 && (
-              <div className="cmd-empty">No commands match "{query}"</div>
+              <div className="cmd-empty">No commands match &quot;{query}&quot;</div>
             )}
           </div>
         )}

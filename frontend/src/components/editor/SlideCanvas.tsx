@@ -13,8 +13,6 @@ import {
   closestCenter,
 } from "@dnd-kit/core";
 import {
-  SortableContext,
-  verticalListSortingStrategy,
   arrayMove,
 } from "@dnd-kit/sortable";
 import { toast } from "sonner";
@@ -403,6 +401,13 @@ export default function SlideCanvas({
     rawLayout === 'quote-centered' ? 'quote-highlight' :
     rawLayout === 'single-column' || rawLayout === 'title-content' ? 'content' :
     rawLayout;
+  const isBleedLayout = [
+    'title-hero',
+    'image-left',
+    'image-right',
+    'image-full',
+    'two-column-image',
+  ].includes(rawLayout);
   const isDenseCanvas = presentationDensity >= 66;
   // Asymmetric safe margins (wider L/R) read more editorial than uniform padding
   const canvasPaddingClass = isDenseCanvas
@@ -450,9 +455,12 @@ export default function SlideCanvas({
         )}
 
         <div
-          className={`h-full overflow-hidden relative z-10 ${isTitleSlide
-            ? `flex flex-col items-center justify-center ${canvasPaddingClass}`
-            : canvasPaddingClass
+          className={`h-full overflow-hidden relative z-10 ${
+            isBleedLayout
+              ? ''
+              : isTitleSlide
+                ? `flex flex-col items-center justify-center ${canvasPaddingClass}`
+                : canvasPaddingClass
             }`}
         >
           {sortedBlocks.length === 0 ? (

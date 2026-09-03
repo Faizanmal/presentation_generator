@@ -78,6 +78,7 @@ export interface GenerateProjectInput {
   type?: string;
   generateImages?: boolean;
   imageSource?: 'ai' | 'stock';
+  qualityMode?: boolean;
 }
 
 // ============================================

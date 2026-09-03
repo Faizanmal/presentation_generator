@@ -68,7 +68,7 @@ describe('PaymentsService', () => {
   };
 
   const mockConfigService = {
-    get: jest.fn((key: string) => {
+    get: jest.fn((key: string): string | undefined => {
       const config: Record<string, string> = {
         STRIPE_SECRET_KEY: 'sk_test_123',
         STRIPE_WEBHOOK_SECRET: 'whsec_test_123',

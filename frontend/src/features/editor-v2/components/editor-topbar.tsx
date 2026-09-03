@@ -11,9 +11,7 @@ import {
   Moon,
   Sun,
   Cloud,
-  CloudOff,
   Share2,
-  MoreHorizontal,
   Undo2,
   Redo2,
   Download,
@@ -22,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
-import { hoverLift, buttonPress, motionTiming, motionEase, springSnappy } from "../lib/motion";
+import { hoverLift, buttonPress, motionTiming } from "../lib/motion";
 import type { PresenceUser } from "../types";
 
 interface EditorTopbarProps {

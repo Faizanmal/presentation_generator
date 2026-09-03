@@ -46,11 +46,8 @@ This guide covers deploying the Presentation Designer application to production 
 ### 1. Environment Setup
 
 ```bash
-# Copy environment template
-cp .env.production.example .env.production
-
-# Edit and fill in all required values
-nano .env.production
+cp .env.example .env
+nano .env
 ```
 
 ### 2. Local Production Testing
@@ -85,7 +82,7 @@ docker push your-registry/presentation-frontend:latest
 # Apply Kubernetes manifests
 kubectl apply -f k8s/namespace.yaml
 kubectl apply -f k8s/configmap.yaml
-kubectl create secret generic app-secrets --from-env-file=.env.production -n presentation-designer
+kubectl create secret generic app-secrets --from-env-file=.env -n presentation-designer
 kubectl apply -f k8s/backend-deployment.yaml
 kubectl apply -f k8s/frontend-deployment.yaml
 kubectl apply -f k8s/ingress.yaml

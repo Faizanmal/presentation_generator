@@ -3,10 +3,17 @@ import {
   NotFoundException,
   ForbiddenException,
   Logger,
+  Inject,
+  Optional,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { AIService, GeneratedPresentation } from '../ai/ai.service';
+import { materializeGeneratedBlocks } from '../ai/presentation-block-mapper';
+import { recipeForSlideIndex, isGenericKicker } from '../ai/slide-recipes';
+import { ThinkingAgentOrchestratorService } from '../ai/thinking-agent/thinking-agent-orchestrator.service';
+import { ThinkingProjectService } from '../ai/thinking-agent/thinking-project.service';
 import { SlidesService } from '../slides/slides.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
@@ -31,6 +38,12 @@ export class ProjectsService {
     private readonly aiService: AIService,
     private readonly slidesService: SlidesService,
     @InjectQueue('generation') private readonly generationQueue: Queue,
+    @Optional()
+    @Inject(forwardRef(() => ThinkingAgentOrchestratorService))
+    private readonly thinkingOrchestrator?: ThinkingAgentOrchestratorService,
+    @Optional()
+    @Inject(forwardRef(() => ThinkingProjectService))
+    private readonly thinkingProjectService?: ThinkingProjectService,
   ) {}
 
   /**
@@ -124,11 +137,19 @@ export class ProjectsService {
       );
     }
 
-    // Add to queue
-    const job = await this.generationQueue.add('generate', {
-      userId,
-      dto: generateDto,
-    });
+    // Add to queue. Keep completed jobs so the dashboard can poll status
+    // (global removeOnComplete:true used to delete them immediately).
+    const job = await this.generationQueue.add(
+      'generate',
+      {
+        userId,
+        dto: generateDto,
+      },
+      {
+        removeOnComplete: { age: 3600, count: 100 },
+        removeOnFail: { age: 86400, count: 50 },
+      },
+    );
 
     this.logger.log(`Project generation queued: ${job.id} for user ${userId}`);
 
@@ -147,7 +168,14 @@ export class ProjectsService {
     const job = await this.generationQueue.getJob(jobId);
 
     if (!job) {
-      throw new NotFoundException('Job not found');
+      // Completed jobs are eventually evicted from Redis. The project is
+      // already in the DB, so tell the client to stop polling instead of 404.
+      return {
+        id: jobId,
+        state: 'not_found',
+        result: undefined,
+        failedReason: undefined,
+      };
     }
 
     // Verify ownership
@@ -157,13 +185,11 @@ export class ProjectsService {
 
     const state = await job.getState();
     const result = job.returnvalue;
-    // const progress = job.progress;
 
     return {
       id: job.id,
       state,
-      // progress,
-      result, // This will be the project object if completed
+      result,
       failedReason: job.failedReason,
     };
   }
@@ -174,59 +200,101 @@ export class ProjectsService {
   async processGeneration(userId: string, generateDto: GenerateProjectDto) {
     this.logger.log(`Processing generation for user ${userId}`);
 
-    // Generate content using AI
+    const length = generateDto.length ?? 10;
+    const generateImages = generateDto.generateImages !== false;
+    const imageSource = generateDto.imageSource || 'stock';
+
+    if (
+      generateDto.qualityMode &&
+      this.thinkingOrchestrator &&
+      this.thinkingProjectService
+    ) {
+      const thinking = await this.thinkingOrchestrator.generateWithThinking({
+        topic: generateDto.topic,
+        tone: generateDto.tone,
+        audience: generateDto.audience,
+        length,
+        type: 'presentation',
+        generateImages,
+        qualityLevel: 'high',
+        maxThinkingIterations: 2,
+        enableQualityRefinement: true,
+      });
+      const created =
+        await this.thinkingProjectService.createProjectFromThinkingResult(
+          userId,
+          thinking.presentation,
+          {
+            title: thinking.presentation.title,
+            audience: generateDto.audience,
+            tone: generateDto.tone,
+            generateImages,
+            qualityScore: thinking.qualityReport?.overallScore,
+          },
+        );
+      await this.usersService.incrementAIGenerations(userId);
+      return this.findOne(created.projectId, userId);
+    }
+
     const generatedContent = await this.aiService.generatePresentation({
       topic: generateDto.topic,
       tone: generateDto.tone,
       audience: generateDto.audience,
-      length: generateDto.length,
+      length,
       type: generateDto.type,
       designStyle: generateDto.designStyle,
-      generateImages: generateDto.generateImages,
-      imageSource: generateDto.imageSource,
+      generateImages,
+      imageSource,
+      qualityMode: generateDto.qualityMode,
     });
 
-    // If requested, generate images for the presentation
-    if (generateDto.generateImages) {
+    if (generateImages) {
       this.logger.log(`Generating images for project ${generateDto.topic}...`);
 
-      const source = generateDto.imageSource || 'ai';
       let images = new Map<number, { imageUrl: string }>();
 
-      if (source === 'ai') {
+      if (imageSource === 'ai') {
         images = await this.aiService.generatePresentationImages(
           generatedContent.sections,
         );
-      } else if (source === 'stock') {
+      } else {
         images = await this.aiService.generateStockImages(
           generatedContent.sections,
         );
       }
 
-      // Add image blocks to sections where images were generated
       generatedContent.sections.forEach((section, index) => {
-        if (images.has(index)) {
-          const imageResult = images.get(index);
-          if (imageResult) {
-            // Add image block at the beginning of content blocks (after heading)
-            section.blocks.unshift({
-              type: 'image',
-              content: imageResult.imageUrl,
-              embedUrl: imageResult.imageUrl,
-            });
+        const imageResult = images.get(index);
+        if (!imageResult?.imageUrl) return;
+        const imageBlock = section.blocks.find(
+          (b) => b.type.toLowerCase() === 'image',
+        );
+        if (imageBlock) {
+          if (
+            !imageBlock.embedUrl ||
+            !/^https?:\/\//i.test(imageBlock.embedUrl)
+          ) {
+            imageBlock.embedUrl = imageResult.imageUrl;
           }
+          if (!/^https?:\/\//i.test(imageBlock.content)) {
+            imageBlock.content = imageResult.imageUrl;
+          }
+        } else {
+          section.blocks.unshift({
+            type: 'image',
+            content: imageResult.imageUrl,
+            embedUrl: imageResult.imageUrl,
+          });
         }
       });
     }
 
-    // Create project with generated content
     const project = await this.createFromAIContent(
       userId,
       generatedContent,
       generateDto,
     );
 
-    // Increment AI generations used
     await this.usersService.incrementAIGenerations(userId);
 
     this.logger.log(
@@ -247,10 +315,37 @@ export class ProjectsService {
     this.applyDesignPolish(content, generateDto.tone);
     const designStyle =
       generateDto.designStyle || GenerationDesignStyle.EDITORIAL;
-
-    // Get the default theme
+    const themeTokens = this.getDesignTokens(designStyle);
     const defaultTheme = await this.prisma.theme.findFirst({
       where: { isDefault: true },
+    });
+
+    const generatedTheme = await this.prisma.theme.create({
+      data: {
+        name: `${designStyle} generated`,
+        description: `Auto theme for ${generateDto.topic}`.slice(0, 180),
+        userId,
+        isDefault: false,
+        colors: {
+          primary: themeTokens.accentColor,
+          secondary: themeTokens.subheadingColor,
+          accent: themeTokens.accentColor,
+          background:
+            designStyle === GenerationDesignStyle.MANIFESTO
+              ? '#FAFAFA'
+              : '#FFFFFF',
+          surface: themeTokens.softSurface,
+          text: themeTokens.bodyColor,
+          textMuted: themeTokens.subheadingColor,
+        } as Prisma.InputJsonValue,
+        fonts: {
+          heading: themeTokens.headingFont,
+          body: themeTokens.bodyFont,
+        } as Prisma.InputJsonValue,
+        spacing:
+          (defaultTheme?.spacing as Prisma.InputJsonValue) ||
+          ({ base: 8, scale: 1.25 } as Prisma.InputJsonValue),
+      },
     });
 
     const project = await this.prisma.project.create({
@@ -267,23 +362,26 @@ export class ProjectsService {
         audience: generateDto.audience,
         aiModel: content.aiModel,
         aiProvider: content.aiProvider,
-        themeId: defaultTheme?.id, // Auto-assign default theme
+        themeId: generatedTheme.id,
       },
     });
 
-    // Create slides and blocks from generated content
     for (
       let slideIndex = 0;
       slideIndex < content.sections.length;
       slideIndex++
     ) {
       const section = content.sections[slideIndex];
+      const recipe = recipeForSlideIndex(
+        slideIndex,
+        content.sections.length,
+      );
 
-      // Use the AI-recommended layout, falling back to sensible defaults
       const slideLayout = this.selectPolishedLayout(
         content.sections,
         slideIndex,
         designStyle,
+        recipe.layout,
       );
 
       const slide = await this.prisma.slide.create({
@@ -295,7 +393,6 @@ export class ProjectsService {
         },
       });
 
-      // Create heading block
       await this.prisma.block.create({
         data: {
           projectId: project.id,
@@ -311,112 +408,72 @@ export class ProjectsService {
         },
       });
 
-      // Create content blocks - group consecutive bullets into lists
-      const sectionBlocks = this.composeVisuallyBalancedBlocks(
-        section.blocks,
-        slideIndex,
-        designStyle,
-      );
       let blockOrder = 1;
-      let i = 0;
+      const headingText = String(section.heading || '').trim();
+      const kickerText = String(section.kicker || '').trim();
+      const skipTexts = new Set<string>(
+        headingText ? [headingText.toLowerCase()] : [],
+      );
+      const useSectionKicker =
+        Boolean(kickerText) &&
+        !isGenericKicker(kickerText) &&
+        kickerText.toLowerCase() !== headingText.toLowerCase();
 
-      while (i < sectionBlocks.length) {
-        const block = sectionBlocks[i];
-        const aiType = block.type?.toLowerCase() || 'paragraph';
-        const blockType = this.mapBlockType(aiType);
+      if (useSectionKicker) {
+        skipTexts.add(kickerText.toLowerCase());
+        await this.prisma.block.create({
+          data: {
+            projectId: project.id,
+            slideId: slide.id,
+            blockType: BlockType.SUBHEADING,
+            content: { text: kickerText },
+            style: { variant: 'kicker' } as Prisma.InputJsonValue,
+            order: blockOrder++,
+          },
+        });
+      }
 
-        // Check if this is a bullet or numbered list item
+      const mapped = materializeGeneratedBlocks(
+        this.composeVisuallyBalancedBlocks(
+          section.blocks,
+          slideIndex,
+          designStyle,
+        ),
+      );
+
+      for (const mappedBlock of mapped) {
+        const mappedText =
+          typeof mappedBlock.content?.text === 'string'
+            ? mappedBlock.content.text.trim()
+            : '';
+        const variant = String(mappedBlock.style?.variant || '');
         if (
-          blockType === BlockType.BULLET_LIST ||
-          blockType === BlockType.NUMBERED_LIST
+          mappedText &&
+          (skipTexts.has(mappedText.toLowerCase()) ||
+            (variant === 'kicker' && isGenericKicker(mappedText)))
         ) {
-          // Collect all consecutive list items of the same type
-          const items: string[] = [];
-          const currentType = blockType;
-
-          while (
-            i < sectionBlocks.length &&
-            this.mapBlockType(sectionBlocks[i].type) === currentType
-          ) {
-            items.push(sectionBlocks[i].content);
-            i++;
-          }
-
-          // Create a single list block with all items
-          await this.prisma.block.create({
-            data: {
-              projectId: project.id,
-              slideId: slide.id,
-              blockType: currentType,
-              content: { items },
-              style: this.getListStyle(
-                currentType,
-                designStyle,
-              ) as Prisma.InputJsonValue,
-              order: blockOrder++,
-            },
-          });
-        } else {
-          // Determine content and formatting based on original AI type
-          let blockContent: Record<string, unknown>;
-          let blockStyle: Record<string, unknown> | undefined;
-
-          if (blockType === BlockType.IMAGE) {
-            blockContent = { url: block.content, alt: 'AI Generated Image' };
-          } else if (aiType === 'chart' && block.chartData) {
-            // Chart block with embedded data
-            blockContent = {
-              text: block.content,
-              chartData: block.chartData,
-            };
-          } else if (aiType === 'card') {
-            // Card-style paragraph with special formatting
-            blockContent = { text: block.content };
-            blockStyle = { variant: 'card' };
-          } else if (aiType === 'icon-text') {
-            // Icon-text style paragraph
-            blockContent = { text: block.content };
-            blockStyle = { variant: 'icon-text' };
-          } else if (
-            aiType === 'timeline' ||
-            aiType === 'comparison' ||
-            aiType === 'stats-grid'
-          ) {
-            // These types use pipe-separated content as list items
-            const items = block.content
-              .split('|')
-              .map((s: string) => s.trim())
-              .filter((s: string) => s.length > 0);
-            blockContent = { items };
-          } else if (aiType === 'call-to-action') {
-            // CTA block - just text
-            blockContent = { text: block.content };
-          } else {
-            blockContent = { text: block.content };
-          }
-
-          if (!blockStyle) {
-            blockStyle = this.getDefaultBlockStyle(
-              blockType,
-              aiType,
-              designStyle,
-            );
-          }
-
-          await this.prisma.block.create({
-            data: {
-              projectId: project.id,
-              slideId: slide.id,
-              blockType,
-              content: blockContent as Prisma.InputJsonValue,
-              ...(blockStyle
-                ? { style: blockStyle as Prisma.InputJsonValue }
-                : {}),
-              order: blockOrder++,
-            },
-          });
-          i++;
+          continue;
         }
+        if (mappedText) skipTexts.add(mappedText.toLowerCase());
+
+        const style = {
+          ...this.getDefaultBlockStyle(
+            mappedBlock.blockType,
+            mappedBlock.blockType.toLowerCase(),
+            designStyle,
+          ),
+          ...mappedBlock.style,
+        };
+        await this.prisma.block.create({
+          data: {
+            projectId: project.id,
+            slideId: slide.id,
+            blockType: mappedBlock.blockType,
+            content: mappedBlock.content as Prisma.InputJsonValue,
+            style: style as Prisma.InputJsonValue,
+            order: blockOrder++,
+          },
+        });
       }
     }
 
@@ -467,19 +524,13 @@ export class ProjectsService {
       );
 
     for (const section of content.sections) {
-      // Reduce wall-of-text effect for readability.
       section.blocks = section.blocks.map((block) => {
         if (
           ['paragraph', 'subheading', 'quote', 'callout', 'statistic'].includes(
             block.type.toLowerCase(),
           )
         ) {
-          const cleaned = block.content.replace(/\s+/g, ' ').trim();
-          const short =
-            cleaned.length > 260
-              ? `${cleaned.slice(0, 257).trim()}...`
-              : cleaned;
-          return { ...block, content: short };
+          return { ...block, content: block.content.replace(/\s+/g, ' ').trim() };
         }
         return block;
       });
@@ -495,14 +546,22 @@ export class ProjectsService {
 
   private composeVisuallyBalancedBlocks(
     blocks: GeneratedPresentation['sections'][number]['blocks'],
-    slideIndex: number,
+    _slideIndex: number,
     designStyle: GenerationDesignStyle,
   ): GeneratedPresentation['sections'][number]['blocks'] {
     const safeBlocks = blocks
-      .filter(
-        (b) => typeof b.content === 'string' && b.content.trim().length > 0,
-      )
-      .map((b) => ({ ...b, content: b.content.trim() }));
+      .filter((b) => {
+        const hasText =
+          typeof b.content === 'string' && b.content.trim().length > 0;
+        const hasItems = Array.isArray(b.items) && b.items.length > 0;
+        const hasStat = Boolean(b.value || b.label);
+        const hasMedia = Boolean(b.embedUrl);
+        return hasText || hasItems || hasStat || hasMedia;
+      })
+      .map((b) => ({
+        ...b,
+        content: typeof b.content === 'string' ? b.content.trim() : b.content,
+      }));
 
     const nonBulletBlocks = safeBlocks.filter((b) => {
       const t = b.type.toLowerCase();
@@ -513,73 +572,13 @@ export class ProjectsService {
       return t === 'bullet' || t === 'bullet-list' || t === 'numbered-list';
     });
 
-    const composed: GeneratedPresentation['sections'][number]['blocks'] = [];
+    const composed: GeneratedPresentation['sections'][number]['blocks'] = [
+      ...nonBulletBlocks,
+      ...bulletBlocks,
+    ];
 
-    // 1) Keep one framing paragraph/subheading early if available.
-    const framing = nonBulletBlocks.find((b) =>
-      ['subheading', 'paragraph'].includes(b.type.toLowerCase()),
-    );
-    if (framing) composed.push(framing);
-
-    // 2) Keep one high-emphasis block for visual anchor.
-    const emphasis = nonBulletBlocks.find((b) =>
-      [
-        'quote',
-        'callout',
-        'statistic',
-        'chart',
-        'comparison',
-        'timeline',
-      ].includes(b.type.toLowerCase()),
-    );
-    if (emphasis && !composed.includes(emphasis)) composed.push(emphasis);
-
-    // 3) Add a compact bullet block if we have lists.
-    if (bulletBlocks.length > 0) {
-      const chosenList = bulletBlocks[0];
-      composed.push(chosenList);
-    }
-
-    // 4) Fill remaining with diverse non-duplicate types.
-    for (const block of nonBulletBlocks) {
-      if (composed.length >= 5) break;
-      if (composed.includes(block)) continue;
-      const hasTypeAlready = composed.some(
-        (b) => b.type.toLowerCase() === block.type.toLowerCase(),
-      );
-      if (
-        hasTypeAlready &&
-        ['paragraph', 'subheading'].includes(block.type.toLowerCase())
-      ) {
-        continue;
-      }
-      composed.push(block);
-    }
-
-    // 5) If still too plain, inject a designed callout block.
-    const hasVisualAnchor = composed.some((b) =>
-      [
-        'quote',
-        'callout',
-        'statistic',
-        'chart',
-        'comparison',
-        'timeline',
-      ].includes(b.type.toLowerCase()),
-    );
-    if (!hasVisualAnchor && composed.length > 0) {
-      composed.splice(1, 0, {
-        type: 'callout',
-        content:
-          slideIndex === 0
-            ? 'Why this matters now: clear outcome and audience value.'
-            : 'Key takeaway: focus on one decisive insight before moving on.',
-      });
-    }
-
-    // 6) Enforce clean range with style-specific density.
-    const maxBlocks = designStyle === GenerationDesignStyle.MANIFESTO ? 4 : 6;
-    const minBlocks = designStyle === GenerationDesignStyle.MANIFESTO ? 2 : 3;
+    const maxBlocks = designStyle === GenerationDesignStyle.MANIFESTO ? 8 : 8;
+    const minBlocks = 2;
     const deduped: GeneratedPresentation['sections'][number]['blocks'] = [];
     const seen = new Set<string>();
     for (const block of composed) {
@@ -590,18 +589,34 @@ export class ProjectsService {
       if (deduped.length >= maxBlocks) break;
     }
 
-    return deduped.slice(
-      0,
-      Math.max(minBlocks, Math.min(maxBlocks, deduped.length)),
-    );
+    return deduped.slice(0, Math.max(minBlocks, deduped.length));
   }
 
   private selectPolishedLayout(
     sections: GeneratedPresentation['sections'],
     index: number,
     designStyle: GenerationDesignStyle,
+    recipeLayout?: string,
   ): string {
-    if (index === 0) return 'title';
+    if (index === 0) {
+      const opening = sections[0].layout;
+      if (
+        opening === 'title-hero' ||
+        opening === 'title-subtitle' ||
+        opening === 'image-full'
+      ) {
+        return opening;
+      }
+      return recipeLayout || 'title-hero';
+    }
+
+    if (recipeLayout) {
+      const prev = index > 0 ? sections[index - 1].layout : '';
+      const prev2 = index > 1 ? sections[index - 2].layout : '';
+      if (recipeLayout !== prev || recipeLayout !== prev2) {
+        return recipeLayout;
+      }
+    }
 
     const fallbackSequence =
       designStyle === GenerationDesignStyle.MANIFESTO
@@ -615,20 +630,19 @@ export class ProjectsService {
             'quote-highlight',
           ]
         : [
-            'title-content',
-            'two-column',
-            'image-right',
-            'comparison',
             'three-column',
-            'chart-focus',
-            'quote-highlight',
+            'image-right',
+            'stats-grid',
+            'comparison',
+            'timeline',
+            'image-left',
+            'bento-grid',
           ];
 
-    const aiLayout = sections[index].layout || 'title-content';
+    const aiLayout = sections[index].layout || recipeLayout || 'title-content';
     const prev = index > 0 ? sections[index - 1].layout : '';
     const prev2 = index > 1 ? sections[index - 2].layout : '';
 
-    // If AI repeats same layout 3rd time in a row, rotate to a varied fallback.
     if (aiLayout === prev && aiLayout === prev2) {
       return fallbackSequence[index % fallbackSequence.length];
     }
@@ -789,7 +803,7 @@ export class ProjectsService {
     }
 
     return {
-      headingFont: 'Poppins',
+      headingFont: 'Source Serif 4',
       bodyFont: 'Source Sans 3',
       quoteFont: 'Lora',
       headingColor: '#0F172A',

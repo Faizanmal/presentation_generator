@@ -132,7 +132,7 @@ export function CommandPalette({
                                 className="text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20 data-[selected=true]:bg-blue-100 dark:data-[selected=true]:bg-blue-900/40"
                             >
                                 <Sparkles className="mr-2 h-4 w-4 text-blue-500" />
-                                <span className="font-medium">Generate: "{search}"</span>
+                                <span className="font-medium">Generate: &quot;{search}&quot;</span>
                             </CommandItem>
                         </CommandGroup>
                     )}

@@ -6,7 +6,6 @@ import {
   Type,
   Pilcrow,
   Image as ImageIcon,
-  Sparkles,
   MessageSquarePlus,
   Hash,
   Quote,

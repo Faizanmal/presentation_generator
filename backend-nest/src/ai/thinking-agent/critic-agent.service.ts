@@ -11,6 +11,7 @@ import {
   QualityReport,
   QualityBreakdown,
 } from './thinking-agent.types';
+import { isBannedFiller, looksLikeMockStatistic } from '../slide-recipes';
 
 /**
  * Critic Agent Service
@@ -204,6 +205,14 @@ export class CriticAgentService {
     );
     totalTokens += improvementsResult.tokens;
 
+    const gammaIssues = this.collectGammaQualityIssues(presentation);
+    improvementsResult.improvements.push(...gammaIssues);
+    if (gammaIssues.length > 0) {
+      synthesisResult.weaknesses.push(
+        ...gammaIssues.map((issue) => issue.suggestedChange),
+      );
+    }
+
     thinkingSteps.push({
       stepNumber: 8,
       phase: 'reflection',
@@ -270,6 +279,69 @@ export class CriticAgentService {
       comparisonToTarget: (reflection.overallScore / 8) * 100, // 8 is default target
       passedThreshold: !reflection.shouldRefine,
     };
+  }
+
+  /**
+   * Deterministic Gamma-quality gates: no filler, no fake stats, every slide
+   * needs a visual (image, stat, card, timeline, comparison, or chart).
+   */
+  collectGammaQualityIssues(
+    presentation: EnhancedPresentation,
+  ): ImprovementSuggestion[] {
+    const issues: ImprovementSuggestion[] = [];
+    const visualTypes = new Set([
+      'image',
+      'statistic',
+      'chart',
+      'timeline-item',
+      'comparison-item',
+      'embed',
+    ]);
+
+    presentation.sections.forEach((section, index) => {
+      const haystack = [
+        section.heading,
+        section.subheading,
+        ...section.blocks.map((block) => block.content),
+      ]
+        .filter(Boolean)
+        .join(' ');
+      if (isBannedFiller(haystack)) {
+        issues.push({
+          area: 'copy',
+          currentState: section.heading,
+          suggestedChange:
+            'Remove generic filler callouts and write a named, specific claim.',
+          priority: 'high',
+          affectedSections: [index],
+        });
+      }
+      if (looksLikeMockStatistic(haystack)) {
+        issues.push({
+          area: 'evidence',
+          currentState: section.heading,
+          suggestedChange:
+            'Drop unsourced placeholder statistics ($1.2B / 15% / 2.5M) or replace with attributed numbers.',
+          priority: 'high',
+          affectedSections: [index],
+        });
+      }
+      const hasVisual = section.blocks.some((block) =>
+        visualTypes.has(String(block.type).toLowerCase()),
+      );
+      if (!hasVisual) {
+        issues.push({
+          area: 'visual',
+          currentState: section.heading,
+          suggestedChange:
+            'Add an image, statistic tile, comparison, timeline, or chart so the slide is not a text stack.',
+          priority: 'high',
+          affectedSections: [index],
+        });
+      }
+    });
+
+    return issues;
   }
 
   /**

@@ -242,7 +242,10 @@ export class CanvasDrawingEngine {
 
     element.x += delta.x;
     element.y += delta.y;
-    element.metadata = { ...element.metadata!, updatedAt: Date.now() };
+    element.metadata = {
+      ...(element.metadata ?? { createdAt: Date.now() }),
+      updatedAt: Date.now(),
+    };
     this.onElementsChange?.(Array.from(this.elements.values()));
   }
 
@@ -641,7 +644,10 @@ export class CanvasDrawingEngine {
     if (!element) {return;}
 
     Object.assign(element, updates);
-    element.metadata = { ...element.metadata!, updatedAt: Date.now() };
+    element.metadata = {
+      ...(element.metadata ?? { createdAt: Date.now() }),
+      updatedAt: Date.now(),
+    };
     this.onElementsChange?.(Array.from(this.elements.values()));
     this.render();
   }

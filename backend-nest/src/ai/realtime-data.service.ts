@@ -83,7 +83,7 @@ export class RealTimeDataService {
   ): Promise<RealTimeDataResult> {
     if (!this.tavilyApiKey) {
       this.logger.warn('Tavily API key not configured');
-      return this.getMockSearchResults(query, limit);
+      return { query, results: [], timestamp: new Date() };
     }
 
     try {
@@ -129,7 +129,7 @@ export class RealTimeDataService {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Tavily search failed: ${errorMessage}`);
-      return this.getMockSearchResults(query, limit);
+      return { query, results: [], timestamp: new Date() };
     }
   }
 
@@ -142,7 +142,7 @@ export class RealTimeDataService {
   ): Promise<RealTimeDataResult> {
     if (!this.googleApiKey || !this.googleSearchEngineId) {
       this.logger.warn('Google API credentials not configured');
-      return this.getMockSearchResults(query, limit); // Fallback to mock if config missing
+      return { query, results: [], timestamp: new Date() };
     }
 
     try {
@@ -258,11 +258,11 @@ export class RealTimeDataService {
       if (result.results.length > 0) return result;
     }
 
-    // 4. Fallback to Mock Data
+    // 4. No research is better than invented statistics.
     this.logger.warn(
-      `All search providers failed or returned no results for: "${query}". Using fallback.`,
+      `All search providers failed or returned no results for: "${query}". Skipping research rather than inventing statistics.`,
     );
-    return this.getMockSearchResults(query, limit);
+    return { query, results: [], timestamp: new Date() };
   }
 
   /**
@@ -304,65 +304,10 @@ export class RealTimeDataService {
 
     // If we couldn't extract enough data, generate sample data
     if (extractedData.length < 3) {
-      return this.generateSampleChartData(query, dataPoints);
+      return [];
     }
 
     return extractedData.slice(0, dataPoints);
-  }
-
-  /**
-   * Generate sample chart data when real data isn't available
-   */
-  private generateSampleChartData(
-    _query: string,
-    count: number,
-  ): ChartDataPoint[] {
-    const baseValue = Math.floor(Math.random() * 100) + 50;
-    const data: ChartDataPoint[] = [];
-
-    for (let i = 0; i < count; i++) {
-      data.push({
-        label: `Data Point ${i + 1}`,
-        value: baseValue + Math.floor(Math.random() * 50) - 25,
-      });
-    }
-
-    return data;
-  }
-
-  /**
-   * Provide mock search results for development/fallback
-   */
-  private getMockSearchResults(
-    query: string,
-    limit: number,
-  ): RealTimeDataResult {
-    const mockResults: SearchResult[] = [
-      {
-        title: `Information about ${query}`,
-        snippet: `This is a sample result about ${query}. In production, this would be real search data from Google or Bing.`,
-        link: 'https://example.com/1',
-        displayLink: 'example.com',
-      },
-      {
-        title: `${query} - Overview and Statistics`,
-        snippet: `Key statistics and data points about ${query}. Market size: $1.2B, Growth rate: 15%, Users: 2.5M.`,
-        link: 'https://example.com/2',
-        displayLink: 'example.com',
-      },
-      {
-        title: `Latest trends in ${query}`,
-        snippet: `Recent developments show ${query} is growing rapidly with significant investments and adoption.`,
-        link: 'https://example.com/3',
-        displayLink: 'example.com',
-      },
-    ];
-
-    return {
-      query,
-      results: mockResults.slice(0, limit),
-      timestamp: new Date(),
-    };
   }
 
   /**

@@ -242,7 +242,7 @@ doppler secrets download --format dotenv > .env.local
   env:
     DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PROD }}
   run: |
-    doppler secrets download --format dotenv --config prd > .env.production
+    doppler secrets download --format dotenv --config prd > .env
 ```
 
 ### Required Secrets

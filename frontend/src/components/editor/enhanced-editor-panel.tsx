@@ -240,7 +240,7 @@ export function EnhancedEditorPanel({
               projectName={projectName}
               slideCount={slideCount}
               onExport={(format, options) => {
-                console.log("Export:", { format, options });
+                console.warn("Export:", { format, options });
               }}
             />
           </TabsContent>

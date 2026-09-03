@@ -334,7 +334,15 @@ export default function EditorPage() {
   // Handle export
   const handleExport = useCallback(async (format: "html" | "json" | "pdf" | "pptx") => {
     try {
-      if (format === "pptx") {
+      if (format === "pdf") {
+        const blob = await api.downloadWysiwygPdf(projectId, "standard");
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${project?.title || "presentation"}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else if (format === "pptx") {
         const data = await api.exportToPptx(projectId, {
           includeNotes: false,
           includeAnimations: true,

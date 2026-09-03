@@ -188,7 +188,7 @@ export function AdvancedColorHarmony({
                       {preset.name}
                     </div>
                     <div className="flex gap-1 mt-1">
-                      {preset.colors.map((color, idx) => (
+                      {preset.colors.map((color) => (
                         <div
                           key={color}
                           className="w-4 h-4 rounded border border-slate-300"
@@ -217,7 +217,7 @@ export function AdvancedColorHarmony({
 
           {/* Color Grid */}
           <div className="grid grid-cols-4 gap-2 mb-3">
-            {selectedHarmonyData.colors.map((color, idx) => (
+            {selectedHarmonyData.colors.map((color) => (
               <div key={color} className="space-y-1">
                 <div
                   className="w-full h-12 rounded-lg border border-slate-300 dark:border-slate-600 cursor-pointer hover:scale-105 transition-transform"

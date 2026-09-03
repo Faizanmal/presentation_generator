@@ -15,7 +15,6 @@ import {
   RotateCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Slider } from "@/components/ui/slider";
 import { staggerContainer, staggerChild, motionTiming, motionEase, buttonPress } from "../lib/motion";
 import type { EditorBlock, EditorComment, LayoutScore, PresenceUser } from "../types";
 

@@ -61,7 +61,7 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         try {
           if (DEMO_MODE) {
-            console.log('[AuthStore] DEMO MODE - Mock login with', email);
+            console.warn('[AuthStore] DEMO MODE - Mock login with', email);
             set({
               user: { ...MOCK_USER, email, name: email.split('@')[0] },
               isAuthenticated: true,
@@ -92,7 +92,7 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         try {
           if (DEMO_MODE) {
-            console.log('[AuthStore] DEMO MODE - Mock OTP login with', identifier);
+            console.warn('[AuthStore] DEMO MODE - Mock OTP login with', identifier);
             set({
               user: { ...MOCK_USER, email: identifier },
               isAuthenticated: true,
@@ -124,7 +124,7 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         try {
           if (DEMO_MODE) {
-            console.log('[AuthStore] DEMO MODE - Mock register with', email);
+            console.warn('[AuthStore] DEMO MODE - Mock register with', email);
             set({
               user: { ...MOCK_USER, email, name },
               isAuthenticated: true,
@@ -165,7 +165,7 @@ export const useAuthStore = create<AuthState>()(
 
       fetchProfile: async () => {
         if (DEMO_MODE) {
-          console.log('[AuthStore] DEMO MODE - Using mock profile');
+          console.warn('[AuthStore] DEMO MODE - Using mock profile');
           set({
             user: MOCK_USER,
             isAuthenticated: true,
@@ -177,7 +177,7 @@ export const useAuthStore = create<AuthState>()(
 
         const token = api.getToken();
         if (!token) {
-          console.log('[AuthStore] No token found, not authenticated');
+          console.warn('[AuthStore] No token found, not authenticated');
           set({
             user: null,
             isAuthenticated: false,
@@ -187,10 +187,10 @@ export const useAuthStore = create<AuthState>()(
           return;
         }
 
-        console.log('[AuthStore] Fetching profile with token:', `${token.substring(0, 20)  }...`);
+        console.warn('[AuthStore] Fetching profile with token:', `${token.substring(0, 20)  }...`);
         try {
           const user = await api.getProfile();
-          console.log('[AuthStore] Profile fetched successfully:', user.email);
+          console.warn('[AuthStore] Profile fetched successfully:', user.email);
           set({
             user,
             isAuthenticated: true,
@@ -198,11 +198,23 @@ export const useAuthStore = create<AuthState>()(
             initialized: true,
           });
         } catch (error: unknown) {
-          const axiosError = error as { response?: { status?: number }; message?: string };
-          const status = axiosError?.response?.status;
-          console.error('[AuthStore] Profile fetch failed:', { status, error: axiosError.message });
-          if (status === 401 || status === 403) {
-            console.log('[AuthStore] Clearing auth state due to 401/403');
+          const status =
+            typeof error === 'object' && error !== null && 'response' in error
+              ? (error as { response?: { status?: number } }).response?.status
+              : undefined;
+          const message =
+            error instanceof Error
+              ? error.message
+              : typeof error === 'string'
+                ? error
+                : 'Profile request failed';
+        // Interceptor may already have cleared tokens on a failed refresh
+          const tokenCleared = !api.getToken();
+          const authFailed = status === 401 || status === 403 || tokenCleared;
+
+          console.warn('[AuthStore] Profile fetch failed:', message, status ?? '');
+          if (authFailed) {
+            console.warn('[AuthStore] Clearing auth state due to 401/403 or missing token');
             set({
               user: null,
               isAuthenticated: false,
@@ -220,7 +232,7 @@ export const useAuthStore = create<AuthState>()(
 
       fetchSubscription: async () => {
         if (DEMO_MODE) {
-          console.log('[AuthStore] DEMO MODE - Using mock subscription');
+          console.warn('[AuthStore] DEMO MODE - Using mock subscription');
           set({ subscription: MOCK_SUBSCRIPTION });
           return;
         }
@@ -242,7 +254,7 @@ export const useAuthStore = create<AuthState>()(
 
       impersonate: async (userId: string) => {
         if (DEMO_MODE) {
-          console.log('[AuthStore] DEMO MODE - Mock impersonate');
+          console.warn('[AuthStore] DEMO MODE - Mock impersonate');
           const currentUser = get().user;
           set({
             user: { ...MOCK_USER, id: userId, email: `impersonated-${userId}@example.com`, name: 'Impersonated User', impersonatorId: currentUser?.id },
@@ -266,7 +278,7 @@ export const useAuthStore = create<AuthState>()(
 
       unimpersonate: async () => {
         if (DEMO_MODE) {
-          console.log('[AuthStore] DEMO MODE - Mock unimpersonate');
+          console.warn('[AuthStore] DEMO MODE - Mock unimpersonate');
           set({
             user: MOCK_USER,
           });

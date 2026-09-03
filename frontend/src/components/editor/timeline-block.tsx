@@ -26,10 +26,56 @@ const DEFAULT_TIMELINE: TimelineItem[] = [
   { id: '3', title: 'Q3: Scaling', description: 'Scale infrastructure and enter new markets.', status: 'upcoming' },
 ];
 
+function normalizeTimelineItems(raw: unknown): TimelineItem[] {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return DEFAULT_TIMELINE;
+  }
+
+  const statuses: TimelineItem['status'][] = ['completed', 'current', 'upcoming'];
+  const seen = new Set<string>();
+
+  return raw.map((entry, index) => {
+    const fallbackId = `timeline-${index}`;
+    if (typeof entry === 'string') {
+      const colon = entry.indexOf(':');
+      const title = colon > 0 ? entry.slice(0, colon).trim() : entry.trim();
+      const description = colon > 0 ? entry.slice(colon + 1).trim() : '';
+      return {
+        id: fallbackId,
+        title: title || `Phase ${index + 1}`,
+        description,
+        status: statuses[Math.min(index, statuses.length - 1)],
+      };
+    }
+
+    const rec =
+      entry && typeof entry === 'object'
+        ? (entry as Record<string, unknown>)
+        : {};
+    const baseId =
+      typeof rec.id === 'string' && rec.id.trim() ? rec.id.trim() : fallbackId;
+    let id = baseId;
+    if (seen.has(id)) {
+      id = `${baseId}-${index}`;
+    }
+    seen.add(id);
+
+    const status =
+      rec.status === 'completed' || rec.status === 'current' || rec.status === 'upcoming'
+        ? rec.status
+        : statuses[Math.min(index, statuses.length - 1)];
+
+    return {
+      id,
+      title: String(rec.title ?? rec.label ?? rec.content ?? `Phase ${index + 1}`),
+      description: String(rec.description ?? rec.text ?? ''),
+      status,
+    };
+  });
+}
+
 export function TimelineBlock({ content, theme, onChange, isEditing = false }: TimelineBlockProps) {
-  const items: TimelineItem[] = Array.isArray(content?.items)
-    ? (content.items as TimelineItem[])
-    : DEFAULT_TIMELINE;
+  const items = normalizeTimelineItems(content?.items);
   const primaryColor = theme?.colors?.primary || "#3b82f6";
   const textBodyColor = theme?.colors?.text || "#334155";
 
@@ -51,7 +97,7 @@ export function TimelineBlock({ content, theme, onChange, isEditing = false }: T
           
           return (
             <motion.div 
-              key={item.id}
+              key={`${item.id}-${index}`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.15, type: 'spring' }}

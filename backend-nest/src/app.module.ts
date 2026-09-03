@@ -105,7 +105,8 @@ import featureFlagsConfig from './common/config/feature-flags.config';
     // Configuration
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
+      // Canonical file is repo-root .env. backend-nest/.env is a leftover fallback.
+      envFilePath: ['../.env', '.env'],
       load: [featureFlagsConfig],
     }),
 
@@ -172,8 +173,10 @@ import featureFlagsConfig from './common/config/feature-flags.config';
         return {
           connection: connection,
           defaultJobOptions: {
-            removeOnComplete: lowLoad ? { count: 20 } : true, // Auto-clean finished jobs to save memory/commands
-            removeOnFail: { count: lowLoad ? 5 : 10 },
+            // Keep finished jobs long enough for the dashboard to poll status.
+            // `true` deletes them immediately, which 404s /generate/status/:id.
+            removeOnComplete: { age: 3600, count: lowLoad ? 20 : 100 },
+            removeOnFail: { age: 86400, count: lowLoad ? 5 : 50 },
             attempts: 1, // Minimize retries that burn through limits
           },
         };

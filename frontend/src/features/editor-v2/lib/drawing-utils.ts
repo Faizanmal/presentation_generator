@@ -3,7 +3,7 @@
  * Provides advanced drawing capabilities: strokes, shapes, paths, effects
  */
 
-import type { Point, DrawingStyle, CanvasElement } from './canvas-drawing-engine';
+import type { Point, CanvasElement } from './canvas-drawing-engine';
 
 export interface StrokeProperties {
   width: number;
@@ -48,7 +48,7 @@ export class DrawingUtils {
   /**
    * Smooth a path using Catmull-Rom curve interpolation
    */
-  static smoothPath(points: Point[], tension: number = 0.5): Point[] {
+  static smoothPath(points: Point[], _tension: number = 0.5): Point[] {
     if (points.length < 2) {return points;}
 
     const result: Point[] = [];
@@ -275,7 +275,6 @@ export class DrawingUtils {
 
     const dx = endX - startX;
     const dy = endY - startY;
-    const dist = Math.sqrt(dx * dx + dy * dy);
     const angle = Math.atan2(dy, dx);
 
     // Adjust end point to account for arrow head

@@ -49,15 +49,8 @@ We are committed to providing a welcoming and inspiring community for all. Pleas
 
 3. **Set up environment variables**
    ```bash
-   # Backend
-   cd backend-nest
    cp .env.example .env
    # Edit .env with your configuration
-   
-   # Frontend
-   cd ../frontend
-   cp .env.local.example .env.local
-   # Edit .env.local with your configuration
    ```
 
 4. **Start development services**

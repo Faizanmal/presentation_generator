@@ -6,9 +6,6 @@ import {
     ExternalLink,
     Loader2,
     AlertCircle,
-    Play,
-    PenTool,
-    X,
 } from 'lucide-react';
 import { FaYoutube, FaFigma, FaTwitter } from 'react-icons/fa';
 import { Input } from '@/components/ui/input';

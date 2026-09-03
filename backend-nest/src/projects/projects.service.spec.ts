@@ -33,6 +33,7 @@ describe('ProjectsService', () => {
     },
     theme: {
       findFirst: jest.fn(),
+      create: jest.fn(),
     },
     projectCollaborator: {
       findUnique: jest.fn(),
@@ -48,6 +49,7 @@ describe('ProjectsService', () => {
   const mockAIService = {
     generatePresentation: jest.fn(),
     generatePresentationImages: jest.fn(),
+    generateStockImages: jest.fn(),
   };
 
   const mockSlidesService = {};
@@ -193,10 +195,62 @@ describe('ProjectsService', () => {
 
       expect(result.jobId).toBe('job1');
       expect(result.status).toBe('queued');
-      expect(mockQueue.add).toHaveBeenCalledWith('generate', {
-        userId,
-        dto: generateDto,
+      expect(mockQueue.add).toHaveBeenCalledWith(
+        'generate',
+        {
+          userId,
+          dto: generateDto,
+        },
+        expect.objectContaining({
+          removeOnComplete: expect.objectContaining({ age: 3600 }),
+        }),
+      );
+    });
+  });
+
+  describe('getGenerationStatus', () => {
+    it('should return job state and result when the job exists', async () => {
+      mockQueue.getJob.mockResolvedValue({
+        id: 'job1',
+        data: { userId: 'user1' },
+        returnvalue: { id: 'proj1', title: 'AI Presentation' },
+        failedReason: undefined,
+        getState: jest.fn().mockResolvedValue('completed'),
       });
+
+      const result = await service.getGenerationStatus('job1', 'user1');
+
+      expect(result).toEqual({
+        id: 'job1',
+        state: 'completed',
+        result: { id: 'proj1', title: 'AI Presentation' },
+        failedReason: undefined,
+      });
+    });
+
+    it('should return not_found instead of throwing when the job was evicted', async () => {
+      mockQueue.getJob.mockResolvedValue(null);
+
+      const result = await service.getGenerationStatus('5', 'user1');
+
+      expect(result).toEqual({
+        id: '5',
+        state: 'not_found',
+        result: undefined,
+        failedReason: undefined,
+      });
+    });
+
+    it('should throw ForbiddenException if another user requests the job', async () => {
+      mockQueue.getJob.mockResolvedValue({
+        id: 'job1',
+        data: { userId: 'owner' },
+        getState: jest.fn(),
+      });
+
+      await expect(
+        service.getGenerationStatus('job1', 'intruder'),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -228,6 +282,8 @@ describe('ProjectsService', () => {
         mockGeneratedContent,
       );
       mockPrismaService.theme.findFirst.mockResolvedValue({ id: 'theme1' });
+      mockPrismaService.theme.create.mockResolvedValue({ id: 'gen-theme' });
+      mockAIService.generateStockImages.mockResolvedValue(new Map());
       mockPrismaService.project.create.mockResolvedValue(mockProject);
       mockPrismaService.slide.create.mockResolvedValue({ id: 'slide1' });
       mockPrismaService.block.create.mockResolvedValue({ id: 'block1' });

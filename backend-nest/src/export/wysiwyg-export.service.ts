@@ -1,6 +1,8 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import axios from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
+import { isGenericKicker } from '../ai/slide-recipes';
 
 /**
  * WysiwygExportService
@@ -63,10 +65,11 @@ export class WysiwygExportService {
   async generateWysiwygHtml(projectId: string): Promise<string> {
     const project = await this.fetchProject(projectId);
     const theme = this.normalizeTheme(project.theme);
+    const imageMap = await this.prefetchImages(project.slides || []);
 
     const slidesHtml = (project.slides || [])
       .sort((a, b) => a.order - b.order)
-      .map((slide, index) => this.renderSlideHtml(slide, theme, index))
+      .map((slide, index) => this.renderSlideHtml(slide, theme, index, imageMap))
       .join('\n');
 
     return this.wrapInFullDocument(project.title, theme, slidesHtml);
@@ -81,6 +84,7 @@ export class WysiwygExportService {
   ): Promise<{ slideIndex: number; html: string }[]> {
     const project = await this.fetchProject(projectId);
     const theme = this.normalizeTheme(project.theme);
+    const imageMap = await this.prefetchImages(project.slides || []);
 
     return (project.slides || [])
       .sort((a, b) => a.order - b.order)
@@ -89,7 +93,7 @@ export class WysiwygExportService {
         html: this.wrapInFullDocument(
           `${project.title} - Slide ${index + 1}`,
           theme,
-          this.renderSlideHtml(slide, theme, index),
+          this.renderSlideHtml(slide, theme, index, imageMap),
         ),
       }));
   }
@@ -117,6 +121,47 @@ export class WysiwygExportService {
     return project as unknown as WysiwygProject;
   }
 
+  private async prefetchImages(slides: WysiwygSlide[]): Promise<Map<string, string>> {
+    const urls = new Set<string>();
+    for (const slide of slides) {
+      for (const block of slide.blocks || []) {
+        const content = block.content || {};
+        const url = String(content.url || content.src || '');
+        if (/^https?:\/\//i.test(url)) urls.add(url);
+      }
+    }
+    const imageMap = new Map<string, string>();
+    await Promise.all(
+      [...urls].map(async (url) => {
+        try {
+          const response = await axios.get<ArrayBuffer>(url, {
+            responseType: 'arraybuffer',
+            timeout: 12_000,
+            maxRedirects: 5,
+            headers: { Accept: 'image/*' },
+          });
+          const mime =
+            String(response.headers['content-type'] || 'image/jpeg').split(
+              ';',
+            )[0] || 'image/jpeg';
+          imageMap.set(
+            url,
+            `data:${mime};base64,${Buffer.from(response.data).toString('base64')}`,
+          );
+        } catch (error) {
+          this.logger.warn(
+            `Could not inline image ${url}: ${(error as Error).message}`,
+          );
+        }
+      }),
+    );
+    return imageMap;
+  }
+
+  private isGenericKicker(text: string): boolean {
+    return isGenericKicker(text);
+  }
+
   private normalizeTheme(theme: WysiwygTheme | null): Required<WysiwygTheme> {
     return {
       colors: {
@@ -129,8 +174,8 @@ export class WysiwygExportService {
         accent: theme?.colors?.accent || '#f59e0b',
       },
       fonts: {
-        heading: theme?.fonts?.heading || 'Inter',
-        body: theme?.fonts?.body || 'Inter',
+        heading: theme?.fonts?.heading || 'Source Serif 4',
+        body: theme?.fonts?.body || 'Source Sans 3',
       },
     };
   }
@@ -142,11 +187,10 @@ export class WysiwygExportService {
     slide: WysiwygSlide,
     theme: Required<WysiwygTheme>,
     slideIndex: number,
+    imageMap: Map<string, string> = new Map(),
   ): string {
-    const blocksHtml = (slide.blocks || [])
-      .sort((a, b) => a.order - b.order)
-      .map((block) => this.renderBlockHtml(block, theme, slide.layout))
-      .join('\n');
+    const blocks = (slide.blocks || []).sort((a, b) => a.order - b.order);
+    const blocksHtml = this.renderLayoutBlocks(blocks, theme, slide.layout, imageMap);
 
     const bgColor = slide.background || theme.colors.background;
 
@@ -159,6 +203,42 @@ export class WysiwygExportService {
       </section>`;
   }
 
+  private renderLayoutBlocks(
+    blocks: WysiwygBlock[],
+    theme: Required<WysiwygTheme>,
+    layout: string,
+    imageMap: Map<string, string> = new Map(),
+  ): string {
+    const isMedia = (block: WysiwygBlock) =>
+      ['IMAGE', 'VIDEO', 'EMBED', 'CHART'].includes(
+        String(block.blockType || '').toUpperCase(),
+      );
+    const isTitle = (block: WysiwygBlock) =>
+      ['HEADING', 'SUBHEADING'].includes(
+        String(block.blockType || '').toUpperCase(),
+      );
+    const media = blocks.filter(isMedia);
+    const titles = blocks.filter(isTitle);
+    const body = blocks.filter((block) => !isMedia(block) && !isTitle(block));
+    const render = (list: WysiwygBlock[]) =>
+      list
+        .map((block) => this.renderBlockHtml(block, theme, layout, imageMap))
+        .join('\n');
+
+    if (layout === 'title-hero') {
+      return `<div class="hero-media">${render(media)}</div><div class="hero-copy">${render(titles)}${render(body)}</div>`;
+    }
+    if (layout === 'image-left' || layout === 'two-column-image') {
+      return `<div class="hero-media">${render(media)}</div><div class="hero-copy">${render(titles)}${render(body)}</div>`;
+    }
+    if (layout === 'image-right') {
+      return `<div class="hero-copy">${render(titles)}${render(body)}</div><div class="hero-media">${render(media)}</div>`;
+    }
+    return blocks
+      .map((block) => this.renderBlockHtml(block, theme, layout, imageMap))
+      .join('\n');
+  }
+
   /**
    * Render a single block as HTML with inline styles for WYSIWYG fidelity
    */
@@ -166,6 +246,7 @@ export class WysiwygExportService {
     block: WysiwygBlock,
     theme: Required<WysiwygTheme>,
     layout: string,
+    imageMap: Map<string, string> = new Map(),
   ): string {
     const content = block.content || {};
     const style = (block.style || {}) as Record<
@@ -176,10 +257,19 @@ export class WysiwygExportService {
 
     switch (block.blockType?.toUpperCase()) {
       case 'HEADING':
-        return `<h1 class="block block-heading" style="${customStyle}; color: ${theme.colors.text}; font-family: '${theme.fonts.heading}', sans-serif;">${this.escapeHtml((content.text as string) || '')}</h1>`;
+        return `<h1 class="block block-heading" style="${customStyle}; color: ${theme.colors.primary}; font-family: '${theme.fonts.heading}', serif;">${this.escapeHtml((content.text as string) || '')}</h1>`;
 
-      case 'SUBHEADING':
-        return `<h2 class="block block-subheading" style="${customStyle}; color: ${theme.colors.text}; font-family: '${theme.fonts.heading}', sans-serif;">${this.escapeHtml((content.text as string) || '')}</h2>`;
+      case 'SUBHEADING': {
+        const variant = String(style.variant || '');
+        const text = String((content.text as string) || '');
+        if (this.isGenericKicker(text)) {
+          return '';
+        }
+        if (variant === 'kicker') {
+          return `<div class="block block-kicker" style="${customStyle}">${this.escapeHtml(text)}</div>`;
+        }
+        return `<h2 class="block block-subheading" style="${customStyle}; color: ${theme.colors.text}; font-family: '${theme.fonts.heading}', sans-serif;">${this.escapeHtml(text)}</h2>`;
+      }
 
       case 'PARAGRAPH':
       case 'TEXT':
@@ -204,7 +294,8 @@ export class WysiwygExportService {
         </blockquote>`;
 
       case 'IMAGE': {
-        const src = (content.url as string) || (content.src as string) || '';
+        const rawSrc = (content.url as string) || (content.src as string) || '';
+        const src = imageMap.get(rawSrc) || rawSrc;
         const alt =
           (content.alt as string) || (content.description as string) || '';
         if (src) {
@@ -250,23 +341,24 @@ export class WysiwygExportService {
         return `<pre class="block block-code" style="${customStyle}; background: ${theme.colors.surface}; color: ${theme.colors.text};"><code data-language="${lang}">${this.escapeHtml(code)}</code></pre>`;
       }
 
-      case 'STATS': {
-        const statItems = Array.isArray(content.items) ? content.items : [];
+      case 'STATS':
+      case 'STATS_GRID': {
+        const statItems = Array.isArray(content.stats)
+          ? content.stats
+          : Array.isArray(content.items)
+            ? content.items
+            : [];
         const statsHtml = statItems
           .map((item: unknown) => {
             const stat = item as Record<string, unknown>;
             const valueText =
-              typeof stat.value === 'string' ||
-              typeof stat.value === 'number' ||
-              typeof stat.value === 'boolean'
+              typeof stat.value === 'string' || typeof stat.value === 'number'
                 ? String(stat.value)
-                : '';
+                : typeof item === 'string'
+                  ? item
+                  : '';
             const labelText =
-              typeof stat.label === 'string' ||
-              typeof stat.label === 'number' ||
-              typeof stat.label === 'boolean'
-                ? String(stat.label)
-                : '';
+              typeof stat.label === 'string' ? stat.label : '';
             return `<div class="stat-item">
                 <div class="stat-value" style="color: ${theme.colors.accent};">${this.escapeHtml(valueText)}</div>
                 <div class="stat-label" style="color: ${theme.colors.textMuted};">${this.escapeHtml(labelText)}</div>
@@ -275,6 +367,31 @@ export class WysiwygExportService {
           .join('');
         return `<div class="block block-stats ${layout === 'two-column' ? 'stats-row' : ''}" style="${customStyle}">${statsHtml}</div>`;
       }
+
+      case 'COMPARISON': {
+        const items = Array.isArray(content.items) ? content.items : [];
+        const cards = items
+          .map(
+            (item: unknown) =>
+              `<div class="comparison-card">${this.escapeHtml(typeof item === 'string' ? item : String((item as Record<string, unknown>)?.text || ''))}</div>`,
+          )
+          .join('');
+        return `<div class="block block-comparison" style="${customStyle}">${cards}</div>`;
+      }
+
+      case 'TIMELINE': {
+        const items = Array.isArray(content.items) ? content.items : [];
+        const steps = items
+          .map(
+            (item: unknown, i: number) =>
+              `<div class="timeline-step"><span class="timeline-index">${i + 1}</span><p>${this.escapeHtml(typeof item === 'string' ? item : String((item as Record<string, unknown>)?.text || ''))}</p></div>`,
+          )
+          .join('');
+        return `<div class="block block-timeline" style="${customStyle}">${steps}</div>`;
+      }
+
+      case 'CALL_TO_ACTION':
+        return `<div class="block block-cta" style="${customStyle}; background: ${theme.colors.accent}; color: ${theme.colors.background};">${this.escapeHtml((content.text as string) || '')}</div>`;
 
       default:
         if (content.text) {
@@ -330,7 +447,7 @@ export class WysiwygExportService {
   <title>${this.escapeHtml(title)}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(theme.fonts.heading)}:wght@300;400;500;600;700;800;900&family=${encodeURIComponent(theme.fonts.body)}:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=${theme.fonts.heading.replace(/\s+/g, '+')}:wght@400;600;700&family=${theme.fonts.body.replace(/\s+/g, '+')}:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -372,44 +489,128 @@ export class WysiwygExportService {
     }
 
     /* ===== LAYOUT VARIANTS ===== */
-    .layout-title-slide {
+    .layout-title, .layout-title-slide, .layout-title-subtitle {
       justify-content: center;
-      align-items: center;
-      text-align: center;
     }
-
-    .layout-title-slide .block-heading { font-size: 56px; margin-bottom: 16px; }
-    .layout-title-slide .block-subheading { font-size: 28px; opacity: 0.8; }
-
-    .layout-two-column {
-      flex-direction: row;
-      flex-wrap: wrap;
-      gap: 40px;
+    .layout-title-hero {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 0;
+      padding: 0;
     }
-
-    .layout-two-column > .block {
-      flex: 1 1 calc(50% - 20px);
-      max-width: calc(50% - 20px);
+    .layout-title-hero .hero-media,
+    .layout-image-left .hero-media,
+    .layout-image-right .hero-media,
+    .layout-two-column-image .hero-media {
+      min-height: 720px;
+      height: 100%;
+      overflow: hidden;
+      background: ${theme.colors.surface};
     }
-
-    .layout-comparison {
-      flex-direction: row;
+    .layout-title-hero .hero-media .block,
+    .layout-image-left .hero-media .block,
+    .layout-image-right .hero-media .block,
+    .layout-two-column-image .hero-media .block {
+      margin: 0;
+      height: 100%;
+    }
+    .layout-title-hero .hero-media .block-image,
+    .layout-image-left .hero-media .block-image,
+    .layout-image-right .hero-media .block-image,
+    .layout-two-column-image .hero-media .block-image {
+      margin: 0;
+      height: 100%;
+      text-align: left;
+    }
+    .layout-title-hero .hero-media img,
+    .layout-image-left .hero-media img,
+    .layout-image-right .hero-media img,
+    .layout-two-column-image .hero-media img {
+      width: 100%;
+      height: 100%;
+      max-height: none;
+      object-fit: cover;
+      border-radius: 0;
+      box-shadow: none;
+    }
+    .layout-title-hero .hero-copy,
+    .layout-image-left .hero-copy,
+    .layout-image-right .hero-copy,
+    .layout-two-column-image .hero-copy {
+      padding: 72px 56px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 16px;
+    }
+    .layout-two-column, .layout-comparison, .layout-three-column {
+      display: grid;
       gap: 24px;
     }
+    .layout-two-column, .layout-comparison { grid-template-columns: 1fr 1fr; }
+    .layout-three-column { grid-template-columns: 1fr 1fr 1fr; }
+    .layout-stats-grid .block-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+    .layout-timeline { justify-content: flex-start; }
+    .layout-image-left, .layout-image-right, .layout-two-column-image {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      align-items: stretch;
+    }
+    .layout-image-full { padding: 0; }
+    .layout-image-full .block-image img { max-height: 720px; width: 100%; object-fit: cover; border-radius: 0; }
+    .layout-quote-highlight { align-items: center; text-align: center; }
+    .layout-bento-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
+    .layout-chart-focus { justify-content: flex-start; }
 
-    .layout-comparison > .block {
-      flex: 1;
+    .layout-title-slide .block-heading, .layout-title .block-heading, .layout-title-hero .block-heading { font-size: 52px; margin-bottom: 16px; }
+    .layout-title-slide .block-subheading { font-size: 28px; opacity: 0.8; }
+
+    .block-kicker {
+      display: inline-flex;
+      align-items: center;
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: ${theme.colors.accent};
+      border: 1px solid ${theme.colors.accent};
+      border-radius: 999px;
+      padding: 6px 12px;
+      width: fit-content;
+    }
+    .comparison-card, .timeline-step {
+      background: ${theme.colors.surface};
+      border-radius: 16px;
+      padding: 20px;
+      font-size: 18px;
+      line-height: 1.45;
+    }
+    .block-comparison, .block-timeline { display: grid; gap: 16px; }
+    .block-comparison { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+    .timeline-step { display: flex; gap: 12px; align-items: flex-start; }
+    .timeline-index {
+      width: 28px; height: 28px; border-radius: 8px;
+      background: ${theme.colors.accent}; color: ${theme.colors.background};
+      display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;
+    }
+    .block-cta {
+      border-radius: 16px;
+      padding: 24px;
+      font-size: 24px;
+      font-weight: 700;
+      text-align: center;
     }
 
     /* ===== BLOCK STYLES ===== */
     .block { margin-bottom: 20px; }
 
     .block-heading {
-      font-family: '${theme.fonts.heading}', sans-serif;
+      font-family: '${theme.fonts.heading}', 'Source Serif 4', Georgia, serif;
       font-size: 42px;
       font-weight: 700;
-      line-height: 1.2;
-      letter-spacing: -0.02em;
+      line-height: 1.15;
+      letter-spacing: -0.03em;
       margin-bottom: 12px;
     }
 

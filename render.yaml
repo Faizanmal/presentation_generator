@@ -2,6 +2,7 @@
 # Docs: https://render.com/docs/blueprint-spec
 #
 # After deploy: set FRONTEND_URL to your Vercel URL in the dashboard.
+# Env templates: backend-nest/.env.example (this service). Frontend: frontend/.env.example (Vercel).
 # Free web services sleep after 15 min idle — use GitHub keep-alive workflow.
 
 services:

@@ -6,6 +6,8 @@ import { Prisma, PrismaClient } from '@prisma/client';
 import { EnhancedPresentation, EnhancedSection } from './thinking-agent.types';
 import { AIService } from '../ai.service';
 import { enhancedToPresentationDocument } from '../agents/enhanced-to-dsl.mapper';
+import { mapGeneratedBlock } from '../presentation-block-mapper';
+import { recipeForSlideIndex } from '../slide-recipes';
 import type {
   PresentationDocument,
   SlideBlock,
@@ -67,6 +69,33 @@ export class ThinkingProjectService {
 
     // Create the project with slides and blocks in a transaction
     const result = await this.db.$transaction(async (tx) => {
+      let themeId = options?.themeId || null;
+      if (!themeId) {
+        const generatedTheme = await tx.theme.create({
+          data: {
+            name: 'Editorial generated',
+            description: `Thinking theme for ${presentation.title}`.slice(0, 180),
+            userId,
+            isDefault: false,
+            colors: {
+              primary: '#0F172A',
+              secondary: '#1E293B',
+              accent: '#0284C7',
+              background: '#FFFFFF',
+              surface: '#F0F9FF',
+              text: '#1F2937',
+              textMuted: '#64748B',
+            } as Prisma.InputJsonValue,
+            fonts: {
+              heading: 'Source Serif 4',
+              body: 'Source Sans 3',
+            } as Prisma.InputJsonValue,
+            spacing: { base: 8, scale: 1.25 } as Prisma.InputJsonValue,
+          },
+        });
+        themeId = generatedTheme.id;
+      }
+
       // 1. Create the project
       const project = await tx.project.create({
         data: {
@@ -75,7 +104,7 @@ export class ThinkingProjectService {
           type: 'PRESENTATION',
           status: 'DRAFT',
           ownerId: userId,
-          themeId: options?.themeId || null,
+          themeId,
           tone: options?.tone,
           audience: options?.audience,
         },
@@ -104,12 +133,16 @@ export class ThinkingProjectService {
         const dslSlide = dslSlides[slideIndex];
         const section = presentation.sections[slideIndex];
 
+        const recipe = recipeForSlideIndex(slideIndex, dslSlides.length);
         const slide = await tx.slide.create({
           data: {
             projectId: project.id,
             order: slideIndex,
             layout:
-              dslSlide.layout?.preset || this.mapLayoutType(section?.layout),
+              dslSlide.layout?.preset ||
+              (section?.layout
+                ? this.mapLayoutType(section.layout)
+                : recipe.layout),
             speakerNotes:
               dslSlide.speakerNotes || section?.speakerNotes || null,
           },
@@ -122,6 +155,43 @@ export class ThinkingProjectService {
         ) {
           const dslBlock = dslSlide.blocks[blockIndex];
           const style = this.styleFromDslBlock(dslBlock);
+          const mapped = mapGeneratedBlock(
+            {
+              type:
+                dslBlock.kind === 'comparison-row'
+                  ? 'comparison'
+                  : dslBlock.kind === 'timeline-item'
+                    ? 'timeline'
+                    : dslBlock.kind === 'statistic'
+                      ? 'statistic'
+                      : dslBlock.kind,
+              content: String(
+                dslBlock.content?.text ||
+                  dslBlock.content?.url ||
+                  dslBlock.content?.value ||
+                  '',
+              ),
+              items: Array.isArray(dslBlock.content?.items)
+                ? dslBlock.content.items.map((item) => String(item))
+                : undefined,
+              value:
+                typeof dslBlock.content?.value === 'string'
+                  ? dslBlock.content.value
+                  : undefined,
+              label:
+                typeof dslBlock.content?.label === 'string'
+                  ? dslBlock.content.label
+                  : undefined,
+              embedUrl:
+                typeof dslBlock.content?.url === 'string'
+                  ? dslBlock.content.url
+                  : undefined,
+            },
+            String((dslBlock.style as Record<string, unknown> | undefined)?.variant) ===
+              'kicker'
+              ? { variant: 'kicker' }
+              : undefined,
+          );
 
           // Mark empty AI image placeholders for generation queue
           const isGeneratedImage =
@@ -134,16 +204,23 @@ export class ThinkingProjectService {
             style.status = 'generating';
           }
 
+          if (!mapped && !isGeneratedImage) {
+            continue;
+          }
+
           const createdBlock = await tx.block.create({
             data: {
               projectId: project.id,
               slideId: slide.id,
-              blockType: this.mapToBlockType(dslBlock.kind),
+              blockType: mapped?.blockType || this.mapToBlockType(dslBlock.kind),
               content: {
-                ...dslBlock.content,
+                ...(mapped?.content || dslBlock.content || {}),
                 ...(isGeneratedImage ? { status: 'generating' } : {}),
               } as Prisma.InputJsonValue,
-              style: style as Prisma.InputJsonValue,
+              style: {
+                ...style,
+                ...(mapped?.style || {}),
+              } as Prisma.InputJsonValue,
               order: dslBlock.order ?? blockIndex,
             },
           });
@@ -356,13 +433,18 @@ export class ThinkingProjectService {
       divider: 'DIVIDER',
       embed: 'EMBED',
       statistic: 'STATS_GRID',
+      'stats-grid': 'STATS_GRID',
       chart: 'CHART',
       video: 'VIDEO',
       audio: 'AUDIO',
       callout: 'QUOTE',
+      timeline: 'TIMELINE',
       'timeline-item': 'TIMELINE',
+      comparison: 'COMPARISON',
       'comparison-item': 'COMPARISON',
+      kicker: 'SUBHEADING',
       cta: 'CALL_TO_ACTION',
+      'call-to-action': 'CALL_TO_ACTION',
     };
 
     return typeMap[type.toLowerCase()] || 'PARAGRAPH';

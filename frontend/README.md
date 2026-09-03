@@ -58,10 +58,11 @@ src/
     ```
 
 2.  **Environment Setup**:
-    Create `.env.local` and add the backend API URL.
     ```bash
-    echo "NEXT_PUBLIC_API_URL=http://localhost:3001/api" > .env.local
+    cp .env.example .env.local
     ```
+    For Vercel, paste the same keys into the project settings.
+    A single-VPS deploy can skip this and use the repo-root `.env`.
 
 3.  **Running the Server**:
     ```bash

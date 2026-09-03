@@ -12,7 +12,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import axios from 'axios';
-import PptxGenJS from 'pptxgenjs';
 import {
   S3Client,
   PutObjectCommand,
@@ -457,30 +456,55 @@ export class MicrosoftOfficeService {
       ...options,
     };
 
-    // Create PowerPoint presentation
-    const pptx = new PptxGenJS();
+    // Create PowerPoint presentation via @office-kit/pptx (ESM-only, loaded dynamically).
+    const pptx = await import('@office-kit/pptx');
+    const pres = pptx.createPresentation({ size: '16:9' });
 
     // Set metadata
-    pptx.author = defaultOptions.author || 'Presentation Designer';
-    pptx.company = defaultOptions.company || '';
-    pptx.subject = defaultOptions.subject ?? '';
-    pptx.title = project.title;
+    pptx.setCoreProperties(pres, {
+      title: project.title,
+      creator: defaultOptions.author || 'Presentation Designer',
+      subject: defaultOptions.subject ?? '',
+    });
+    pptx.setExtendedProperties(pres, {
+      application: 'Presentation Designer',
+      company: defaultOptions.company || '',
+    });
 
-    // Apply template style
-    this.applyTemplateStyle(pptx, defaultOptions.templateStyle);
+    // Template style palette (applied per-slide as shapes; @office-kit/pptx
+    // cannot author custom slide masters from scratch yet).
+    const palette = this.getTemplatePalette(defaultOptions.templateStyle);
+    const blankLayout = pptx.findSlideLayoutByType(pres, 'blank');
+    if (!blankLayout) {
+      throw new Error('Blank slide layout not found in default presentation');
+    }
 
     // Convert slides
     for (const slide of slides) {
-      const pptxSlide = pptx.addSlide();
+      const pptxSlide = pptx.addSlide(pres, { layout: blankLayout });
+      pptx.setSlideBackground(pptxSlide, 'FFFFFF');
+
+      // Header accent bar
+      const headerShape = pptx.addSlideShape(pptxSlide, {
+        x: pptx.inches(0),
+        y: pptx.inches(0),
+        w: pptx.inches(13.333),
+        h: pptx.inches(0.05),
+        preset: 'rect',
+      });
+      pptx.setShapeFill(headerShape, palette.primary);
 
       // Add title
       if (slide.title) {
-        pptxSlide.addText(slide.title, {
-          x: 0.5,
-          y: 0.3,
-          w: '90%',
-          h: 0.8,
-          fontSize: 32,
+        const titleTb = pptx.addSlideTextBox(pptxSlide, {
+          x: pptx.inches(0.5),
+          y: pptx.inches(0.3),
+          w: pptx.inches(12),
+          h: pptx.inches(0.8),
+          text: slide.title,
+        });
+        pptx.setShapeTextFormat(titleTb, {
+          size: 32,
           bold: true,
           color: '363636',
         });
@@ -489,20 +513,36 @@ export class MicrosoftOfficeService {
       // Add blocks
       let yPosition = 1.5;
       for (const block of slide.blocks) {
-        yPosition = this.addBlockToPptx(pptxSlide, block, yPosition);
+        yPosition = await this.addBlockToPptx(
+          pptx,
+          pptxSlide,
+          block,
+          yPosition,
+        );
       }
+
+      // Footer
+      const footerTb = pptx.addSlideTextBox(pptxSlide, {
+        x: pptx.inches(0.5),
+        y: pptx.inches(7.125),
+        w: pptx.inches(5.33),
+        h: pptx.inches(0.3),
+        text: 'Created with Presentation Designer',
+      });
+      pptx.setShapeTextFormat(footerTb, {
+        size: 8,
+        color: '9CA3AF',
+      });
 
       // Add speaker notes
       if (defaultOptions.includeNotes && slide.speakerNotes) {
-        pptxSlide.addNotes(slide.speakerNotes);
+        pptx.setSlideNotes(pptxSlide, slide.speakerNotes);
       }
     }
 
     // Generate file
-    const pptxBuffer = (await pptx.write({
-      outputType: 'arraybuffer',
-    })) as ArrayBuffer;
-    const buffer = Buffer.from(pptxBuffer);
+    const pptxBytes = await pptx.savePresentation(pres);
+    const buffer = Buffer.from(pptxBytes);
 
     // Upload to S3
     const s3Key = `exports/${userId}/${projectId}/${Date.now()}_${project.title.replace(/[^a-zA-Z0-9]/g, '_')}.pptx`;
@@ -669,11 +709,11 @@ export class MicrosoftOfficeService {
     return project;
   }
 
-  private applyTemplateStyle(
-    pptx: PptxGenJS,
-    style: ExportOptions['templateStyle'],
-  ): void {
-    // Apply different theme colors based on style
+  private getTemplatePalette(style: ExportOptions['templateStyle']): {
+    primary: string;
+    secondary: string;
+    accent: string;
+  } {
     const themes: Record<
       string,
       { primary: string; secondary: string; accent: string }
@@ -683,113 +723,107 @@ export class MicrosoftOfficeService {
       minimal: { primary: '374151', secondary: '6B7280', accent: '3B82F6' },
       corporate: { primary: '1A365D', secondary: '2B6CB0', accent: 'DD6B20' },
     };
-
-    const theme = themes[style] || themes.modern;
-
-    // Set slide master
-    pptx.defineSlideMaster({
-      title: 'DEFAULT_MASTER',
-      background: { color: 'FFFFFF' },
-      objects: [
-        // Header line
-        {
-          rect: {
-            x: 0,
-            y: 0,
-            w: '100%',
-            h: 0.05,
-            fill: { color: theme.primary },
-          },
-        },
-        // Footer
-        {
-          text: {
-            text: 'Created with Presentation Designer',
-            options: {
-              x: 0.5,
-              y: '95%',
-              w: '40%',
-              h: 0.3,
-              fontSize: 8,
-              color: '9CA3AF',
-            },
-          },
-        },
-      ],
-    });
+    return themes[style] || themes.modern;
   }
 
-  private addBlockToPptx(
-    slide: PptxGenJS.Slide,
+  private async addBlockToPptx(
+    pptx: typeof import('@office-kit/pptx'),
+    slide: NonNullable<
+      ReturnType<(typeof import('@office-kit/pptx'))['addSlide']>
+    >,
     block: { blockType: string; content: unknown },
     yPosition: number,
-  ): number {
+  ): Promise<number> {
     const content = block.content as Record<string, unknown>;
     const textContent = typeof content.text === 'string' ? content.text : '';
     const imageUrl = typeof content.url === 'string' ? content.url : '';
     const codeContent = typeof content.code === 'string' ? content.code : '';
 
     switch (block.blockType) {
-      case 'HEADING':
-        slide.addText(textContent, {
-          x: 0.5,
-          y: yPosition,
-          w: '90%',
-          fontSize: 24,
+      case 'HEADING': {
+        const tb = pptx.addSlideTextBox(slide, {
+          x: pptx.inches(0.5),
+          y: pptx.inches(yPosition),
+          w: pptx.inches(12),
+          h: pptx.inches(0.8),
+          text: textContent,
+        });
+        pptx.setShapeTextFormat(tb, {
+          size: 24,
           bold: true,
           color: '1F2937',
         });
         return yPosition + 0.8;
+      }
 
-      case 'PARAGRAPH':
-        slide.addText(textContent, {
-          x: 0.5,
-          y: yPosition,
-          w: '90%',
-          fontSize: 14,
+      case 'PARAGRAPH': {
+        const tb = pptx.addSlideTextBox(slide, {
+          x: pptx.inches(0.5),
+          y: pptx.inches(yPosition),
+          w: pptx.inches(12),
+          h: pptx.inches(0.6),
+          text: textContent,
+        });
+        pptx.setShapeTextFormat(tb, {
+          size: 14,
           color: '4B5563',
         });
         return yPosition + 0.6;
+      }
 
       case 'BULLET_LIST': {
         const items = (content.items as string[]) || [];
-        items.forEach((item, index) => {
-          slide.addText(item, {
-            x: 0.7,
-            y: yPosition + index * 0.4,
-            w: '85%',
-            fontSize: 14,
-            bullet: true,
-            color: '4B5563',
-          });
+        const tb = pptx.addSlideTextBox(slide, {
+          x: pptx.inches(0.7),
+          y: pptx.inches(yPosition),
+          w: pptx.inches(11.33),
+          h: pptx.inches(items.length * 0.4),
+          text: items.join('\n'),
+        });
+        pptx.setShapeBullets(tb, { char: '\u2022' });
+        pptx.setShapeTextFormat(tb, {
+          size: 14,
+          color: '4B5563',
         });
         return yPosition + items.length * 0.4;
       }
 
       case 'IMAGE':
         if (imageUrl) {
-          slide.addImage({
-            path: imageUrl,
-            x: 0.5,
-            y: yPosition,
-            w: 4,
-            h: 3,
-          });
-          return yPosition + 3.3;
+          try {
+            const resp = await axios.get(imageUrl, {
+              responseType: 'arraybuffer',
+              timeout: 15_000,
+            });
+            pptx.addSlideImage(slide, new Uint8Array(resp.data), {
+              x: pptx.inches(0.5),
+              y: pptx.inches(yPosition),
+              w: pptx.inches(4),
+              h: pptx.inches(3),
+            });
+            return yPosition + 3.3;
+          } catch {
+            this.logger.warn(`Failed to add image: ${imageUrl}`);
+          }
         }
         return yPosition;
 
-      case 'CODE':
-        slide.addText(codeContent, {
-          x: 0.5,
-          y: yPosition,
-          w: '90%',
-          fontSize: 10,
-          fontFace: 'Courier New',
-          fill: { color: 'F3F4F6' },
+      case 'CODE': {
+        const tb = pptx.addSlideTextBox(slide, {
+          x: pptx.inches(0.5),
+          y: pptx.inches(yPosition),
+          w: pptx.inches(12),
+          h: pptx.inches(1),
+          text: codeContent,
+        });
+        pptx.setShapeTextFormat(tb, {
+          size: 10,
+          font: 'Courier New',
           color: '374151',
         });
+        pptx.setShapeFill(tb, 'F3F4F6');
         return yPosition + 1;
+      }
 
       default:
         return yPosition + 0.5;

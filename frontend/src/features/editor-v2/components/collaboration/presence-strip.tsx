@@ -1,8 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { Wifi, WifiOff } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { WifiOff } from "lucide-react";
 import { motionTiming, motionEase } from "../../lib/motion";
 import type { PresenceUser } from "../../types";
 

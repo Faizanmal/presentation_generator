@@ -99,15 +99,62 @@ class ApiClient {
   private csrfPromise: Promise<string> | null = null;
   // Used to queue concurrent requests that arrive while a token refresh is in-flight
   private isRefreshing = false;
-  private refreshSubscribers: Array<(newToken: string) => void> = [];
+  private refreshSubscribers: Array<{
+    resolve: (newToken: string) => void;
+    reject: (error: unknown) => void;
+  }> = [];
 
-  private subscribeTokenRefresh(cb: (newToken: string) => void) {
-    this.refreshSubscribers.push(cb);
+  private subscribeTokenRefresh(
+    resolve: (newToken: string) => void,
+    reject: (error: unknown) => void,
+  ) {
+    this.refreshSubscribers.push({ resolve, reject });
   }
 
   private notifyRefreshed(newToken: string) {
-    this.refreshSubscribers.forEach((cb) => cb(newToken));
+    this.refreshSubscribers.forEach(({ resolve }) => resolve(newToken));
     this.refreshSubscribers = [];
+  }
+
+  private notifyRefreshFailed(error: unknown) {
+    this.refreshSubscribers.forEach(({ reject }) => reject(error));
+    this.refreshSubscribers = [];
+  }
+
+  private skipAuthHeader(url?: string) {
+    if (!url) return false;
+    return (
+      url.includes('/auth/login') ||
+      url.includes('/auth/register') ||
+      url.includes('/auth/refresh') ||
+      url.includes('/csrf/token')
+    );
+  }
+
+  /** Match AuthProvider: don't kick the user off public / auth-only pages. */
+  private shouldForceLoginRedirect() {
+    if (typeof window === 'undefined') return false;
+    const path = window.location.pathname;
+    if (
+      path.startsWith('/login') ||
+      path.startsWith('/register') ||
+      path.startsWith('/password-reset') ||
+      path.startsWith('/present/') ||
+      path.startsWith('/view/') ||
+      path.startsWith('/embed/') ||
+      path.startsWith('/auth/')
+    ) {
+      return false;
+    }
+    return !['/', '/marketplace', '/terms', '/offline'].includes(path);
+  }
+
+  private redirectToLogin() {
+    if (!this.shouldForceLoginRedirect()) return;
+    const redirect = encodeURIComponent(
+      `${window.location.pathname}${window.location.search}`,
+    );
+    window.location.href = `/login?redirect=${redirect}`;
   }
 
   constructor() {
@@ -129,23 +176,24 @@ class ApiClient {
         this.token = localStorage.getItem('token');
       }
       
-      if (this.token) {
+      if (this.token && !this.skipAuthHeader(config.url)) {
         config.headers.Authorization = `Bearer ${this.token}`;
-        console.log('[ApiClient] Adding Authorization header for request to:', config.url);
+        console.warn('[ApiClient] Adding Authorization header for request to:', config.url);
       }
 
-      // Add CSRF token for mutation requests
+      // Add CSRF token for mutation requests (login/refresh are token-authenticated)
       if (
         config.method &&
         ['post', 'put', 'patch', 'delete'].includes(config.method.toLowerCase()) &&
-        !config.url?.includes('/auth/login')
+        !config.url?.includes('/auth/login') &&
+        !config.url?.includes('/auth/refresh')
       ) {
         if (!this.csrfToken) {
           await this.fetchCsrfToken().catch(err => console.error('[ApiClient] CSRF fetch failed', err));
         }
 
         if (this.csrfToken) {
-          // console.log('[ApiClient] Attaching CSRF token');
+          // console.warn('[ApiClient] Attaching CSRF token');
           config.headers['x-csrf-token'] = this.csrfToken;
         } else {
           console.warn('[ApiClient] Failed to obtain CSRF token - request may fail');
@@ -189,7 +237,8 @@ class ApiClient {
           !originalRequest._retry &&
           (this.storedRefreshToken || (typeof window !== 'undefined' && localStorage.getItem('refreshToken'))) &&
           !originalRequest.url?.includes('/auth/refresh') &&
-          !originalRequest.url?.includes('/auth/login')
+          !originalRequest.url?.includes('/auth/login') &&
+          !originalRequest.url?.includes('/csrf/token')
         ) {
           // Ensure we have the latest refresh token from localStorage
           if (!this.storedRefreshToken && typeof window !== 'undefined') {
@@ -197,23 +246,19 @@ class ApiClient {
           }
 
           if (!this.storedRefreshToken) {
-            // No refresh token available, clear and redirect
             this.clearToken();
-            if (typeof window !== 'undefined') {
-              window.location.href = '/login';
-            }
+            this.redirectToLogin();
             return Promise.reject(error);
           }
 
           if (this.isRefreshing) {
-            // Queue requests that arrive while refresh is in-flight
-            return new Promise<AxiosResponse>((resolve) => {
+            return new Promise<AxiosResponse>((resolve, reject) => {
               this.subscribeTokenRefresh((newToken: string) => {
                 if (originalRequest.headers) {
                   originalRequest.headers.Authorization = `Bearer ${newToken}`;
                 }
                 resolve(this.client(originalRequest));
-              });
+              }, reject);
             });
           }
 
@@ -236,22 +281,23 @@ class ApiClient {
             }
             return this.client(originalRequest);
           } catch (refreshError) {
-            // Refresh token is invalid — clear state and redirect to login
-            console.error('[ApiClient] Token refresh failed:', refreshError);
+            const normalized =
+              refreshError instanceof Error
+                ? refreshError
+                : new Error('Token refresh failed');
+            console.warn('[ApiClient] Token refresh failed:', normalized.message);
             this.clearToken();
-            if (typeof window !== 'undefined') {
-              window.location.href = '/login';
-            }
+            this.notifyRefreshFailed(normalized);
+            this.redirectToLogin();
+            return Promise.reject(normalized);
           } finally {
             this.isRefreshing = false;
           }
         }
 
-        if (error.response?.status === 401) {
+        if (error.response?.status === 401 && !originalRequest.url?.includes('/auth/refresh')) {
           this.clearToken();
-          if (typeof window !== 'undefined') {
-            window.location.href = '/login';
-          }
+          this.redirectToLogin();
         }
         return Promise.reject(error);
       }
@@ -306,9 +352,13 @@ class ApiClient {
 
     this.csrfPromise = (async () => {
       try {
-        // Add timestamp to prevent 304 Not Modified responses
+        // Use a bare axios call so CSRF fetch never re-enters auth interceptors
         const timestamp = new Date().getTime();
-        const response = await this.client.get<{ token: string }>(`/csrf/token?t=${timestamp}`);
+        const response = await axios.get<{ token: string }>(`${API_URL}/csrf/token`, {
+          params: { t: timestamp },
+          withCredentials: true,
+          timeout: 15_000,
+        });
 
         if (response.data) {
           // Handle case where token might be nested or direct property
@@ -368,7 +418,7 @@ class ApiClient {
 
   async register(credentials: RegisterCredentials): Promise<AuthResponse> {
     if (DEMO_MODE) {
-      console.log('[ApiClient] DEMO MODE - Mock register:', credentials.email);
+      console.warn('[ApiClient] DEMO MODE - Mock register:', credentials.email);
       const response: AuthResponse = {
         accessToken: `demo-token-${  Date.now()}`,
         refreshToken: `demo-refresh-${  Date.now()}`,
@@ -401,7 +451,7 @@ class ApiClient {
 
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     if (DEMO_MODE) {
-      console.log('[ApiClient] DEMO MODE - Mock login:', credentials.email);
+      console.warn('[ApiClient] DEMO MODE - Mock login:', credentials.email);
       const response: AuthResponse = {
         accessToken: `demo-token-${  Date.now()}`,
         refreshToken: `demo-refresh-${  Date.now()}`,
@@ -434,7 +484,7 @@ class ApiClient {
 
   async getProfile(): Promise<User> {
     if (DEMO_MODE) {
-      console.log('[ApiClient] DEMO MODE - Mock profile');
+      console.warn('[ApiClient] DEMO MODE - Mock profile');
       return {
         id: 'demo-user-123',
         email: 'demo@example.com',
@@ -450,7 +500,7 @@ class ApiClient {
 
   async patchProfile(payload: Partial<Pick<User, 'name' | 'email' | 'image'>>): Promise<User> {
     if (DEMO_MODE) {
-      console.log('[ApiClient] DEMO MODE - Mock profile update:', payload);
+      console.warn('[ApiClient] DEMO MODE - Mock profile update:', payload);
       return {
         id: 'demo-user-123',
         email: payload.email || 'demo@example.com',
@@ -466,7 +516,7 @@ class ApiClient {
 
   async changePassword(currentPassword: string, newPassword: string): Promise<{ success: boolean; message: string }> {
     if (DEMO_MODE) {
-      console.log('[ApiClient] DEMO MODE - Mock password change');
+      console.warn('[ApiClient] DEMO MODE - Mock password change');
       return { success: true, message: 'Password changed successfully' };
     }
 
@@ -479,7 +529,7 @@ class ApiClient {
 
   async refreshToken(): Promise<{ accessToken: string; refreshToken?: string }> {
     if (DEMO_MODE) {
-      console.log('[ApiClient] DEMO MODE - Mock token refresh');
+      console.warn('[ApiClient] DEMO MODE - Mock token refresh');
       const newAccessToken = `demo-token-${  Date.now()}`;
       this.setToken(newAccessToken);
       return { accessToken: newAccessToken };
@@ -497,7 +547,7 @@ class ApiClient {
 
   async requestOtpLogin(email: string): Promise<{ success: boolean; message: string; expiresInSeconds?: number }> {
     if (DEMO_MODE) {
-      console.log('[ApiClient] DEMO MODE - Mock OTP request for', email);
+      console.warn('[ApiClient] DEMO MODE - Mock OTP request for', email);
       return { success: true, message: 'OTP sent successfully', expiresInSeconds: 600 };
     }
 
@@ -517,7 +567,7 @@ class ApiClient {
     retryAfterSeconds?: number;
   }> {
     if (DEMO_MODE) {
-      console.log('[ApiClient] DEMO MODE - Mock OTP request via', channel, 'for', identifier);
+      console.warn('[ApiClient] DEMO MODE - Mock OTP request via', channel, 'for', identifier);
       return { success: true, message: `OTP sent via ${channel}`, expiresInSeconds: 600 };
     }
 
@@ -617,7 +667,7 @@ class ApiClient {
 
   async getProjects(page = 1, limit = 20): Promise<PaginatedResponse<Project>> {
     if (DEMO_MODE) {
-      console.log('[ApiClient] DEMO MODE - Mock projects list');
+      console.warn('[ApiClient] DEMO MODE - Mock projects list');
       return {
         data: [
           MOCK_PROJECT,
@@ -651,7 +701,7 @@ class ApiClient {
 
   async getProject(id: string): Promise<Project> {
     if (DEMO_MODE) {
-      console.log('[ApiClient] DEMO MODE - Mock project:', id);
+      console.warn('[ApiClient] DEMO MODE - Mock project:', id);
       return MOCK_PROJECT;
     }
 
@@ -661,7 +711,7 @@ class ApiClient {
 
   async getProjectByShareToken(shareToken: string): Promise<Project> {
     if (DEMO_MODE) {
-      console.log('[ApiClient] DEMO MODE - Mock shared project:', shareToken);
+      console.warn('[ApiClient] DEMO MODE - Mock shared project:', shareToken);
       return MOCK_PROJECT;
     }
 
@@ -671,7 +721,7 @@ class ApiClient {
 
   async createProject(input: CreateProjectInput): Promise<Project> {
     if (DEMO_MODE) {
-      console.log('[ApiClient] DEMO MODE - Mock project creation:', input.title);
+      console.warn('[ApiClient] DEMO MODE - Mock project creation:', input.title);
       return {
         ...MOCK_PROJECT,
         id: `demo-project-${  Date.now()}`,
@@ -686,7 +736,7 @@ class ApiClient {
 
   async generateProject(input: GenerateProjectInput): Promise<{ status: string; jobId: string; message?: string }> {
     if (DEMO_MODE) {
-      console.log('[ApiClient] DEMO MODE - Mock project generation:', input.topic);
+      console.warn('[ApiClient] DEMO MODE - Mock project generation:', input.topic);
       return { status: 'queued', jobId: `demo-job-${  Date.now()}`, message: 'Generating demo project...' };
     }
 
@@ -697,7 +747,7 @@ class ApiClient {
 
   async getProjectGenerationStatus(jobId: string): Promise<{ id: string; state: string; result?: Project; failedReason?: string }> {
     if (DEMO_MODE) {
-      console.log('[ApiClient] DEMO MODE - Mock project generation status:', jobId);
+      console.warn('[ApiClient] DEMO MODE - Mock project generation status:', jobId);
       return {
         id: jobId,
         state: 'completed',
@@ -804,7 +854,7 @@ class ApiClient {
 
   async getSubscription(): Promise<Subscription> {
     if (DEMO_MODE) {
-      console.log('[ApiClient] DEMO MODE - Mock subscription');
+      console.warn('[ApiClient] DEMO MODE - Mock subscription');
       return MOCK_SUBSCRIPTION;
     }
 
@@ -814,7 +864,7 @@ class ApiClient {
 
   async createCheckout(plan: 'pro' | 'enterprise'): Promise<{ url: string }> {
     if (DEMO_MODE) {
-      console.log('[ApiClient] DEMO MODE - Mock checkout for plan:', plan);
+      console.warn('[ApiClient] DEMO MODE - Mock checkout for plan:', plan);
       return { url: 'https://checkout.demo.local' };
     }
 
@@ -824,7 +874,7 @@ class ApiClient {
 
   async createPortalSession(): Promise<{ url: string }> {
     if (DEMO_MODE) {
-      console.log('[ApiClient] DEMO MODE - Mock portal session');
+      console.warn('[ApiClient] DEMO MODE - Mock portal session');
       return { url: 'https://portal.demo.local' };
     }
 
@@ -3941,6 +3991,7 @@ class ApiClient {
     const response = await this.client.get(`/export/${projectId}/wysiwyg-pdf`, {
       params: { quality },
       responseType: 'blob',
+      timeout: 180_000,
     });
     return response.data as unknown as Blob;
   }

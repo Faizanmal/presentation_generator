@@ -6,6 +6,7 @@ import {
   UseGuards,
   Res,
   Header,
+  Logger,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import puppeteer from 'puppeteer';
@@ -14,11 +15,13 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { WysiwygExportService } from './wysiwyg-export.service';
 import { ExportService } from './export.service';
 import { ThrottleExportPDF } from '../common/decorators/throttle.decorator';
-import { Feature } from '../common/decorators/feature.decorator';
+import { resolveBrowserExecutable } from './browser-executable';
 
 @Controller('export')
 @UseGuards(JwtAuthGuard)
 export class WysiwygExportController {
+  private readonly logger = new Logger(WysiwygExportController.name);
+
   constructor(
     private readonly wysiwygService: WysiwygExportService,
     private readonly exportService: ExportService,
@@ -27,13 +30,8 @@ export class WysiwygExportController {
   /**
    * GET /api/export/:projectId/wysiwyg-html
    * Returns a self-contained HTML document that replicates the editor canvas.
-   * Can be used for:
-   *  - Direct browser preview
-   *  - Puppeteer-based PDF screenshot rendering
-   *  - PPTX image-based exports
    */
   @Get(':projectId/wysiwyg-html')
-  @Feature('highResExport')
   @Header('Content-Type', 'text/html')
   async getWysiwygHtml(
     @CurrentUser() _user: { id: string },
@@ -49,7 +47,6 @@ export class WysiwygExportController {
    */
   @Get(':projectId/wysiwyg-pdf')
   @ThrottleExportPDF()
-  @Feature('highResExport')
   async getWysiwygPdf(
     @CurrentUser() _user: { id: string },
     @Param('projectId') projectId: string,
@@ -57,7 +54,6 @@ export class WysiwygExportController {
     @Res() res: Response,
   ) {
     try {
-      // Try Puppeteer-based WYSIWYG export
       const pdfBuffer = await this.renderWithPuppeteer(projectId, quality);
 
       res.setHeader('Content-Type', 'application/pdf');
@@ -67,8 +63,11 @@ export class WysiwygExportController {
       );
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.send(pdfBuffer);
-    } catch {
-      // Fallback to standard PDF export
+    } catch (error) {
+      this.logger.error(
+        `WYSIWYG PDF failed, using text fallback: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
       const fallback = await this.exportService.exportToPDF(projectId);
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader(
@@ -80,31 +79,30 @@ export class WysiwygExportController {
   }
 
   /**
-   * Render HTML to PDF using Puppeteer (if available).
-   * Each slide is rendered as a full 1280x720 page.
+   * Screenshot each 16:9 slide and embed the PNG into a PDF.
+   * This preserves layout, images, and fonts — unlike the Helvetica pdf-lib path.
    */
   private async renderWithPuppeteer(
     projectId: string,
     quality: 'standard' | 'high',
   ): Promise<Buffer> {
-    // Dynamic import to avoid hard dependency on puppeteer
     const slidePages =
       await this.wysiwygService.generatePerSlideHtml(projectId);
 
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-      ],
-    });
+    const executablePath = resolveBrowserExecutable();
+    const launchArgs = [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--font-render-hinting=none',
+    ];
+
+    const browser = await this.launchBrowser(executablePath, launchArgs);
 
     try {
       const { PDFDocument } = await import('pdf-lib');
       const mergedPdf = await PDFDocument.create();
-
       const deviceScaleFactor = quality === 'high' ? 2 : 1;
 
       for (const slidePage of slidePages) {
@@ -115,26 +113,38 @@ export class WysiwygExportController {
           deviceScaleFactor,
         });
         await page.setContent(slidePage.html, {
-          waitUntil: 'load',
-          timeout: 15000,
+          waitUntil: 'domcontentloaded',
+          timeout: 30_000,
+        });
+        await page.evaluate(async () => {
+          await (document as Document & { fonts: { ready: Promise<unknown> } }).fonts.ready;
+          const images = Array.from(document.images);
+          await Promise.all(
+            images.map(
+              (img) =>
+                img.complete ||
+                new Promise((resolve) => {
+                  img.onload = () => resolve(true);
+                  img.onerror = () => resolve(true);
+                }),
+            ),
+          );
         });
 
-        // Wait a bit for fonts to load
-        await page.evaluate(() => new Promise((r) => setTimeout(r, 500)));
-
-        const pdfBuffer = await page.pdf({
-          width: '1280px',
-          height: '720px',
-          printBackground: true,
-          margin: { top: 0, right: 0, bottom: 0, left: 0 },
+        const png = await page.screenshot({
+          type: 'png',
+          clip: { x: 0, y: 0, width: 1280, height: 720 },
         });
-
-        // Merge individual slide PDFs
-        const slidePdf = await PDFDocument.load(pdfBuffer);
-        const [copiedPage] = await mergedPdf.copyPages(slidePdf, [0]);
-        mergedPdf.addPage(copiedPage);
-
         await page.close();
+
+        const pdfPage = mergedPdf.addPage([1280, 720]);
+        const image = await mergedPdf.embedPng(png);
+        pdfPage.drawImage(image, {
+          x: 0,
+          y: 0,
+          width: 1280,
+          height: 720,
+        });
       }
 
       const mergedBytes = await mergedPdf.save();
@@ -142,5 +152,34 @@ export class WysiwygExportController {
     } finally {
       await browser.close();
     }
+  }
+
+  private async launchBrowser(
+    executablePath: string | undefined,
+    args: string[],
+  ) {
+    if (executablePath) {
+      this.logger.log(`Launching PDF browser: ${executablePath}`);
+      return puppeteer.launch({
+        headless: true,
+        executablePath,
+        args,
+      });
+    }
+
+    try {
+      this.logger.log('Launching PDF browser channel: chrome');
+      return await puppeteer.launch({
+        headless: true,
+        channel: 'chrome',
+        args,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `PDF browser channel chrome failed: ${(error as Error).message}`,
+      );
+    }
+
+    return puppeteer.launch({ headless: true, args });
   }
 }

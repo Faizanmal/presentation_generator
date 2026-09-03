@@ -58,10 +58,10 @@ src/
     ```
 
 2.  **Environment Setup**:
-    Copy `.env.example` to `.env` and fill in the required values.
     ```bash
     cp .env.example .env
     ```
+    Nest and Prisma also load the repo-root `.env` if this file is missing. On Render, paste keys from this file.
 
     **Key Environment Variables**:
     - `DATABASE_URL`: PostgreSQL connection string.

@@ -162,13 +162,6 @@ const EFFECT_PRESETS: EffectPreset[] = [
   },
 ];
 
-const TYPOGRAPHY_EFFECTS = [
-  { id: "bold-outline", name: "Bold Outline", css: "text-stroke: 1px" },
-  { id: "soft-shadow", name: "Soft Shadow", css: "text-shadow: 2px 2px 4px" },
-  { id: "deep-shadow", name: "Deep Shadow", css: "text-shadow: 3px 3px 0px" },
-  { id: "neon", name: "Neon Glow", css: "text-shadow: 0 0 10px" },
-];
-
 interface PremiumDesignSystemProps {
   onApplyGradient?: (gradient: string) => void;
   onApplyShadow?: (shadow: ShadowPreset) => void;

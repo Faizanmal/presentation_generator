@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { RealTimeDataService } from './realtime-data.service';
 import { AICostOptimizerService } from './ai-cost-optimizer.service';
+import axios from 'axios';
 
 // Mock OpenAI
 const mockOpenAI = {
@@ -15,6 +16,9 @@ const mockOpenAI = {
     completions: {
       create: jest.fn(),
     },
+  },
+  embeddings: {
+    create: jest.fn().mockResolvedValue({ data: [{ embedding: [0.1, 0.2] }] }),
   },
   images: {
     generate: jest.fn(),
@@ -94,6 +98,7 @@ describe('AIService', () => {
   const mockRealTimeDataService = {
     extractChartData: jest.fn().mockResolvedValue([]),
     fetchRealTimeData: jest.fn().mockResolvedValue([]),
+    search: jest.fn().mockResolvedValue({ results: [] }),
   };
 
   const mockAICostOptimizerService = {
@@ -259,6 +264,57 @@ describe('AIService', () => {
         }),
       );
     });
+
+    it('strips mock statistics and filler callouts from generated slides', async () => {
+      mockOpenAI.chat.completions.create.mockResolvedValue({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                title: 'AI is already here',
+                sections: [
+                  {
+                    heading: 'The current landscape',
+                    layout: 'stats-grid',
+                    blocks: [
+                      {
+                        type: 'statistic',
+                        content: '$1.2B Market Size',
+                        value: '$1.2B',
+                        label: 'Market Size',
+                      },
+                      {
+                        type: 'callout',
+                        content:
+                          'Key takeaway: focus on one decisive insight before moving on.',
+                      },
+                      {
+                        type: 'paragraph',
+                        content:
+                          "Amazon's recommendation engine drives 35% of total revenue.",
+                      },
+                    ],
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+        usage: { total_tokens: 200 },
+      });
+
+      const result = await service.generatePresentation({
+        topic: 'AI is not the future',
+        length: 5,
+      });
+
+      const texts = result.sections.flatMap((section) =>
+        section.blocks.map((block) => block.content),
+      );
+      expect(texts.join(' ')).not.toMatch(/\$1\.2B/i);
+      expect(texts.join(' ')).not.toMatch(/decisive insight/i);
+      expect(texts.join(' ')).toMatch(/Amazon/i);
+    });
   });
 
   describe('enhanceContent', () => {
@@ -298,6 +354,15 @@ describe('AIService', () => {
   });
 
   describe('generateImage', () => {
+    beforeEach(() => {
+      mockConfigService.get.mockImplementation((key: string) => {
+        const config: Record<string, string> = {
+          OPENAI_API_KEY: 'test-api-key',
+        };
+        return config[key];
+      });
+    });
+
     it('should generate an image successfully', async () => {
       mockOpenAI.images.generate.mockResolvedValue({
         data: [
@@ -335,6 +400,85 @@ describe('AIService', () => {
           size: '1024x1024',
         }),
       );
+    });
+
+    it('uses NVIDIA FLUX.1-dev before other providers', async () => {
+      mockConfigService.get.mockImplementation((key: string) => {
+        if (key === 'NVIDIA_API_KEY') return 'nvapi-test';
+        if (key === 'OPENAI_API_KEY') return 'test-api-key';
+        return '';
+      });
+      jest.spyOn(service, 'generateImageNvidia').mockResolvedValue({
+        imageUrl: 'data:image/png;base64,abc123',
+        revisedPrompt: 'A city skyline',
+        provider: 'nvidia',
+      });
+
+      const result = await service.generateImage('A city skyline');
+
+      expect(result.provider).toBe('nvidia');
+      expect(service.generateImageNvidia).toHaveBeenCalled();
+    });
+
+    it('uses NVIDIA Kontext-dev when a reference image is provided', async () => {
+      mockConfigService.get.mockImplementation((key: string) => {
+        if (key === 'NVIDIA_API_KEY') return 'nvapi-test';
+        return '';
+      });
+      const get = jest.spyOn(axios, 'get').mockResolvedValue({
+        data: Buffer.from('png-bytes'),
+        headers: { 'content-type': 'image/png' },
+      });
+      const post = jest.spyOn(axios, 'post').mockResolvedValue({
+        status: 200,
+        data: { image: 'data:image/png;base64,kontext' },
+      });
+
+      try {
+        const result = await service.generateImageNvidia(
+          'Hold pizza instead',
+          '1024x1024',
+          'https://picsum.photos/seed/ref/1600/900',
+        );
+
+        expect(result.provider).toBe('nvidia');
+        expect(post).toHaveBeenCalledWith(
+          'https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-kontext-dev',
+          expect.objectContaining({
+            image: expect.stringContaining('data:image/png;base64,'),
+            aspect_ratio: 'match_input_image',
+          }),
+          expect.any(Object),
+        );
+      } finally {
+        get.mockRestore();
+        post.mockRestore();
+      }
+    });
+
+    it('falls back to Gemini then Stability when NVIDIA fails', async () => {
+      mockConfigService.get.mockImplementation((key: string) => {
+        if (key === 'NVIDIA_API_KEY') return 'nvapi-test';
+        if (key === 'GOOGLE_GENERATIVE_AI_API_KEY') return 'gemini-test';
+        if (key === 'STABILITY_API_KEY') return 'sk-stability-test';
+        return '';
+      });
+      jest
+        .spyOn(service, 'generateImageNvidia')
+        .mockRejectedValue(new Error('NVIDIA down'));
+      jest
+        .spyOn(service, 'generateImageGemini')
+        .mockRejectedValue(new Error('Gemini down'));
+      jest.spyOn(service, 'generateImageStability').mockResolvedValue({
+        imageUrl: 'data:image/png;base64,stability-bytes',
+        revisedPrompt: 'A river',
+        provider: 'stability',
+      });
+
+      const result = await service.generateImage('A river');
+
+      expect(result.provider).toBe('stability');
+      expect(result.imageUrl).toContain('stability-bytes');
     });
   });
 

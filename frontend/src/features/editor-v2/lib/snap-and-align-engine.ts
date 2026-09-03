@@ -4,7 +4,7 @@
  * Features: snap to grid, snap to edges, align tools, distribution
  */
 
-import type { Point, Rect } from './canvas-drawing-engine';
+import type { Rect } from './canvas-drawing-engine';
 
 export type AlignmentType = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom' | 'distribute-h' | 'distribute-v';
 
@@ -133,9 +133,12 @@ export class SnapAndAlignEngine {
     const snapX = this.findClosestSnap(snapPoints.x, movingElement.x);
     const snapY = this.findClosestSnap(snapPoints.y, movingElement.y);
 
+    const guides = result.guides ?? [];
+    result.guides = guides;
+
     if (snapX.snapped && snapX.position !== undefined) {
       result.x = snapX.position;
-      result.guides!.push({
+      guides.push({
         type: 'vertical',
         position: snapX.position,
         elements: snapX.elements,
@@ -144,7 +147,7 @@ export class SnapAndAlignEngine {
 
     if (snapY.snapped && snapY.position !== undefined) {
       result.y = snapY.position;
-      result.guides!.push({
+      guides.push({
         type: 'horizontal',
         position: snapY.position,
         elements: snapY.elements,
@@ -161,10 +164,12 @@ export class SnapAndAlignEngine {
     elementId: string
   ): void {
     if (Math.abs(currentPos - targetPos) < this.snapThreshold) {
-      if (!snapMap.has(targetPos)) {
-        snapMap.set(targetPos, []);
+      const existing = snapMap.get(targetPos);
+      if (existing) {
+        existing.push(elementId);
+      } else {
+        snapMap.set(targetPos, [elementId]);
       }
-      snapMap.get(targetPos)!.push(elementId);
     }
   }
 
@@ -207,7 +212,9 @@ export class SnapAndAlignEngine {
     const result = new Map(elements);
     if (elementIds.length < 2) {return result;}
 
-    const selectedElements = elementIds.map((id) => elements.get(id)!).filter((e) => e !== undefined);
+    const selectedElements = elementIds
+      .map((id) => elements.get(id))
+      .filter((e): e is Rect => e !== undefined);
 
     let alignValue: number;
 
@@ -325,7 +332,9 @@ export class SnapAndAlignEngine {
    */
   public getGuideLines(elements: Map<string, Rect>, selectedIds: string[]): SnapGuide[] {
     const guides: SnapGuide[] = [];
-    const selectedElements = selectedIds.map((id) => elements.get(id)!).filter((e) => e !== undefined);
+    const selectedElements = selectedIds
+      .map((id) => elements.get(id))
+      .filter((e): e is Rect => e !== undefined);
 
     if (selectedElements.length === 0) {return guides;}
 

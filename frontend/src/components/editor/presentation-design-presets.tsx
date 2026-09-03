@@ -289,7 +289,7 @@ export function PresentationDesignPresets({
 
             {/* Color Palette */}
             <div className="flex gap-2 mb-3">
-              {preset.preview.colors.map((color, idx) => (
+              {preset.preview.colors.map((color) => (
                 <div
                   key={color}
                   className="w-8 h-8 rounded border border-slate-300 dark:border-slate-600"

@@ -184,6 +184,13 @@ PresentationDesigner/
 - AWS S3 bucket (for file uploads)
 - Google OAuth credentials (optional)
 
+### Environment (once, from the repo root)
+
+```bash
+cp .env.example .env
+# Edit .env with your credentials
+```
+
 ### Backend Setup
 
 1. Navigate to the backend directory:
@@ -196,19 +203,13 @@ PresentationDesigner/
    npm install
    ```
 
-3. Copy the environment file and configure:
-   ```bash
-   cp .env.example .env
-   # Edit .env with your credentials
-   ```
-
-4. Generate Prisma client and run migrations:
+3. Generate Prisma client and run migrations:
    ```bash
    npx prisma generate
    npx prisma migrate dev
    ```
 
-5. Start the development server:
+4. Start the development server:
    ```bash
    npm run start:dev
    ```
@@ -227,12 +228,7 @@ The backend will be available at `http://localhost:3001`.
    npm install
    ```
 
-3. Create environment file:
-   ```bash
-   echo "NEXT_PUBLIC_API_URL=http://localhost:3001/api" > .env.local
-   ```
-
-4. Start the development server:
+3. Start the development server:
    ```bash
    npm run dev
    ```
@@ -241,47 +237,19 @@ The frontend will be available at `http://localhost:3000`.
 
 ## Environment Variables
 
-### Backend (.env)
+| Deploy | Template |
+|--------|----------|
+| Local / single VPS | `.env.example` → `.env` at the repo root |
+| Frontend (Vercel) | `frontend/.env.example` |
+| Backend (Render) | `backend-nest/.env.example` |
 
-```env
-# Database
-DATABASE_URL="postgresql://user:password@localhost:5432/presentation_designer"
-
-# JWT
-JWT_SECRET="your-secret-key"
-JWT_EXPIRATION="7d"
-
-# Google OAuth
-GOOGLE_CLIENT_ID="your-google-client-id"
-GOOGLE_CLIENT_SECRET="your-google-client-secret"
-GOOGLE_CALLBACK_URL="http://localhost:3001/api/auth/google/callback"
-
-# OpenAI
-OPENAI_API_KEY="your-openai-api-key"
-
-# Stripe
-STRIPE_SECRET_KEY="your-stripe-secret-key"
-STRIPE_WEBHOOK_SECRET="your-webhook-secret"
-STRIPE_PRO_PRICE_ID="price_xxx"
-STRIPE_ENTERPRISE_PRICE_ID="price_xxx"
-
-# AWS S3
-AWS_ACCESS_KEY_ID="your-access-key"
-AWS_SECRET_ACCESS_KEY="your-secret-key"
-AWS_REGION="us-east-1"
-AWS_S3_BUCKET="your-bucket-name"
-
-# App
-FRONTEND_URL="http://localhost:3000"
-PORT=3001
+```bash
+cp .env.example .env
+cp frontend/.env.example frontend/.env.local
+cp backend-nest/.env.example backend-nest/.env
 ```
 
-### Frontend (.env.local)
-
-```env
-NEXT_PUBLIC_API_URL=http://localhost:3001/api
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-```
+Do not commit real `.env` files.
 
 ## Subscription Plans
 

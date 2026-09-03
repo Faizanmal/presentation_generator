@@ -485,5 +485,39 @@ describe('AuthService', () => {
         expect.objectContaining({ expiresIn: expect.any(Number) }),
       );
     });
+
+    it('should accept a legacy JWT refresh token when Redis has no key', async () => {
+      mockRedis.get.mockResolvedValue(null);
+      mockJwtService.verify.mockReturnValue({
+        sub: mockUser.id,
+        email: mockUser.email,
+        iat: 1_000_000,
+        exp: 1_000_000 + 7 * 24 * 60 * 60,
+      });
+      mockUsersService.findById.mockResolvedValue(mockUser);
+
+      const result = await service.refreshToken('header.payload.signature');
+
+      expect(mockJwtService.verify).toHaveBeenCalledWith(
+        'header.payload.signature',
+      );
+      expect(result.accessToken).toBe('mock-jwt-token');
+      expect(result.refreshToken).toEqual(expect.any(String));
+    });
+
+    it('should reject an access-token JWT used as a refresh token', async () => {
+      mockRedis.get.mockResolvedValue(null);
+      mockJwtService.verify.mockReturnValue({
+        sub: mockUser.id,
+        email: mockUser.email,
+        iat: 1_000_000,
+        exp: 1_000_000 + 3600,
+      });
+
+      await expect(
+        service.refreshToken('header.payload.signature'),
+      ).rejects.toThrow(UnauthorizedException);
+      expect(mockUsersService.findById).not.toHaveBeenCalled();
+    });
   });
 });

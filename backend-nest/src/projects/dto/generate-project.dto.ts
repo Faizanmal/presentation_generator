@@ -1,4 +1,12 @@
-import { IsString, IsOptional, IsEnum, IsInt, Min, Max } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsInt,
+  Min,
+  Max,
+  IsBoolean,
+} from 'class-validator';
 
 export enum GenerationTone {
   PROFESSIONAL = 'professional',
@@ -36,20 +44,25 @@ export class GenerateProjectDto {
   @Min(3)
   @Max(20)
   @IsOptional()
-  length?: number = 5;
+  length?: number = 10;
 
   @IsEnum(GenerationType)
   @IsOptional()
   type?: GenerationType = GenerationType.PRESENTATION;
 
+  @IsBoolean()
   @IsOptional()
-  generateImages?: boolean;
+  generateImages?: boolean = true;
 
   @IsString()
   @IsOptional()
-  imageSource?: 'ai' | 'stock' = 'ai';
+  imageSource?: 'ai' | 'stock' = 'stock';
 
   @IsEnum(GenerationDesignStyle)
   @IsOptional()
   designStyle?: GenerationDesignStyle = GenerationDesignStyle.EDITORIAL;
+
+  @IsBoolean()
+  @IsOptional()
+  qualityMode?: boolean = false;
 }

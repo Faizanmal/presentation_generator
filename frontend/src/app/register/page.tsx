@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -44,13 +44,13 @@ export default function RegisterPage() {
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
-    watch,
   } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
   });
 
-  const password = watch("password", "");
+  const password = useWatch({ control, name: "password", defaultValue: "" });
 
   const onSubmit = async (data: RegisterForm) => {
     if (isLoading) { return; }

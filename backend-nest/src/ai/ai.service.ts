@@ -18,6 +18,11 @@ import { Ollama } from 'ollama';
 import axios from 'axios';
 import { ImageSuggestion } from './thinking-agent/thinking-agent.types';
 import { AICostOptimizerService } from './ai-cost-optimizer.service';
+import {
+  isBannedFiller,
+  looksLikeMockStatistic,
+  recipeForSlideIndex,
+} from './slide-recipes';
 
 // Types for AI generation
 type DesignStyle = 'editorial' | 'executive' | 'bold' | 'manifesto';
@@ -30,6 +35,7 @@ export interface GenerationParams {
   designStyle?: DesignStyle | (string & {});
   generateImages?: boolean;
   imageSource?: 'ai' | 'stock';
+  qualityMode?: boolean;
   smartLayout?: boolean;
   templateType?:
     | 'pitch-deck'
@@ -47,6 +53,9 @@ export interface GenerationParams {
 export interface GeneratedBlock {
   type: string;
   content: string;
+  items?: string[];
+  value?: string;
+  label?: string;
   chartData?: ChartData;
   embedUrl?: string;
   embedType?: 'youtube' | 'vimeo' | 'figma' | 'miro' | 'custom';
@@ -71,6 +80,8 @@ export interface GeneratedSection {
   heading: string;
   blocks: GeneratedBlock[];
   layout: LayoutType;
+  kicker?: string;
+  recipe?: string;
   // The AI endpoints historically returned a simple string prompt, but the
   // thinking-agent subsystem works with a richer `ImageSuggestion` type that
   // includes style/placement info.  The methods below just care about the
@@ -99,10 +110,27 @@ export interface GeneratedPresentation {
 }
 
 export type ImageProvider =
+  | 'nvidia'
+  | 'gemini'
+  | 'stability'
   | 'pollinations'
   | 'huggingface'
   | 'replicate'
   | 'dall-e-3';
+
+/** Groq retired llama-3.3-70b-versatile for free/developer keys on 2026-08-16. */
+const GROQ_CHAT_MODELS = ['openai/gpt-oss-120b', 'qwen/qwen3.6-27b'] as const;
+/** Free Groq on_demand TPM. A request's prompt + max_tokens must stay under this. */
+const GROQ_TPM_LIMIT = 8000;
+const GOOGLE_CHAT_MODELS = [
+  'gemini-3.6-flash',
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
+] as const;
+const NVIDIA_CHAT_MODELS = [
+  'qwen/qwen3.5-122b-a10b',
+  'meta/llama-3.1-70b-instruct',
+] as const;
 
 export interface ImageGenerationResult {
   imageUrl: string;
@@ -180,11 +208,7 @@ export class AIService {
     const openAiKey =
       typeof openAiKeyRaw === 'string' ? openAiKeyRaw.trim() : undefined;
 
-    const isOpenAiKeyConfigured =
-      typeof openAiKey === 'string' &&
-      openAiKey.length > 0 &&
-      !openAiKey.toLowerCase().startsWith('your-') &&
-      openAiKey !== 'your-openai-api-key';
+    const isOpenAiKeyConfigured = !this.isPlaceholderSecret(openAiKey);
 
     if (features?.openAI === false) {
       this.logger.log(
@@ -466,74 +490,81 @@ export class AIService {
 
     // 1. Try NVIDIA AI - First priority as requested
     if (this.nvidia) {
-      try {
-        const nvidiaOptions = {
-          ...chatParams,
-          model: 'qwen/qwen3.5-122b-a10b', // Explicitly use NVIDIA model
-          // Pass NVIDIA specific thinking features if provided or enable by default
-          chat_template_kwargs: options.chat_template_kwargs || {
-            enable_thinking: true,
-          },
-        } as OpenAI.Chat.Completions.ChatCompletionCreateParams & {
-          chat_template_kwargs?: Record<string, unknown>;
-        };
+      for (const nvidiaModel of NVIDIA_CHAT_MODELS) {
+        try {
+          const nvidiaOptions = {
+            ...chatParams,
+            model: nvidiaModel,
+            chat_template_kwargs: options.chat_template_kwargs || {
+              enable_thinking: true,
+            },
+          } as OpenAI.Chat.Completions.ChatCompletionCreateParams & {
+            chat_template_kwargs?: Record<string, unknown>;
+          };
 
-        const response = (await this.retryOperation(
-          () => this.nvidia!.chat.completions.create(nvidiaOptions),
-          'NVIDIA',
-          2, // Try twice then failover
-          1000,
-        )) as OpenAI.Chat.Completions.ChatCompletion;
-        return { ...response, provider: 'NVIDIA' };
-      } catch (error) {
-        this.logger.warn(
-          `NVIDIA AI failed: ${(error as Error).message}. Falling back to Groq/OpenAI.`,
-        );
+          const response = (await this.retryOperation(
+            () => this.nvidia!.chat.completions.create(nvidiaOptions),
+            'NVIDIA',
+            2,
+            1000,
+          )) as OpenAI.Chat.Completions.ChatCompletion;
+          return { ...response, provider: 'NVIDIA' };
+        } catch (error) {
+          this.logger.warn(
+            `NVIDIA AI (${nvidiaModel}) failed: ${(error as Error).message}.`,
+          );
+        }
       }
     }
 
-    // 2. Try Groq first (if available) - Faster and cheaper
+    // 2. Try Groq (if available) - Faster and cheaper
     if (this.groq) {
-      try {
-        const groqOptions = {
-          ...chatParams,
-          model: 'llama-3.3-70b-versatile', // Explicitly use Groq model
-        } satisfies OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming;
+      for (const groqModel of GROQ_CHAT_MODELS) {
+        try {
+          const groqOptions = {
+            ...this.fitGroqTokenBudget(chatParams),
+            model: groqModel,
+          } satisfies OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming;
 
-        const response = (await this.retryOperation(
-          () => this.groq!.chat.completions.create(groqOptions),
-          'Groq',
-          2, // Try twice then failover
-          1000,
-        )) as OpenAI.Chat.Completions.ChatCompletion;
-        return { ...response, provider: 'Groq' };
-      } catch (error) {
-        this.logger.warn(
-          `Groq AI failed after retries: ${(error as Error).message}. Falling back to Google/OpenAI.`,
-        );
+          const response = (await this.retryOperation(
+            () => this.groq!.chat.completions.create(groqOptions),
+            'Groq',
+            2,
+            1000,
+          )) as OpenAI.Chat.Completions.ChatCompletion;
+          return { ...response, provider: 'Groq' };
+        } catch (error) {
+          this.logger.warn(
+            `Groq AI (${groqModel}) failed after retries: ${(error as Error).message}.`,
+          );
+        }
       }
     }
 
     // 3. Try Google next (if available) - Good balance of speed/quality
     if (this.google) {
-      try {
-        const response = await this.retryOperation(
-          () => this.callGoogleAI(options),
-          'Google AI',
-          2,
-          1000,
-        );
-        return { ...response, provider: 'Google' };
-      } catch (error) {
-        this.logger.warn(
-          `Google AI failed after retries: ${(error as Error).message}. Falling back to OpenAI.`,
-        );
+      for (const googleModel of GOOGLE_CHAT_MODELS) {
+        try {
+          const response = await this.retryOperation(
+            () => this.callGoogleAI(options, googleModel),
+            'Google AI',
+            2,
+            1000,
+          );
+          return { ...response, provider: 'Google' };
+        } catch (error) {
+          this.logger.warn(
+            `Google AI (${googleModel}) failed after retries: ${(error as Error).message}.`,
+          );
+        }
       }
     }
 
-    // 3. Fallback to OpenAI - More reliable but slower/expensive
+    // 4. Fallback to OpenAI - More reliable but slower/expensive
     if (!this.openai) {
-      throw new BadRequestException('OpenAI support is disabled');
+      throw new BadRequestException(
+        'All AI providers failed. Set a valid GROQ_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, or OPENAI_API_KEY.',
+      );
     }
     const response = (await this.retryOperation(
       () => this.openai.chat.completions.create(chatParams),
@@ -847,7 +878,7 @@ export class AIService {
       topic,
       tone = 'professional',
       audience = 'general',
-      length = 5,
+      length = 10,
       type = 'presentation',
       designStyle = 'editorial',
     } = params;
@@ -889,7 +920,8 @@ export class AIService {
 
     const systemPrompt = this.buildSystemPrompt(type);
 
-    // Fetch live search data for authentic chart building
+    // Fetch live search data only when providers return real results.
+    // Mock fallbacks must never be treated as facts.
     let realtimeContext = '';
     try {
       this.logger.log(
@@ -899,10 +931,17 @@ export class AIService {
         `${topic} current statistics percentages numbers data metrics`,
         4,
       );
-      if (searchResult && searchResult.results.length > 0) {
-        realtimeContext = searchResult.results
-          .map((r) => r.snippet)
-          .join('\n---\n');
+      const snippets = (searchResult?.results || [])
+        .map((r) => r.snippet)
+        .filter(
+          (snippet) =>
+            Boolean(snippet) &&
+            !looksLikeMockStatistic(snippet) &&
+            !snippet.includes('example.com') &&
+            !snippet.includes('sample result'),
+        );
+      if (snippets.length > 0) {
+        realtimeContext = snippets.join('\n---\n');
       }
     } catch (err) {
       this.logger.warn(`Failed to fetch real-time data for ${topic}`, err);
@@ -919,14 +958,55 @@ export class AIService {
     );
 
     try {
+      const useTwoPass = length >= 8;
+      let outlineContext = '';
+
+      if (useTwoPass) {
+        try {
+          const outlineResponse = await this.chatCompletion({
+            model: 'gpt-4o',
+            messages: [
+              {
+                role: 'system',
+                content:
+                  'Return ONLY valid JSON. Design a presentation outline, not full copy.',
+              },
+              {
+                role: 'user',
+                content: this.buildOutlinePrompt(
+                  topic,
+                  tone,
+                  audience,
+                  length,
+                  designStyle,
+                ),
+              },
+            ],
+            temperature: 0.6,
+            max_tokens: 2000,
+            response_format: { type: 'json_object' },
+          });
+          outlineContext = outlineResponse.choices[0]?.message?.content || '';
+        } catch (outlineError) {
+          this.logger.warn(
+            'Outline pass skipped; generating full deck in one shot',
+            outlineError,
+          );
+        }
+      }
+
+      const contentPrompt = outlineContext
+        ? `${userPrompt}\n\nAPPROVED OUTLINE (expand each slide; do not drop slides):\n${outlineContext}`
+        : userPrompt;
+
       const response = await this.chatCompletion({
         model: 'gpt-4o',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
+          { role: 'user', content: contentPrompt },
         ],
         temperature: 0.7,
-        max_tokens: 4000,
+        max_tokens: 8000,
         response_format: { type: 'json_object' },
       });
 
@@ -937,7 +1017,10 @@ export class AIService {
       }
 
       // Parse and validate the response
-      const parsed = this.parseAndValidateResponse(content);
+      const parsed = this.sanitizeGeneratedPresentation(
+        this.parseAndValidateResponse(content),
+        length,
+      );
       parsed.aiModel = response.model || 'Unknown';
       parsed.aiProvider = response.provider || 'Unknown';
 
@@ -995,41 +1078,41 @@ export class AIService {
   private buildSystemPrompt(type: string): string {
     const isPresentation = type === 'presentation';
 
-    return `You are a world-class ${isPresentation ? 'presentation' : 'document'} designer.
+    return `You are a world-class ${isPresentation ? 'presentation' : 'document'} designer in the league of Gamma and Apple keynotes.
 
-Create polished, distinctive work that feels editorial rather than generic. Favor clarity, hierarchy, and visual rhythm over decoration.
+Create designed slides, not documents. Each slide has one visual job and one message.
 
 NON-NEGOTIABLE RULES:
 1. Return ONLY valid JSON. No markdown or commentary.
-2. Give every slide one clear focal point.
-3. Use 3-6 purposeful blocks per slide. Do not add filler blocks.
-4. Vary layouts across the deck, but only when it helps the story. Never repeat the same layout more than twice in a row.
-5. Emojis are optional. Avoid them entirely for formal or academic material; for casual or creative material, use them sparingly.
-6. Use charts or stats only when the topic genuinely benefits from quantitative proof.
-7. Never fabricate data and never use placeholder sequences like [10, 20, 30]. If reliable figures are not available, omit the chart.
-8. Keep speaker notes concise and useful.
-9. Suggested images should be specific, cinematic, and relevant, not generic stock-photo phrases.
+2. Headlines are 6-8 words, specific, and curious. Never restate the topic as a label.
+3. Name real companies, products, laws, or studies when the topic supports it. Vague claims are banned.
+4. Statistics must be specific and attributable. If you do not have a real number, OMIT the statistic. Never invent figures. Never use $1.2B, 15%, or 2.5M as placeholders.
+5. Banned phrases: "in today's world", "it's important to note", "unlock potential", "innovative solutions", "why this matters now: clear outcome", "key takeaway: focus on one decisive insight".
+6. Use 4-8 purposeful blocks per slide. Include a topical kicker (2-4 word eyebrow) on most slides. Never use editorial, executive, bold, or manifesto as kicker or heading text.
+7. Vary layouts. Never repeat the same layout more than twice in a row.
+8. Suggested images must be cinematic and specific (subject, setting, lighting), not generic stock phrases.
+9. Typed visual blocks: statistic (value + label), comparison (items array), timeline (items array), card, call-to-action. Do NOT encode layouts as pipe-separated strings.
 
 JSON STRUCTURE:
 {
   "title": "Compelling presentation title",
   "sections": [
     {
-      "heading": "Slide heading",
-      "layout": "title-content",
-      "suggestedImage": "Specific visual direction for this slide",
+      "heading": "6-8 word headline",
+      "kicker": "SHORT EYEBROW LABEL",
+      "layout": "title-hero",
+      "suggestedImage": "Cinematic visual: subject, setting, lighting",
       "speakerNotes": "2-3 concise presenter notes",
       "blocks": [
-        { "type": "subheading", "content": "Framing line" },
-        { "type": "paragraph", "content": "Concise explanatory copy" },
-        { "type": "bullet", "content": "Key point" },
-        { "type": "numbered", "content": "Ordered step" },
-        { "type": "quote", "content": "Short, relevant quote or insight" },
-        { "type": "callout", "content": "High-value takeaway" },
-        { "type": "statistic", "content": "Single standout metric" },
-        { "type": "chart", "content": "Chart title", "chartData": { "type": "bar", "labels": ["A", "B"], "datasets": [{ "label": "Metric", "data": [12, 24] }] } },
-        { "type": "timeline-item", "content": "Phase 1|Phase 2|Phase 3" },
-        { "type": "comparison-item", "content": "Option A: description|Option B: description" }
+        { "type": "kicker", "content": "THE FOUNDATION" },
+        { "type": "paragraph", "content": "One tight supporting paragraph with a named example." },
+        { "type": "statistic", "content": "95%+", "value": "95%+", "label": "Radiology detection accuracy" },
+        { "type": "comparison", "content": "Healthcare vs Finance vs Commerce", "items": ["Healthcare: named proof", "Finance: named proof", "E-commerce: named proof"] },
+        { "type": "timeline", "content": "Decade path", "items": ["2025-2026: claim", "2027-2028: claim"] },
+        { "type": "card", "content": "Card title — one sentence of proof" },
+        { "type": "call-to-action", "content": "Start a 30-day pilot this week" },
+        { "type": "quote", "content": "Short attributed insight" },
+        { "type": "bullet", "content": "Action-oriented point with a named example" }
       ]
     }
   ],
@@ -1041,7 +1124,7 @@ JSON STRUCTURE:
 }
 
 AVAILABLE LAYOUTS:
-- "title"
+- "title-hero"
 - "title-subtitle"
 - "title-content"
 - "two-column"
@@ -1054,20 +1137,16 @@ AVAILABLE LAYOUTS:
 - "quote-highlight"
 - "stats-grid"
 - "chart-focus"
-- "gallery"
-- "agenda"
-
-FOR TIMELINE/COMPARISON CONTENT: use pipe "|" separators.
+- "bento-grid"
 
 ${
   isPresentation
-    ? `PRESENTATION GUIDANCE:
-- Opening slide: establish the premise cleanly with a strong title and one supporting line.
-- Early deck: build credibility with one evidence slide if the topic supports data.
-- Middle deck: alternate between explanation, proof, and examples.
-- Final slide: end with a summary, decision, or call to action.
-- Use at most one quote-highlight slide unless the topic is narrative-heavy.
-- Use at most one chart-focus slide every 3 slides.`
+    ? `PRESENTATION ARC:
+- Slide 1: title-hero. Split energy: punchy headline + one supporting line.
+- Early: credibility with named examples or real stats (stats-grid / three-column).
+- Middle: proof (comparison or three-column), story (image-right), path (timeline).
+- Close: quote-highlight or bento-grid CTA with 3 concrete next actions.
+- Use at most one quote-highlight unless the topic is narrative-heavy.`
     : 'DOCUMENT GUIDANCE: preserve hierarchy, keep paragraphs tighter than report prose, and use data visuals only when they clarify the argument.'
 }`;
   }
@@ -1119,11 +1198,14 @@ SPECIFICATIONS:
 
     if (realtimeContext) {
       prompt += `
-MANDATORY REAL-WORLD DATA CONTEXT:
-Use the following real-time data extracted from the web to fact-check and populate your charts, stats-grids, and text. Never hallucinate data that contradicts these numbers. Rely on these EXACT stats where relevant:
+REAL-WORLD DATA (use only these numbers; if a claim is not here, write it without a number):
 '''
 ${realtimeContext}
 '''
+`;
+    } else {
+      prompt += `
+NO VERIFIED STATISTICS WERE PROVIDED. Do not invent market size, growth rate, or user counts. Prefer named qualitative examples over fake numbers.
 `;
     }
 
@@ -1131,37 +1213,100 @@ ${realtimeContext}
   DECK REQUIREMENTS:
 
   1. Opening slide:
-    - Use "title" or "title-subtitle"
-    - Establish the premise clearly with minimal clutter
+    - Use "title-hero"
+    - One punchy headline, one supporting line, cinematic suggestedImage
 
   2. Evidence slide:
-    - Use "stats-grid" or "chart-focus" only if the topic genuinely benefits from quantitative proof
-    - If exact numbers are not reliable, use a narrative layout instead of a chart
+    - Use "stats-grid" or "three-column" only with real numbers or named proof points
+    - If numbers are not reliable, use named examples instead of a chart
 
   3. Middle slides:
-    - Use a balanced mix of "title-content", "two-column", "image-left", "image-right", "comparison", and "timeline"
-    - Keep each slide focused on one idea: explanation, proof, example, or next step
-    - Favor strong callouts and concise paragraphs over long bullet walls
+    - Mix "image-right", "comparison", "timeline", "three-column"
+    - One idea per slide. Cards and comparisons use items arrays, never pipe "|" strings
 
   4. Final slide:
-    - Use "title-content", "quote-highlight", or "image-full" depending on the topic
-    - End with a clear takeaway, recommendation, or call to action
+    - Use "quote-highlight" or "bento-grid"
+    - End with 3 concrete actions the audience can take this week
 
   VISUAL EXCELLENCE REQUIREMENTS:
   - Follow this style direction: ${guideString}
   - Never repeat the same layout more than twice consecutively
-  - Each slide should have 3-6 blocks with at least 2 block types when appropriate
+  - Each slide should have 4-8 blocks and a kicker where it helps hierarchy
+  - Kickers are topical eyebrows like "THE SHIFT" or "IN PRACTICE", never the design-style name
+  - Do not duplicate section.kicker as a type:"kicker" block
   - Use statistics only when specific and credible
-  - If chart data is included, it must be factual and non-placeholder
-  - Speaker notes for every slide, but keep them concise
-  - SuggestedImage for slides where a visual would materially improve the message
-  - For timeline/comparison content fields, use "|" separators
-  - Avoid generic filler such as "innovative solutions" or "unlock potential" unless grounded in the topic
+  - SuggestedImage on hero, proof, timeline, and close slides
+  - Avoid generic filler such as "innovative solutions" or "unlock potential"
 
 Metadata: estimated duration ${length * 2}-${length * 3} minutes, keywords, summary
 
-CRITICAL: Return ONLY valid JSON - no markdown, no explanations, no thinking process. Start your response with { and end with }. Do not include any text before or after the JSON object.`;
+CRITICAL: Return ONLY valid JSON - no markdown, no explanations. Start with { and end with }.`;
     return prompt;
+  }
+
+  private buildOutlinePrompt(
+    topic: string,
+    tone: string,
+    audience: string,
+    length: number,
+    designStyle: string,
+  ): string {
+    return `Create a ${length}-slide outline for "${topic}".
+Audience: ${audience}. Tone: ${tone}. Style: ${designStyle}.
+
+Return JSON:
+{
+  "title": "string",
+  "narrativeArc": "one sentence",
+  "slides": [
+    {
+      "heading": "6-8 word headline",
+      "kicker": "EYEBROW",
+      "layout": "title-hero|three-column|stats-grid|comparison|timeline|image-right|quote-highlight|bento-grid",
+      "keyPoints": ["named example or proof point"],
+      "suggestedImage": "cinematic visual direction"
+    }
+  ]
+}
+
+Slide 1 must be title-hero. Include at least one comparison, one timeline, and one stats-grid or three-column. Close with a CTA slide.`;
+  }
+
+  private sanitizeGeneratedPresentation(
+    presentation: GeneratedPresentation,
+    targetLength: number,
+  ): GeneratedPresentation {
+    const sections = presentation.sections.map((section, index) => {
+      const recipe = recipeForSlideIndex(index, presentation.sections.length);
+      const blocks = section.blocks.filter((block) => {
+        const haystack = [block.content, block.label, ...(block.items || [])]
+          .filter(Boolean)
+          .join(' ');
+        if (!haystack.trim()) return false;
+        if (isBannedFiller(haystack)) return false;
+        if (looksLikeMockStatistic(haystack)) return false;
+        return true;
+      });
+
+      return {
+        ...section,
+        kicker: section.kicker || undefined,
+        layout: section.layout || recipe.layout,
+        recipe: recipe.id,
+        blocks,
+        suggestedImage:
+          section.suggestedImage ||
+          (recipe.wantsImage
+            ? `Cinematic 16:9 photograph for: ${section.heading}`
+            : section.suggestedImage),
+      };
+    });
+
+    return {
+      ...presentation,
+      sections:
+        targetLength > 0 ? sections.slice(0, Math.max(targetLength, 3)) : sections,
+    };
   }
 
   /**
@@ -1231,6 +1376,7 @@ CRITICAL: Return ONLY valid JSON - no markdown, no explanations, no thinking pro
 
       const typedSection = section as {
         heading?: unknown;
+        kicker?: unknown;
         blocks?: unknown;
         layout?: unknown;
         suggestedImage?: unknown;
@@ -1244,17 +1390,9 @@ CRITICAL: Return ONLY valid JSON - no markdown, no explanations, no thinking pro
       let blocks: GeneratedBlock[] = [];
 
       if (Array.isArray(typedSection.blocks)) {
-        blocks = typedSection.blocks.filter(
-          (block: unknown): block is GeneratedBlock => {
-            if (typeof block !== 'object' || block === null) return false;
-            const b = block as {
-              type?: unknown;
-              content?: unknown;
-              chartData?: unknown;
-            };
-            return typeof b.type === 'string' && typeof b.content === 'string';
-          },
-        );
+        blocks = typedSection.blocks
+          .map((block: unknown) => this.normalizeGeneratedBlock(block))
+          .filter((block): block is GeneratedBlock => block !== null);
       }
 
       // Determine layout from AI response or use smart recommendation
@@ -1271,6 +1409,10 @@ CRITICAL: Return ONLY valid JSON - no markdown, no explanations, no thinking pro
 
       sections.push({
         heading: typedSection.heading,
+        kicker:
+          typeof typedSection.kicker === 'string'
+            ? typedSection.kicker
+            : undefined,
         blocks,
         layout,
         suggestedImage:
@@ -1328,8 +1470,12 @@ CRITICAL: Return ONLY valid JSON - no markdown, no explanations, no thinking pro
   private isValidLayout(layout: string): boolean {
     const validLayouts: LayoutType[] = [
       'title',
+      'title-hero',
+      'title-subtitle',
       'title-content',
       'two-column',
+      'two-column-image',
+      'three-column',
       'image-left',
       'image-right',
       'image-full',
@@ -1338,8 +1484,90 @@ CRITICAL: Return ONLY valid JSON - no markdown, no explanations, no thinking pro
       'quote-highlight',
       'stats-grid',
       'chart-focus',
+      'bento-grid',
+      'gallery',
+      'agenda',
+      'content',
     ];
     return validLayouts.includes(layout as LayoutType);
+  }
+
+  private normalizeGeneratedBlock(raw: unknown): GeneratedBlock | null {
+    if (typeof raw !== 'object' || raw === null) return null;
+    const b = raw as {
+      type?: unknown;
+      content?: unknown;
+      items?: unknown;
+      value?: unknown;
+      label?: unknown;
+      chartData?: unknown;
+      embedUrl?: unknown;
+    };
+    if (typeof b.type !== 'string' || !b.type.trim()) return null;
+
+    let content = '';
+    let items: string[] | undefined;
+    let value: string | undefined;
+    let label: string | undefined;
+
+    if (typeof b.content === 'string') {
+      content = b.content;
+    } else if (b.content && typeof b.content === 'object') {
+      const nested = b.content as Record<string, unknown>;
+      if (typeof nested.text === 'string') content = nested.text;
+      else if (typeof nested.value === 'string') content = nested.value;
+      if (Array.isArray(nested.items)) {
+        items = nested.items.map((item) =>
+          typeof item === 'string'
+            ? item
+            : String(
+                (item as Record<string, unknown>)?.text ||
+                  (item as Record<string, unknown>)?.value ||
+                  item,
+              ),
+        );
+      }
+      if (typeof nested.value === 'string') value = nested.value;
+      if (typeof nested.label === 'string') label = nested.label;
+    }
+
+    if (Array.isArray(b.items)) {
+      items = b.items.map((item) =>
+        typeof item === 'string'
+          ? item
+          : String(
+              (item as Record<string, unknown>)?.text ||
+                (item as Record<string, unknown>)?.value ||
+                item,
+            ),
+      );
+    }
+    if (typeof b.value === 'string') value = b.value;
+    if (typeof b.label === 'string') label = b.label;
+
+    if (!content && value) content = value;
+    if (!content && items?.length) content = items.join('\n');
+    if (!content.trim() && !items?.length && !value) return null;
+
+    const type = b.type.toLowerCase().replace(/_/g, '-');
+    const mappedType =
+      type === 'timeline-item'
+        ? 'timeline'
+        : type === 'comparison-item'
+          ? 'comparison'
+          : type === 'stats-grid'
+            ? 'statistic'
+            : type;
+
+    return {
+      type: mappedType,
+      content: content.trim(),
+      items,
+      value,
+      label,
+      chartData: b.chartData as GeneratedBlock['chartData'],
+      embedUrl: typeof b.embedUrl === 'string' ? b.embedUrl : undefined,
+    };
   }
 
   /**
@@ -1577,8 +1805,25 @@ Return as JSON: { "prompts": ["Prompt 1", "Prompt 2", ...] }`,
     }
   }
 
+  private fitGroqTokenBudget(
+    params: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming,
+  ): OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming {
+    const promptTokens = Math.ceil(JSON.stringify(params.messages).length / 4);
+    const reserve = 256;
+    const maxOut = Math.max(256, GROQ_TPM_LIMIT - promptTokens - reserve);
+    const requested = params.max_tokens ?? 2000;
+    if (requested <= maxOut) {
+      return params;
+    }
+    this.logger.warn(
+      `Capping Groq max_tokens from ${requested} to ${maxOut} to stay under the ${GROQ_TPM_LIMIT} TPM limit.`,
+    );
+    return { ...params, max_tokens: maxOut };
+  }
+
   private async callGoogleAI(
     options: Record<string, unknown>,
+    modelName: string = GOOGLE_CHAT_MODELS[0],
   ): Promise<OpenAI.Chat.Completions.ChatCompletion> {
     const generationConfig: Record<string, unknown> = {};
     const responseFormat = options.response_format as
@@ -1587,12 +1832,6 @@ Return as JSON: { "prompts": ["Prompt 1", "Prompt 2", ...] }`,
     if (responseFormat?.type === 'json_object') {
       generationConfig.responseMimeType = 'application/json';
     }
-
-    // Use Gemini 1.5 Flash for speed/cost (comparable to Groq fallback)
-    const model = this.google!.getGenerativeModel({
-      model: 'gemini-1.5-flash',
-      generationConfig,
-    });
 
     const messages =
       options.messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[];
@@ -1611,6 +1850,20 @@ Return as JSON: { "prompts": ["Prompt 1", "Prompt 2", ...] }`,
               .map((part) => part.text)
               .join('\n')
           : undefined;
+
+    // Gemini's REST schema requires Content, not a bare string.
+    const model = this.google!.getGenerativeModel({
+      model: modelName,
+      generationConfig,
+      ...(systemInstructionText
+        ? {
+            systemInstruction: {
+              role: 'user',
+              parts: [{ text: systemInstructionText }],
+            },
+          }
+        : {}),
+    });
 
     // Convert messages to Gemini history format
     // Filter out system message as it's handled separately
@@ -1635,7 +1888,6 @@ Return as JSON: { "prompts": ["Prompt 1", "Prompt 2", ...] }`,
 
     const chat = model.startChat({
       history: previousHistory,
-      systemInstruction: systemInstructionText,
     });
 
     const result = await chat.sendMessage(lastMessage.parts[0].text);
@@ -1659,7 +1911,7 @@ Return as JSON: { "prompts": ["Prompt 1", "Prompt 2", ...] }`,
       id: `google-${Date.now()}`,
       object: 'chat.completion',
       created: Math.floor(Date.now() / 1000),
-      model: 'gemini-1.5-flash',
+      model: modelName,
       choices: [
         {
           index: 0,
@@ -1685,28 +1937,26 @@ Return as JSON: { "prompts": ["Prompt 1", "Prompt 2", ...] }`,
   // ============================================
 
   /**
-   * Generate an image using DALL-E 3 with fallback to Pollinations (Free)
-   */
-  /**
-   * Generate an image with priority-based fallback mechanism
-   * Priority: Pollinations -> Hugging Face -> Replicate -> DALL-E
+   * Generate an image with priority-based fallback.
+   * NVIDIA FLUX → Gemini Imagen → Stability AI → Pollinations → Hugging Face → Replicate → DALL-E.
    */
   async generateImage(
     prompt: string,
     style: 'vivid' | 'natural' = 'vivid',
     size: '1024x1024' | '1792x1024' | '1024x1792' = '1024x1024',
-    // Optional: force a specific provider, otherwise follows strict priority
     preferredProvider?: ImageProvider,
     referenceImageUrl?: string,
   ): Promise<ImageGenerationResult> {
     const providers: ImageProvider[] = [
+      'nvidia',
+      'gemini',
+      'stability',
       'pollinations',
       'huggingface',
       'replicate',
       'dall-e-3',
     ];
 
-    // If a specific provider is requested, try that first, then fall back to others in order
     const orderedProviders = preferredProvider
       ? [preferredProvider, ...providers.filter((p) => p !== preferredProvider)]
       : providers;
@@ -1716,16 +1966,29 @@ Return as JSON: { "prompts": ["Prompt 1", "Prompt 2", ...] }`,
     for (const provider of orderedProviders) {
       try {
         switch (provider) {
+          case 'nvidia':
+            if (!this.getConfiguredKey('NVIDIA_API_KEY')) continue;
+            return await this.generateImageNvidia(
+              prompt,
+              size,
+              referenceImageUrl,
+            );
+          case 'gemini':
+            if (!this.getConfiguredKey('GOOGLE_GENERATIVE_AI_API_KEY')) continue;
+            return await this.generateImageGemini(prompt, size);
+          case 'stability':
+            if (!this.getConfiguredKey('STABILITY_API_KEY')) continue;
+            return await this.generateImageStability(prompt, size);
           case 'pollinations':
             return await this.generateImagePollinations(prompt);
           case 'huggingface':
-            if (!this.configService.get('HUGGINGFACE_API_KEY')) continue;
+            if (!this.getConfiguredKey('HUGGINGFACE_API_KEY')) continue;
             return await this.generateImageHuggingFace(prompt);
           case 'replicate':
-            if (!this.configService.get('REPLICATE_API_TOKEN')) continue;
+            if (!this.getConfiguredKey('REPLICATE_API_TOKEN')) continue;
             return await this.generateImageReplicate(prompt, referenceImageUrl);
           case 'dall-e-3':
-            if (!this.configService.get('OPENAI_API_KEY')) continue;
+            if (!this.getConfiguredKey('OPENAI_API_KEY')) continue;
             return await this.generateImageDallE(prompt, style, size);
         }
       } catch (error) {
@@ -1735,7 +1998,6 @@ Return as JSON: { "prompts": ["Prompt 1", "Prompt 2", ...] }`,
           }`,
         );
         lastError = error;
-        // Continue to next provider
       }
     }
 
@@ -1744,6 +2006,333 @@ Return as JSON: { "prompts": ["Prompt 1", "Prompt 2", ...] }`,
         (lastError as Error)?.message
       }`,
     );
+  }
+
+  private isPlaceholderSecret(value?: string): boolean {
+    if (!value) return true;
+    const trimmed = value.trim();
+    if (!trimmed) return true;
+    const lower = trimmed.toLowerCase();
+    return (
+      lower.startsWith('your-') ||
+      lower.includes('your-actual') ||
+      lower.includes('placeholder')
+    );
+  }
+
+  private getConfiguredKey(name: string): string {
+    const value = this.configService.get<string>(name) || '';
+    if (this.isPlaceholderSecret(value)) {
+      return '';
+    }
+    return value.trim();
+  }
+
+  private asDataImageUrl(raw: string, mime = 'image/png'): string {
+    const trimmed = raw.trim();
+    if (trimmed.startsWith('data:image/')) return trimmed;
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    return `data:${mime};base64,${trimmed}`;
+  }
+
+  private extractGeneratedImageUrl(payload: unknown): string {
+    const rec = (payload || {}) as Record<string, unknown>;
+    if (typeof rec.image === 'string' && rec.image.length > 8) {
+      return this.asDataImageUrl(rec.image);
+    }
+    if (typeof rec.b64_json === 'string') {
+      return this.asDataImageUrl(rec.b64_json);
+    }
+    const artifacts = rec.artifacts;
+    if (Array.isArray(artifacts) && artifacts[0]) {
+      const art = artifacts[0] as Record<string, unknown>;
+      const b64 = art.base64 || art.b64_json;
+      if (typeof b64 === 'string') return this.asDataImageUrl(b64);
+    }
+    const data = rec.data;
+    if (Array.isArray(data) && data[0]) {
+      const first = data[0] as Record<string, unknown>;
+      if (typeof first.b64_json === 'string') {
+        return this.asDataImageUrl(first.b64_json);
+      }
+      if (typeof first.url === 'string') return first.url;
+    }
+    const predictions = rec.predictions;
+    if (Array.isArray(predictions) && predictions[0]) {
+      const pred = predictions[0] as Record<string, unknown>;
+      if (typeof pred.bytesBase64Encoded === 'string') {
+        return this.asDataImageUrl(
+          pred.bytesBase64Encoded,
+          typeof pred.mimeType === 'string' ? pred.mimeType : 'image/png',
+        );
+      }
+    }
+    const candidates = rec.candidates;
+    if (Array.isArray(candidates) && candidates[0]) {
+      const parts =
+        ((candidates[0] as Record<string, unknown>).content as Record<
+          string,
+          unknown
+        >)?.parts || [];
+      if (Array.isArray(parts)) {
+        for (const part of parts) {
+          const inline = (part as Record<string, unknown>).inlineData as
+            | Record<string, unknown>
+            | undefined;
+          if (inline && typeof inline.data === 'string') {
+            return this.asDataImageUrl(
+              inline.data,
+              typeof inline.mimeType === 'string'
+                ? inline.mimeType
+                : 'image/png',
+            );
+          }
+        }
+      }
+    }
+    throw new Error('Image API response did not include image data');
+  }
+
+  private async urlToDataUri(url: string): Promise<string> {
+    if (url.startsWith('data:image/')) return url;
+    const response = await axios.get<ArrayBuffer>(url, {
+      responseType: 'arraybuffer',
+      timeout: 15_000,
+    });
+    const mime =
+      String(response.headers['content-type'] || 'image/png').split(';')[0] ||
+      'image/png';
+    return `data:${mime};base64,${Buffer.from(response.data).toString('base64')}`;
+  }
+
+  /**
+   * NVIDIA FLUX: Kontext-dev when a reference image exists, otherwise flux.1-dev.
+   */
+  async generateImageNvidia(
+    prompt: string,
+    size: '1024x1024' | '1792x1024' | '1024x1792' = '1024x1024',
+    referenceImageUrl?: string,
+  ): Promise<ImageGenerationResult> {
+    const apiKey = this.getConfiguredKey('NVIDIA_API_KEY');
+    if (!apiKey) {
+      throw new Error('NVIDIA_API_KEY is not configured');
+    }
+
+    const headers = {
+      Authorization: `Bearer ${apiKey}`,
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    };
+    const enhancedPrompt = `Professional 16:9 presentation photograph, cinematic lighting, no text overlay. ${prompt}`;
+    const seed = Math.floor(Math.random() * 1_000_000);
+
+    if (referenceImageUrl) {
+      try {
+        const image = await this.urlToDataUri(referenceImageUrl);
+        const response = await axios.post(
+          'https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-kontext-dev',
+          {
+            prompt: enhancedPrompt,
+            image,
+            aspect_ratio: 'match_input_image',
+            steps: 30,
+            cfg_scale: 3.5,
+            seed,
+          },
+          { headers, timeout: 90_000 },
+        );
+        if (response.status !== 200) {
+          throw new Error(`NVIDIA Kontext failed with status ${response.status}`);
+        }
+        return {
+          imageUrl: this.extractGeneratedImageUrl(response.data),
+          revisedPrompt: prompt,
+          provider: 'nvidia',
+        };
+      } catch (error) {
+        this.logger.warn(
+          `NVIDIA Kontext-dev failed, trying flux.1-dev: ${(error as Error).message}`,
+        );
+      }
+    }
+
+    const [width, height] =
+      size === '1792x1024'
+        ? [1344, 768]
+        : size === '1024x1792'
+          ? [768, 1344]
+          : [1024, 1024];
+
+    const response = await axios.post(
+      'https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev',
+      {
+        prompt: enhancedPrompt,
+        mode: 'base',
+        cfg_scale: 3.5,
+        width,
+        height,
+        seed,
+        steps: 30,
+        samples: 1,
+      },
+      { headers, timeout: 90_000 },
+    );
+    if (response.status !== 200) {
+      throw new Error(`NVIDIA FLUX failed with status ${response.status}`);
+    }
+
+    this.logger.log(
+      `Generated image (NVIDIA FLUX) for: ${prompt.substring(0, 30)}...`,
+    );
+    return {
+      imageUrl: this.extractGeneratedImageUrl(response.data),
+      revisedPrompt: prompt,
+      provider: 'nvidia',
+    };
+  }
+
+  /**
+   * Gemini Imagen, then native Gemini image models.
+   */
+  async generateImageGemini(
+    prompt: string,
+    size: '1024x1024' | '1792x1024' | '1024x1792' = '1024x1024',
+  ): Promise<ImageGenerationResult> {
+    const apiKey = this.getConfiguredKey('GOOGLE_GENERATIVE_AI_API_KEY');
+    if (!apiKey) {
+      throw new Error('GOOGLE_GENERATIVE_AI_API_KEY is not configured');
+    }
+
+    const enhancedPrompt = `Professional cinematic 16:9 presentation photograph, no text in the image. ${prompt}`;
+    const aspectRatio =
+      size === '1024x1792' ? '9:16' : size === '1024x1024' ? '1:1' : '16:9';
+
+    try {
+      const imagen = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`,
+        {
+          instances: [{ prompt: enhancedPrompt }],
+          parameters: { sampleCount: 1, aspectRatio },
+        },
+        { timeout: 60_000 },
+      );
+      return {
+        imageUrl: this.extractGeneratedImageUrl(imagen.data),
+        revisedPrompt: prompt,
+        provider: 'gemini',
+      };
+    } catch (imagenError) {
+      this.logger.warn(
+        `Gemini Imagen failed, trying Gemini image model: ${
+          (imagenError as Error).message
+        }`,
+      );
+    }
+
+    const geminiModels = [
+      'gemini-2.5-flash-image',
+      'gemini-2.0-flash-preview-image-generation',
+    ];
+    let lastError: unknown;
+    for (const model of geminiModels) {
+      try {
+        const response = await axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {
+            contents: [{ parts: [{ text: enhancedPrompt }] }],
+            generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
+          },
+          { timeout: 60_000 },
+        );
+        return {
+          imageUrl: this.extractGeneratedImageUrl(response.data),
+          revisedPrompt: prompt,
+          provider: 'gemini',
+        };
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw new Error(
+      `Gemini image generation failed: ${(lastError as Error)?.message}`,
+    );
+  }
+
+  /**
+   * Stability AI Core, then SDXL.
+   */
+  async generateImageStability(
+    prompt: string,
+    size: '1024x1024' | '1792x1024' | '1024x1792' = '1024x1024',
+  ): Promise<ImageGenerationResult> {
+    const apiKey = this.getConfiguredKey('STABILITY_API_KEY');
+    if (!apiKey) {
+      throw new Error('STABILITY_API_KEY is not configured');
+    }
+
+    const enhancedPrompt = `Professional cinematic presentation photograph, no text overlay. ${prompt}`;
+    const aspectRatio =
+      size === '1024x1792' ? '9:16' : size === '1024x1024' ? '1:1' : '16:9';
+
+    try {
+      const form = new FormData();
+      form.append('prompt', enhancedPrompt);
+      form.append('output_format', 'png');
+      form.append('aspect_ratio', aspectRatio);
+      const core = await axios.post(
+        'https://api.stability.ai/v2beta/stable-image/generate/core',
+        form,
+        {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            Accept: 'application/json',
+          },
+          timeout: 60_000,
+        },
+      );
+      return {
+        imageUrl: this.extractGeneratedImageUrl(core.data),
+        revisedPrompt: prompt,
+        provider: 'stability',
+      };
+    } catch (coreError) {
+      this.logger.warn(
+        `Stability Core failed, trying SDXL: ${(coreError as Error).message}`,
+      );
+    }
+
+    const [width, height] =
+      size === '1024x1792'
+        ? [768, 1344]
+        : size === '1792x1024'
+          ? [1344, 768]
+          : [1024, 1024];
+    const sdxl = await axios.post(
+      'https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image',
+      {
+        text_prompts: [{ text: enhancedPrompt, weight: 1 }],
+        cfg_scale: 7,
+        width,
+        height,
+        steps: 30,
+        samples: 1,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        timeout: 60_000,
+      },
+    );
+
+    return {
+      imageUrl: this.extractGeneratedImageUrl(sdxl.data),
+      revisedPrompt: prompt,
+      provider: 'stability',
+    };
   }
 
   /**
@@ -1912,7 +2501,7 @@ Return as JSON: { "prompts": ["Prompt 1", "Prompt 2", ...] }`,
               : prompt;
 
             const preferredProvider = referenceImageUrl
-              ? 'replicate'
+              ? 'nvidia'
               : undefined;
             const result = await this.generateImage(
               finalPrompt,
@@ -2039,15 +2628,21 @@ Return as JSON: { "notes": ["Note for slide 1", "Note for slide 2", ...] }`,
       heading.toLowerCase().includes('progress');
     const hasStats =
       hasCard ||
-      content.some((b) =>
-        b.content.match(/\d+%|\$[\d,]+|\d+\s*(million|billion|thousand|k)/i),
+      content.some(
+        (b) =>
+          b.type === 'statistic' ||
+          Boolean(b.value) ||
+          b.content.match(/\d+%|\$[\d,]+|\d+\s*(million|billion|thousand|k)/i),
       );
 
     // Priority-based layout selection
     if (hasChart) return 'chart-focus';
-    if (hasTimeline) return 'timeline';
-    if (hasComparison) return 'comparison';
-    if (hasStats && bulletCount >= 3) return 'stats-grid';
+    if (hasTimeline || content.some((b) => b.type === 'timeline'))
+      return 'timeline';
+    if (hasComparison || content.some((b) => b.type === 'comparison'))
+      return 'comparison';
+    if (hasStats && (bulletCount >= 3 || content.some((b) => b.type === 'statistic')))
+      return 'stats-grid';
     if (hasQuote && !hasImage) return 'quote-highlight';
     if (hasImage && bulletCount > 3) return 'image-left';
     if (hasImage && bulletCount <= 3) return 'image-right';
@@ -2599,17 +3194,14 @@ Use the advanced presentation JSON format with layouts and image suggestions.`,
       const batchPromises = batch.map(async ({ section, index }) => {
         try {
           const description = promptFromSuggestion(section.suggestedImage);
-          const keywords = await this.extractKeywords(description);
-          const encodedKeywords = encodeURIComponent(
-            keywords.replace(/[^a-zA-Z0-9 ,]/g, '').trim(),
-          );
-
-          // Primary: Unsplash Source (high-quality stock)
-          const imageUrl = `https://source.unsplash.com/1600x900/?${encodedKeywords}`;
+          const seed = (section.heading || description || `section-${index}`)
+            .replace(/[^a-zA-Z0-9]/g, '')
+            .substring(0, 24) || `slide${index}`;
+          const imageUrl = `https://picsum.photos/seed/${seed}/1600/900`;
           imageMap.set(index, {
             imageUrl,
-            revisedPrompt: description,
-            provider: 'pollinations', // categorize as stock
+            revisedPrompt: description || section.heading || `slide ${index}`,
+            provider: 'pollinations',
           });
         } catch (error) {
           this.logger.warn(

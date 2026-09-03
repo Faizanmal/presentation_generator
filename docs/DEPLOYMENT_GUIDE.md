@@ -24,11 +24,8 @@ npm install
 
 ### 2. Setup Environment Variables
 ```bash
-# Copy scalability config
-cp .env.scalability backend-nest/.env
-
-# Update critical values
-nano backend-nest/.env
+cp .env.example .env
+nano .env
 ```
 
 **Required variables:**

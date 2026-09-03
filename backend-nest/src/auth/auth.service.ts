@@ -783,7 +783,7 @@ export class AuthService {
   }
 
   // ─── JWT Generation ────────────────────────────────────────
-  private generateAuthResponse(
+  private async generateAuthResponse(
     user: {
       id: string;
       email: string;
@@ -792,7 +792,7 @@ export class AuthService {
       role?: string | null;
     },
     impersonatorId?: string,
-  ): AuthResponse {
+  ): Promise<AuthResponse> {
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
@@ -810,9 +810,16 @@ export class AuthService {
     // Generate refresh token (longer-lived, stored in Redis)
     const refreshTokenRaw = randomBytes(40).toString('hex');
     const refreshKey = `refresh:${refreshTokenRaw}`;
-    this.redis
-      .set(refreshKey, user.id, 'EX', this.REFRESH_TOKEN_EXPIRY)
-      .catch((err) => this.logger.error('Failed to store refresh token', err));
+    try {
+      await this.redis.set(
+        refreshKey,
+        user.id,
+        'EX',
+        this.REFRESH_TOKEN_EXPIRY,
+      );
+    } catch (err) {
+      this.logger.error('Failed to store refresh token', err);
+    }
 
     return {
       accessToken,
@@ -901,9 +908,15 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token is required');
     }
 
-    // Get userId from refresh token
     const refreshKey = `refresh:${refreshTokenRaw}`;
-    const userId = await this.redis.get(refreshKey);
+    let userId = await this.redis.get(refreshKey);
+
+    if (userId) {
+      // Opaque Redis token — rotate by deleting so it cannot be reused
+      await this.redis.del(refreshKey);
+    } else {
+      userId = this.userIdFromLegacyJwtRefresh(refreshTokenRaw);
+    }
 
     if (!userId) {
       throw new UnauthorizedException(
@@ -917,10 +930,6 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    // --- REFRESH TOKEN ROTATION ---
-    // Delete the old refresh token so it cannot be reused
-    await this.redis.del(refreshKey);
-
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
@@ -931,21 +940,53 @@ export class AuthService {
       expiresIn: this.ACCESS_TOKEN_EXPIRY,
     });
 
-    // Generate a new refresh token
     const newRefreshTokenRaw = randomBytes(40).toString('hex');
     const newRefreshKey = `refresh:${newRefreshTokenRaw}`;
 
-    // Store the new refresh token in Redis
-    await this.redis
-      .set(newRefreshKey, user.id, 'EX', this.REFRESH_TOKEN_EXPIRY)
-      .catch((err) =>
-        this.logger.error('Failed to store rotated refresh token', err),
+    try {
+      await this.redis.set(
+        newRefreshKey,
+        user.id,
+        'EX',
+        this.REFRESH_TOKEN_EXPIRY,
       );
+    } catch (err) {
+      this.logger.error('Failed to store rotated refresh token', err);
+    }
 
     return {
       accessToken,
-      refreshToken: newRefreshTokenRaw, // Return the newly rotated token
+      refreshToken: newRefreshTokenRaw,
       expiresIn: this.ACCESS_TOKEN_EXPIRY,
     };
+  }
+
+  /**
+   * Older sessions issued JWT refresh tokens (7-day lifetime) instead of
+   * opaque Redis keys. Accept those so a Redis flush or format change
+   * does not force an immediate re-login. Access tokens (1h) are rejected.
+   */
+  private userIdFromLegacyJwtRefresh(token: string): string | null {
+    if (token.split('.').length !== 3) {
+      return null;
+    }
+
+    try {
+      const decoded = this.jwtService.verify<JwtPayload & { iat?: number; exp?: number }>(
+        token,
+      );
+      const lifetime =
+        decoded.exp !== undefined && decoded.iat !== undefined
+          ? decoded.exp - decoded.iat
+          : 0;
+
+      if (!decoded.sub || lifetime <= this.ACCESS_TOKEN_EXPIRY) {
+        return null;
+      }
+
+      return decoded.sub;
+    } catch {
+      return null;
+    }
   }
 }

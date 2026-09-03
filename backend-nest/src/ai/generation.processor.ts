@@ -29,14 +29,10 @@ export class GenerationProcessor extends WorkerHost {
       const { userId, dto } = job.data;
 
       // Call the original logic (refactored to be callable directly)
-      // Since ProjectsService.generate was synchronous before, we need to extract the core logic
-      // Ideally, we move the core generation logic to AIService or a separate helper
-      // For now, I'll update ProjectsService to expose a method 'processGeneration'
-
-      await this.projectsService.processGeneration(userId, dto);
+      const project = await this.projectsService.processGeneration(userId, dto);
 
       this.logger.log(`Generation job ${job.id} completed successfully`);
-      return { success: true };
+      return project;
     } catch (error) {
       if (error instanceof Error) {
         this.logger.error(

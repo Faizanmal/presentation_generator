@@ -6,11 +6,12 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ZipAdapter } from './zip-adapter';
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
-import PptxGenJS from 'pptxgenjs';
+import { PDFDocument, PDFPage, StandardFonts, rgb } from 'pdf-lib';
+import axios from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { SubscriptionPlan } from '@prisma/client';
+import { isGenericKicker } from '../ai/slide-recipes';
 
 // Types for export
 interface ExportOptions {
@@ -559,7 +560,7 @@ export class ExportService {
             let itemY = pdfY;
             for (const item of items) {
               if (itemY < 30) break;
-              page.drawText(`• ${item}`, {
+              this.drawPdfText(page, `• ${item}`, {
                 x: bx,
                 y: itemY,
                 size: fontSize,
@@ -581,7 +582,7 @@ export class ExportService {
             let lineY = pdfY;
             for (const line of lines) {
               if (lineY < 30) break;
-              page.drawText(line, {
+              this.drawPdfText(page, line, {
                 x: bx,
                 y: lineY,
                 size: fontSize,
@@ -607,7 +608,7 @@ export class ExportService {
           switch (block.blockType) {
             case 'heading':
             case 'HEADING':
-              page.drawText(content, {
+              this.drawPdfText(page, content, {
                 x: 60,
                 y: yOffset,
                 size: 36,
@@ -624,7 +625,10 @@ export class ExportService {
 
             case 'subheading':
             case 'SUBHEADING':
-              page.drawText(content, {
+              if (this.isGenericKicker(content)) {
+                break;
+              }
+              this.drawPdfText(page, content, {
                 x: 60,
                 y: yOffset,
                 size: 24,
@@ -646,7 +650,7 @@ export class ExportService {
               const lines = this.wrapText(content, 100);
               for (const line of lines) {
                 if (yOffset < 60) break;
-                page.drawText(line, {
+                this.drawPdfText(page, line, {
                   x: 60,
                   y: yOffset,
                   size: 16,
@@ -663,6 +667,44 @@ export class ExportService {
               break;
             }
 
+            case 'IMAGE':
+            case 'image': {
+              const imageContent = (block.content || {}) as Record<string, unknown>;
+              const imageUrl = String(imageContent.url || imageContent.src || '');
+              if (/^https?:\/\//i.test(imageUrl) && yOffset > 180) {
+                try {
+                  const resp = await axios.get<ArrayBuffer>(imageUrl, {
+                    responseType: 'arraybuffer',
+                    timeout: 12_000,
+                    maxRedirects: 5,
+                  });
+                  const bytes = new Uint8Array(resp.data);
+                  const mime = String(resp.headers['content-type'] || '');
+                  const embedded = mime.includes('png')
+                    ? await pdfDoc.embedPng(bytes)
+                    : await pdfDoc.embedJpg(bytes);
+                  const maxW = 640;
+                  const maxH = 260;
+                  const scale = Math.min(
+                    maxW / embedded.width,
+                    maxH / embedded.height,
+                    1,
+                  );
+                  const drawH = embedded.height * scale;
+                  page.drawImage(embedded, {
+                    x: 60,
+                    y: yOffset - drawH,
+                    width: embedded.width * scale,
+                    height: drawH,
+                  });
+                  yOffset -= drawH + 24;
+                } catch {
+                  this.logger.warn(`PDF fallback could not embed ${imageUrl}`);
+                }
+              }
+              break;
+            }
+
             case 'bullet_list':
             case 'BULLET_LIST':
             case 'list':
@@ -670,7 +712,7 @@ export class ExportService {
               const items = this.getListItems(block);
               for (const item of items) {
                 if (yOffset < 60) break;
-                page.drawText(`• ${item}`, {
+                this.drawPdfText(page, `• ${item}`, {
                   x: 80,
                   y: yOffset,
                   size: 16,
@@ -690,7 +732,7 @@ export class ExportService {
 
             default:
               if (content) {
-                page.drawText(content, {
+                this.drawPdfText(page, content, {
                   x: 60,
                   y: yOffset,
                   size: 16,
@@ -709,7 +751,7 @@ export class ExportService {
       }
 
       // Add slide number
-      page.drawText(`${(slide.order || 0) + 1}`, {
+      this.drawPdfText(page, `${(slide.order || 0) + 1}`, {
         x: SLIDE_W - 60,
         y: 30,
         size: 12,
@@ -811,8 +853,371 @@ export class ExportService {
     const content = block.content as Record<string, unknown>;
     if (typeof content === 'string') return content;
     if (typeof content?.text === 'string') return content.text;
+    if (typeof content?.quote === 'string') return content.quote;
     if (typeof content?.content === 'string') return content.content;
+    if (Array.isArray(content?.items)) {
+      return content.items
+        .map((item) =>
+          typeof item === 'string'
+            ? item
+            : String(
+                (item as Record<string, unknown>)?.text ||
+                  (item as Record<string, unknown>)?.value ||
+                  '',
+              ),
+        )
+        .filter(Boolean)
+        .join('\n');
+    }
     return '';
+  }
+
+  private getVisualTiles(
+    block: ExportBlock,
+  ): Array<{ value: string; label: string }> {
+    const content = (block.content || {}) as Record<string, unknown>;
+    if (Array.isArray(content.stats)) {
+      return content.stats.map((item) => {
+        const stat = item as Record<string, unknown>;
+        return {
+          value: String(stat.value || item || ''),
+          label: String(stat.label || ''),
+        };
+      });
+    }
+    if (Array.isArray(content.items)) {
+      return content.items.map((item) => {
+        if (typeof item === 'string') {
+          const [value, ...rest] = item.split(/[:–-]/);
+          return { value: value.trim(), label: rest.join(':').trim() };
+        }
+        const rec = item as Record<string, unknown>;
+        return {
+          value: String(rec.value || rec.text || ''),
+          label: String(rec.label || ''),
+        };
+      });
+    }
+    const text = this.getBlockTextContent(block);
+    return text ? [{ value: text, label: '' }] : [];
+  }
+
+  private isGenericKicker(text: string): boolean {
+    return isGenericKicker(text);
+  }
+
+  private async addPptxImage(
+    pptx: Awaited<typeof import('@office-kit/pptx')>,
+    pptxSlide: unknown,
+    url: string,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+  ): Promise<void> {
+    if (!/^(https?:\/\/|data:image\/)/i.test(url)) return;
+    try {
+      const resp = await axios.get(url, {
+        responseType: 'arraybuffer',
+        timeout: 15_000,
+        maxRedirects: 5,
+      });
+      pptx.addSlideImage(pptxSlide as never, new Uint8Array(resp.data), {
+        x: pptx.inches(x),
+        y: pptx.inches(y),
+        w: pptx.inches(w),
+        h: pptx.inches(h),
+      });
+    } catch {
+      this.logger.warn(`Failed to add PPTX image: ${url}`);
+    }
+  }
+
+  private blockTypeName(block: ExportBlock): string {
+    return String(block.blockType || '').toUpperCase();
+  }
+
+  private isImageBlock(block: ExportBlock): boolean {
+    return this.blockTypeName(block) === 'IMAGE';
+  }
+
+  private isKickerBlock(block: ExportBlock): boolean {
+    const style = (block.style || {}) as Record<string, unknown>;
+    return String(style.variant || '') === 'kicker';
+  }
+
+  private isVisualBlock(block: ExportBlock): boolean {
+    const type = this.blockTypeName(block);
+    return (
+      type === 'STATS_GRID' ||
+      type === 'STATISTIC' ||
+      type === 'COMPARISON' ||
+      type === 'TIMELINE' ||
+      type === 'BENTO_GRID'
+    );
+  }
+
+  private uniqueCopyBlocks(blocks: ExportBlock[]): ExportBlock[] {
+    const seen = new Set<string>();
+    return blocks.filter((block) => {
+      if (this.isImageBlock(block) || this.isVisualBlock(block)) return false;
+      const text = this.getBlockTextContent(block).trim();
+      if (!text || this.isGenericKicker(text)) return false;
+      const key = text.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  private async renderLayoutAwarePptxSlide(
+    pptx: Awaited<typeof import('@office-kit/pptx')>,
+    pptxSlide: unknown,
+    slide: ExportSlide,
+    headingFont: string,
+    bodyFont: string,
+    headingColor: string,
+    textColor: string,
+  ): Promise<void> {
+    const layout = String(slide.layout || '');
+    const blocks = [...(slide.blocks || [])].sort((a, b) => a.order - b.order);
+    const images = blocks.filter((block) => this.isImageBlock(block));
+    const copyBlocks = this.uniqueCopyBlocks(blocks);
+    const visualBlocks = blocks.filter((block) => this.isVisualBlock(block));
+    const splitHero = [
+      'title-hero',
+      'image-left',
+      'image-right',
+      'two-column-image',
+    ].includes(layout);
+    const imageLeft = layout !== 'image-right';
+
+    const addText = (
+      text: string,
+      x: number,
+      y: number,
+      w: number,
+      h: number,
+      size: number,
+      bold = false,
+    ) => {
+      const tb = pptx.addSlideTextBox(pptxSlide as never, {
+        x: pptx.inches(x),
+        y: pptx.inches(y),
+        w: pptx.inches(w),
+        h: pptx.inches(h),
+        text,
+      });
+      pptx.setShapeTextFormat(tb, {
+        size,
+        font: bold ? headingFont : bodyFont,
+        color: bold ? headingColor : textColor,
+        bold,
+      });
+      pptx.setShapeTextAnchor(tb, 'top');
+    };
+
+    const renderCopyColumn = (
+      list: ExportBlock[],
+      x: number,
+      startY: number,
+      width: number,
+    ) => {
+      let y = startY;
+      for (const block of list) {
+        const text = this.getBlockTextContent(block);
+        const type = this.blockTypeName(block);
+        const isHeading = type === 'HEADING';
+        const isKicker = this.isKickerBlock(block);
+        if (isKicker) {
+          addText(text.toUpperCase(), x, y, width, 0.32, 11, true);
+          y += 0.38;
+          continue;
+        }
+        addText(
+          text,
+          x,
+          y,
+          width,
+          isHeading ? 1.45 : 0.95,
+          isHeading ? 28 : 15,
+          isHeading,
+        );
+        y += isHeading ? 1.55 : 0.85;
+      }
+      return y;
+    };
+
+    const renderTiles = (
+      tiles: Array<{ value: string; label: string }>,
+      x: number,
+      y: number,
+      width: number,
+      maxCols: number,
+    ) => {
+      const cols = Math.min(Math.max(tiles.length, 1), maxCols);
+      const colW = width / cols;
+      tiles.forEach((tile, i) => {
+        addText(tile.value, x + i * colW, y, colW - 0.18, 0.65, 24, true);
+        if (tile.label) {
+          addText(tile.label, x + i * colW, y + 0.68, colW - 0.18, 0.7, 12);
+        }
+      });
+    };
+
+    if (splitHero && images[0]) {
+      const imageContent = images[0].content as Record<string, unknown>;
+      const imageUrl = String(imageContent?.url || imageContent?.src || '');
+      const imgX = imageLeft ? 0 : 6.67;
+      const textX = imageLeft ? 7.05 : 0.45;
+      await this.addPptxImage(pptx, pptxSlide, imageUrl, imgX, 0, 6.67, 7.5);
+      renderCopyColumn(copyBlocks.slice(0, 4), textX, 1.45, 5.7);
+      return;
+    }
+
+    if (layout === 'stats-grid' || visualBlocks.some((b) => /STATS|STATISTIC/.test(this.blockTypeName(b)))) {
+      const afterCopy = renderCopyColumn(copyBlocks.slice(0, 2), 0.55, 0.45, 12.2);
+      let y = Math.max(afterCopy, 1.7);
+      for (const block of visualBlocks) {
+        renderTiles(this.getVisualTiles(block), 0.55, y, 12.2, 4);
+        y += 1.7;
+      }
+      return;
+    }
+
+    if (layout === 'timeline' || visualBlocks.some((b) => this.blockTypeName(b) === 'TIMELINE')) {
+      const afterCopy = renderCopyColumn(copyBlocks.slice(0, 2), 0.55, 0.4, 12.2);
+      let y = Math.max(afterCopy, 1.55);
+      for (const block of visualBlocks) {
+        const tiles = this.getVisualTiles(block);
+        const cols = Math.min(Math.max(tiles.length, 1), 4);
+        const colW = 12.2 / cols;
+        tiles.forEach((tile, i) => {
+          addText(String(i + 1).padStart(2, '0'), 0.55 + i * colW, y, colW - 0.2, 0.35, 11, true);
+          addText(
+            `${tile.value}${tile.label ? `\n${tile.label}` : ''}`,
+            0.55 + i * colW,
+            y + 0.4,
+            colW - 0.2,
+            1.6,
+            14,
+          );
+        });
+        y += 2.2;
+      }
+      return;
+    }
+
+    if (layout === 'comparison' || visualBlocks.some((b) => this.blockTypeName(b) === 'COMPARISON')) {
+      const afterCopy = renderCopyColumn(copyBlocks.slice(0, 2), 0.55, 0.4, 12.2);
+      let y = Math.max(afterCopy, 1.55);
+      for (const block of visualBlocks) {
+        const tiles = this.getVisualTiles(block);
+        const cols = Math.min(Math.max(tiles.length, 1), 3);
+        const colW = 12.2 / cols;
+        tiles.forEach((tile, i) => {
+          addText(
+            `${tile.value}${tile.label ? `\n${tile.label}` : ''}`,
+            0.55 + i * colW,
+            y,
+            colW - 0.25,
+            2.4,
+            16,
+          );
+        });
+        y += 2.6;
+      }
+      return;
+    }
+
+    if (layout === 'quote-highlight') {
+      const heading = copyBlocks.find(
+        (block) => this.blockTypeName(block) === 'HEADING',
+      );
+      const quote =
+        copyBlocks.find((block) => this.blockTypeName(block) === 'QUOTE') ||
+        copyBlocks.find(
+          (block) =>
+            this.blockTypeName(block) !== 'HEADING' &&
+            !this.isKickerBlock(block),
+        );
+      if (heading) {
+        addText(this.getBlockTextContent(heading), 1.2, 1.1, 10.9, 1.1, 22, true);
+      }
+      if (quote) {
+        addText(this.getBlockTextContent(quote), 1.4, 2.5, 10.5, 2.4, 26, true);
+      }
+      const rest = copyBlocks.filter(
+        (block) => block !== heading && block !== quote && !this.isKickerBlock(block),
+      );
+      renderCopyColumn(rest.slice(0, 3), 1.4, 5.1, 10.5);
+      if (visualBlocks[0]) {
+        renderTiles(this.getVisualTiles(visualBlocks[0]), 0.8, 5.4, 11.7, 3);
+      }
+      return;
+    }
+
+    if (layout === 'bento-grid') {
+      const afterCopy = renderCopyColumn(copyBlocks.slice(0, 2), 0.55, 0.35, 12.2);
+      const cards = [
+        ...visualBlocks,
+        ...copyBlocks.slice(2),
+      ];
+      const cols = Math.min(Math.max(cards.length, 1), 3);
+      const colW = 12.2 / cols;
+      const y = Math.min(Math.max(afterCopy, 1.55), 4.2);
+      cards.slice(0, 6).forEach((block, i) => {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const text = this.isVisualBlock(block)
+          ? this.getVisualTiles(block)
+              .map((tile) => `${tile.value}${tile.label ? ` — ${tile.label}` : ''}`)
+              .join('\n')
+          : this.getBlockTextContent(block);
+        addText(text, 0.55 + col * colW, y + row * 2.15, colW - 0.25, 2.0, 14);
+      });
+      return;
+    }
+
+    let yPosition = 0.45;
+    const drawn = new Set<string>();
+    for (const block of blocks) {
+      const type = this.blockTypeName(block);
+      const content = this.getBlockTextContent(block);
+      if (this.isKickerBlock(block) && this.isGenericKicker(content)) continue;
+
+      if (this.isImageBlock(block)) {
+        if (yPosition > 4.1) continue;
+        const imageContent = block.content as Record<string, unknown>;
+        const imageUrl = String(imageContent?.url || imageContent?.src || '');
+        await this.addPptxImage(pptx, pptxSlide, imageUrl, 0.55, yPosition, 12.2, 2.55);
+        yPosition += 2.75;
+        continue;
+      }
+
+      if (this.isVisualBlock(block)) {
+        renderTiles(this.getVisualTiles(block), 0.55, yPosition, 12.2, 4);
+        yPosition += 1.65;
+        continue;
+      }
+
+      if (!content) continue;
+      const key = content.toLowerCase();
+      if (drawn.has(key)) continue;
+      drawn.add(key);
+      const isHeading = type === 'HEADING';
+      const isKicker = this.isKickerBlock(block);
+      addText(
+        isKicker ? content.toUpperCase() : content,
+        0.55,
+        yPosition,
+        12.2,
+        isHeading ? 0.9 : 0.65,
+        isKicker ? 11 : isHeading ? 28 : 16,
+        isHeading || isKicker,
+      );
+      yPosition += isHeading ? 1.0 : 0.72;
+    }
   }
 
   /**
@@ -824,36 +1229,49 @@ export class ExportService {
     const theme = project.theme || this.getDefaultTheme();
     const themeColors = (theme.colors || {}) as Record<string, string>;
 
-    const pptx = new PptxGenJS();
+    // @office-kit/pptx is ESM-only; load it via dynamic import (works in CJS on Node 22+).
+    const pptx = await import('@office-kit/pptx');
 
-    // Set presentation properties
-    pptx.author = 'Presentation Designer';
-    pptx.title = project.title || 'Untitled Presentation';
-    pptx.subject = project.description || '';
-    pptx.company = 'Presentation Designer';
+    const pres = pptx.createPresentation({ size: '16:9' });
 
-    // Set layout to 16:9
-    pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
-    pptx.layout = 'WIDE';
+    // Document metadata
+    pptx.setCoreProperties(pres, {
+      title: project.title || 'Untitled Presentation',
+      creator: 'Presentation Designer',
+      subject: project.description || '',
+    });
+    pptx.setExtendedProperties(pres, {
+      application: 'Presentation Designer',
+      company: 'Presentation Designer',
+    });
 
-    // Conversion factor: canvas 1280px → 13.333in
+    const blankLayout = pptx.findSlideLayoutByType(pres, 'blank');
+    if (!blankLayout) {
+      throw new Error('Blank slide layout not found in default presentation');
+    }
+    // Canvas 1280px maps to 13.333in (16:9)
+    const headingFont = theme.fonts?.heading || 'Calibri';
+    const bodyFont = theme.fonts?.body || 'Calibri';
+    const textColor = (themeColors.text || '#000000').replace('#', '');
+    const headingColor = (themeColors.primary || themeColors.text || '#111827').replace(
+      '#',
+      '',
+    );
     const PX_TO_IN = 13.333 / 1280;
 
-    // Process each slide
     for (const slide of project.slides || []) {
-      const pptxSlide = pptx.addSlide();
+      const pptxSlide = pptx.addSlide(pres, { layout: blankLayout });
 
-      // Set background color
+      // Background color
       if (themeColors.background) {
-        pptxSlide.background = {
-          color: themeColors.background.replace('#', ''),
-        };
+        pptx.setSlideBackground(
+          pptxSlide,
+          themeColors.background.replace('#', ''),
+        );
       }
 
       const blocks = slide.blocks || [];
-      const textColor = (themeColors.text || '#000000').replace('#', '');
 
-      // Determine if any blocks have absolute position data
       const hasPositionedBlocks = blocks.some(
         (b) => b.style && b.style.x !== undefined && b.style.y !== undefined,
       );
@@ -862,13 +1280,13 @@ export class ExportService {
         // === ABSOLUTE POSITION MODE ===
         for (const block of blocks) {
           const content = this.getBlockTextContent(block);
-          if (!content) continue;
-
           const style = (block.style || {}) as Record<string, number>;
-          const x = (style.x ?? 60) * PX_TO_IN;
-          const y = (style.y ?? 60) * PX_TO_IN;
-          const w = (style.width ?? 1160) * PX_TO_IN;
-          const h = (style.height ?? 100) * PX_TO_IN;
+
+          const xIn = (style.x ?? 60) * PX_TO_IN;
+          const yIn = (style.y ?? 60) * PX_TO_IN;
+          const wIn = (style.width ?? 1160) * PX_TO_IN;
+          const hIn = (style.height ?? 100) * PX_TO_IN;
+
           const isBold =
             block.blockType === 'HEADING' ||
             block.blockType === 'heading' ||
@@ -886,181 +1304,93 @@ export class ExportService {
             block.blockType === 'list'
           ) {
             const items = this.getListItems(block);
-            const textProps = items.map((item) => ({
-              text: item,
-              options: { bullet: true, color: textColor, fontSize },
-            }));
-            pptxSlide.addText(textProps, {
-              x,
-              y,
-              w,
-              h: Math.max(h, items.length * 0.4),
-              fontFace: 'Arial',
-              valign: 'top',
+            const tb = pptx.addSlideTextBox(pptxSlide, {
+              x: pptx.inches(xIn),
+              y: pptx.inches(yIn),
+              w: pptx.inches(wIn),
+              h: pptx.inches(Math.max(hIn, items.length * 0.4)),
+              text: items.join('\n'),
             });
+            pptx.setShapeBullets(tb, { char: '\u2022' });
+            pptx.setShapeTextFormat(tb, {
+              color: textColor,
+              size: fontSize,
+              font: bodyFont,
+            });
+            pptx.setShapeTextAnchor(tb, 'top');
           } else if (
             block.blockType === 'IMAGE' ||
             block.blockType === 'image'
           ) {
             const imageContent = block.content as Record<string, unknown>;
             const imageUrl = imageContent?.url || imageContent?.src;
-            if (typeof imageUrl === 'string' && imageUrl.startsWith('http')) {
+            if (typeof imageUrl === 'string' && /^(https?:\/\/|data:image\/)/i.test(imageUrl)) {
               try {
-                pptxSlide.addImage({ path: imageUrl, x, y, w, h });
+                const resp = await axios.get(imageUrl, {
+                  responseType: 'arraybuffer',
+                  timeout: 15_000,
+                });
+                pptx.addSlideImage(pptxSlide, new Uint8Array(resp.data), {
+                  x: pptx.inches(xIn),
+                  y: pptx.inches(yIn),
+                  w: pptx.inches(wIn),
+                  h: pptx.inches(hIn),
+                });
               } catch {
                 this.logger.warn(`Failed to add image: ${imageUrl}`);
               }
             }
           } else {
-            pptxSlide.addText(content, {
-              x,
-              y,
-              w,
-              h,
-              fontSize,
-              fontFace: 'Arial',
-              color: textColor,
-              bold: isBold,
-              valign: 'top',
+            const tb = pptx.addSlideTextBox(pptxSlide, {
+              x: pptx.inches(xIn),
+              y: pptx.inches(yIn),
+              w: pptx.inches(wIn),
+              h: pptx.inches(hIn),
+              text: content,
             });
+            pptx.setShapeTextFormat(tb, {
+              size: fontSize,
+              font: isBold ? headingFont : bodyFont,
+              color: isBold ? headingColor : textColor,
+              bold: isBold,
+            });
+            pptx.setShapeTextAnchor(tb, 'top');
           }
         }
       } else {
-        // === LINEAR FLOW MODE (legacy) ===
-        let yPosition = 0.5;
-
-        for (const block of blocks) {
-          const content = this.getBlockTextContent(block);
-
-          switch (block.blockType) {
-            case 'heading':
-            case 'HEADING':
-              pptxSlide.addText(content, {
-                x: 0.5,
-                y: yPosition,
-                w: 12.333,
-                h: 0.8,
-                fontSize: 36,
-                fontFace: 'Arial',
-                color: textColor,
-                bold: true,
-              });
-              yPosition += 1;
-              break;
-
-            case 'subheading':
-            case 'SUBHEADING':
-              pptxSlide.addText(content, {
-                x: 0.5,
-                y: yPosition,
-                w: 12.333,
-                h: 0.6,
-                fontSize: 24,
-                fontFace: 'Arial',
-                color: textColor,
-                bold: true,
-              });
-              yPosition += 0.8;
-              break;
-
-            case 'paragraph':
-            case 'PARAGRAPH':
-            case 'text':
-            case 'TEXT':
-              pptxSlide.addText(content, {
-                x: 0.5,
-                y: yPosition,
-                w: 12.333,
-                h: 1,
-                fontSize: 16,
-                fontFace: 'Arial',
-                color: textColor,
-                valign: 'top',
-              });
-              yPosition += 1.2;
-              break;
-
-            case 'bullet_list':
-            case 'BULLET_LIST':
-            case 'list':
-            case 'LIST': {
-              const items = this.getListItems(block);
-              const textProps = items.map((item) => ({
-                text: item,
-                options: { bullet: true, color: textColor, fontSize: 16 },
-              }));
-              pptxSlide.addText(textProps, {
-                x: 0.5,
-                y: yPosition,
-                w: 12.333,
-                h: items.length * 0.4,
-                fontFace: 'Arial',
-                valign: 'top',
-              });
-              yPosition += items.length * 0.4 + 0.3;
-              break;
-            }
-
-            case 'image':
-            case 'IMAGE': {
-              const imageContent = block.content as Record<string, unknown>;
-              const imageUrl = imageContent?.url || imageContent?.src;
-              if (typeof imageUrl === 'string' && imageUrl.startsWith('http')) {
-                try {
-                  pptxSlide.addImage({
-                    path: imageUrl,
-                    x: 0.5,
-                    y: yPosition,
-                    w: 6,
-                    h: 4,
-                  });
-                  yPosition += 4.2;
-                } catch {
-                  this.logger.warn(`Failed to add image: ${imageUrl}`);
-                }
-              }
-              break;
-            }
-
-            default:
-              if (content) {
-                pptxSlide.addText(content, {
-                  x: 0.5,
-                  y: yPosition,
-                  w: 12.333,
-                  h: 0.5,
-                  fontSize: 14,
-                  fontFace: 'Arial',
-                  color: textColor,
-                });
-                yPosition += 0.6;
-              }
-          }
-        }
+        await this.renderLayoutAwarePptxSlide(
+          pptx,
+          pptxSlide,
+          slide,
+          headingFont,
+          bodyFont,
+          headingColor,
+          textColor,
+        );
       }
 
-      // Add slide number
-      pptxSlide.addText(String((slide.order || 0) + 1), {
-        x: 12.5,
-        y: 7,
-        w: 0.5,
-        h: 0.3,
-        fontSize: 10,
-        color: '808080',
-        align: 'right',
+      // Slide number
+      const numTb = pptx.addSlideTextBox(pptxSlide, {
+        x: pptx.inches(12.5),
+        y: pptx.inches(7),
+        w: pptx.inches(0.5),
+        h: pptx.inches(0.3),
+        text: String((slide.order || 0) + 1),
       });
+      pptx.setShapeTextFormat(numTb, {
+        size: 10,
+        color: '808080',
+      });
+      pptx.setShapeAlignment(numTb, 'right');
     }
 
-    // Generate PPTX buffer
-    const pptxBuffer = (await pptx.write({
-      outputType: 'nodebuffer',
-    })) as Buffer;
+    const pptxBytes = await pptx.savePresentation(pres);
 
     return {
       filename: `${this.sanitizeFilename(project.title)}.pptx`,
       mimeType:
         'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      data: pptxBuffer,
+      data: Buffer.from(pptxBytes),
     };
   }
 
@@ -1529,7 +1859,41 @@ export class ExportService {
     theme: ExportTheme,
   ): string {
     if (element.elementType === 'image') {
-      return ''; // Images require additional handling with relationships
+      const imageOpts = (element.options || {}) as Record<string, number | string>;
+      const x = Math.round(((imageOpts.x as number) || 0.5) * 914400);
+      const y = Math.round(((imageOpts.y as number) || 0.5) * 914400);
+      const w = Math.round(((imageOpts.w as number) || 6) * 914400);
+      const h = Math.round(((imageOpts.h as number) || 4) * 914400);
+      const caption =
+        typeof element.text === 'string' && element.text
+          ? this.escapeXml(element.text)
+          : 'Image';
+      return `<p:sp>
+  <p:nvSpPr>
+    <p:cNvPr id="${id}" name="Picture ${id}"/>
+    <p:cNvSpPr/>
+    <p:nvPr/>
+  </p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${w}" cy="${h}"/></a:xfrm>
+    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="E2E8F0"/></a:solidFill>
+  </p:spPr>
+  <p:txBody>
+    <a:bodyPr anchor="ctr"/>
+    <a:lstStyle/>
+    <a:p>
+      <a:pPr algn="ctr"/>
+      <a:r>
+        <a:rPr lang="en-US" sz="1400">
+          <a:solidFill><a:srgbClr val="64748B"/></a:solidFill>
+          <a:latin typeface="${theme.fonts?.heading || 'Calibri'}"/>
+        </a:rPr>
+        <a:t>${caption}</a:t>
+      </a:r>
+    </a:p>
+  </p:txBody>
+</p:sp>`;
     }
 
     const text =
@@ -1547,7 +1911,7 @@ export class ExportService {
     const w = Math.round(((opts.w as number) || 9) * 914400);
     const h = Math.round(((opts.h as number) || 1) * 914400);
     const fontSize = ((opts.fontSize as number) || 18) * 100;
-    const fontFace = (opts.fontFace as string) || theme.fonts?.body || 'Arial';
+    const fontFace = (opts.fontFace as string) || theme.fonts?.body || 'Calibri';
     const color =
       (opts.color as string) ||
       (theme.colors?.text || '#1e293b').replace('#', '');
@@ -1662,6 +2026,47 @@ export class ExportService {
         body: 'Inter',
       },
     };
+  }
+
+  /**
+   * Helvetica uses WinAnsi and cannot encode many Unicode chars from AI copy
+   * (non-breaking hyphen, em dash, curly quotes, etc.).
+   */
+  private sanitizePdfText(text: string): string {
+    if (!text) return '';
+    return text
+      .replace(/[\u2010\u2011\u2012\u2212\uFE58\uFE63\uFF0D]/g, '-')
+      .replace(/[\u2013\u2014\u2015]/g, '-')
+      .replace(/[\u2018\u2019\u201A\u201B\u2032]/g, "'")
+      .replace(/[\u201C\u201D\u201E\u2033]/g, '"')
+      .replace(/\u2026/g, '...')
+      .replace(/[\u00A0\u202F\u2007\u2008\u2009\u200A\u200B\u2060\uFEFF]/g, ' ')
+      .replace(/[\u2000-\u200F\u2028\u2029]/g, ' ')
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .split('')
+      .filter((ch) => {
+        const code = ch.charCodeAt(0);
+        return (
+          code === 0x09 ||
+          code === 0x0a ||
+          code === 0x0d ||
+          (code >= 0x20 && code <= 0x7e) ||
+          code === 0x2022 ||
+          (code >= 0xa0 && code <= 0xff && code !== 0xad)
+        );
+      })
+      .join('');
+  }
+
+  private drawPdfText(
+    page: PDFPage,
+    text: string,
+    options: Parameters<PDFPage['drawText']>[1],
+  ): void {
+    const safe = this.sanitizePdfText(text);
+    if (!safe || !options) return;
+    page.drawText(safe, options);
   }
 
   /**

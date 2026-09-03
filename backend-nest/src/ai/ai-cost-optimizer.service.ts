@@ -58,14 +58,14 @@ export class AICostOptimizerService {
     // Groq - Very cheap and fast
     {
       provider: 'groq',
-      model: 'llama-3.3-70b-versatile',
+      model: 'openai/gpt-oss-120b',
       costPerToken: 0.000001,
       speed: 'fast',
       quality: 'high',
     },
     {
       provider: 'groq',
-      model: 'mixtral-8x7b-32768',
+      model: 'qwen/qwen3.6-27b',
       costPerToken: 0.0000005,
       speed: 'fast',
       quality: 'medium',
@@ -81,7 +81,7 @@ export class AICostOptimizerService {
     },
     {
       provider: 'google',
-      model: 'gemini-1.5-flash',
+      model: 'gemini-3.6-flash',
       costPerToken: 0.0000005,
       speed: 'fast',
       quality: 'medium',
@@ -185,11 +185,11 @@ export class AICostOptimizerService {
       // Fallback to Groq
       if (operation === 'generation' || operation === 'analysis') {
         return this.modelCosts.find(
-          (m) => m.provider === 'groq' && m.model === 'llama-3.3-70b-versatile',
+          (m) => m.provider === 'groq' && m.model === 'openai/gpt-oss-120b',
         )!;
       }
       return this.modelCosts.find(
-        (m) => m.provider === 'groq' && m.model === 'mixtral-8x7b-32768',
+        (m) => m.provider === 'groq' && m.model === 'qwen/qwen3.6-27b',
       )!;
     }
 

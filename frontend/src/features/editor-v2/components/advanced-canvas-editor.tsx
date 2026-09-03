@@ -3,7 +3,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { CanvasDrawingEngine, type ToolType, type CanvasElement } from '../lib/canvas-drawing-engine';
 import { SnapAndAlignEngine, type AlignmentType } from '../lib/snap-and-align-engine';
-import { ConstraintEngine, ConstraintPresets } from '../lib/constraint-engine';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -31,12 +30,16 @@ export const AdvancedCanvasEditor: React.FC<AdvancedCanvasEditorProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [engine, setEngine] = useState<CanvasDrawingEngine | null>(null);
   const [snapEngine] = useState(() => new SnapAndAlignEngine(8, 16));
-  const [constraintEngine] = useState(() => new ConstraintEngine());
   const [currentTool, setCurrentTool] = useState<ToolType>('select');
   const [selectedElement, setSelectedElement] = useState<CanvasElement | null>(null);
   const [elements, setElements] = useState<CanvasElement[]>(initialElements);
   const [zoom, setZoom] = useState(1);
   const [showGrid, setShowGrid] = useState(true);
+  // Keep latest elements for selection callback without re-initing the engine
+  const elementsRef = useRef(elements);
+  useEffect(() => {
+    elementsRef.current = elements;
+  }, [elements]);
 
   // Initialize canvas engine
   useEffect(() => {
@@ -49,7 +52,7 @@ export const AdvancedCanvasEditor: React.FC<AdvancedCanvasEditorProps> = ({
       onElementsChange?.(els);
     });
     newEngine.setOnSelectionChange((id) => {
-      const selected = elements.find((e: CanvasElement) => e.id === id) || null;
+      const selected = elementsRef.current.find((e: CanvasElement) => e.id === id) || null;
       setSelectedElement(selected || null);
       onSelectionChange?.(id);
     });
@@ -78,13 +81,6 @@ export const AdvancedCanvasEditor: React.FC<AdvancedCanvasEditorProps> = ({
       engine.setZoom(newZoom);
     },
     [engine, zoom]
-  );
-
-  const handlePan = useCallback(
-    (dx: number, dy: number) => {
-      engine?.pan(dx, dy);
-    },
-    [engine]
   );
 
   const handleAlign = useCallback(

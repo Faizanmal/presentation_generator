@@ -1,4 +1,42 @@
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import type { NextConfig } from "next";
+
+/**
+ * Split deploy (Vercel): platform env + frontend/.env.local already in process.env.
+ * Single VPS: fill any missing keys from the repo-root .env (does not override).
+ */
+function loadRootEnvFallback() {
+  const rootEnv = resolve(__dirname, "..", ".env");
+  if (!existsSync(rootEnv)) {
+    return;
+  }
+
+  for (const raw of readFileSync(rootEnv, "utf8").split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) {
+      continue;
+    }
+    const eq = line.indexOf("=");
+    if (eq <= 0) {
+      continue;
+    }
+    const key = line.slice(0, eq).trim();
+    if (!key || process.env[key] !== undefined) {
+      continue;
+    }
+    let value = line.slice(eq + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    process.env[key] = value;
+  }
+}
+
+loadRootEnvFallback();
 
 const nextConfig: NextConfig = {
   // Avoid double renders in development (StrictMode runs effects twice)
@@ -47,6 +85,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "placehold.co" },
       { protocol: "https", hostname: "loremflickr.com" },
+      { protocol: "https", hostname: "picsum.photos" },
       { protocol: "https", hostname: "images.unsplash.com" },
     ],
   },

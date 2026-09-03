@@ -317,7 +317,7 @@ export function AdvancedTemplateGallery({
 
             {/* Color Scheme */}
             <div className="flex gap-1 mb-3">
-              {template.colorScheme.map((color, idx) => (
+              {template.colorScheme.map((color) => (
                 <div
                   key={color}
                   className="w-6 h-6 rounded border border-slate-300 dark:border-slate-600"

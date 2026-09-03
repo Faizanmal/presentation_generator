@@ -40,7 +40,7 @@ export class PaymentsService {
       'dummy-key-to-prevent-crash';
     this.stripe = new Stripe(stripeKey, {
       // upgrade to the version allowed by current Stripe types
-      apiVersion: '2026-04-22.dahlia',
+      apiVersion: '2026-08-26.dahlia',
     });
   }
 

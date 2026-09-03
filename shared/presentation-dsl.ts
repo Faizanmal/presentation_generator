@@ -476,7 +476,15 @@ export interface GeneratedImage {
   imageUrl: string;
   prompt: string;
   revisedPrompt?: string;
-  provider: 'dall-e-3' | 'pollinations' | 'huggingface' | 'replicate' | 'stock';
+  provider:
+    | 'nvidia'
+    | 'gemini'
+    | 'stability'
+    | 'dall-e-3'
+    | 'pollinations'
+    | 'huggingface'
+    | 'replicate'
+    | 'stock';
   width: number;
   height: number;
   style: string;

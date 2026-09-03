@@ -6,19 +6,14 @@ import {
   Search,
   Sparkles,
   Plus,
-  Play,
   Sun,
-  MessageSquare,
   Layout,
-  Type,
-  Pilcrow,
-  Image as ImageIcon,
   Command,
   ArrowUp,
   CornerDownLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { scaleInVariants, motionTiming, motionEase, staggerContainerFast, staggerChild } from "../lib/motion";
+import { scaleInVariants, motionTiming } from "../lib/motion";
 import { fuzzyMatch } from "../lib/fuzzy-search";
 import type { CommandDefinition } from "../types";
 

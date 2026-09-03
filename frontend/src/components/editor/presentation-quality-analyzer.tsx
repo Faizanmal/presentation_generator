@@ -253,7 +253,7 @@ export function PresentationQualityAnalyzer({
               {/* Issues */}
               {metric.issues.length > 0 && (
                 <div className="space-y-1">
-                  {metric.issues.map((issue, idx) => (
+                  {metric.issues.map((issue) => (
                     <div key={issue} className="flex gap-2 text-xs">
                       <AlertCircle className="w-3 h-3 text-red-500 flex-shrink-0 mt-0.5" />
                       <span className="text-slate-600 dark:text-slate-400">
@@ -267,7 +267,7 @@ export function PresentationQualityAnalyzer({
               {/* Recommendations */}
               {metric.recommendations.length > 0 && (
                 <div className="space-y-1">
-                  {metric.recommendations.map((rec, idx) => (
+                  {metric.recommendations.map((rec) => (
                     <div key={rec} className="flex gap-2 text-xs">
                       <Info className="w-3 h-3 text-blue-500 flex-shrink-0 mt-0.5" />
                       <span className="text-slate-600 dark:text-slate-400">
@@ -289,7 +289,7 @@ export function PresentationQualityAnalyzer({
             Top Suggestions
           </h4>
           <ul className="space-y-1">
-            {report.suggestions.map((suggestion, idx) => (
+            {report.suggestions.map((suggestion) => (
               <li key={suggestion} className="text-xs text-blue-800 dark:text-blue-200">
                 • {suggestion}
               </li>

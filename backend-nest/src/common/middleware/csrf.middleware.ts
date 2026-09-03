@@ -5,8 +5,15 @@ import { doubleCsrfProtection } from '../csrf/double-csrf.config';
 @Injectable()
 export class CsrfMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction) {
-    // Skip CSRF for health checks, metrics, and webhooks
-    const skipPaths = ['/health', '/metrics', '/api/payments/webhook'];
+    // Skip CSRF for health checks, metrics, webhooks, and token refresh
+    // (refresh authenticates with the refresh token in the body, not a cookie session)
+    const skipPaths = [
+      '/health',
+      '/metrics',
+      '/api/payments/webhook',
+      '/api/auth/refresh',
+      '/auth/refresh',
+    ];
     if (skipPaths.some((path) => req.path.startsWith(path))) {
       return next();
     }

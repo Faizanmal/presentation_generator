@@ -22,7 +22,7 @@ interface LayoutCompilerProps {
 
 /** Map DSL / legacy layout names onto compiler cases */
 const LAYOUT_ALIASES: Record<string, string> = {
-  'title-hero': 'title',
+  'title-hero': 'title-hero',
   'title-subtitle': 'title-subtitle',
   title: 'title',
   'single-column': 'single-column',
@@ -44,9 +44,16 @@ const LAYOUT_ALIASES: Record<string, string> = {
   blank: 'single-column',
 };
 
+const GENERIC_KICKER = /^(editorial|executive|bold|manifesto|comparison|quote|timeline|history|basics|evidence|use cases|look ahead|call to action|cta|hook|context|transformation|foundation|proof)$/i;
+
 const getBlockType = (block: Block) => {
   const rawType = block.type || (block as Block & { blockType?: string }).blockType;
   return (rawType as string | undefined)?.toUpperCase().trim().replace(/-/g, '_') || 'PARAGRAPH';
+};
+
+const blockPlainText = (block: Block): string => {
+  const text = block.content?.text;
+  return typeof text === 'string' ? text.trim() : '';
 };
 
 const getBlockZone = (block: Block): number | undefined => {
@@ -127,10 +134,24 @@ export function LayoutCompiler({
   const surface = theme?.colors?.surface || 'rgba(148, 163, 184, 0.08)';
   const borderSubtle = 'border border-black/5 dark:border-white/8';
 
-  const titleBlocks = useMemo(
-    () => blocks.filter((block) => ['HEADING', 'SUBHEADING'].includes(getBlockType(block))),
-    [blocks]
-  );
+  const bleedMediaClass =
+    'h-full min-h-0 overflow-hidden [&_.aspect-video]:aspect-auto [&_.aspect-video]:h-full [&_.aspect-video]:rounded-none [&_.rounded-xl]:rounded-none [&_img]:object-cover [&_img]:h-full [&_img]:w-full [&_.bottom-4]:hidden';
+
+  const titleBlocks = useMemo(() => {
+    const titles = blocks.filter((block) =>
+      ['HEADING', 'SUBHEADING'].includes(getBlockType(block)),
+    );
+    const seen = new Set<string>();
+    return titles.filter((block) => {
+      const text = blockPlainText(block);
+      const variant = String(block.style?.variant || '');
+      if (variant === 'kicker' && GENERIC_KICKER.test(text)) return false;
+      const key = text.toLowerCase();
+      if (key && seen.has(key)) return false;
+      if (key) seen.add(key);
+      return true;
+    });
+  }, [blocks]);
 
   const mediaBlocks = useMemo(
     () =>
@@ -141,7 +162,14 @@ export function LayoutCompiler({
   );
 
   const bodyBlocks = useMemo(
-    () => blocks.filter((block) => !titleBlocks.includes(block) && !mediaBlocks.includes(block)),
+    () =>
+      blocks.filter((block) => {
+        if (titleBlocks.includes(block) || mediaBlocks.includes(block)) return false;
+        const text = blockPlainText(block);
+        const variant = String(block.style?.variant || '');
+        if (variant === 'kicker' && GENERIC_KICKER.test(text)) return false;
+        return true;
+      }),
     [blocks, titleBlocks, mediaBlocks]
   );
 
@@ -193,6 +221,26 @@ export function LayoutCompiler({
   );
 
   switch (resolvedLayout) {
+    case 'title-hero':
+      return (
+        <div className="w-full h-full grid grid-cols-2 items-stretch relative z-10 overflow-hidden">
+          <div
+            className={bleedMediaClass}
+            style={{ background: surface }}
+          >
+            {mediaBlocks.length > 0 ? (
+              <div className="w-full h-full">{renderBlockList(mediaBlocks, 'm-')}</div>
+            ) : (
+              <div className="w-full h-full" style={{ background: theme?.colors?.primary || '#0F172A', opacity: 0.12 }} />
+            )}
+          </div>
+          <div className="flex flex-col justify-center min-h-0 px-10 py-8 gap-4">
+            {renderBlockList(titleBlocks, 't-')}
+            <div style={{ opacity: bodyOpacity }}>{renderBlockList(bodyBlocks, 'b-')}</div>
+          </div>
+        </div>
+      );
+
     case 'title':
       return (
         <div
@@ -237,13 +285,13 @@ export function LayoutCompiler({
             <div className="mb-1 shrink-0 max-w-4xl">{renderBlockList(titleBlocks, 't-')}</div>
           )}
           <div
-            className={`flex-1 grid grid-cols-1 lg:grid-cols-2 ${columnGap} items-start min-h-0 ${
+            className={`flex-1 grid grid-cols-2 ${columnGap} items-start min-h-0 ${
               isComparison ? 'relative' : ''
             }`}
           >
             {isComparison && (
               <div
-                className="hidden lg:block absolute left-1/2 top-2 bottom-2 w-px -translate-x-1/2 opacity-20"
+                className="absolute left-1/2 top-2 bottom-2 w-px -translate-x-1/2 opacity-20"
                 style={{ background: theme?.colors?.primary || '#64748B' }}
               />
             )}
@@ -261,7 +309,7 @@ export function LayoutCompiler({
           {titleBlocks.length > 0 && (
             <div className="shrink-0 max-w-4xl">{renderBlockList(titleBlocks, 't-')}</div>
           )}
-          <div className={`flex-1 grid grid-cols-1 md:grid-cols-3 ${columnGap} items-start min-h-0`}>
+          <div className={`flex-1 grid grid-cols-3 ${columnGap} items-start min-h-0`}>
             {cols.map((col, i) => (
               <div
                 // eslint-disable-next-line react/no-array-index-key
@@ -281,16 +329,14 @@ export function LayoutCompiler({
     case 'image-left':
       return (
         <div
-          className={`w-full h-full grid grid-cols-1 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] ${columnGap} items-stretch relative z-10 ${contentPad} overflow-hidden`}
+          className={`w-full h-full grid grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] ${columnGap} items-stretch relative z-10 ${contentPad} overflow-hidden`}
         >
           <div
-            className={`min-h-56 flex items-center justify-center overflow-hidden ${borderSubtle} shadow-sm`}
+            className={`${bleedMediaClass} ${borderSubtle} shadow-sm`}
             style={{ borderRadius: radius, background: surface }}
           >
             {mediaBlocks.length > 0 ? (
-              <div className="w-full h-full [&_img]:object-cover [&_img]:h-full [&_img]:w-full">
-                {renderBlockList(mediaBlocks, 'm-')}
-              </div>
+              <div className="w-full h-full">{renderBlockList(mediaBlocks, 'm-')}</div>
             ) : (
               <div className="text-slate-400 text-sm font-medium tracking-wide uppercase">Visual</div>
             )}
@@ -305,20 +351,18 @@ export function LayoutCompiler({
     case 'image-right':
       return (
         <div
-          className={`w-full h-full grid grid-cols-1 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] ${columnGap} items-stretch relative z-10 ${contentPad} overflow-hidden`}
+          className={`w-full h-full grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] ${columnGap} items-stretch relative z-10 ${contentPad} overflow-hidden`}
         >
           <div className={`flex flex-col justify-center min-h-0 ${isDense ? 'gap-3' : 'gap-4'} py-1`}>
             {renderBlockList(titleBlocks, 't-')}
             <div style={{ opacity: bodyOpacity }}>{columnStack(bodyBlocks, 'content-')}</div>
           </div>
           <div
-            className={`min-h-56 flex items-center justify-center overflow-hidden ${borderSubtle} shadow-sm`}
+            className={`${bleedMediaClass} ${borderSubtle} shadow-sm`}
             style={{ borderRadius: radius, background: surface }}
           >
             {mediaBlocks.length > 0 ? (
-              <div className="w-full h-full [&_img]:object-cover [&_img]:h-full [&_img]:w-full">
-                {renderBlockList(mediaBlocks, 'm-')}
-              </div>
+              <div className="w-full h-full">{renderBlockList(mediaBlocks, 'm-')}</div>
             ) : (
               <div className="text-slate-400 text-sm font-medium tracking-wide uppercase">Visual</div>
             )}
@@ -418,7 +462,7 @@ export function LayoutCompiler({
         <div className={`w-full h-full flex flex-col ${contentPad} ${verticalGap} relative z-10 overflow-hidden`}>
           {titleBlocks.length > 0 && <div className="shrink-0 max-w-4xl">{renderBlockList(titleBlocks, 't-')}</div>}
           <div
-            className="flex-1 grid grid-cols-2 lg:grid-cols-3 grid-rows-2 gap-3 min-h-0"
+            className="flex-1 grid grid-cols-3 grid-rows-2 gap-3 min-h-0"
             style={{ opacity: bodyOpacity }}
           >
             {items.map((block, index) => {

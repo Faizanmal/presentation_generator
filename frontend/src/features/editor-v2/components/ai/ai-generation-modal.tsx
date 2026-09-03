@@ -13,7 +13,6 @@ import {
   Palette,
   CheckCircle2,
   AlertTriangle,
-  X,
   Brain,
   Wand2,
   RefreshCw,
@@ -28,17 +27,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
-  scaleInVariants,
   staggerContainer,
   staggerChild,
-  motionTiming,
   motionEase,
   aiPulse,
   aiStreamReveal,
-  springSnappy,
   buttonPress,
 } from "../../lib/motion";
-import { AI_PHASE_LABELS, AI_PHASE_ICONS } from "../../constants/editor";
+import { AI_PHASE_LABELS } from "../../constants/editor";
 import type { AIGenerationPhase, AIGenerationState, AISuggestion } from "../../types";
 
 interface AIGenerationModalProps {

@@ -57,7 +57,7 @@ export default function AdminPage() {
         };
 
         fetchData();
-    }, [initialized, isAuthenticated, user, page, search]);
+    }, [initialized, isAuthenticated, user, page, search, router]);
 
     const handleImpersonate = async (targetUserId: string) => {
         try {
