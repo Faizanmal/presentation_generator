@@ -71,6 +71,14 @@ interface ExportResult {
   data: string | Buffer;
 }
 
+function asString(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  return '';
+}
+
 interface PptxSlideElement {
   elementType: string;
   text?: string | Record<string, unknown>[];
@@ -669,8 +677,12 @@ export class ExportService {
 
             case 'IMAGE':
             case 'image': {
-              const imageContent = (block.content || {}) as Record<string, unknown>;
-              const imageUrl = String(imageContent.url || imageContent.src || '');
+              const imageContent = (block.content || {}) as Record<
+                string,
+                unknown
+              >;
+              const imageUrl =
+                asString(imageContent.url) || asString(imageContent.src);
               if (/^https?:\/\//i.test(imageUrl) && yOffset > 180) {
                 try {
                   const resp = await axios.get<ArrayBuffer>(imageUrl, {
@@ -860,11 +872,8 @@ export class ExportService {
         .map((item) =>
           typeof item === 'string'
             ? item
-            : String(
-                (item as Record<string, unknown>)?.text ||
-                  (item as Record<string, unknown>)?.value ||
-                  '',
-              ),
+            : asString((item as Record<string, unknown>)?.text) ||
+              asString((item as Record<string, unknown>)?.value),
         )
         .filter(Boolean)
         .join('\n');
@@ -880,8 +889,8 @@ export class ExportService {
       return content.stats.map((item) => {
         const stat = item as Record<string, unknown>;
         return {
-          value: String(stat.value || item || ''),
-          label: String(stat.label || ''),
+          value: asString(stat.value) || asString(item),
+          label: asString(stat.label),
         };
       });
     }
@@ -893,8 +902,8 @@ export class ExportService {
         }
         const rec = item as Record<string, unknown>;
         return {
-          value: String(rec.value || rec.text || ''),
-          label: String(rec.label || ''),
+          value: asString(rec.value) || asString(rec.text),
+          label: asString(rec.label),
         };
       });
     }
@@ -942,8 +951,8 @@ export class ExportService {
   }
 
   private isKickerBlock(block: ExportBlock): boolean {
-    const style = (block.style || {}) as Record<string, unknown>;
-    return String(style.variant || '') === 'kicker';
+    const style = block.style || {};
+    return asString(style.variant) === 'kicker';
   }
 
   private isVisualBlock(block: ExportBlock): boolean {
@@ -1067,7 +1076,8 @@ export class ExportService {
 
     if (splitHero && images[0]) {
       const imageContent = images[0].content as Record<string, unknown>;
-      const imageUrl = String(imageContent?.url || imageContent?.src || '');
+      const imageUrl =
+        asString(imageContent?.url) || asString(imageContent?.src);
       const imgX = imageLeft ? 0 : 6.67;
       const textX = imageLeft ? 7.05 : 0.45;
       await this.addPptxImage(pptx, pptxSlide, imageUrl, imgX, 0, 6.67, 7.5);
@@ -1075,8 +1085,16 @@ export class ExportService {
       return;
     }
 
-    if (layout === 'stats-grid' || visualBlocks.some((b) => /STATS|STATISTIC/.test(this.blockTypeName(b)))) {
-      const afterCopy = renderCopyColumn(copyBlocks.slice(0, 2), 0.55, 0.45, 12.2);
+    if (
+      layout === 'stats-grid' ||
+      visualBlocks.some((b) => /STATS|STATISTIC/.test(this.blockTypeName(b)))
+    ) {
+      const afterCopy = renderCopyColumn(
+        copyBlocks.slice(0, 2),
+        0.55,
+        0.45,
+        12.2,
+      );
       let y = Math.max(afterCopy, 1.7);
       for (const block of visualBlocks) {
         renderTiles(this.getVisualTiles(block), 0.55, y, 12.2, 4);
@@ -1085,15 +1103,31 @@ export class ExportService {
       return;
     }
 
-    if (layout === 'timeline' || visualBlocks.some((b) => this.blockTypeName(b) === 'TIMELINE')) {
-      const afterCopy = renderCopyColumn(copyBlocks.slice(0, 2), 0.55, 0.4, 12.2);
+    if (
+      layout === 'timeline' ||
+      visualBlocks.some((b) => this.blockTypeName(b) === 'TIMELINE')
+    ) {
+      const afterCopy = renderCopyColumn(
+        copyBlocks.slice(0, 2),
+        0.55,
+        0.4,
+        12.2,
+      );
       let y = Math.max(afterCopy, 1.55);
       for (const block of visualBlocks) {
         const tiles = this.getVisualTiles(block);
         const cols = Math.min(Math.max(tiles.length, 1), 4);
         const colW = 12.2 / cols;
         tiles.forEach((tile, i) => {
-          addText(String(i + 1).padStart(2, '0'), 0.55 + i * colW, y, colW - 0.2, 0.35, 11, true);
+          addText(
+            String(i + 1).padStart(2, '0'),
+            0.55 + i * colW,
+            y,
+            colW - 0.2,
+            0.35,
+            11,
+            true,
+          );
           addText(
             `${tile.value}${tile.label ? `\n${tile.label}` : ''}`,
             0.55 + i * colW,
@@ -1108,8 +1142,16 @@ export class ExportService {
       return;
     }
 
-    if (layout === 'comparison' || visualBlocks.some((b) => this.blockTypeName(b) === 'COMPARISON')) {
-      const afterCopy = renderCopyColumn(copyBlocks.slice(0, 2), 0.55, 0.4, 12.2);
+    if (
+      layout === 'comparison' ||
+      visualBlocks.some((b) => this.blockTypeName(b) === 'COMPARISON')
+    ) {
+      const afterCopy = renderCopyColumn(
+        copyBlocks.slice(0, 2),
+        0.55,
+        0.4,
+        12.2,
+      );
       let y = Math.max(afterCopy, 1.55);
       for (const block of visualBlocks) {
         const tiles = this.getVisualTiles(block);
@@ -1142,13 +1184,22 @@ export class ExportService {
             !this.isKickerBlock(block),
         );
       if (heading) {
-        addText(this.getBlockTextContent(heading), 1.2, 1.1, 10.9, 1.1, 22, true);
+        addText(
+          this.getBlockTextContent(heading),
+          1.2,
+          1.1,
+          10.9,
+          1.1,
+          22,
+          true,
+        );
       }
       if (quote) {
         addText(this.getBlockTextContent(quote), 1.4, 2.5, 10.5, 2.4, 26, true);
       }
       const rest = copyBlocks.filter(
-        (block) => block !== heading && block !== quote && !this.isKickerBlock(block),
+        (block) =>
+          block !== heading && block !== quote && !this.isKickerBlock(block),
       );
       renderCopyColumn(rest.slice(0, 3), 1.4, 5.1, 10.5);
       if (visualBlocks[0]) {
@@ -1158,11 +1209,13 @@ export class ExportService {
     }
 
     if (layout === 'bento-grid') {
-      const afterCopy = renderCopyColumn(copyBlocks.slice(0, 2), 0.55, 0.35, 12.2);
-      const cards = [
-        ...visualBlocks,
-        ...copyBlocks.slice(2),
-      ];
+      const afterCopy = renderCopyColumn(
+        copyBlocks.slice(0, 2),
+        0.55,
+        0.35,
+        12.2,
+      );
+      const cards = [...visualBlocks, ...copyBlocks.slice(2)];
       const cols = Math.min(Math.max(cards.length, 1), 3);
       const colW = 12.2 / cols;
       const y = Math.min(Math.max(afterCopy, 1.55), 4.2);
@@ -1171,7 +1224,10 @@ export class ExportService {
         const row = Math.floor(i / cols);
         const text = this.isVisualBlock(block)
           ? this.getVisualTiles(block)
-              .map((tile) => `${tile.value}${tile.label ? ` — ${tile.label}` : ''}`)
+              .map(
+                (tile) =>
+                  `${tile.value}${tile.label ? ` — ${tile.label}` : ''}`,
+              )
               .join('\n')
           : this.getBlockTextContent(block);
         addText(text, 0.55 + col * colW, y + row * 2.15, colW - 0.25, 2.0, 14);
@@ -1189,8 +1245,17 @@ export class ExportService {
       if (this.isImageBlock(block)) {
         if (yPosition > 4.1) continue;
         const imageContent = block.content as Record<string, unknown>;
-        const imageUrl = String(imageContent?.url || imageContent?.src || '');
-        await this.addPptxImage(pptx, pptxSlide, imageUrl, 0.55, yPosition, 12.2, 2.55);
+        const imageUrl =
+          asString(imageContent?.url) || asString(imageContent?.src);
+        await this.addPptxImage(
+          pptx,
+          pptxSlide,
+          imageUrl,
+          0.55,
+          yPosition,
+          12.2,
+          2.55,
+        );
         yPosition += 2.75;
         continue;
       }
@@ -1253,10 +1318,11 @@ export class ExportService {
     const headingFont = theme.fonts?.heading || 'Calibri';
     const bodyFont = theme.fonts?.body || 'Calibri';
     const textColor = (themeColors.text || '#000000').replace('#', '');
-    const headingColor = (themeColors.primary || themeColors.text || '#111827').replace(
-      '#',
-      '',
-    );
+    const headingColor = (
+      themeColors.primary ||
+      themeColors.text ||
+      '#111827'
+    ).replace('#', '');
     const PX_TO_IN = 13.333 / 1280;
 
     for (const slide of project.slides || []) {
@@ -1324,7 +1390,10 @@ export class ExportService {
           ) {
             const imageContent = block.content as Record<string, unknown>;
             const imageUrl = imageContent?.url || imageContent?.src;
-            if (typeof imageUrl === 'string' && /^(https?:\/\/|data:image\/)/i.test(imageUrl)) {
+            if (
+              typeof imageUrl === 'string' &&
+              /^(https?:\/\/|data:image\/)/i.test(imageUrl)
+            ) {
               try {
                 const resp = await axios.get(imageUrl, {
                   responseType: 'arraybuffer',
@@ -1859,7 +1928,10 @@ export class ExportService {
     theme: ExportTheme,
   ): string {
     if (element.elementType === 'image') {
-      const imageOpts = (element.options || {}) as Record<string, number | string>;
+      const imageOpts = (element.options || {}) as Record<
+        string,
+        number | string
+      >;
       const x = Math.round(((imageOpts.x as number) || 0.5) * 914400);
       const y = Math.round(((imageOpts.y as number) || 0.5) * 914400);
       const w = Math.round(((imageOpts.w as number) || 6) * 914400);
@@ -1911,7 +1983,8 @@ export class ExportService {
     const w = Math.round(((opts.w as number) || 9) * 914400);
     const h = Math.round(((opts.h as number) || 1) * 914400);
     const fontSize = ((opts.fontSize as number) || 18) * 100;
-    const fontFace = (opts.fontFace as string) || theme.fonts?.body || 'Calibri';
+    const fontFace =
+      (opts.fontFace as string) || theme.fonts?.body || 'Calibri';
     const color =
       (opts.color as string) ||
       (theme.colors?.text || '#1e293b').replace('#', '');

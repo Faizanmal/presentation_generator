@@ -16,9 +16,7 @@ import type { EnhancedPresentation } from './thinking-agent/thinking-agent.types
 describe('Gamma-quality generation guards', () => {
   it('rejects hardcoded filler callouts', () => {
     expect(
-      isBannedFiller(
-        'Why this matters now: clear outcome and audience value.',
-      ),
+      isBannedFiller('Why this matters now: clear outcome and audience value.'),
     ).toBe(true);
     expect(
       isBannedFiller(
@@ -32,14 +30,15 @@ describe('Gamma-quality generation guards', () => {
     expect(looksLikeMockStatistic('$1.2B Market Size')).toBe(true);
     expect(looksLikeMockStatistic('2.5M Active Users')).toBe(true);
     expect(looksLikeMockStatistic('15% Annual Growth Rate')).toBe(true);
-    expect(looksLikeMockStatistic("Amazon's engine drives 35% of revenue")).toBe(
-      false,
-    );
+    expect(
+      looksLikeMockStatistic("Amazon's engine drives 35% of revenue"),
+    ).toBe(false);
   });
 
   it('seeds a Gamma-like deck arc with native layouts', () => {
-    const layouts = Array.from({ length: 10 }, (_, i) =>
-      recipeForSlideIndex(i, 10).layout,
+    const layouts = Array.from(
+      { length: 10 },
+      (_, i) => recipeForSlideIndex(i, 10).layout,
     );
     expect(layouts[0]).toBe('title-hero');
     expect(layouts).toEqual(expect.arrayContaining(['stats-grid']));
@@ -66,13 +65,15 @@ describe('Gamma-quality generation guards', () => {
       type: 'statistic',
       content: '35%',
       value: '35%',
-      label: "Amazon recommendation share of revenue",
+      label: 'Amazon recommendation share of revenue',
     });
 
     expect(comparison?.blockType).toBe(BlockType.COMPARISON);
     expect(timeline?.blockType).toBe(BlockType.TIMELINE);
     expect(stat?.blockType).toBe(BlockType.STATS_GRID);
-    expect(mapGeneratedBlock({ type: 'paragraph', content: '$1.2B Market Size' })).toBeNull();
+    expect(
+      mapGeneratedBlock({ type: 'paragraph', content: '$1.2B Market Size' }),
+    ).toBeNull();
     expect(
       mapGeneratedBlock({
         type: 'kicker',
@@ -89,28 +90,27 @@ describe('Gamma-quality generation guards', () => {
     expect(
       mapGeneratedBlock({
         type: 'callout',
-        content: 'Key takeaway: focus on one decisive insight before moving on.',
+        content:
+          'Key takeaway: focus on one decisive insight before moving on.',
       }),
     ).toBeNull();
   });
 
   it('merges consecutive statistic tiles into one stats grid', () => {
-    const merged = mergeConsecutiveLists(
-      [
-        mapGeneratedBlock({
-          type: 'statistic',
-          content: '95%+',
-          value: '95%+',
-          label: 'Detection accuracy',
-        })!,
-        mapGeneratedBlock({
-          type: 'statistic',
-          content: '35%',
-          value: '35%',
-          label: 'Revenue share',
-        })!,
-      ],
-    );
+    const merged = mergeConsecutiveLists([
+      mapGeneratedBlock({
+        type: 'statistic',
+        content: '95%+',
+        value: '95%+',
+        label: 'Detection accuracy',
+      })!,
+      mapGeneratedBlock({
+        type: 'statistic',
+        content: '35%',
+        value: '35%',
+        label: 'Revenue share',
+      })!,
+    ]);
     expect(merged).toHaveLength(1);
     expect(merged[0].blockType).toBe(BlockType.STATS_GRID);
     expect((merged[0].content.items as string[]).length).toBe(2);
@@ -142,12 +142,13 @@ describe('Gamma-quality generation guards', () => {
     expect(types).toContain(BlockType.STATS_GRID);
     expect(types).toContain(BlockType.TIMELINE);
     expect(types).not.toContain(BlockType.PARAGRAPH);
+    expect(JSON.stringify(blocks)).not.toMatch(/\$1\.2B/);
     expect(
-      JSON.stringify(blocks),
-    ).not.toMatch(/\$1\.2B/);
-    expect(blocks.some((block) => String(block.content.url || '').includes('picsum'))).toBe(
-      true,
-    );
+      blocks.some((block) => {
+        const url = block.content.url;
+        return typeof url === 'string' && url.includes('picsum');
+      }),
+    ).toBe(true);
   });
 
   it('critic flags filler, mock stats, and slides with no visual block', () => {

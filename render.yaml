@@ -1,7 +1,10 @@
-# Render Blueprint — backend + Postgres + Redis (Free tier)
+# Render Blueprint — backend + Redis (Free tier)
 # Docs: https://render.com/docs/blueprint-spec
 #
-# After deploy: set FRONTEND_URL to your Vercel URL in the dashboard.
+# Postgres lives on Neon (not Render). After deploy, set in the dashboard:
+#   DATABASE_URL          Neon pooled URL (hostname contains -pooler)
+#   DIRECT_DATABASE_URL   Neon direct URL (no -pooler; used by prisma migrate)
+#   FRONTEND_URL          your Vercel origin
 # Env templates: backend-nest/.env.example (this service). Frontend: frontend/.env.example (Vercel).
 # Free web services sleep after 15 min idle — use GitHub keep-alive workflow.
 
@@ -12,7 +15,9 @@ services:
     plan: free
     rootDir: backend-nest
     buildCommand: npm ci --include=dev && npx prisma generate && npm run build
-    startCommand: npx prisma migrate resolve --applied "20260805180000_apply_pending_sql" || true && npx prisma migrate deploy && npm run start:prod
+    # Do not `migrate resolve --applied` here. That marked 20260805180000 as
+    # applied without running it, so production never got projects.dslDocument.
+    startCommand: npx prisma migrate deploy && npm run start:prod
     healthCheckPath: /health/liveness
     envVars:
       - key: NODE_ENV
@@ -36,14 +41,13 @@ services:
         value: "false"
       - key: CLUSTER_REDIS_ENABLED
         value: "false"
+      # Neon free: keep the app pool small so the compute is not exhausted
+      - key: DB_POOL_MAX
+        value: "5"
       - key: DATABASE_URL
-        fromDatabase:
-          name: presentation-designer-db
-          property: connectionString
+        sync: false
       - key: DIRECT_DATABASE_URL
-        fromDatabase:
-          name: presentation-designer-db
-          property: connectionString
+        sync: false
       - key: REDIS_URL
         fromService:
           name: presentation-designer-redis
@@ -90,9 +94,3 @@ services:
     # mid-job and queued work disappears silently.
     maxmemoryPolicy: noeviction
     ipAllowList: []
-
-databases:
-  - name: presentation-designer-db
-    plan: free
-    databaseName: presentation_designer
-    user: presentation_designer

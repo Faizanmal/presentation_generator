@@ -74,7 +74,10 @@ export class ThinkingProjectService {
         const generatedTheme = await tx.theme.create({
           data: {
             name: 'Editorial generated',
-            description: `Thinking theme for ${presentation.title}`.slice(0, 180),
+            description: `Thinking theme for ${presentation.title}`.slice(
+              0,
+              180,
+            ),
             userId,
             isDefault: false,
             colors: {
@@ -85,12 +88,12 @@ export class ThinkingProjectService {
               surface: '#F0F9FF',
               text: '#1F2937',
               textMuted: '#64748B',
-            } as Prisma.InputJsonValue,
+            },
             fonts: {
               heading: 'Source Serif 4',
               body: 'Source Sans 3',
-            } as Prisma.InputJsonValue,
-            spacing: { base: 8, scale: 1.25 } as Prisma.InputJsonValue,
+            },
+            spacing: { base: 8, scale: 1.25 },
           },
         });
         themeId = generatedTheme.id;
@@ -187,8 +190,9 @@ export class ThinkingProjectService {
                   ? dslBlock.content.url
                   : undefined,
             },
-            String((dslBlock.style as Record<string, unknown> | undefined)?.variant) ===
-              'kicker'
+            String(
+              (dslBlock.style as Record<string, unknown> | undefined)?.variant,
+            ) === 'kicker'
               ? { variant: 'kicker' }
               : undefined,
           );
@@ -212,7 +216,8 @@ export class ThinkingProjectService {
             data: {
               projectId: project.id,
               slideId: slide.id,
-              blockType: mapped?.blockType || this.mapToBlockType(dslBlock.kind),
+              blockType:
+                mapped?.blockType || this.mapToBlockType(dslBlock.kind),
               content: {
                 ...(mapped?.content || dslBlock.content || {}),
                 ...(isGeneratedImage ? { status: 'generating' } : {}),

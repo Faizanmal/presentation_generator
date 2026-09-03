@@ -47,6 +47,14 @@ interface WysiwygProject {
   theme: WysiwygTheme | null;
 }
 
+function asString(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  return '';
+}
+
 @Injectable()
 export class WysiwygExportService {
   private readonly logger = new Logger(WysiwygExportService.name);
@@ -69,7 +77,9 @@ export class WysiwygExportService {
 
     const slidesHtml = (project.slides || [])
       .sort((a, b) => a.order - b.order)
-      .map((slide, index) => this.renderSlideHtml(slide, theme, index, imageMap))
+      .map((slide, index) =>
+        this.renderSlideHtml(slide, theme, index, imageMap),
+      )
       .join('\n');
 
     return this.wrapInFullDocument(project.title, theme, slidesHtml);
@@ -121,12 +131,14 @@ export class WysiwygExportService {
     return project as unknown as WysiwygProject;
   }
 
-  private async prefetchImages(slides: WysiwygSlide[]): Promise<Map<string, string>> {
+  private async prefetchImages(
+    slides: WysiwygSlide[],
+  ): Promise<Map<string, string>> {
     const urls = new Set<string>();
     for (const slide of slides) {
       for (const block of slide.blocks || []) {
         const content = block.content || {};
-        const url = String(content.url || content.src || '');
+        const url = asString(content.url) || asString(content.src);
         if (/^https?:\/\//i.test(url)) urls.add(url);
       }
     }
@@ -190,7 +202,12 @@ export class WysiwygExportService {
     imageMap: Map<string, string> = new Map(),
   ): string {
     const blocks = (slide.blocks || []).sort((a, b) => a.order - b.order);
-    const blocksHtml = this.renderLayoutBlocks(blocks, theme, slide.layout, imageMap);
+    const blocksHtml = this.renderLayoutBlocks(
+      blocks,
+      theme,
+      slide.layout,
+      imageMap,
+    );
 
     const bgColor = slide.background || theme.colors.background;
 
@@ -357,8 +374,7 @@ export class WysiwygExportService {
                 : typeof item === 'string'
                   ? item
                   : '';
-            const labelText =
-              typeof stat.label === 'string' ? stat.label : '';
+            const labelText = typeof stat.label === 'string' ? stat.label : '';
             return `<div class="stat-item">
                 <div class="stat-value" style="color: ${theme.colors.accent};">${this.escapeHtml(valueText)}</div>
                 <div class="stat-label" style="color: ${theme.colors.textMuted};">${this.escapeHtml(labelText)}</div>
@@ -373,7 +389,7 @@ export class WysiwygExportService {
         const cards = items
           .map(
             (item: unknown) =>
-              `<div class="comparison-card">${this.escapeHtml(typeof item === 'string' ? item : String((item as Record<string, unknown>)?.text || ''))}</div>`,
+              `<div class="comparison-card">${this.escapeHtml(typeof item === 'string' ? item : asString((item as Record<string, unknown>)?.text))}</div>`,
           )
           .join('');
         return `<div class="block block-comparison" style="${customStyle}">${cards}</div>`;
@@ -384,7 +400,7 @@ export class WysiwygExportService {
         const steps = items
           .map(
             (item: unknown, i: number) =>
-              `<div class="timeline-step"><span class="timeline-index">${i + 1}</span><p>${this.escapeHtml(typeof item === 'string' ? item : String((item as Record<string, unknown>)?.text || ''))}</p></div>`,
+              `<div class="timeline-step"><span class="timeline-index">${i + 1}</span><p>${this.escapeHtml(typeof item === 'string' ? item : asString((item as Record<string, unknown>)?.text))}</p></div>`,
           )
           .join('');
         return `<div class="block block-timeline" style="${customStyle}">${steps}</div>`;

@@ -77,7 +77,9 @@ export function mapGeneratedBlock(
     return {
       blockType: BlockType.STATS_GRID,
       content: {
-        items: structured.map((s) => `${s.value}${s.label ? ` ${s.label}` : ''}`),
+        items: structured.map(
+          (s) => `${s.value}${s.label ? ` ${s.label}` : ''}`,
+        ),
         stats: structured,
       },
       style: { variant: 'data-emphasis' },

@@ -99,10 +99,7 @@ export const DEFAULT_DECK_ARC: SlideRecipeId[] = [
   'cta-grid',
 ];
 
-export function recipeForSlideIndex(
-  index: number,
-  total: number,
-): SlideRecipe {
+export function recipeForSlideIndex(index: number, total: number): SlideRecipe {
   if (index === 0) {
     return SLIDE_RECIPES['title-hero'];
   }
@@ -119,8 +116,8 @@ export function recipeForSlideIndex(
 export const BANNED_FILLER_PHRASES = [
   'why this matters now: clear outcome and audience value',
   'key takeaway: focus on one decisive insight before moving on',
-  'in today\'s world',
-  'it\'s important to note',
+  "in today's world",
+  "it's important to note",
   'unlock potential',
   'innovative solutions',
   'leverage synergies',

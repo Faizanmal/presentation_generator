@@ -1305,7 +1305,9 @@ Slide 1 must be title-hero. Include at least one comparison, one timeline, and o
     return {
       ...presentation,
       sections:
-        targetLength > 0 ? sections.slice(0, Math.max(targetLength, 3)) : sections,
+        targetLength > 0
+          ? sections.slice(0, Math.max(targetLength, 3))
+          : sections,
     };
   }
 
@@ -1974,7 +1976,8 @@ Return as JSON: { "prompts": ["Prompt 1", "Prompt 2", ...] }`,
               referenceImageUrl,
             );
           case 'gemini':
-            if (!this.getConfiguredKey('GOOGLE_GENERATIVE_AI_API_KEY')) continue;
+            if (!this.getConfiguredKey('GOOGLE_GENERATIVE_AI_API_KEY'))
+              continue;
             return await this.generateImageGemini(prompt, size);
           case 'stability':
             if (!this.getConfiguredKey('STABILITY_API_KEY')) continue;
@@ -2070,10 +2073,12 @@ Return as JSON: { "prompts": ["Prompt 1", "Prompt 2", ...] }`,
     const candidates = rec.candidates;
     if (Array.isArray(candidates) && candidates[0]) {
       const parts =
-        ((candidates[0] as Record<string, unknown>).content as Record<
-          string,
-          unknown
-        >)?.parts || [];
+        (
+          (candidates[0] as Record<string, unknown>).content as Record<
+            string,
+            unknown
+          >
+        )?.parts || [];
       if (Array.isArray(parts)) {
         for (const part of parts) {
           const inline = (part as Record<string, unknown>).inlineData as
@@ -2142,7 +2147,9 @@ Return as JSON: { "prompts": ["Prompt 1", "Prompt 2", ...] }`,
           { headers, timeout: 90_000 },
         );
         if (response.status !== 200) {
-          throw new Error(`NVIDIA Kontext failed with status ${response.status}`);
+          throw new Error(
+            `NVIDIA Kontext failed with status ${response.status}`,
+          );
         }
         return {
           imageUrl: this.extractGeneratedImageUrl(response.data),
@@ -2500,9 +2507,7 @@ Return as JSON: { "prompts": ["Prompt 1", "Prompt 2", ...] }`,
               ? `${prompt}. Art style requirements: ${styleSeed}. Do not include text. Maintain consistent lighting.`
               : prompt;
 
-            const preferredProvider = referenceImageUrl
-              ? 'nvidia'
-              : undefined;
+            const preferredProvider = referenceImageUrl ? 'nvidia' : undefined;
             const result = await this.generateImage(
               finalPrompt,
               'vivid',
@@ -2641,7 +2646,10 @@ Return as JSON: { "notes": ["Note for slide 1", "Note for slide 2", ...] }`,
       return 'timeline';
     if (hasComparison || content.some((b) => b.type === 'comparison'))
       return 'comparison';
-    if (hasStats && (bulletCount >= 3 || content.some((b) => b.type === 'statistic')))
+    if (
+      hasStats &&
+      (bulletCount >= 3 || content.some((b) => b.type === 'statistic'))
+    )
       return 'stats-grid';
     if (hasQuote && !hasImage) return 'quote-highlight';
     if (hasImage && bulletCount > 3) return 'image-left';
@@ -3164,7 +3172,7 @@ Use the advanced presentation JSON format with layouts and image suggestions.`,
    * Generate stock images using Unsplash Source API (high-quality, free).
    * Falls back to Picsum Photos if Unsplash is unavailable.
    */
-  async generateStockImages(
+  generateStockImages(
     // Similar to the method above, we only care about the suggestedImage value
     // so we allow the broader union.  We also optionally accept a `heading`
     // property used when falling back to Picsum seed generation.
@@ -3174,7 +3182,6 @@ Use the advanced presentation JSON format with layouts and image suggestions.`,
     }[],
   ): Promise<Map<number, ImageGenerationResult>> {
     const imageMap = new Map<number, ImageGenerationResult>();
-    const CONCURRENCY = 3;
 
     // local helper for converting the union to a plain prompt string
     const promptFromSuggestion = (
@@ -3188,42 +3195,38 @@ Use the advanced presentation JSON format with layouts and image suggestions.`,
       .map((section, index) => ({ section, index }))
       .filter(({ section }) => section.suggestedImage);
 
-    // Process in batches to avoid overwhelming the API
-    for (let i = 0; i < sectionsWithImages.length; i += CONCURRENCY) {
-      const batch = sectionsWithImages.slice(i, i + CONCURRENCY);
-      const batchPromises = batch.map(async ({ section, index }) => {
-        try {
-          const description = promptFromSuggestion(section.suggestedImage);
-          const seed = (section.heading || description || `section-${index}`)
+    for (const { section, index } of sectionsWithImages) {
+      try {
+        const description = promptFromSuggestion(section.suggestedImage);
+        const seed =
+          (section.heading || description || `section-${index}`)
             .replace(/[^a-zA-Z0-9]/g, '')
             .substring(0, 24) || `slide${index}`;
-          const imageUrl = `https://picsum.photos/seed/${seed}/1600/900`;
-          imageMap.set(index, {
-            imageUrl,
-            revisedPrompt: description || section.heading || `slide ${index}`,
-            provider: 'pollinations',
-          });
-        } catch (error) {
-          this.logger.warn(
-            `Failed to get stock image for section ${index}`,
-            error,
-          );
-          // Fallback: Picsum with seed for consistency
-          const seed = (section.heading || `section-${index}`)
-            .replace(/[^a-zA-Z0-9]/g, '')
-            .substring(0, 20);
-          imageMap.set(index, {
-            imageUrl: `https://picsum.photos/seed/${seed}/1600/900`,
-            revisedPrompt: section.suggestedImage
-              ? promptFromSuggestion(section.suggestedImage)
-              : section.heading || '',
-          });
-        }
-      });
-      await Promise.allSettled(batchPromises);
+        const imageUrl = `https://picsum.photos/seed/${seed}/1600/900`;
+        imageMap.set(index, {
+          imageUrl,
+          revisedPrompt: description || section.heading || `slide ${index}`,
+          provider: 'pollinations',
+        });
+      } catch (error) {
+        this.logger.warn(
+          `Failed to get stock image for section ${index}`,
+          error,
+        );
+        // Fallback: Picsum with seed for consistency
+        const seed = (section.heading || `section-${index}`)
+          .replace(/[^a-zA-Z0-9]/g, '')
+          .substring(0, 20);
+        imageMap.set(index, {
+          imageUrl: `https://picsum.photos/seed/${seed}/1600/900`,
+          revisedPrompt: section.suggestedImage
+            ? promptFromSuggestion(section.suggestedImage)
+            : section.heading || '',
+        });
+      }
     }
 
-    return imageMap;
+    return Promise.resolve(imageMap);
   }
 
   /**

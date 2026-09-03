@@ -972,9 +972,9 @@ export class AuthService {
     }
 
     try {
-      const decoded = this.jwtService.verify<JwtPayload & { iat?: number; exp?: number }>(
-        token,
-      );
+      const decoded = this.jwtService.verify<
+        JwtPayload & { iat?: number; exp?: number }
+      >(token);
       const lifetime =
         decoded.exp !== undefined && decoded.iat !== undefined
           ? decoded.exp - decoded.iat

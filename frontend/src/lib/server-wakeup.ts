@@ -42,7 +42,7 @@ const listeners = new Set<WakeListener>();
 function emit() {
   const message =
     status === 'waking'
-      ? 'Server is waking up — free hosting can take up to a minute…'
+      ? 'Connecting to the server…'
       : status === 'failed'
         ? 'Could not reach the server. Please try again.'
         : status === 'ready'

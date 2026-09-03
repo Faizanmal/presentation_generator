@@ -97,7 +97,7 @@ export function TimelineBlock({ content, theme, onChange, isEditing = false }: T
           
           return (
             <motion.div 
-              key={`${item.id}-${index}`}
+              key={item.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.15, type: 'spring' }}

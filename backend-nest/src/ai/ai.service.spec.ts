@@ -408,16 +408,18 @@ describe('AIService', () => {
         if (key === 'OPENAI_API_KEY') return 'test-api-key';
         return '';
       });
-      jest.spyOn(service, 'generateImageNvidia').mockResolvedValue({
-        imageUrl: 'data:image/png;base64,abc123',
-        revisedPrompt: 'A city skyline',
-        provider: 'nvidia',
-      });
+      const generateImageNvidia = jest
+        .spyOn(service, 'generateImageNvidia')
+        .mockResolvedValue({
+          imageUrl: 'data:image/png;base64,abc123',
+          revisedPrompt: 'A city skyline',
+          provider: 'nvidia',
+        });
 
       const result = await service.generateImage('A city skyline');
 
       expect(result.provider).toBe('nvidia');
-      expect(service.generateImageNvidia).toHaveBeenCalled();
+      expect(generateImageNvidia).toHaveBeenCalled();
     });
 
     it('uses NVIDIA Kontext-dev when a reference image is provided', async () => {

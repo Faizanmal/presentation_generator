@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Head, UseGuards } from '@nestjs/common';
 import { HealthService } from './health.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PerformanceMonitoringService } from '../common/monitoring/performance-monitoring.service';
@@ -16,6 +16,7 @@ export class HealthController {
   }
 
   @Get('liveness')
+  @Head('liveness')
   liveness() {
     return { status: 'ok', timestamp: new Date().toISOString() };
   }

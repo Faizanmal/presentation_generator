@@ -51,13 +51,13 @@ export function ColdStartProvider({ children }: { children: React.ReactNode }) {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                  {status === 'failed' ? 'Server unavailable' : 'Waking up the server'}
+                  {status === 'failed' ? 'Server unavailable' : 'Connecting to the server'}
                 </p>
                 <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
                   {message ||
                     (status === 'failed'
-                      ? 'Could not reach the API. Free hosting may still be starting.'
-                      : 'Free hosting sleeps when idle — this usually takes under a minute.')}
+                      ? 'Could not reach the API. Please try again.'
+                      : 'Please wait while we connect…')}
                 </p>
                 {status === 'waking' && (
                   <div className="mt-3">

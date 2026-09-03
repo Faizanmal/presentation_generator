@@ -678,7 +678,7 @@ const BlockRenderer = React.memo(({
         const comparisonItems = ((content?.items as string[]) || [
           "Option A: Fast and simple",
           "Option B: Powerful and flexible",
-        ]).map((text, idx) => ({ id: text || `cmp-${idx}`, text }));
+        ]).map((text, idx) => ({ id: `cmp-${idx}`, text }));
         return (
           <div className="grid grid-cols-2 gap-5">
             {comparisonItems.map((entry, i) => {
@@ -686,7 +686,7 @@ const BlockRenderer = React.memo(({
               const color = colors[i % colors.length];
               return (
                 <div
-                  key={`${entry.id}-${i}`}
+                  key={entry.id}
                   className="p-6 rounded-2xl transition-all duration-300 hover:shadow-xl hover:-translate-y-1 relative overflow-hidden"
                   style={{
                     background: `linear-gradient(135deg, ${colorWithAlpha(color, 0.08)}, ${colorWithAlpha(color, 0.03)})`,
@@ -730,18 +730,19 @@ const BlockRenderer = React.memo(({
       }
 
       case "STATS_GRID": {
-        const rawItems = (content?.stats as Array<{ value?: string; label?: string }>) ||
-          (content?.items as Array<string | { value?: string; label?: string; text?: string }>) ||
+        type StatItem = { value?: string; label?: string; text?: string };
+        const rawItems = (content?.stats as Array<StatItem> | undefined) ||
+          (content?.items as Array<string | StatItem> | undefined) ||
           [];
         const statsItems = (rawItems.length
           ? rawItems
           : ["Named proof point", "Specific outcome", "Measurable change"]
         ).map((item, idx) => {
           if (typeof item === 'string') {
-            return { id: `${item}-${idx}`, value: item, label: '' };
+            return { id: `stat-${idx}`, value: item, label: '' };
           }
           return {
-            id: `${item.value || item.label || item.text || idx}`,
+            id: `stat-${idx}`,
             value: item.value || item.text || '',
             label: item.label || '',
           };
@@ -753,7 +754,7 @@ const BlockRenderer = React.memo(({
               const color = colors[i % colors.length];
               return (
                 <div
-                  key={`${entry.id}-${i}`}
+                  key={entry.id}
                   className="relative p-6 rounded-2xl text-center transition-all duration-300 hover:shadow-xl hover:-translate-y-1 overflow-hidden group/stat"
                   style={{
                     background: `linear-gradient(135deg, ${colorWithAlpha(color, 0.06)}, ${colorWithAlpha(color, 0.02)})`,
@@ -768,7 +769,7 @@ const BlockRenderer = React.memo(({
                     className="text-3xl font-extrabold outline-none relative z-10 tracking-tight"
                     style={{
                       fontFamily: theme?.fonts?.heading || 'var(--font-dm-sans), system-ui, sans-serif',
-                      color: color,
+                      color,
                       lineHeight: 1.1,
                     }}
                   >

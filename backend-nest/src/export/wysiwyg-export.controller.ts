@@ -117,17 +117,19 @@ export class WysiwygExportController {
           timeout: 30_000,
         });
         await page.evaluate(async () => {
-          await (document as Document & { fonts: { ready: Promise<unknown> } }).fonts.ready;
+          await (document as Document & { fonts: { ready: Promise<unknown> } })
+            .fonts.ready;
           const images = Array.from(document.images);
           await Promise.all(
-            images.map(
-              (img) =>
-                img.complete ||
-                new Promise((resolve) => {
-                  img.onload = () => resolve(true);
-                  img.onerror = () => resolve(true);
-                }),
-            ),
+            images
+              .filter((img) => !img.complete)
+              .map(
+                (img) =>
+                  new Promise<void>((resolve) => {
+                    img.onload = () => resolve();
+                    img.onerror = () => resolve();
+                  }),
+              ),
           );
         });
 

@@ -337,14 +337,15 @@ export class ProjectsService {
           surface: themeTokens.softSurface,
           text: themeTokens.bodyColor,
           textMuted: themeTokens.subheadingColor,
-        } as Prisma.InputJsonValue,
+        },
         fonts: {
           heading: themeTokens.headingFont,
           body: themeTokens.bodyFont,
-        } as Prisma.InputJsonValue,
-        spacing:
-          (defaultTheme?.spacing as Prisma.InputJsonValue) ||
-          ({ base: 8, scale: 1.25 } as Prisma.InputJsonValue),
+        },
+        spacing: (defaultTheme?.spacing as Prisma.InputJsonValue) || {
+          base: 8,
+          scale: 1.25,
+        },
       },
     });
 
@@ -372,10 +373,7 @@ export class ProjectsService {
       slideIndex++
     ) {
       const section = content.sections[slideIndex];
-      const recipe = recipeForSlideIndex(
-        slideIndex,
-        content.sections.length,
-      );
+      const recipe = recipeForSlideIndex(slideIndex, content.sections.length);
 
       const slideLayout = this.selectPolishedLayout(
         content.sections,
@@ -427,7 +425,7 @@ export class ProjectsService {
             slideId: slide.id,
             blockType: BlockType.SUBHEADING,
             content: { text: kickerText },
-            style: { variant: 'kicker' } as Prisma.InputJsonValue,
+            style: { variant: 'kicker' },
             order: blockOrder++,
           },
         });
@@ -446,7 +444,10 @@ export class ProjectsService {
           typeof mappedBlock.content?.text === 'string'
             ? mappedBlock.content.text.trim()
             : '';
-        const variant = String(mappedBlock.style?.variant || '');
+        const variant =
+          typeof mappedBlock.style?.variant === 'string'
+            ? mappedBlock.style.variant
+            : '';
         if (
           mappedText &&
           (skipTexts.has(mappedText.toLowerCase()) ||
@@ -530,7 +531,10 @@ export class ProjectsService {
             block.type.toLowerCase(),
           )
         ) {
-          return { ...block, content: block.content.replace(/\s+/g, ' ').trim() };
+          return {
+            ...block,
+            content: block.content.replace(/\s+/g, ' ').trim(),
+          };
         }
         return block;
       });

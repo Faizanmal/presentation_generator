@@ -145,10 +145,10 @@ export function LayoutCompiler({
     return titles.filter((block) => {
       const text = blockPlainText(block);
       const variant = String(block.style?.variant || '');
-      if (variant === 'kicker' && GENERIC_KICKER.test(text)) return false;
+      if (variant === 'kicker' && GENERIC_KICKER.test(text)) {return false;}
       const key = text.toLowerCase();
-      if (key && seen.has(key)) return false;
-      if (key) seen.add(key);
+      if (key && seen.has(key)) {return false;}
+      if (key) {seen.add(key);}
       return true;
     });
   }, [blocks]);
@@ -164,10 +164,10 @@ export function LayoutCompiler({
   const bodyBlocks = useMemo(
     () =>
       blocks.filter((block) => {
-        if (titleBlocks.includes(block) || mediaBlocks.includes(block)) return false;
+        if (titleBlocks.includes(block) || mediaBlocks.includes(block)) {return false;}
         const text = blockPlainText(block);
         const variant = String(block.style?.variant || '');
-        if (variant === 'kicker' && GENERIC_KICKER.test(text)) return false;
+        if (variant === 'kicker' && GENERIC_KICKER.test(text)) {return false;}
         return true;
       }),
     [blocks, titleBlocks, mediaBlocks]

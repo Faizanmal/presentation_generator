@@ -35,7 +35,10 @@ describe('WysiwygExportService visual fidelity', () => {
           {
             blockType: 'IMAGE',
             order: 1,
-            content: { url: 'https://picsum.photos/seed/hero/1600/900', alt: 'Neural net' },
+            content: {
+              url: 'https://picsum.photos/seed/hero/1600/900',
+              alt: 'Neural net',
+            },
             style: {},
           },
         ],
@@ -98,7 +101,9 @@ describe('WysiwygExportService visual fidelity', () => {
     expect(html).toContain('layout-stats-grid');
     expect(html).toContain('layout-timeline');
     expect(html).toContain('<img');
-    expect(html.includes('picsum.photos') || html.includes('data:image')).toBe(true);
+    expect(html.includes('picsum.photos') || html.includes('data:image')).toBe(
+      true,
+    );
     expect(html).toContain('stat-value');
     expect(html).toContain('35%');
     expect(html).toContain('timeline-step');

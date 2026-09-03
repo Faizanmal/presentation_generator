@@ -122,7 +122,7 @@ class ApiClient {
   }
 
   private skipAuthHeader(url?: string) {
-    if (!url) return false;
+    if (!url) {return false;}
     return (
       url.includes('/auth/login') ||
       url.includes('/auth/register') ||
@@ -133,7 +133,7 @@ class ApiClient {
 
   /** Match AuthProvider: don't kick the user off public / auth-only pages. */
   private shouldForceLoginRedirect() {
-    if (typeof window === 'undefined') return false;
+    if (typeof window === 'undefined') {return false;}
     const path = window.location.pathname;
     if (
       path.startsWith('/login') ||
@@ -150,7 +150,7 @@ class ApiClient {
   }
 
   private redirectToLogin() {
-    if (!this.shouldForceLoginRedirect()) return;
+    if (!this.shouldForceLoginRedirect()) {return;}
     const redirect = encodeURIComponent(
       `${window.location.pathname}${window.location.search}`,
     );

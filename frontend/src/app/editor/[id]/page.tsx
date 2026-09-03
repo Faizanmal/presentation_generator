@@ -365,7 +365,7 @@ export default function EditorPage() {
           a.click();
         } else {
           const blobData = typeof data === 'string' ? data : data.blob;
-          const blob = new Blob([blobData], { type: format === "pdf" ? "application/pdf" : "text/html" });
+          const blob = new Blob([blobData], { type: "text/html" });
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.href = url;

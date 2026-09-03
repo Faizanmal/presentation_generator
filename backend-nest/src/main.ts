@@ -1,5 +1,5 @@
 import { NestFactory, Reflector } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
@@ -184,7 +184,14 @@ async function bootstrap() {
   // excluding 'health' alone does not cover its sub-routes, and platform health
   // checks probe /health/liveness directly.
   app.setGlobalPrefix('api', {
-    exclude: ['health', 'health/liveness', 'health/readiness', 'metrics'],
+    exclude: [
+      { path: '/', method: RequestMethod.GET },
+      { path: '/', method: RequestMethod.HEAD },
+      'health',
+      'health/liveness',
+      'health/readiness',
+      'metrics',
+    ],
   });
 
   // ========================================

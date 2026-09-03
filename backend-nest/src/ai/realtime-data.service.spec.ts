@@ -15,7 +15,10 @@ describe('RealTimeDataService', () => {
     }).compile();
 
     const service = module.get(RealTimeDataService);
-    const result = await service.search('artificial intelligence statistics', 4);
+    const result = await service.search(
+      'artificial intelligence statistics',
+      4,
+    );
 
     expect(result.results).toEqual([]);
     expect(JSON.stringify(result)).not.toMatch(/\$1\.2B/);
