@@ -48,6 +48,7 @@ interface ProjectCardProps {
                 secondary?: string;
             };
         } | null;
+        slides?: unknown[];
         _count?: {
             slides: number;
         };
@@ -78,6 +79,10 @@ export const ProjectCard = memo(({
     variant = "grid",
 }: ProjectCardProps) => {
     const [isHovered, setIsHovered] = useState(false);
+    const slidesCount =
+        project.slideCount ??
+        project._count?.slides ??
+        (Array.isArray(project.slides) ? project.slides.length : undefined);
 
     const openProject = () => onOpen?.(project.id);
     const themeColors = project.theme?.colors ?? null;
@@ -143,15 +148,7 @@ export const ProjectCard = memo(({
                             <Clock className="h-3.5 w-3.5" />
                             {formatDate(project.updatedAt)}
                         </span>
-                        {(() => {
-                            const slides =
-                                project.slideCount ??
-                                project._count?.slides ??
-                                (Array.isArray((project as { slides?: unknown[] }).slides)
-                                    ? (project as { slides: unknown[] }).slides.length
-                                    : undefined);
-                            return slides !== undefined ? <span>{slides} slides</span> : null;
-                        })()}
+                        {slidesCount !== undefined ? <span>{slidesCount} slides</span> : null}
                         {project.viewCount !== undefined && project.viewCount > 0 && (
                             <span className="flex items-center gap-1">
                                 <Eye className="h-3.5 w-3.5" />
@@ -396,15 +393,7 @@ export const ProjectCard = memo(({
                             <Clock className="h-3.5 w-3.5" />
                             {formatDate(project.updatedAt)}
                         </span>
-                        {(() => {
-                            const slides =
-                                project.slideCount ??
-                                project._count?.slides ??
-                                (Array.isArray((project as { slides?: unknown[] }).slides)
-                                    ? (project as { slides: unknown[] }).slides.length
-                                    : undefined);
-                            return slides !== undefined ? <span>{slides} slides</span> : null;
-                        })()}
+                        {slidesCount !== undefined ? <span>{slidesCount} slides</span> : null}
                     </div>
 
                     {/* Collaborators */}
