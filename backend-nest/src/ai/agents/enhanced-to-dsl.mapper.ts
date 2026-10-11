@@ -12,7 +12,10 @@ import type {
   SlideBlock,
   NarrativeRole,
 } from '@shared/presentation-dsl';
-import { getBlockFontSize, getSlidePadding } from '@shared/layout-engine';
+import {
+  getBlockFontSize,
+  getSlidePadding,
+} from '../../../../shared/layout-engine';
 import type {
   EnhancedBlock,
   EnhancedPresentation,

@@ -20,7 +20,7 @@ export default registerAs('features', () => ({
   // Heavy Operations
   videoExport: process.env.FEATURE_VIDEO_EXPORT === 'true',
   highResExport: process.env.FEATURE_HIGH_RES_EXPORT === 'true',
-  // Allow export for free users if explicitly enabled (local testing / dev)
+  // Bypass plan export locks for all formats (local testing only — keep false in production)
   exportPremiumEnabled: process.env.FEATURE_EXPORT_PREMIUM === 'true',
 
   // Integrations

@@ -2,6 +2,7 @@
 
 import type { ErrorInfo, ReactNode } from 'react';
 import React, { Component } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
@@ -67,10 +68,6 @@ export class ErrorBoundary extends Component<Props, State> {
       error: null,
       errorInfo: null,
     });
-  };
-
-  handleGoHome = () => {
-    window.location.href = '/';
   };
 
   render() {
@@ -139,9 +136,11 @@ export class ErrorBoundary extends Component<Props, State> {
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Try Again
               </Button>
-              <Button onClick={this.handleGoHome} variant="outline" className="flex-1">
-                <Home className="mr-2 h-4 w-4" />
-                Go Home
+              <Button asChild variant="outline" className="flex-1">
+                <Link href="/">
+                  <Home className="mr-2 h-4 w-4" />
+                  Go Home
+                </Link>
               </Button>
             </CardFooter>
           </Card>

@@ -148,7 +148,7 @@ export class EmailProcessor extends WorkerHost {
     const { to, name, loginUrl } = job.data;
     await this.dispatchMail(
       to,
-      'Welcome to Presentation Designer!',
+      'Welcome to PresentPitch!',
       'welcome',
       {
         name,

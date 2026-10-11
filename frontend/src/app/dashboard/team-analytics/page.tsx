@@ -37,6 +37,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { api } from "@/lib/api";
+import { FEATURES, FEATURE_LABELS } from "@/lib/features";
+import { ComingSoonPage } from "@/components/ui/coming-soon";
 
 const actionIcons: Record<string, React.ReactNode> = {
   CREATE: <FileText className="h-4 w-4 text-green-500" />,
@@ -48,6 +50,13 @@ const actionIcons: Record<string, React.ReactNode> = {
 };
 
 export default function TeamAnalyticsPage() {
+  if (!FEATURES.teamAnalytics) {
+    return <ComingSoonPage title={FEATURE_LABELS.teamAnalytics} />;
+  }
+  return <TeamAnalyticsView />;
+}
+
+function TeamAnalyticsView() {
   const [dateRange, setDateRange] = useState("7d");
   const [actionFilter, setActionFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");

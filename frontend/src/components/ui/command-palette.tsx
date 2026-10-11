@@ -222,6 +222,10 @@ export function CommandPalette({
                                     <Sparkles className="mr-2 h-4 w-4" />
                                     <span>Enhance with AI</span>
                                 </CommandItem>
+                                <CommandItem onSelect={() => runCommand(() => emitEditorCommand({ type: "ai-action", payload: { action: "summarize" } }))}>
+                                    <FileText className="mr-2 h-4 w-4" />
+                                    <span>Summarize Slide</span>
+                                </CommandItem>
                                 <CommandItem onSelect={() => runCommand(() => emitEditorCommand({ type: "ai-action", payload: { action: "shorten" } }))}>
                                     <Zap className="mr-2 h-4 w-4" />
                                     <span>Shorten Text</span>
@@ -229,6 +233,10 @@ export function CommandPalette({
                                 <CommandItem onSelect={() => runCommand(() => emitEditorCommand({ type: "ai-action", payload: { action: "expand" } }))}>
                                     <MessageSquare className="mr-2 h-4 w-4" />
                                     <span>Expand Text</span>
+                                </CommandItem>
+                                <CommandItem onSelect={() => runCommand(() => emitEditorCommand({ type: "ai-action", payload: { action: "add-visuals" } }))}>
+                                    <ImageIcon className="mr-2 h-4 w-4" />
+                                    <span>Add Visuals to Slide</span>
                                 </CommandItem>
                                 <CommandItem onSelect={() => runCommand(() => emitEditorCommand({ type: "ai-action", payload: { action: "speaker-notes" } }))}>
                                     <Mic className="mr-2 h-4 w-4" />

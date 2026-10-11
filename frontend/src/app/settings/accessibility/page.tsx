@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -37,6 +37,7 @@ import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { api } from "@/lib/api";
+import type { Project } from "@/types";
 
 interface AccessibilityIssue {
     id: string;
@@ -64,6 +65,22 @@ export default function AccessibilitySettingsPage() {
     const [imageUrl, setImageUrl] = useState("");
     const [generatedAltText, setGeneratedAltText] = useState("");
     const [selectedIssues, setSelectedIssues] = useState<string[]>([]);
+
+    const { data: projects, isLoading: projectsLoading } = useQuery({
+        queryKey: ["projects"],
+        queryFn: () => api.projects.getAll(),
+    });
+
+    const latestProjectId = useMemo(() => {
+        if (!projects?.length) {return "";}
+        const latest = [...projects].sort(
+            (a: Project, b: Project) =>
+                new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+        )[0];
+        return latest?.id ?? "";
+    }, [projects]);
+
+    const effectiveProjectId = selectedProjectId || latestProjectId;
 
     // Fetch WCAG guidelines
     const { data: guidelines } = useQuery({
@@ -255,15 +272,22 @@ export default function AccessibilitySettingsPage() {
                                     </div>
 
                                     <div className="pt-4 space-y-2">
+                                        <Label htmlFor="accessibility-project-id">Presentation</Label>
                                         <Input
-                                            placeholder="Enter project ID"
-                                            value={selectedProjectId}
+                                            id="accessibility-project-id"
+                                            placeholder={projectsLoading ? "Loading presentations…" : "Paste a project ID or use your latest deck"}
+                                            value={effectiveProjectId}
                                             onChange={(e) => setSelectedProjectId(e.target.value)}
                                         />
+                                        {!projectsLoading && projects?.length === 0 && (
+                                            <p className="text-xs text-muted-foreground">
+                                                No presentations yet. Create one on the dashboard, then run an accessibility check here.
+                                            </p>
+                                        )}
                                         <Button
                                             className="w-full"
-                                            onClick={() => selectedProjectId && checkAccessibilityMutation.mutate(selectedProjectId)}
-                                            disabled={!selectedProjectId || checkAccessibilityMutation.isPending}
+                                            onClick={() => effectiveProjectId && checkAccessibilityMutation.mutate(effectiveProjectId)}
+                                            disabled={!effectiveProjectId || checkAccessibilityMutation.isPending}
                                         >
                                             {checkAccessibilityMutation.isPending ? (
                                                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -287,7 +311,7 @@ export default function AccessibilitySettingsPage() {
                                         <Button
                                             size="sm"
                                             onClick={() => autoFixMutation.mutate({
-                                                projectId: selectedProjectId,
+                                                projectId: effectiveProjectId,
                                                 issueIds: selectedIssues,
                                             })}
                                             disabled={autoFixMutation.isPending}
@@ -307,7 +331,16 @@ export default function AccessibilitySettingsPage() {
                                             <div className="text-center py-8 text-slate-500">
                                                 <Target className="h-10 w-10 mx-auto mb-3 text-slate-300 dark:text-slate-600" />
                                                 <p className="font-medium">No accessibility check run yet</p>
-                                                <p className="text-sm mt-1">Enter a project ID and click &ldquo;Run Check&rdquo; to scan for issues.</p>
+                                                <p className="text-sm mt-1 max-w-sm mx-auto">
+                                                    {effectiveProjectId
+                                                        ? "Click Run Check to scan this presentation for WCAG issues."
+                                                        : "Pick a presentation (we pre-fill your latest when available), then click Run Check."}
+                                                </p>
+                                                {!effectiveProjectId && (
+                                                    <Link href="/dashboard" className="inline-block mt-4">
+                                                        <Button variant="outline" size="sm">Go to dashboard</Button>
+                                                    </Link>
+                                                )}
                                             </div>
                                         )}
                                         {hasRunCheck && issues.length === 0 && (

@@ -7,6 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
+import { getPlanLimits, PLAN_LIMITS } from '../common/subscription/plan-limits';
 
 interface CreateUserDto {
   email: string;
@@ -223,8 +224,8 @@ export class UsersService {
         userId,
         plan: SubscriptionPlan.FREE,
         status: SubscriptionStatus.ACTIVE,
-        projectsLimit: 3,
-        aiGenerationsLimit: 10,
+        projectsLimit: PLAN_LIMITS.FREE.presentations,
+        aiGenerationsLimit: PLAN_LIMITS.FREE.aiGenerationsPerMonth,
       },
     });
   }
@@ -243,7 +244,7 @@ export class UsersService {
 
     // Calculate projects used
     const projectsUsed = await this.prisma.project.count({
-      where: { ownerId: userId },
+      where: { ownerId: userId, deletedAt: null },
     });
 
     return {
@@ -300,51 +301,63 @@ export class UsersService {
     });
   }
 
+  private allowUnlimitedInDev(): boolean {
+    return (
+      this.configService.get<string>('NODE_ENV') === 'development' &&
+      this.configService.get<string>('ALLOW_UNLIMITED_IN_DEV') === 'true'
+    );
+  }
+
+  private resolveProjectsLimit(subscription: {
+    plan: SubscriptionPlan;
+    projectsLimit: number;
+  }): number {
+    if (subscription.projectsLimit > 0) {
+      return subscription.projectsLimit;
+    }
+    return getPlanLimits(subscription.plan).presentations;
+  }
+
+  private resolveAiGenerationsLimit(subscription: {
+    plan: SubscriptionPlan;
+    aiGenerationsLimit: number;
+  }): number {
+    if (subscription.aiGenerationsLimit > 0) {
+      return subscription.aiGenerationsLimit;
+    }
+    return getPlanLimits(subscription.plan).aiGenerationsPerMonth;
+  }
+
   /**
-   * Check if user can generate AI content
-   * PRO/ENTERPRISE users have unlimited generations.
+   * Check if user can generate AI content (enforces subscription/plan limits).
    */
   async canGenerateAI(userId: string): Promise<boolean> {
-    // In development mode, allow unlimited AI generations
-    if (this.configService.get('NODE_ENV') === 'development') {
+    if (this.allowUnlimitedInDev()) {
       return true;
     }
 
     const subscription = await this.getSubscription(userId);
+    const limit = this.resolveAiGenerationsLimit(subscription);
 
-    if (
-      subscription.plan === SubscriptionPlan.PRO ||
-      subscription.plan === SubscriptionPlan.ENTERPRISE
-    ) {
-      return true;
-    }
-
-    return subscription.aiGenerationsUsed < subscription.aiGenerationsLimit;
+    return subscription.aiGenerationsUsed < limit;
   }
 
   /**
    * Check if user can create more projects
    */
   async canCreateProject(userId: string): Promise<boolean> {
-    // In development mode, allow unlimited projects
-    if (this.configService.get('NODE_ENV') === 'development') {
+    if (this.allowUnlimitedInDev()) {
       return true;
     }
 
     const subscription = await this.getSubscription(userId);
-
-    if (
-      subscription.plan === SubscriptionPlan.PRO ||
-      subscription.plan === SubscriptionPlan.ENTERPRISE
-    ) {
-      return true;
-    }
+    const limit = this.resolveProjectsLimit(subscription);
 
     const projectCount = await this.prisma.project.count({
       where: { ownerId: userId, deletedAt: null },
     });
 
-    return projectCount < subscription.projectsLimit;
+    return projectCount < limit;
   }
 
   /**

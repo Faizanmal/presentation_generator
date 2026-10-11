@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Search,
@@ -105,6 +106,7 @@ const categoryIcons: Record<string, React.ReactNode> = {
 };
 
 export function TemplateMarketplace() {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -155,8 +157,7 @@ export function TemplateMarketplace() {
     },
     onSuccess: (data: { projectId: string }) => {
       toast.success('Template applied! Opening project...');
-      // Navigate to project
-      window.location.href = `/editor/${data.projectId}`;
+      router.push(`/editor/${data.projectId}`);
     },
     onError: (error: unknown) => {
       const err = error as { response?: { data?: { message?: string } } };

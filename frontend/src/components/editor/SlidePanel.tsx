@@ -17,6 +17,26 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { stripHtmlText } from "@/lib/project-preview";
+import type { Block } from "@/types";
+
+function blockPreviewLine(block: Block, maxLen = 48): string | null {
+  const blockType = (block.type || (block as Block & { blockType?: string }).blockType)?.toUpperCase();
+  const text = block.content?.text;
+  if (typeof text === "string" && text.trim()) {
+    const plain = stripHtmlText(text);
+    if (plain) {
+      return plain.length > maxLen ? `${plain.slice(0, maxLen - 1)}…` : plain;
+    }
+  }
+  if (blockType === "IMAGE" && block.content?.url) {
+    return "Image";
+  }
+  if (blockType === "CHART") {
+    return "Chart";
+  }
+  return null;
+}
 
 interface SlidePanelProps {
   slide: Slide;
@@ -53,6 +73,7 @@ const SlidePanel = React.memo(({
 
   // Theme-based colors
   const bgColor = theme?.colors?.background || "#ffffff";
+  const textColor = theme?.colors?.text || "#0f172a";
   const primaryColor = theme?.colors?.primary || "#3b82f6";
   const accentColor = theme?.colors?.accent || "#10b981";
 
@@ -141,119 +162,75 @@ const SlidePanel = React.memo(({
         )}
 
         {/* Mini representation of slide content */}
-        <div className={`h-full flex flex-col gap-1 overflow-hidden ${isTitleSlide ? 'justify-center items-center' : ''}`}>
-          {slide.blocks?.slice(0, 4).map((block) => {
+        <div
+          className={`h-full flex flex-col gap-0.5 overflow-hidden min-w-0 ${
+            isTitleSlide ? "justify-center items-center text-center" : ""
+          }`}
+        >
+          {(slide.blocks?.length ? slide.blocks.slice(0, 4) : []).map((block) => {
             const blockType = (block.type || block.blockType)?.toUpperCase();
+            const preview = blockPreviewLine(block);
 
-            if (blockType === 'HEADING') {
+            if (blockType === "IMAGE") {
+              const url = block.content?.url;
               return (
                 <div
                   key={block.id}
-                  className="h-2.5 rounded-sm w-3/4"
-                  style={{
-                    background: `linear-gradient(90deg, ${primaryColor}, ${primaryColor}88)`,
-                  }}
-                />
-              );
-            }
-            if (blockType === 'SUBHEADING') {
-              return (
-                <div
-                  key={block.id}
-                  className="h-2 rounded-sm w-2/3"
-                  style={{
-                    background: `linear-gradient(90deg, ${primaryColor}66, ${primaryColor}33)`,
-                  }}
-                />
-              );
-            }
-            if (blockType === 'IMAGE') {
-              return (
-                <div
-                  key={block.id}
-                  className="h-4 rounded-sm bg-slate-200 dark:bg-slate-600 w-full flex items-center justify-center"
+                  className="h-5 rounded-sm w-full overflow-hidden bg-slate-200/80 dark:bg-slate-600/80 shrink-0"
                 >
-                  <div className="w-2 h-2 rounded-sm bg-slate-300 dark:bg-slate-500" />
+                  {typeof url === "string" && url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={url} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center text-[8px] text-slate-500">
+                      Image
+                    </div>
+                  )}
                 </div>
               );
             }
-            if (blockType === 'CHART') {
+
+            if (preview) {
+              const isHeading = blockType === "HEADING" || blockType === "SUBHEADING";
               return (
-                <div key={block.id} className="h-4 rounded-sm bg-slate-100 dark:bg-slate-700 w-full flex items-end gap-px px-1 pb-0.5">
+                <p
+                  key={block.id}
+                  className={`leading-tight shrink-0 w-full min-w-0 ${
+                    isHeading
+                      ? "font-semibold line-clamp-2 text-[9px]"
+                      : "line-clamp-2 text-[8px] opacity-80"
+                  }`}
+                  style={{ color: isHeading ? primaryColor : textColor }}
+                  title={preview}
+                >
+                  {preview}
+                </p>
+              );
+            }
+
+            if (blockType === "CHART") {
+              return (
+                <div
+                  key={block.id}
+                  className="h-4 rounded-sm bg-slate-100/80 dark:bg-slate-700/80 w-full flex items-end gap-px px-1 pb-0.5 shrink-0"
+                >
                   <div className="w-1 h-1.5 rounded-t-sm" style={{ backgroundColor: `${primaryColor}66` }} />
                   <div className="w-1 h-2.5 rounded-t-sm" style={{ backgroundColor: `${primaryColor}88` }} />
-                  <div className="w-1 h-2 rounded-t-sm" style={{ backgroundColor: `${primaryColor}66` }} />
                   <div className="w-1 h-3 rounded-t-sm" style={{ backgroundColor: primaryColor }} />
                 </div>
               );
             }
-            if (blockType === 'QUOTE') {
-              return (
-                <div key={block.id} className="flex gap-0.5">
-                  <div className="w-0.5 h-3 rounded-full" style={{ backgroundColor: `${primaryColor}88` }} />
-                  <div className="h-1.5 bg-slate-300 dark:bg-slate-500 w-4/5 rounded-sm mt-0.5" />
-                </div>
-              );
-            }
-            if (blockType === 'BULLET_LIST') {
-              return (
-                <div key={block.id} className="space-y-0.5">
-                  <div className="flex items-center gap-1">
-                    <div className="w-1 h-1 rounded-full" style={{ backgroundColor: primaryColor }} />
-                    <div className="h-1 bg-slate-300 dark:bg-slate-500 flex-1 rounded-sm" />
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-1 h-1 rounded-full" style={{ backgroundColor: primaryColor }} />
-                    <div className="h-1 bg-slate-300 dark:bg-slate-500 w-3/4 rounded-sm" />
-                  </div>
-                </div>
-              );
-            }
-            if (blockType === 'TIMELINE') {
-              return (
-                <div key={block.id} className="flex items-center gap-0.5 pl-1">
-                  <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: primaryColor }} />
-                  <div className="w-3 h-0.5 rounded-full" style={{ backgroundColor: `${primaryColor}44` }} />
-                  <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: `${primaryColor}88` }} />
-                  <div className="w-3 h-0.5 rounded-full" style={{ backgroundColor: `${primaryColor}44` }} />
-                  <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: `${primaryColor}66` }} />
-                </div>
-              );
-            }
-            if (blockType === 'STATS_GRID') {
-              return (
-                <div key={block.id} className="grid grid-cols-2 gap-0.5">
-                  {[0.9, 0.7, 0.8, 0.6].map((opacity) => (
-                    <div key={opacity} className="h-2 rounded-sm" style={{ backgroundColor: `${primaryColor}${Math.round(opacity * 255).toString(16)}` }} />
-                  ))}
-                </div>
-              );
-            }
-            if (blockType === 'COMPARISON') {
-              return (
-                <div key={block.id} className="grid grid-cols-2 gap-0.5">
-                  <div className="h-3 rounded-sm" style={{ backgroundColor: `${primaryColor}22`, borderTop: `1px solid ${primaryColor}88` }} />
-                  <div className="h-3 rounded-sm bg-emerald-100 dark:bg-emerald-900/30" style={{ borderTop: `1px solid #10b98188` }} />
-                </div>
-              );
-            }
-            if (blockType === 'CALL_TO_ACTION') {
-              return (
-                <div
-                  key={block.id}
-                  className="h-3 rounded-sm w-3/4 mx-auto"
-                  style={{ background: `linear-gradient(90deg, ${primaryColor}, ${primaryColor}bb)` }}
-                />
-              );
-            }
-            // Default text block
+
             return (
               <div
                 key={block.id}
-                className="h-1.5 bg-slate-300 dark:bg-slate-600 w-full rounded-sm"
+                className="h-1 bg-slate-300/70 dark:bg-slate-600/70 w-full rounded-sm shrink-0"
               />
             );
           })}
+          {!slide.blocks?.length && (
+            <p className="text-[8px] text-slate-400 italic">Empty slide</p>
+          )}
         </div>
       </div>
 

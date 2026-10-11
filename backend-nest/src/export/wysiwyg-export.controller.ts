@@ -7,6 +7,7 @@ import {
   Res,
   Header,
   Logger,
+  ForbiddenException,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import puppeteer from 'puppeteer';
@@ -48,11 +49,18 @@ export class WysiwygExportController {
   @Get(':projectId/wysiwyg-pdf')
   @ThrottleExportPDF()
   async getWysiwygPdf(
-    @CurrentUser() _user: { id: string },
+    @CurrentUser() user: { id: string },
     @Param('projectId') projectId: string,
     @Query('quality') quality: 'standard' | 'high' = 'high',
     @Res() res: Response,
   ) {
+    const allowed = await this.exportService.canExport(user.id, 'pdf');
+    if (!allowed) {
+      throw new ForbiddenException(
+        'PDF export requires a Pro or Enterprise plan. Please upgrade.',
+      );
+    }
+
     try {
       const pdfBuffer = await this.renderWithPuppeteer(projectId, quality);
 

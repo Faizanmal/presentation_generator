@@ -41,8 +41,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       }
     } else if (
       exception instanceof Error &&
-      (exception.name === 'ForbiddenError' ||
-        /csrf/i.test(exception.message))
+      (exception.name === 'ForbiddenError' || /csrf/i.test(exception.message))
     ) {
       status = HttpStatus.FORBIDDEN;
       message = 'Invalid CSRF token';

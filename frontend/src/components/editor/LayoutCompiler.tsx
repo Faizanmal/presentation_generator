@@ -234,9 +234,9 @@ export function LayoutCompiler({
               <div className="w-full h-full" style={{ background: theme?.colors?.primary || '#0F172A', opacity: 0.12 }} />
             )}
           </div>
-          <div className="flex flex-col justify-center min-h-0 px-10 py-8 gap-4">
+          <div className="flex flex-col justify-center min-h-0 min-w-0 px-10 py-8 gap-4 overflow-hidden">
             {renderBlockList(titleBlocks, 't-')}
-            <div style={{ opacity: bodyOpacity }}>{renderBlockList(bodyBlocks, 'b-')}</div>
+            <div className="min-w-0" style={{ opacity: bodyOpacity }}>{renderBlockList(bodyBlocks, 'b-')}</div>
           </div>
         </div>
       );

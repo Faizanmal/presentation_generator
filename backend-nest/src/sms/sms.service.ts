@@ -53,7 +53,7 @@ export class SmsService {
     otp: string,
     expiresInMinutes: number = 5,
   ): Promise<void> {
-    const message = `Your Presentation Designer verification code is: ${otp}. Expires in ${expiresInMinutes} minutes. Do not share this code with anyone.`;
+    const message = `Your PresentPitch verification code is: ${otp}. Expires in ${expiresInMinutes} minutes. Do not share this code with anyone.`;
     await this.sendSms(to, message);
   }
 

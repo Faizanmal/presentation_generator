@@ -165,17 +165,15 @@ For EACH section, generate slides with:
     const sections: NarrativeSection[] = parsed.sections.map((s, idx) => ({
       sectionId: s.sectionId || `section-${idx}`,
       title: s.title,
-      slides: (s.slides || []).map(
-        (slide): NarrativeSlide => ({
-          heading: slide.heading,
-          bodyContent: slide.bodyContent,
-          bulletPoints: slide.bulletPoints || undefined,
-          speakerNotes: slide.speakerNotes || '',
-          suggestedVisual: slide.suggestedVisual || undefined,
-          calloutText: slide.calloutText || undefined,
-          statisticHighlight: slide.statisticHighlight || undefined,
-        }),
-      ),
+      slides: (s.slides || []).map((slide): NarrativeSlide => ({
+        heading: slide.heading,
+        bodyContent: slide.bodyContent,
+        bulletPoints: slide.bulletPoints || undefined,
+        speakerNotes: slide.speakerNotes || '',
+        suggestedVisual: slide.suggestedVisual || undefined,
+        calloutText: slide.calloutText || undefined,
+        statisticHighlight: slide.statisticHighlight || undefined,
+      })),
       storybeat: {
         emotionalTone: validTones.includes(
           s.storybeat?.emotionalTone as (typeof validTones)[number],

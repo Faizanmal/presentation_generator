@@ -30,7 +30,7 @@ export class EmailService {
       this.configService.get<string>('MAIL_ENABLED') !== 'false' &&
       Boolean(
         this.configService.get<string>('SENDGRID_API_KEY') ||
-          this.configService.get<string>('MAIL_HOST'),
+        this.configService.get<string>('MAIL_HOST'),
       );
   }
 

@@ -27,6 +27,11 @@ export class OrganizationsController {
     return this.organizationsService.getUserOrganizations(req.user.id);
   }
 
+  @Get('current')
+  async getCurrentOrganization(@Request() req: { user: { id: string } }) {
+    return this.organizationsService.getCurrentOrganization(req.user.id);
+  }
+
   @Post()
   async createOrganization(
     @Request() req: { user: { id: string } },
@@ -83,9 +88,69 @@ export class OrganizationsController {
   async inviteMember(
     @Request() req: { user: { id: string } },
     @Param('id') id: string,
-    @Body() body: { email: string; role?: 'OWNER' | 'ADMIN' | 'MEMBER' },
+    @Body()
+    body: { email: string; role?: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER' },
   ) {
     return this.organizationsService.inviteUser(id, req.user.id, body);
+  }
+
+  @Get(':id/invitations')
+  async listInvitations(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+  ) {
+    return this.organizationsService.listInvitations(id, req.user.id);
+  }
+
+  @Post(':id/invitations')
+  async createInvitation(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body()
+    body: { email: string; role?: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER' },
+  ) {
+    return this.organizationsService.inviteUser(id, req.user.id, body);
+  }
+
+  @Post(':id/invitations/bulk')
+  async bulkInvite(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Body()
+    body: { emails: string[]; role?: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER' },
+  ) {
+    return this.organizationsService.bulkInvite(
+      id,
+      req.user.id,
+      body.emails || [],
+      body.role,
+    );
+  }
+
+  @Post(':id/invitations/:invitationId/resend')
+  async resendInvitation(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Param('invitationId') invitationId: string,
+  ) {
+    return this.organizationsService.resendInvitation(
+      id,
+      invitationId,
+      req.user.id,
+    );
+  }
+
+  @Delete(':id/invitations/:invitationId')
+  async cancelInvitation(
+    @Request() req: { user: { id: string } },
+    @Param('id') id: string,
+    @Param('invitationId') invitationId: string,
+  ) {
+    return this.organizationsService.cancelInvitation(
+      id,
+      invitationId,
+      req.user.id,
+    );
   }
 
   @Patch(':id/members/:memberId')

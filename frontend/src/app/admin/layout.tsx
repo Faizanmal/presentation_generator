@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggleSimple } from "@/components/ui/enhanced-ui";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 export default function AdminLayout({
     children,
@@ -47,7 +48,7 @@ export default function AdminLayout({
                 {/* Mobile Header */}
                 <header className="md:hidden flex items-center justify-between p-4 border-b bg-white/50 dark:bg-slate-950/50 backdrop-blur-sm">
                     <div className="flex items-center gap-2 font-bold text-lg">
-                        <span className="text-xl">Present.AI Admin</span>
+                        <span className="text-xl">{PRODUCT_NAME} Admin</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <ThemeToggleSimple />

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -24,35 +24,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-// import { Slider } from '@/components/ui/slider';
 import {
   Share2,
   Code,
   Mail,
   Copy,
   Check,
-  QrCode,
   Eye,
   Lock,
   Globe,
   Users,
-  Clock,
   ExternalLink,
-  Download,
+  Loader2,
 } from 'lucide-react';
 import { FaTwitter, FaLinkedin, FaFacebook } from 'react-icons/fa';
-
-interface ShareSettings {
-  isPublic: boolean;
-  requirePassword: boolean;
-  password: string;
-  allowDownload: boolean;
-  allowComments: boolean;
-  showAuthor: boolean;
-  expiresAt: Date | null;
-  accessCount: number;
-  maxViews: number | null;
-}
+import { toast } from 'sonner';
+import { api } from '@/lib/api';
+import type { Project } from '@/types';
 
 interface EmbedSettings {
   width: number;
@@ -69,27 +57,38 @@ interface EmbedSettings {
 interface EmbedSharePanelProps {
   presentationId: string;
   presentationTitle: string;
-  onShare?: () => void;
+  shareToken?: string | null;
+  isPublic?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  showTrigger?: boolean;
+  onProjectUpdated?: (project: Project) => void;
 }
 
 export function EmbedSharePanel({
   presentationId,
   presentationTitle,
+  shareToken,
+  isPublic = false,
+  open,
+  onOpenChange,
+  showTrigger = true,
+  onProjectUpdated,
 }: EmbedSharePanelProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [copied, setCopied] = useState<string | null>(null);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const isControlled = open !== undefined;
+  const isOpen = isControlled ? open : uncontrolledOpen;
+  const setIsOpen = onOpenChange || setUncontrolledOpen;
 
-  const [shareSettings, setShareSettings] = useState<ShareSettings>({
-    isPublic: true,
-    requirePassword: false,
-    password: '',
-    allowDownload: true,
-    allowComments: true,
-    showAuthor: true,
-    expiresAt: null,
-    accessCount: 0,
-    maxViews: null,
-  });
+  const [copied, setCopied] = useState<string | null>(null);
+  const [publicAccess, setPublicAccess] = useState(isPublic);
+  const [prevIsPublic, setPrevIsPublic] = useState(isPublic);
+  const [currentShareToken, setCurrentShareToken] = useState(shareToken || null);
+  const [prevShareToken, setPrevShareToken] = useState(shareToken);
+  const [savingPublic, setSavingPublic] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<'VIEWER' | 'EDITOR'>('VIEWER');
+  const [inviting, setInviting] = useState(false);
 
   const [embedSettings, setEmbedSettings] = useState<EmbedSettings>({
     width: 800,
@@ -103,9 +102,21 @@ export function EmbedSharePanel({
     startSlide: 1,
   });
 
+  // Sync local state when parent props change (adjust during render — avoids effect setState)
+  if (isPublic !== prevIsPublic) {
+    setPrevIsPublic(isPublic);
+    setPublicAccess(isPublic);
+  }
+  if (shareToken !== prevShareToken) {
+    setPrevShareToken(shareToken);
+    setCurrentShareToken(shareToken || null);
+  }
+
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-  const shareUrl = `${baseUrl}/view/${presentationId}`;
-  const embedUrl = `${baseUrl}/embed/${presentationId}`;
+  const publicPath = currentShareToken || presentationId;
+  const shareUrl = `${baseUrl}/view/${publicPath}`;
+  const embedUrl = `${baseUrl}/embed/${publicPath}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(shareUrl)}`;
 
   const generateEmbedCode = useCallback(() => {
     const params = new URLSearchParams();
@@ -141,24 +152,64 @@ export function EmbedSharePanel({
   const copyToClipboard = useCallback(async (text: string, type: string) => {
     await navigator.clipboard.writeText(text);
     setCopied(type);
+    toast.success('Copied to clipboard');
     setTimeout(() => setCopied(null), 2000);
   }, []);
 
-  const socialShareUrls = {
+  const handlePublicToggle = useCallback(async (checked: boolean) => {
+    setPublicAccess(checked);
+    setSavingPublic(true);
+    try {
+      const updated = await api.updateProject(presentationId, { isPublic: checked });
+      setCurrentShareToken(updated.shareToken);
+      onProjectUpdated?.(updated);
+      toast.success(checked ? 'Anyone with the link can view this presentation' : 'Link access turned off');
+    } catch {
+      setPublicAccess(!checked);
+      toast.error('Could not update sharing');
+    } finally {
+      setSavingPublic(false);
+    }
+  }, [onProjectUpdated, presentationId]);
+
+  const handleInvite = useCallback(async () => {
+    const email = inviteEmail.trim();
+    if (!email.includes('@')) {
+      toast.error('Enter a valid email');
+      return;
+    }
+    setInviting(true);
+    try {
+      await api.addCollaborator(presentationId, email, inviteRole);
+      toast.success(`Invited ${email} as ${inviteRole.toLowerCase()}`);
+      setInviteEmail('');
+    } catch (error) {
+      const message =
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'User must already have an account to be added as a collaborator';
+      toast.error(message);
+    } finally {
+      setInviting(false);
+    }
+  }, [inviteEmail, inviteRole, presentationId]);
+
+  const socialShareUrls = useMemo(() => ({
     twitter: `https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(`Check out my presentation: ${presentationTitle}`)}`,
     linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`,
     facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`,
     email: `mailto:?subject=${encodeURIComponent(`Presentation: ${presentationTitle}`)}&body=${encodeURIComponent(`Check out this presentation: ${shareUrl}`)}`,
-  };
+  }), [presentationTitle, shareUrl]);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" className="gap-2">
-          <Share2 className="h-4 w-4" />
-          Share
-        </Button>
-      </DialogTrigger>
+      {showTrigger && (
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm">
+            <Share2 className="h-4 w-4 mr-2" />
+            Share
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -166,7 +217,7 @@ export function EmbedSharePanel({
             Share & Embed
           </DialogTitle>
           <DialogDescription>
-            Share your presentation or embed it on any website
+            Publish a view link, invite collaborators, or embed this presentation
           </DialogDescription>
         </DialogHeader>
 
@@ -174,11 +225,27 @@ export function EmbedSharePanel({
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="share">Share Link</TabsTrigger>
             <TabsTrigger value="embed">Embed</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
+            <TabsTrigger value="people">People</TabsTrigger>
           </TabsList>
 
           <TabsContent value="share" className="space-y-6 mt-4">
-            {/* Share Link */}
+            <div className="flex items-center justify-between rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+              <div>
+                <Label>Public access</Label>
+                <p className="text-xs text-muted-foreground">
+                  Anyone with the link can view, without signing in
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {savingPublic && <Loader2 className="h-4 w-4 animate-spin text-slate-400" />}
+                <Switch
+                  checked={publicAccess}
+                  onCheckedChange={(checked) => void handlePublicToggle(checked)}
+                  disabled={savingPublic}
+                />
+              </div>
+            </div>
+
             <div className="space-y-3">
               <Label>Shareable Link</Label>
               <div className="flex gap-2">
@@ -186,13 +253,13 @@ export function EmbedSharePanel({
                   <Input
                     value={shareUrl}
                     readOnly
-                    className="pr-10"
+                    className="pr-24"
                   />
                   <Badge
-                    variant={shareSettings.isPublic ? 'default' : 'secondary'}
+                    variant={publicAccess ? 'default' : 'secondary'}
                     className="absolute right-2 top-1/2 -translate-y-1/2"
                   >
-                    {shareSettings.isPublic ? (
+                    {publicAccess ? (
                       <><Globe className="h-3 w-3 mr-1" /> Public</>
                     ) : (
                       <><Lock className="h-3 w-3 mr-1" /> Private</>
@@ -215,9 +282,13 @@ export function EmbedSharePanel({
                   </a>
                 </Button>
               </div>
+              {!publicAccess && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  Turn on public access so people without an account can open this link.
+                </p>
+              )}
             </div>
 
-            {/* Social Sharing */}
             <div className="space-y-3">
               <Label>Share on Social Media</Label>
               <div className="flex gap-2">
@@ -251,44 +322,41 @@ export function EmbedSharePanel({
               </div>
             </div>
 
-            {/* Email Share */}
             <div className="space-y-3">
               <Label>Share via Email</Label>
-              <div className="flex gap-2">
-                <Input placeholder="Enter email addresses" className="flex-1" />
-                <Button>
+              <Button variant="outline" className="w-full" asChild>
+                <a href={socialShareUrls.email}>
                   <Mail className="h-4 w-4 mr-2" />
-                  Send
-                </Button>
-              </div>
+                  Open email draft
+                </a>
+              </Button>
             </div>
 
-            {/* QR Code */}
             <Card>
               <CardContent className="p-4 flex items-center gap-4">
-                <div className="w-24 h-24 bg-muted rounded-lg flex items-center justify-center">
-                  <QrCode className="h-16 w-16 text-muted-foreground" />
-                </div>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={qrUrl}
+                  alt="QR code for presentation link"
+                  width={96}
+                  height={96}
+                  className="rounded-lg bg-white"
+                />
                 <div className="flex-1">
                   <h4 className="font-medium">QR Code</h4>
                   <p className="text-sm text-muted-foreground">
-                    Scan to view presentation on mobile
+                    Scan to open the presentation on mobile
                   </p>
-                  <Button variant="outline" size="sm" className="mt-2">
-                    <Download className="h-4 w-4 mr-2" />
-                    Download QR
-                  </Button>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="embed" className="space-y-6 mt-4">
-            {/* Embed Preview */}
             <div className="space-y-3">
               <Label>Preview</Label>
               <div
-                className="bg-slate-100 rounded-lg overflow-hidden"
+                className="bg-slate-100 dark:bg-slate-900 rounded-lg overflow-hidden"
                 style={{
                   aspectRatio: `${embedSettings.width}/${embedSettings.height}`,
                   maxHeight: '200px',
@@ -300,7 +368,6 @@ export function EmbedSharePanel({
               </div>
             </div>
 
-            {/* Embed Settings */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Width</Label>
@@ -423,7 +490,6 @@ export function EmbedSharePanel({
               </div>
             </div>
 
-            {/* Embed Code */}
             <div className="space-y-3">
               <Label>Embed Code</Label>
               <Textarea
@@ -451,179 +517,43 @@ export function EmbedSharePanel({
             </div>
           </TabsContent>
 
-          <TabsContent value="settings" className="space-y-6 mt-4">
-            {/* Access Settings */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Lock className="h-4 w-4" />
-                  Access Control
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Public Access</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Anyone with the link can view
-                    </p>
-                  </div>
-                  <Switch
-                    checked={shareSettings.isPublic}
-                    onCheckedChange={(checked) =>
-                      setShareSettings((prev) => ({ ...prev, isPublic: checked }))
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Require Password</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Viewers need a password to access
-                    </p>
-                  </div>
-                  <Switch
-                    checked={shareSettings.requirePassword}
-                    onCheckedChange={(checked) =>
-                      setShareSettings((prev) => ({ ...prev, requirePassword: checked }))
-                    }
-                  />
-                </div>
-
-                {shareSettings.requirePassword && (
-                  <div className="space-y-2">
-                    <Label>Password</Label>
-                    <Input
-                      type="password"
-                      value={shareSettings.password}
-                      onChange={(e) =>
-                        setShareSettings((prev) => ({ ...prev, password: e.target.value }))
-                      }
-                      placeholder="Enter password"
-                    />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Viewer Permissions */}
+          <TabsContent value="people" className="space-y-6 mt-4">
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Users className="h-4 w-4" />
-                  Viewer Permissions
+                  Invite a collaborator
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label>Allow Download</Label>
-                  <Switch
-                    checked={shareSettings.allowDownload}
-                    onCheckedChange={(checked) =>
-                      setShareSettings((prev) => ({ ...prev, allowDownload: checked }))
-                    }
+                <p className="text-sm text-muted-foreground">
+                  Collaborators must already have an account. They will get editor or viewer access to this presentation.
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    type="email"
+                    placeholder="teammate@company.com"
+                    value={inviteEmail}
+                    onChange={(event) => setInviteEmail(event.target.value)}
+                    className="flex-1"
                   />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <Label>Allow Comments</Label>
-                  <Switch
-                    checked={shareSettings.allowComments}
-                    onCheckedChange={(checked) =>
-                      setShareSettings((prev) => ({ ...prev, allowComments: checked }))
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <Label>Show Author Name</Label>
-                  <Switch
-                    checked={shareSettings.showAuthor}
-                    onCheckedChange={(checked) =>
-                      setShareSettings((prev) => ({ ...prev, showAuthor: checked }))
-                    }
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Expiration */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  Link Expiration
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Expires After</Label>
                   <Select
-                    value={
-                      shareSettings.expiresAt
-                        ? 'custom'
-                        : 'never'
-                    }
-                    onValueChange={(value) => {
-                      if (value === 'never') {
-                        setShareSettings((prev) => ({ ...prev, expiresAt: null }));
-                      } else {
-                        const days = parseInt(value);
-                        const date = new Date();
-                        date.setDate(date.getDate() + days);
-                        setShareSettings((prev) => ({ ...prev, expiresAt: date }));
-                      }
-                    }}
+                    value={inviteRole}
+                    onValueChange={(value: 'VIEWER' | 'EDITOR') => setInviteRole(value)}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select expiration" />
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="never">Never</SelectItem>
-                      <SelectItem value="1">1 day</SelectItem>
-                      <SelectItem value="7">7 days</SelectItem>
-                      <SelectItem value="30">30 days</SelectItem>
-                      <SelectItem value="90">90 days</SelectItem>
+                      <SelectItem value="VIEWER">Viewer</SelectItem>
+                      <SelectItem value="EDITOR">Editor</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-
-                <div className="space-y-2">
-                  <Label>Max Views</Label>
-                  <Input
-                    type="number"
-                    value={shareSettings.maxViews || ''}
-                    onChange={(e) =>
-                      setShareSettings((prev) => ({
-                        ...prev,
-                        maxViews: e.target.value ? parseInt(e.target.value) : null,
-                      }))
-                    }
-                    placeholder="Unlimited"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Leave empty for unlimited views
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Analytics */}
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Link Analytics</p>
-                    <p className="text-sm text-muted-foreground">
-                      {shareSettings.accessCount} views so far
-                    </p>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    <Eye className="h-4 w-4 mr-2" />
-                    View Details
-                  </Button>
-                </div>
+                <Button onClick={() => void handleInvite()} disabled={inviting} className="w-full">
+                  {inviting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Send invite
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>

@@ -10,14 +10,21 @@ import {
   Request,
   Query,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CollaborationService } from './collaboration.service';
+import { EmailService } from '../email/email.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Controller('collaboration')
 @UseGuards(JwtAuthGuard)
 export class CollaborationController {
-  constructor(private readonly collaborationService: CollaborationService) {}
+  constructor(
+    private readonly collaborationService: CollaborationService,
+    private readonly emailService: EmailService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   // ============================================
   // COLLABORATORS
@@ -36,15 +43,60 @@ export class CollaborationController {
   @Post(':projectId/collaborators')
   async addCollaborator(
     @Param('projectId') projectId: string,
-    @Body() body: { userId: string; role: 'VIEWER' | 'COMMENTER' | 'EDITOR' },
-    @Request() req: { user: { id: string } },
+    @Body()
+    body: {
+      userId?: string;
+      email?: string;
+      role: 'VIEWER' | 'COMMENTER' | 'EDITOR';
+    },
+    @Request() req: { user: { id: string; name?: string } },
   ) {
-    return this.collaborationService.addCollaborator(
+    const identifier = body.email || body.userId;
+    if (!identifier) {
+      throw new BadRequestException('email or userId is required');
+    }
+
+    const collaborator = await this.collaborationService.addCollaborator(
       projectId,
-      body.userId,
+      identifier,
       body.role,
       req.user.id,
     );
+
+    const inviteEmail = identifier.includes('@')
+      ? identifier
+      : (
+          await this.prisma.user.findUnique({
+            where: { id: identifier },
+            select: { email: true },
+          })
+        )?.email;
+
+    if (inviteEmail) {
+      const project = await this.prisma.project.findUnique({
+        where: { id: projectId },
+        select: { title: true, shareToken: true, isPublic: true },
+      });
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const projectUrl =
+        project?.isPublic && project.shareToken
+          ? `${frontendUrl}/view/${project.shareToken}`
+          : `${frontendUrl}/editor/${projectId}`;
+
+      try {
+        await this.emailService.sendProjectSharedEmail(
+          inviteEmail,
+          req.user.name || 'A teammate',
+          project?.title || 'a presentation',
+          projectUrl,
+          body.role.toLowerCase(),
+        );
+      } catch {
+        // Invitation is valid even if the email queue is down.
+      }
+    }
+
+    return collaborator;
   }
 
   @Delete(':projectId/collaborators/:userId')

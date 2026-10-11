@@ -66,7 +66,9 @@ export class ImageRecognitionService {
       this.openai = new OpenAI({ apiKey: openaiKey });
     } else {
       this.openai = null;
-      this.logger.debug('OpenAI API key not configured — image recognition disabled');
+      this.logger.debug(
+        'OpenAI API key not configured — image recognition disabled',
+      );
     }
   }
 

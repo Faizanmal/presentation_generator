@@ -184,8 +184,7 @@ export class PrismaService
       const modelKey = model as string;
 
       const delegate = (this as Record<string, unknown>)[modelKey] as
-        | { deleteMany?: () => Promise<unknown> }
-        | undefined;
+        { deleteMany?: () => Promise<unknown> } | undefined;
       if (delegate?.deleteMany) {
         await delegate.deleteMany();
       }

@@ -38,14 +38,21 @@ import { Textarea } from "@/components/ui/textarea";
 import dynamic from "next/dynamic";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
+import { aiGenerationLimit, presentationLimit } from "@/lib/plans";
 import { analytics } from "@/lib/analytics";
 import type { Project } from "@/types";
+import { FeaturesHub } from "@/components/dashboard/features-hub";
+import { FEATURES } from "@/lib/features";
+import { ComingSoonModal } from "@/components/ui/coming-soon";
 
 // Dynamically import heavy/secondary components for performance
 const CommandPalette = dynamic(() => import("@/components/ui/command-palette").then(mod => mod.CommandPalette), { ssr: false });
 const KeyboardShortcutsDialog = dynamic(() => import("@/components/ui/keyboard-shortcuts").then(mod => mod.KeyboardShortcutsDialog), { ssr: false });
 const FavoritesRecentPanel = dynamic(() => import("@/components/ui/favorites-recent").then(mod => mod.FavoritesRecentPanel), { ssr: false });
-const FeaturesHub = dynamic(() => import("@/components/dashboard/features-hub").then(mod => mod.FeaturesHub), { ssr: false });
+const InviteTeamDialog = dynamic(
+  () => import("@/components/dashboard/invite-team-dialog").then((mod) => mod.InviteTeamDialog),
+  { ssr: false }
+);
 const QuickActionsGrid = dynamic(() => import("@/components/ui/dashboard-widgets").then(mod => mod.QuickActionsGrid), { ssr: false });
 const UsageCard = dynamic(() => import("@/components/ui/dashboard-widgets").then(mod => mod.UsageCard), { ssr: false });
 const ProjectCard = dynamic(() => import("@/components/ui/project-card").then(mod => mod.ProjectCard), { ssr: false });
@@ -61,6 +68,7 @@ export default function DashboardPage() {
   const queryClient = useQueryClient();
   const _user = useAuthStore((state) => state.user);
   const subscription = useAuthStore((state) => state.subscription);
+  const fetchSubscription = useAuthStore((state) => state.fetchSubscription);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const authLoading = useAuthStore((state) => state.isLoading);
   const initialized = useAuthStore((state) => state.initialized);
@@ -70,6 +78,8 @@ export default function DashboardPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
+  const [showInviteTeam, setShowInviteTeam] = useState(false);
+  const [showInviteComingSoon, setShowInviteComingSoon] = useState(false);
 
   // Favorites and recent projects
   const { favorites, toggleFavorite, isFavorite } = useFavorites();
@@ -130,6 +140,7 @@ export default function DashboardPage() {
     mutationFn: (data: { topic: string; tone: string; audience: string; length: number; type: string; generateImages?: boolean; imageSource?: 'ai' | 'stock'; qualityMode?: boolean }) =>
       api.projects.generate(data),
     onSuccess: (job, variables) => {
+      void fetchSubscription();
       setIsCreateModalOpen(false);
       setIsGenerating(false);
       analytics.project.create('ai-generated');
@@ -160,6 +171,7 @@ export default function DashboardPage() {
             const status = await api.getProjectGenerationStatus(job.jobId);
 
             if (status.state === 'completed') {
+              void fetchSubscription();
               if (status.result) {
                 const result = status.result as Project;
                 queryClient.setQueryData<Project[] | undefined>(["projects"], (old) => {
@@ -303,6 +315,16 @@ export default function DashboardPage() {
     createProjectMutation.mutate({ title: "Untitled Presentation", type: "PRESENTATION" });
   }, [createProjectMutation]);
 
+  const planId = (subscription?.plan || "FREE").toUpperCase();
+  const presentationsTotal =
+    subscription?.projectsLimit ?? presentationLimit(planId);
+  const aiGenerationsTotal =
+    subscription?.aiGenerationsLimit ?? aiGenerationLimit(planId);
+  const presentationsUsed =
+    subscription?.projectsUsed ?? (projectsLoading ? undefined : projects?.length ?? 0);
+  const usageCardLoading =
+    projectsLoading && subscription?.projectsUsed === undefined;
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -321,8 +343,16 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
           <UsageCard
             plan={subscription?.plan || "free"}
-            presentations={{ used: projects?.length || 0, total: subscription?.presentationLimit || (subscription?.plan === 'ENTERPRISE' ? 10000 : subscription?.plan === 'PRO' ? 500 : 10) }}
-            aiGenerations={{ used: subscription?.aiGenerationsUsed || 0, total: subscription?.aiGenerationsLimit || 10 }}
+            isLoading={usageCardLoading}
+            presentations={{
+              used: presentationsUsed ?? 0,
+              total: presentationsTotal,
+            }}
+            aiGenerations={{
+              used: subscription?.aiGenerationsUsed ?? 0,
+              total: aiGenerationsTotal,
+            }}
+            onUpgrade={() => router.push("/settings/billing")}
           />
           <QuickActionsGrid
             onCreateNew={() => {
@@ -339,8 +369,13 @@ export default function DashboardPage() {
             }}
             onInviteTeam={() => {
               analytics.engagement.featureClick('quick_action_invite_team');
-              toast.info("Team invitation coming soon!");
+              if (!FEATURES.teamInvites) {
+                setShowInviteComingSoon(true);
+                return;
+              }
+              setShowInviteTeam(true);
             }}
+            inviteTeamComingSoon={!FEATURES.teamInvites}
           />
         </div>
 
@@ -532,6 +567,16 @@ export default function DashboardPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {FEATURES.teamInvites && (
+        <InviteTeamDialog open={showInviteTeam} onOpenChange={setShowInviteTeam} />
+      )}
+      <ComingSoonModal
+        open={showInviteComingSoon}
+        onClose={() => setShowInviteComingSoon(false)}
+        title="Team Invites"
+        description="Team invites are coming soon."
+      />
 
       {/* Command Palette */}
       <CommandPalette

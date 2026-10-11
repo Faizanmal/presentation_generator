@@ -971,6 +971,10 @@ export class ProjectsService {
       throw new ForbiddenException('You cannot edit this project');
     }
 
+    const makingPublic = updateProjectDto.isPublic === true;
+    const shareToken =
+      makingPublic && !project.shareToken ? uuidv4() : undefined;
+
     return this.prisma.project.update({
       where: { id },
       data: {
@@ -979,6 +983,7 @@ export class ProjectsService {
         status: updateProjectDto.status,
         isPublic: updateProjectDto.isPublic,
         themeId: updateProjectDto.themeId,
+        ...(shareToken ? { shareToken } : {}),
         ...(updateProjectDto.dslDocument
           ? {
               dslDocument:

@@ -5,11 +5,7 @@ import { AuditLogService } from './audit-log.service';
 import { DataResidencyService } from './data-residency.service';
 
 export type ComplianceFramework =
-  | 'SOC2'
-  | 'GDPR'
-  | 'HIPAA'
-  | 'ISO27001'
-  | 'PCI-DSS';
+  'SOC2' | 'GDPR' | 'HIPAA' | 'ISO27001' | 'PCI-DSS';
 
 export interface ComplianceCheck {
   id: string;

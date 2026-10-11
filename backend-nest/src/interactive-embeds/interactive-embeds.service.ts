@@ -8,12 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { InteractiveEmbedType, Prisma } from '@prisma/client';
 
 export type EmbedType =
-  | 'poll'
-  | 'qa'
-  | 'form'
-  | 'quiz'
-  | 'reaction'
-  | 'wordcloud';
+  'poll' | 'qa' | 'form' | 'quiz' | 'reaction' | 'wordcloud';
 
 const embedTypeToPrisma = (type: EmbedType): InteractiveEmbedType => {
   switch (type) {
@@ -71,13 +66,7 @@ export interface QASession {
 export interface FormField {
   id: string;
   type:
-    | 'text'
-    | 'email'
-    | 'number'
-    | 'select'
-    | 'checkbox'
-    | 'textarea'
-    | 'rating';
+    'text' | 'email' | 'number' | 'select' | 'checkbox' | 'textarea' | 'rating';
   label: string;
   required: boolean;
   options?: string[];
@@ -613,11 +602,7 @@ export class InteractiveEmbedsService {
       slideId: e.slideId,
       type: e.type as EmbedType,
       config: e.config as unknown as
-        | Poll
-        | QASession
-        | Form
-        | Quiz
-        | WordCloudConfig,
+        Poll | QASession | Form | Quiz | WordCloudConfig,
       createdAt: e.createdAt,
       updatedAt: e.updatedAt,
     }));
@@ -651,11 +636,7 @@ export class InteractiveEmbedsService {
       slideId: embed.slideId,
       type: embed.type as EmbedType,
       config: embed.config as unknown as
-        | Poll
-        | QASession
-        | Form
-        | Quiz
-        | WordCloudConfig,
+        Poll | QASession | Form | Quiz | WordCloudConfig,
       createdAt: embed.createdAt,
       updatedAt: embed.updatedAt,
     };
@@ -676,11 +657,7 @@ export class InteractiveEmbedsService {
       slideId: embed.slideId,
       type: embed.type as EmbedType,
       config: embed.config as unknown as
-        | Poll
-        | QASession
-        | Form
-        | Quiz
-        | WordCloudConfig,
+        Poll | QASession | Form | Quiz | WordCloudConfig,
       createdAt: embed.createdAt,
       updatedAt: embed.updatedAt,
     };

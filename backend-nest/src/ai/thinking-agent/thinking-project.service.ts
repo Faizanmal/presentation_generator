@@ -549,9 +549,8 @@ export class ThinkingProjectService {
     // Handle quotes
     if (blockType === 'quote') {
       content.text = sectionBlock.content;
-      content.author = (
-        sectionBlock.formatting as Record<string, unknown>
-      )?.author;
+      content.author = (sectionBlock.formatting as Record<string, unknown>)
+        ?.author;
     }
 
     // Handle charts

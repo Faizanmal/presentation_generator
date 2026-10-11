@@ -21,6 +21,8 @@ import {
     Clock,
     Tag,
     Check,
+    Construction,
+    RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,6 +53,8 @@ import {
 
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
+import { FEATURES } from "@/lib/features";
+import { SoonBadge } from "@/components/ui/soon-badge";
 
 interface MarketplaceTemplate {
     id: string;
@@ -80,13 +84,22 @@ export default function MarketplacePage() {
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
     // Fetch categories
+    const marketplaceEnabled = FEATURES.marketplaceBrowse;
+
     const { data: categories } = useQuery({
         queryKey: ["marketplace-categories"],
         queryFn: () => api.getMarketplaceCategories(),
+        enabled: marketplaceEnabled,
+        retry: 1,
     });
 
-    // Fetch templates
-    const { data: templatesData, isLoading } = useQuery({
+    const {
+        data: templatesData,
+        isLoading,
+        isError,
+        isFetched,
+        refetch,
+    } = useQuery({
         queryKey: ["marketplace-templates", selectedCategory, sortBy, priceFilter, searchQuery],
         queryFn: () =>
             api.listMarketplaceTemplates({
@@ -97,6 +110,8 @@ export default function MarketplacePage() {
                 page: 1,
                 limit: 24,
             }),
+        enabled: marketplaceEnabled,
+        retry: 1,
     });
 
     // Use template mutation
@@ -113,6 +128,15 @@ export default function MarketplacePage() {
     });
 
     const templates = useMemo<MarketplaceTemplate[]>(() => templatesData?.data || [], [templatesData?.data]);
+
+    const hasActiveFilters =
+        Boolean(searchQuery) ||
+        selectedCategory !== "all" ||
+        priceFilter !== "all";
+
+    const showMarketplaceComingSoon =
+        !marketplaceEnabled ||
+        (isFetched && !isLoading && !isError && templates.length === 0 && !hasActiveFilters);
 
     // Featured templates (first 4 with highest downloads)
     const featuredTemplates = useMemo(() => {
@@ -166,9 +190,14 @@ export default function MarketplacePage() {
 
                         <div className="flex items-center gap-3">
                             <Link href="/marketplace/author">
-                                <Button variant="outline" size="sm">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className={!FEATURES.sellTemplates ? "gap-2 opacity-90" : undefined}
+                                >
                                     <Crown className="h-4 w-4 mr-2" />
                                     Sell Templates
+                                    {!FEATURES.sellTemplates && <SoonBadge />}
                                 </Button>
                             </Link>
                         </div>
@@ -183,11 +212,12 @@ export default function MarketplacePage() {
                         Professional Presentation Templates
                     </h1>
                     <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
-                        Browse thousands of professionally designed templates to create stunning presentations in minutes.
+                        Browse professionally designed templates to jump-start your next presentation. New templates are added regularly.
                     </p>
                 </div>
 
                 {/* Search & Filters */}
+                {!showMarketplaceComingSoon && (
                 <div className="flex flex-col lg:flex-row gap-4 mb-8">
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
@@ -280,9 +310,30 @@ export default function MarketplacePage() {
                         </div>
                     </div>
                 </div>
+                )}
+
+                {showMarketplaceComingSoon && (
+                    <div className="text-center py-16 px-4 mb-8 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/40">
+                        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 mx-auto">
+                            <Construction className="h-7 w-7" />
+                        </div>
+                        <div className="mb-2 flex items-center justify-center gap-2">
+                            <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Templates coming soon</h2>
+                            <SoonBadge />
+                        </div>
+                        <p className="text-slate-600 dark:text-slate-400 max-w-md mx-auto mb-6">
+                            {marketplaceEnabled
+                                ? "We're curating the first template collection. Check back soon, or create a deck from the dashboard today."
+                                : "The template marketplace is not live yet. You can still build presentations with AI from your dashboard."}
+                        </p>
+                        <Link href="/dashboard">
+                            <Button variant="outline">Go to dashboard</Button>
+                        </Link>
+                    </div>
+                )}
 
                 {/* Featured Templates */}
-                {!searchQuery && selectedCategory === "all" && featuredTemplates.length > 0 && (
+                {!showMarketplaceComingSoon && !searchQuery && selectedCategory === "all" && featuredTemplates.length > 0 && (
                     <div className="mb-12">
                         <div className="flex items-center gap-2 mb-6">
                             <Sparkles className="h-5 w-5 text-yellow-500" />
@@ -343,19 +394,38 @@ export default function MarketplacePage() {
                 )}
 
                 {/* All Templates */}
+                {!showMarketplaceComingSoon && (
                 <div>
                     <div className="flex items-center justify-between mb-6">
                         <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
                             {searchQuery ? `Results for "${searchQuery}"` : "All Templates"}
                         </h2>
-                        <span className="text-slate-500">
-                            {templates.length} template{templates.length !== 1 ? "s" : ""} found
-                        </span>
+                        {!isLoading && !isError && (
+                            <span className="text-slate-500">
+                                {templates.length} template{templates.length !== 1 ? "s" : ""} found
+                            </span>
+                        )}
                     </div>
 
                     {isLoading ? (
                         <div className="flex items-center justify-center py-20">
                             <Loader2 className="h-10 w-10 animate-spin text-purple-600" />
+                        </div>
+                    ) : isError ? (
+                        <div className="text-center py-20">
+                            <div className="h-16 w-16 rounded-full bg-red-50 dark:bg-red-950/30 flex items-center justify-center mx-auto mb-4">
+                                <Search className="h-8 w-8 text-red-400" />
+                            </div>
+                            <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">
+                                Couldn&apos;t load templates
+                            </h3>
+                            <p className="text-slate-500 mb-4">
+                                Check your connection and try again.
+                            </p>
+                            <Button variant="outline" onClick={() => refetch()}>
+                                <RefreshCw className="h-4 w-4 mr-2" />
+                                Retry
+                            </Button>
                         </div>
                     ) : templates.length === 0 ? (
                         <div className="text-center py-20">
@@ -465,6 +535,7 @@ export default function MarketplacePage() {
                         </div>
                     )}
                 </div>
+                )}
             </main>
 
             {/* Template Preview Dialog */}

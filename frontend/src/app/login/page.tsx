@@ -28,6 +28,7 @@ import { Label } from "@/components/ui/label";
 import { useAuthStore } from "@/stores/auth-store";
 import { api } from "@/lib/api";
 import { ThemeToggleButton } from "@/components/ui/enhanced-ui";
+import { PRODUCT_NAME } from "@/lib/brand";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -432,7 +433,8 @@ export default function LoginPage() {
   }, []);
 
   const handleGoogleLogin = () => {
-    window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'}/auth/google`;
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+    window.location.assign(new URL('auth/google', apiBase.endsWith('/') ? apiBase : `${apiBase}/`).href);
   };
 
   const resetOtpFlow = () => {
@@ -457,7 +459,7 @@ export default function LoginPage() {
               <Sparkles className="h-6 w-6 text-white" />
             </div>
             <span className="text-xl font-bold text-slate-900 dark:text-white">
-              Presentation Designer
+              {PRODUCT_NAME}
             </span>
           </Link>
 

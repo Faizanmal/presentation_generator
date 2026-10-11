@@ -32,6 +32,7 @@
   "include": [
     "src/**/*",
     "test/**/*.ts",
-    "test/**/*.d.ts"
+    "test/**/*.d.ts",
+    "../shared/**/*.ts"
   ]
 }

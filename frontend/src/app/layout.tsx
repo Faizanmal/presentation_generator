@@ -20,6 +20,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { setupErrorTracking } from "@/lib/sentry";
 import { GoogleAnalytics, GoogleTagManager, GoogleTagManagerNoScript } from "@/components/analytics";
 import { ImpersonationBanner } from "@/components/admin/ImpersonationBanner";
+import { BRAND } from "@/lib/brand";
 import "./globals.css";
 
 // Initialize error tracking
@@ -40,8 +41,8 @@ const fontClasses = `${inter.variable} ${playfair.variable} ${sora.variable} ${s
 
 
 export const metadata: Metadata = {
-  title: "Presentation Designer - AI-Powered Presentations",
-  description: "Create stunning presentations in minutes with AI. Transform your ideas into beautifully designed slides.",
+  title: BRAND.titleDefault,
+  description: BRAND.description,
   keywords: ["presentation", "AI", "design", "slides", "powerpoint", "pitch deck"],
 };
 

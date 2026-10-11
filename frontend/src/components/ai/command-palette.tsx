@@ -94,7 +94,12 @@ export function AICommandPalette({ isOpen, onClose, editorActions }: CommandPale
         description: 'Enhance clarity, tone, and impact of selected text',
         icon: '💡',
         category: 'ai',
-        action: () => { /* TODO: connect to inline AI editing */ onClose(); },
+        action: () => {
+          window.dispatchEvent(new CustomEvent('presentation:editor-command', {
+            detail: { type: 'ai-action', payload: { action: 'enhance' } },
+          }));
+          onClose();
+        },
       },
       {
         id: 'ai-summarize',
@@ -102,7 +107,12 @@ export function AICommandPalette({ isOpen, onClose, editorActions }: CommandPale
         description: 'Create a concise summary of verbose slides',
         icon: '📝',
         category: 'ai',
-        action: () => { onClose(); },
+        action: () => {
+          window.dispatchEvent(new CustomEvent('presentation:editor-command', {
+            detail: { type: 'ai-action', payload: { action: 'summarize' } },
+          }));
+          onClose();
+        },
       },
       {
         id: 'ai-add-visuals',
@@ -110,7 +120,12 @@ export function AICommandPalette({ isOpen, onClose, editorActions }: CommandPale
         description: 'Generate images or icons for the current slide',
         icon: '🖼️',
         category: 'ai',
-        action: () => { onClose(); },
+        action: () => {
+          window.dispatchEvent(new CustomEvent('presentation:editor-command', {
+            detail: { type: 'ai-action', payload: { action: 'add-visuals' } },
+          }));
+          onClose();
+        },
         disabled: !editorActions?.activeSlideId,
       },
 

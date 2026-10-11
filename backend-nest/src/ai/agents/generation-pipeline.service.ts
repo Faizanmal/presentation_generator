@@ -44,7 +44,10 @@ import type {
   EditMemoryEntry,
   BrandGuidelines,
 } from '@shared/presentation-dsl';
-import { getBlockFontSize, getSlidePadding } from '@shared/layout-engine';
+import {
+  getBlockFontSize,
+  getSlidePadding,
+} from '../../../../shared/layout-engine';
 import { assignZonesToBlocks } from './enhanced-to-dsl.mapper';
 
 /** Event emitted during generation for real-time progress tracking */

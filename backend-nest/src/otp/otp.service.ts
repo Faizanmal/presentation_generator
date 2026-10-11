@@ -157,7 +157,7 @@ export class OtpService {
       } else if ((channel as string) === 'sms') {
         await this.smsService.sendSms(
           normalizedId,
-          `Your Presentation Designer verification code is: ${otp}. Expires in ${Math.ceil(this.OTP_EXPIRY / 60)} minutes. Do not share this code.`,
+          `Your PresentPitch verification code is: ${otp}. Expires in ${Math.ceil(this.OTP_EXPIRY / 60)} minutes. Do not share this code.`,
         );
       }
     } catch (error) {

@@ -18,66 +18,20 @@ import {
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
+import { PRODUCT_NAME } from "@/lib/brand";
+import { PLANS_LIST, type PlanId } from "@/lib/plans";
 
-const PLANS = [
-  {
-    id: "FREE",
-    name: "Free",
-    price: 0,
-    icon: Zap,
-    description: "Get started with basic features",
-    features: [
-      "3 presentations",
-      "10 AI generations per month",
-      "Basic themes",
-      "Export to HTML/JSON",
-      "Share with link",
-    ],
-    limitations: [
-      "No PDF export",
-      "No premium themes",
-      "Limited AI generations",
-    ],
-  },
-  {
-    id: "PRO",
-    name: "Pro",
-    price: 29,
-    icon: Crown,
-    description: "For power users — covers heavier AI usage",
-    popular: true,
-    features: [
-      "100 presentations",
-      "1,000 standard AI generations per month",
-      "5 Thinking (high‑quality) generations per month",
-      "All themes including premium",
-      "Export to PDF/HTML/JSON",
-      "Priority support",
-      "Custom branding (coming soon)",
-    ],
-    priceId: "price_pro_monthly", // Replace with actual Stripe price ID
-    thinkingCreditsIncluded: 5,
-  },
-  {
-    id: "ENTERPRISE",
-    name: "Enterprise",
-    price: 199,
-    icon: Building2,
-    description: "For teams and large organizations — optimized for AI workloads",
-    features: [
-      "1,000 presentations (expandable)",
-      "50,000 standard AI generations per month",
-      "250 Thinking (high‑quality) generations per month",
-      "All Pro features",
-      "Team collaboration",
-      "SSO & advanced security",
-      "Dedicated support & onboarding",
-      "Custom integrations",
-    ],
-    priceId: "price_enterprise_monthly", // Replace with actual Stripe price ID
-    thinkingCreditsIncluded: 250,
-  }
-];
+const PLAN_ICONS: Record<PlanId, typeof Zap> = {
+  FREE: Zap,
+  PRO: Crown,
+  ENTERPRISE: Building2,
+};
+
+const PLAN_DESCRIPTIONS: Record<PlanId, string> = {
+  FREE: "Get started with basic features",
+  PRO: "For power users — covers heavier AI usage",
+  ENTERPRISE: "For teams and large organizations — optimized for AI workloads",
+};
 
 export default function BillingPage() {
   const router = useRouter();
@@ -154,7 +108,7 @@ export default function BillingPage() {
                   <Sparkles className="h-5 w-5 text-white" />
                 </div>
                 <span className="text-xl font-bold text-slate-900 dark:text-white">
-                  Presentation Designer
+                  {PRODUCT_NAME}
                 </span>
               </Link>
             </div>
@@ -243,9 +197,10 @@ export default function BillingPage() {
 
         {/* Plan cards */}
         <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-          {PLANS.map((plan) => {
+          {PLANS_LIST.map((plan) => {
             const isCurrentPlan = currentPlan === plan.id;
-            const Icon = plan.icon;
+            const Icon = PLAN_ICONS[plan.id];
+            const description = PLAN_DESCRIPTIONS[plan.id];
 
             return (
               <div
@@ -282,13 +237,13 @@ export default function BillingPage() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-slate-900 dark:text-white">{plan.name}</h3>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">{plan.description}</p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">{description}</p>
                     </div>
                   </div>
 
                   <div className="mb-6">
                     <span className="text-4xl font-bold text-slate-900 dark:text-white">
-                      ${plan.price}
+                      ${plan.priceMonthly}
                     </span>
                     <span className="text-slate-600 dark:text-slate-400">/month</span>
                   </div>

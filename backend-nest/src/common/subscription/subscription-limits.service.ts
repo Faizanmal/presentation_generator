@@ -8,6 +8,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { PLAN_LIMITS } from './plan-limits';
 
 export type SubscriptionTier = 'FREE' | 'PRO' | 'ENTERPRISE';
 
@@ -37,12 +38,12 @@ export interface SubscriptionLimits {
 export const SUBSCRIPTION_LIMITS: Record<SubscriptionTier, SubscriptionLimits> =
   {
     FREE: {
-      maxProjects: 5,
+      maxProjects: PLAN_LIMITS.FREE.presentations,
       maxSlidesPerProject: 15,
       maxBlocksPerSlide: 20,
       maxCollaboratorsPerProject: 2,
       maxStorageMB: 100,
-      aiGenerationsPerMonth: 10,
+      aiGenerationsPerMonth: PLAN_LIMITS.FREE.aiGenerationsPerMonth,
       imageGenerationsPerMonth: 5,
       exportsPerMonth: 10,
       maxFileSizeMB: 5,
@@ -59,12 +60,12 @@ export const SUBSCRIPTION_LIMITS: Record<SubscriptionTier, SubscriptionLimits> =
       },
     },
     PRO: {
-      maxProjects: 50,
+      maxProjects: PLAN_LIMITS.PRO.presentations,
       maxSlidesPerProject: 100,
       maxBlocksPerSlide: 50,
       maxCollaboratorsPerProject: 10,
       maxStorageMB: 5000,
-      aiGenerationsPerMonth: 200,
+      aiGenerationsPerMonth: PLAN_LIMITS.PRO.aiGenerationsPerMonth,
       imageGenerationsPerMonth: 100,
       exportsPerMonth: 100,
       maxFileSizeMB: 50,

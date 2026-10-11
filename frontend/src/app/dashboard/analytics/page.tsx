@@ -1,22 +1,26 @@
 'use client';
 
-import { useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import { useQuery } from '@tanstack/react-query';
 import {
   BarChart3,
   ArrowLeft,
   Loader2,
   TrendingUp,
   Users,
-  Eye,
-  Globe,
+  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { api } from '@/lib/api';
+import { FEATURES } from '@/lib/features';
+import { SoonBadge } from '@/components/ui/soon-badge';
+import type { Project } from '@/types';
 
 // Dynamically import heavy analytics components
 const EnhancedAnalyticsDashboard = dynamic(
@@ -55,10 +59,33 @@ const InsightsDashboard = dynamic(
   },
 );
 
+function pickLatestProject(projects: Project[]): Project | undefined {
+  if (!projects.length) {return undefined;}
+  return [...projects].sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+  )[0];
+}
+
 export default function AnalyticsPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const projectId = searchParams.get('projectId') || '';
   const [activeTab, setActiveTab] = useState('overview');
+
+  const { data: projects, isLoading: projectsLoading } = useQuery({
+    queryKey: ['projects'],
+    queryFn: () => api.projects.getAll(),
+  });
+
+  useEffect(() => {
+    if (projectId || projectsLoading || !projects?.length) {return;}
+    const latest = pickLatestProject(projects);
+    if (latest) {
+      router.replace(`/dashboard/analytics?projectId=${latest.id}`);
+    }
+  }, [projectId, projects, projectsLoading, router]);
+
+  const selectedProject = projects?.find((p) => p.id === projectId);
 
   return (
     <div className="space-y-6">
@@ -76,87 +103,57 @@ export default function AnalyticsPage() {
               Analytics
             </h1>
             <p className="text-muted-foreground mt-1">
-              {projectId
-                ? 'Presentation-level insights and engagement metrics'
-                : 'Workspace-wide analytics and performance overview'}
+              {projectId && selectedProject
+                ? `Insights for "${selectedProject.title}"`
+                : projectId
+                  ? 'Presentation-level insights and engagement metrics'
+                  : 'Pick a presentation to see analytics.'}
             </p>
           </div>
         </div>
 
         {projectId && (
-          <Badge variant="secondary" className="text-sm px-3 py-1">
-            Project: {projectId.slice(0, 8)}…
+          <Badge variant="secondary" className="text-sm px-3 py-1 max-w-[12rem] truncate">
+            {selectedProject?.title || `Project ${projectId.slice(0, 8)}…`}
           </Badge>
         )}
       </div>
 
-      {/* No project selected – show workspace summary cards */}
-      {!projectId && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            {
-              title: 'Total Views',
-              icon: Eye,
-              value: '—',
-              desc: 'Select a project to see data',
-              color: 'text-blue-500',
-            },
-            {
-              title: 'Unique Viewers',
-              icon: Users,
-              value: '—',
-              desc: 'Select a project to see data',
-              color: 'text-green-500',
-            },
-            {
-              title: 'Avg. Engagement',
-              icon: TrendingUp,
-              value: '—',
-              desc: 'Select a project to see data',
-              color: 'text-purple-500',
-            },
-            {
-              title: 'Locations',
-              icon: Globe,
-              value: '—',
-              desc: 'Select a project to see data',
-              color: 'text-orange-500',
-            },
-          ].map((stat) => (
-            <Card key={stat.title}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <stat.icon className={`w-4 h-4 ${stat.color}`} />
-                  {stat.title}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">{stat.value}</p>
-                <p className="text-xs text-muted-foreground mt-1">{stat.desc}</p>
-              </CardContent>
-            </Card>
-          ))}
+      {!projectId && projectsLoading && (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </div>
+      )}
 
-          <Card className="sm:col-span-2 lg:col-span-4">
-            <CardHeader>
-              <CardTitle>Get Started with Analytics</CardTitle>
-              <CardDescription>
-                Open a presentation from your dashboard and view its analytics, or navigate to{' '}
-                <Link href="/dashboard/analytics/team" className="text-primary underline underline-offset-2">
-                  Team Analytics
-                </Link>{' '}
-                for workspace-wide insights.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex gap-3 flex-wrap">
-              <Link href="/dashboard">
-                <Button variant="outline">Go to Dashboard</Button>
-              </Link>
-              <Link href="/dashboard/analytics/team">
-                <Button>View Team Analytics</Button>
-              </Link>
-            </CardContent>
-          </Card>
+      {!projectId && !projectsLoading && !projects?.length && (
+        <Card className="border-dashed">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
+              <FileText className="h-6 w-6 text-slate-400" />
+            </div>
+            <CardTitle>Pick a presentation to see analytics.</CardTitle>
+            <CardDescription>
+              Create or open a deck from your dashboard, then return here for views, engagement, and audience insights.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex justify-center gap-3 flex-wrap pb-8">
+            <Link href="/dashboard">
+              <Button>Create or open a presentation</Button>
+            </Link>
+            <Link href="/dashboard/team-analytics">
+              <Button variant="outline" className="gap-2">
+                Team Analytics
+                {!FEATURES.teamAnalytics && <SoonBadge />}
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
+
+      {!projectId && !projectsLoading && projects && projects.length > 0 && (
+        <div className="flex items-center justify-center py-16 text-muted-foreground">
+          <Loader2 className="w-6 h-6 animate-spin mr-2" />
+          Loading analytics for your latest presentation…
         </div>
       )}
 
