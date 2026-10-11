@@ -22,7 +22,7 @@ const {
     httpOnly: true,
     // CHIPS: allow the cookie on the Vercel → Render cross-site fetch.
     partitioned: isProduction,
-  } as CookieOptions,
+  },
 
   size: 64,
   ignoredMethods: ['GET', 'HEAD', 'OPTIONS'],

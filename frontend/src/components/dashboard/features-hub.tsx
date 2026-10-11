@@ -6,6 +6,8 @@ import {
   Library, FileSpreadsheet, ImageIcon, Palette,
   Accessibility, Globe, BrainCog, UsersRound, Target,
 } from 'lucide-react';
+import { FEATURES } from '@/lib/features';
+import { SoonBadge } from '@/components/ui/soon-badge';
 
 const featureCategories = [
   {
@@ -14,8 +16,22 @@ const featureCategories = [
       { name: 'AI Research', href: '/dashboard/ai-research', icon: SearchIcon, color: 'text-blue-500' },
       { name: 'AI Thinking', href: '/dashboard/ai-thinking', icon: BrainCog, color: 'text-rose-500' },
       { name: 'Storyboarding', href: '/dashboard/storyboarding', icon: Layers, color: 'text-indigo-500' },
-      { name: 'Presentation Coach', href: '#', icon: Target, color: 'text-emerald-500', badge: 'Editor' },
-      { name: 'AI Co-Pilot', href: '#', icon: Bot, color: 'text-violet-500', badge: 'Editor' },
+      {
+        name: 'Presentation Coach',
+        href: '/dashboard/presentation-coach',
+        icon: Target,
+        color: 'text-emerald-500',
+        badge: 'Editor',
+        soon: !FEATURES.presentationCoach,
+      },
+      {
+        name: 'AI Co-Pilot',
+        href: '/dashboard/ai-copilot',
+        icon: Bot,
+        color: 'text-violet-500',
+        badge: 'Editor',
+        soon: !FEATURES.aiCopilot,
+      },
     ],
   },
   {
@@ -31,7 +47,13 @@ const featureCategories = [
   {
     title: 'Analytics',
     features: [
-      { name: 'Team Analytics', href: '/dashboard/analytics/team', icon: UsersRound, color: 'text-blue-500' },
+      {
+        name: 'Team Analytics',
+        href: '/dashboard/team-analytics',
+        icon: UsersRound,
+        color: 'text-blue-500',
+        soon: !FEATURES.teamAnalytics,
+      },
     ],
   },
 
@@ -70,15 +92,18 @@ export function FeaturesHub() {
                       <Icon className={`w-4 h-4 ${f.color}`} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <span className="font-medium text-sm text-slate-700 dark:text-slate-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">
                           {f.name}
                         </span>
-                        {'badge' in f && f.badge && (
-                          <span className="text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 px-1.5 py-0.5 rounded-full font-medium ml-2 shrink-0">
-                            {f.badge}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-1 shrink-0">
+                          {'soon' in f && f.soon && <SoonBadge />}
+                          {'badge' in f && f.badge && (
+                            <span className="text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 px-1.5 py-0.5 rounded-full font-medium">
+                              {f.badge}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all" />
@@ -92,4 +117,3 @@ export function FeaturesHub() {
     </div>
   );
 }
-

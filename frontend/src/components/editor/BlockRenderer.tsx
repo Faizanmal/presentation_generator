@@ -205,13 +205,13 @@ const BlockRenderer = React.memo(({
               onInput={handleTextChange}
               onFocus={onFocus}
               onBlur={onBlur}
-              className="outline-none font-extrabold leading-[1.08] tracking-[-0.025em] transition-all duration-200"
+              className="outline-none font-extrabold leading-[1.08] tracking-[-0.025em] transition-all duration-200 w-full max-w-full break-words [overflow-wrap:anywhere] text-balance"
               style={{
                 fontFamily: theme?.fonts?.heading || 'var(--font-dm-sans), system-ui, sans-serif',
                 color: customColor?.startsWith('#') ? customColor : (theme?.colors?.text || primaryColor),
                 textAlign,
                 fontSize: customFontSize || headingScale,
-                maxWidth: textAlign === 'center' ? '18ch' : 'none',
+                maxWidth: textAlign === 'center' ? readableWidth : '100%',
               }}
               dangerouslySetInnerHTML={{ __html: content?.text || "Heading" }}
             />
@@ -246,14 +246,14 @@ const BlockRenderer = React.memo(({
             onInput={handleTextChange}
             onFocus={onFocus}
             onBlur={onBlur}
-            className="outline-none font-semibold leading-snug transition-all duration-200 text-[clamp(1.45rem,2.3vw,2.25rem)]"
+            className="outline-none font-semibold leading-snug transition-all duration-200 text-[clamp(1.45rem,2.3vw,2.25rem)] w-full max-w-full break-words [overflow-wrap:anywhere]"
             style={{
               fontFamily: theme?.fonts?.heading || 'var(--font-dm-sans), system-ui, sans-serif',
               color: customColor?.startsWith('#') ? customColor : undefined,
               textAlign,
               fontSize: customFontSize || subheadingScale,
               opacity: 0.9,
-              maxWidth: '36ch',
+              maxWidth: readableWidth,
             }}
             dangerouslySetInnerHTML={{ __html: content?.text || "Subheading" }}
           />
@@ -815,7 +815,7 @@ const BlockRenderer = React.memo(({
               onInput={handleTextChange}
               onFocus={onFocus}
               onBlur={onBlur}
-              className="text-3xl md:text-4xl font-extrabold text-white outline-none relative z-10 drop-shadow-sm leading-tight"
+              className="text-2xl md:text-3xl font-extrabold text-white outline-none relative z-10 drop-shadow-sm leading-snug w-full max-w-full break-words [overflow-wrap:anywhere] text-balance px-2"
               style={{ fontFamily: theme?.fonts?.heading || 'var(--font-dm-sans), system-ui, sans-serif' }}
               dangerouslySetInnerHTML={{ __html: ctaText }}
             />

@@ -3,6 +3,7 @@ import {
   Logger,
   NotFoundException,
   ForbiddenException,
+  ConflictException,
   Inject,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -196,7 +197,7 @@ export class CollaborationService {
       });
 
     if (existingCollaborator) {
-      throw new Error('User is already a collaborator');
+      throw new ConflictException('User is already a collaborator');
     }
 
     return this.prisma.projectCollaborator.create({

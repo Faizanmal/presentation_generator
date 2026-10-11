@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import { Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
 
@@ -44,7 +45,7 @@ interface SSOConfigDto {
 
 interface InviteUserDto {
   email: string;
-  role?: OrgRole;
+  role?: OrgRole | 'VIEWER';
 }
 
 @Injectable()
@@ -54,6 +55,7 @@ export class OrganizationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    private readonly emailService: EmailService,
   ) {}
 
   // ============================================
@@ -147,6 +149,20 @@ export class OrganizationsService {
   }
 
   /**
+   * Primary organization for the signed-in user (owner first).
+   */
+  async getCurrentOrganization(userId: string) {
+    const organizations = await this.getUserOrganizations(userId);
+    if (organizations.length === 0) {
+      throw new NotFoundException('You are not a member of any organization');
+    }
+    return (
+      organizations.find((organization) => organization.role === 'OWNER') ||
+      organizations[0]
+    );
+  }
+
+  /**
    * Update organization settings
    */
   async updateOrganization(
@@ -229,6 +245,56 @@ export class OrganizationsService {
     }));
   }
 
+  private resolveInviteRole(role?: OrgRole | 'VIEWER'): OrgRole {
+    if (role === 'VIEWER') {
+      return 'MEMBER';
+    }
+    return role || 'MEMBER';
+  }
+
+  private invitationStatus(expiresAt: Date): 'PENDING' | 'EXPIRED' {
+    return expiresAt < new Date() ? 'EXPIRED' : 'PENDING';
+  }
+
+  private buildInviteUrl(token: string) {
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    return `${frontendUrl}/invite/${token}`;
+  }
+
+  private async mapInvitation(invitation: {
+    id: string;
+    organizationId: string;
+    email: string;
+    role: OrgRole;
+    token: string;
+    invitedBy: string;
+    createdAt: Date;
+    expiresAt: Date;
+  }) {
+    const inviter = await this.prisma.user.findUnique({
+      where: { id: invitation.invitedBy },
+      select: { name: true, email: true },
+    });
+
+    return {
+      id: invitation.id,
+      organizationId: invitation.organizationId,
+      email: invitation.email,
+      role: invitation.role,
+      status: this.invitationStatus(invitation.expiresAt),
+      invitedById: invitation.invitedBy,
+      invitedBy: {
+        name: inviter?.name || null,
+        email: inviter?.email || '',
+      },
+      token: invitation.token,
+      createdAt: invitation.createdAt.toISOString(),
+      expiresAt: invitation.expiresAt.toISOString(),
+      inviteUrl: this.buildInviteUrl(invitation.token),
+    };
+  }
+
   /**
    * Invite a user to the organization
    */
@@ -239,9 +305,15 @@ export class OrganizationsService {
   ) {
     await this.ensureAdminAccess(organizationId, invitedBy);
 
-    // Check if user is already a member
+    const email = dto.email.trim().toLowerCase();
+    if (!email.includes('@')) {
+      throw new BadRequestException('A valid email is required');
+    }
+
+    const role = this.resolveInviteRole(dto.role);
+
     const existingUser = await this.prisma.user.findUnique({
-      where: { email: dto.email },
+      where: { email },
     });
 
     if (existingUser) {
@@ -256,15 +328,23 @@ export class OrganizationsService {
       }
     }
 
-    // Create invitation
+    const pending = await this.prisma.teamInvitation.findFirst({
+      where: { organizationId, email },
+    });
+    if (pending && pending.expiresAt > new Date()) {
+      throw new BadRequestException(
+        'An invitation is already pending for this email',
+      );
+    }
+
     const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
     const invitation = await this.prisma.teamInvitation.create({
       data: {
         organizationId,
-        email: dto.email,
-        role: dto.role || 'MEMBER',
+        email,
+        role,
         token,
         invitedBy,
         expiresAt,
@@ -278,13 +358,130 @@ export class OrganizationsService {
       'member',
       invitation.id,
       null as unknown as Prisma.InputJsonValue,
-      { email: dto.email, role: dto.role },
+      { email, role },
     );
 
-    // In production, send email with invitation link
-    const inviteUrl = `${this.configService.get('FRONTEND_URL')}/invite/${token}`;
+    await this.sendInvitationEmail(
+      organizationId,
+      invitedBy,
+      invitation.email,
+      invitation.token,
+    );
 
-    return { invitation, inviteUrl };
+    return this.mapInvitation(invitation);
+  }
+
+  async listInvitations(organizationId: string, userId: string) {
+    await this.ensureAdminAccess(organizationId, userId);
+    const invitations = await this.prisma.teamInvitation.findMany({
+      where: { organizationId },
+      orderBy: { createdAt: 'desc' },
+    });
+    return Promise.all(
+      invitations.map((invitation) => this.mapInvitation(invitation)),
+    );
+  }
+
+  async resendInvitation(
+    organizationId: string,
+    invitationId: string,
+    userId: string,
+  ) {
+    await this.ensureAdminAccess(organizationId, userId);
+    const invitation = await this.prisma.teamInvitation.findFirst({
+      where: { id: invitationId, organizationId },
+    });
+    if (!invitation) {
+      throw new NotFoundException('Invitation not found');
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const updated = await this.prisma.teamInvitation.update({
+      where: { id: invitation.id },
+      data: { token, expiresAt },
+    });
+
+    await this.sendInvitationEmail(
+      organizationId,
+      userId,
+      updated.email,
+      updated.token,
+    );
+
+    return this.mapInvitation(updated);
+  }
+
+  async cancelInvitation(
+    organizationId: string,
+    invitationId: string,
+    userId: string,
+  ) {
+    await this.ensureAdminAccess(organizationId, userId);
+    const invitation = await this.prisma.teamInvitation.findFirst({
+      where: { id: invitationId, organizationId },
+    });
+    if (!invitation) {
+      throw new NotFoundException('Invitation not found');
+    }
+    await this.prisma.teamInvitation.delete({ where: { id: invitation.id } });
+    return { success: true };
+  }
+
+  async bulkInvite(
+    organizationId: string,
+    invitedBy: string,
+    emails: string[],
+    role?: OrgRole | 'VIEWER',
+  ) {
+    const uniqueEmails = [
+      ...new Set(
+        emails.map((value) => value.trim().toLowerCase()).filter(Boolean),
+      ),
+    ];
+    let sent = 0;
+    for (const email of uniqueEmails) {
+      try {
+        await this.inviteUser(organizationId, invitedBy, { email, role });
+        sent += 1;
+      } catch (error) {
+        this.logger.warn(
+          `Bulk invite skipped ${email}: ${(error as Error).message}`,
+        );
+      }
+    }
+    return { sent };
+  }
+
+  private async sendInvitationEmail(
+    organizationId: string,
+    invitedBy: string,
+    email: string,
+    token: string,
+  ) {
+    const [organization, inviter] = await Promise.all([
+      this.prisma.organization.findUnique({
+        where: { id: organizationId },
+        select: { name: true },
+      }),
+      this.prisma.user.findUnique({
+        where: { id: invitedBy },
+        select: { name: true, email: true },
+      }),
+    ]);
+
+    try {
+      await this.emailService.sendTeamInviteEmail(
+        email,
+        inviter?.name || inviter?.email || 'A teammate',
+        organization?.name || 'the team',
+        this.buildInviteUrl(token),
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Failed to enqueue team invite email: ${(error as Error).message}`,
+      );
+    }
   }
 
   /**

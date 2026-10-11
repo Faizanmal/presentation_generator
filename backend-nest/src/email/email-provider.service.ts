@@ -245,7 +245,7 @@ export class EmailProviderService implements OnModuleInit {
   }> {
     const from =
       options.from ||
-      `"${this.configService.get('MAIL_FROM_NAME') || 'Presentation Designer'}" <${this.configService.get('MAIL_FROM') || 'noreply@example.com'}>`;
+      `"${this.configService.get('MAIL_FROM_NAME') || 'PresentPitch'}" <${this.configService.get('MAIL_FROM') || 'noreply@example.com'}>`;
 
     const sortedProviders = this.getSortedHealthyProviders();
 

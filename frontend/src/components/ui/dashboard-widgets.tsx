@@ -13,6 +13,7 @@ import {
     Users,
     Zap,
 } from "lucide-react";
+import { SoonBadge } from "@/components/ui/soon-badge";
 
 interface StatCardProps {
     title: string;
@@ -79,6 +80,7 @@ interface QuickActionCardProps {
     icon: React.ReactNode;
     color: string;
     onClick: () => void;
+    showSoonBadge?: boolean;
 }
 
 export function QuickActionCard({
@@ -87,6 +89,7 @@ export function QuickActionCard({
     icon,
     color,
     onClick,
+    showSoonBadge,
 }: QuickActionCardProps) {
     return (
         <motion.button
@@ -102,8 +105,9 @@ export function QuickActionCard({
                     {icon}
                 </div>
                 <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-slate-900 dark:text-white mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                    <h3 className="font-semibold text-slate-900 dark:text-white mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors flex items-center gap-2">
                         {title}
+                        {showSoonBadge && <SoonBadge />}
                     </h3>
                     <p className="text-sm text-slate-500 dark:text-slate-400">{description}</p>
                 </div>
@@ -175,6 +179,7 @@ interface QuickActionsGridProps {
     onAIGenerate: () => void;
     onViewAnalytics: () => void;
     onInviteTeam: () => void;
+    inviteTeamComingSoon?: boolean;
 }
 
 export function QuickActionsGrid({
@@ -182,6 +187,7 @@ export function QuickActionsGrid({
     onAIGenerate,
     onViewAnalytics,
     onInviteTeam,
+    inviteTeamComingSoon,
 }: QuickActionsGridProps) {
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -212,6 +218,7 @@ export function QuickActionsGrid({
                 icon={<Users className="h-6 w-6" />}
                 color="from-orange-500 to-orange-600"
                 onClick={onInviteTeam}
+                showSoonBadge={inviteTeamComingSoon}
             />
         </div>
     );
@@ -348,6 +355,7 @@ interface UsageCardProps {
     presentations: { used: number; total: number };
     aiGenerations: { used: number; total: number };
     onUpgrade?: () => void;
+    isLoading?: boolean;
 }
 
 export function UsageCard({
@@ -355,6 +363,7 @@ export function UsageCard({
     presentations,
     aiGenerations,
     onUpgrade,
+    isLoading = false,
 }: UsageCardProps) {
     return (
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6">
@@ -365,7 +374,7 @@ export function UsageCard({
                         Current plan: <span className="font-medium capitalize">{plan}</span>
                     </p>
                 </div>
-                {plan === "free" && onUpgrade && (
+                {plan.toLowerCase() === "free" && onUpgrade && (
                     <button
                         onClick={onUpgrade}
                         className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
@@ -375,20 +384,33 @@ export function UsageCard({
                 )}
             </div>
 
-            <div className="space-y-4">
-                <UsageProgress
-                    label="Presentations"
-                    used={presentations.used}
-                    total={presentations.total}
-                    color="bg-blue-500"
-                />
-                <UsageProgress
-                    label="AI Generations"
-                    used={aiGenerations.used}
-                    total={aiGenerations.total}
-                    color="bg-purple-500"
-                />
-            </div>
+            {isLoading ? (
+                <div className="space-y-4 animate-pulse">
+                    <div className="space-y-2">
+                        <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-3/4" />
+                        <div className="h-2 bg-slate-200 dark:bg-slate-800 rounded-full" />
+                    </div>
+                    <div className="space-y-2">
+                        <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-2/3" />
+                        <div className="h-2 bg-slate-200 dark:bg-slate-800 rounded-full" />
+                    </div>
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    <UsageProgress
+                        label="Presentations"
+                        used={presentations.used}
+                        total={presentations.total}
+                        color="bg-blue-500"
+                    />
+                    <UsageProgress
+                        label="AI Generations"
+                        used={aiGenerations.used}
+                        total={aiGenerations.total}
+                        color="bg-purple-500"
+                    />
+                </div>
+            )}
         </div>
     );
 }

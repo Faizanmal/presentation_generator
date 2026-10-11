@@ -4,3 +4,10 @@
 .env.*.local
 
 .tmp-export-inspect/
+
+# build / compile output (never commit)
+dist/
+dist-test/
+**/dist/
+**/dist-test/
+*.tsbuildinfo

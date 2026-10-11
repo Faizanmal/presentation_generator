@@ -44,6 +44,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 import { Progress } from "@/components/ui/progress";
 import { ThemeToggleSimple } from "@/components/ui/enhanced-ui";
+import { PRODUCT_NAME } from "@/lib/brand";
+import { FEATURES, type FeatureKey } from "@/lib/features";
+import { SoonBadge } from "@/components/ui/soon-badge";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
     className?: string;
@@ -89,10 +92,10 @@ export function Sidebar({ className, isCollapsed = false, onCollapse, onLinkClic
             title: "Engagement",
             collapsed: true,
             items: [
-                { title: "Live Q&A", icon: MessageSquareMore, href: "/dashboard/live-qa" },
-                { title: "Learning Paths", icon: GraduationCap, href: "/dashboard/learning-paths" },
-                { title: "Immersive View", icon: Glasses, href: "/dashboard/immersive" },
-                { title: "Cross-Sync", icon: MonitorSmartphone, href: "/dashboard/cross-sync" },
+                { title: "Live Q&A", icon: MessageSquareMore, href: "/dashboard/live-qa", featureKey: "liveQa" as FeatureKey },
+                { title: "Learning Paths", icon: GraduationCap, href: "/dashboard/learning-paths", featureKey: "learningPaths" as FeatureKey },
+                { title: "Immersive View", icon: Glasses, href: "/dashboard/immersive", featureKey: "immersiveView" as FeatureKey },
+                { title: "Cross-Sync", icon: MonitorSmartphone, href: "/dashboard/cross-sync", featureKey: "crossSync" as FeatureKey },
             ]
         },
     ];
@@ -107,7 +110,7 @@ export function Sidebar({ className, isCollapsed = false, onCollapse, onLinkClic
                         <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-linear-to-br from-blue-600 to-indigo-600 shadow-sm">
                             <Sparkles className="w-5 h-5 text-white" />
                         </div>
-                        <span>Present.AI</span>
+                        <span>{PRODUCT_NAME}</span>
                     </Link>
                 )}
                 {isCollapsed && (
@@ -143,7 +146,14 @@ export function Sidebar({ className, isCollapsed = false, onCollapse, onLinkClic
                                                         )}
                                                     >
                                                         <item.icon className={cn("h-4 w-4", isCollapsed ? "mr-0" : "mr-3", isActive && "text-blue-600 dark:text-blue-400")} />
-                                                        {!isCollapsed && <span>{item.title}</span>}
+                                                        {!isCollapsed && (
+                                                            <span className="flex items-center gap-2 min-w-0">
+                                                                <span className="truncate">{item.title}</span>
+                                                                {'featureKey' in item && item.featureKey && !FEATURES[item.featureKey] && (
+                                                                    <SoonBadge />
+                                                                )}
+                                                            </span>
+                                                        )}
                                                     </Button>
                                                 </Link>
                                             </TooltipTrigger>

@@ -119,9 +119,7 @@ export class EnterpriseComplianceService {
       enabledFrameworks: settings.enabledFrameworks as ComplianceFramework[],
       autoReportGeneration: settings.autoReportGeneration,
       reportFrequency: settings.reportFrequency as
-        | 'weekly'
-        | 'monthly'
-        | 'quarterly',
+        'weekly' | 'monthly' | 'quarterly',
       notificationEmails: settings.notificationEmails as string[],
       dataRetentionDays: settings.dataRetentionDays,
       requireMFA: settings.requireMFA,

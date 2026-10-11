@@ -13,6 +13,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
+import { useAuthStore } from "@/stores/auth-store";
+import { canExportFormat } from "@/lib/plans";
+import { UpgradePrompt } from "@/components/ui/pro-badge";
 
 export interface ExportFormat {
   id: string;
@@ -33,7 +36,7 @@ const EXPORT_FORMATS: ExportFormat[] = [
     fileExtension: ".pdf",
     icon: <ImageIcon className="w-4 h-4" />,
     category: "static",
-    isPremium: false,
+    isPremium: true,
     quality: 85,
   },
   {
@@ -53,7 +56,7 @@ const EXPORT_FORMATS: ExportFormat[] = [
     fileExtension: ".pptx",
     icon: <FileJson className="w-4 h-4" />,
     category: "interactive",
-    isPremium: false,
+    isPremium: true,
     quality: 90,
   },
   {
@@ -128,6 +131,8 @@ interface AdvancedExportSystemProps {
 export function AdvancedExportSystem({
   onExport,
 }: AdvancedExportSystemProps) {
+  const userPlan = useAuthStore((state) => state.subscription?.plan || "FREE");
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [selectedFormat, setSelectedFormat] = useState<string | null>(null);
   const [options, setOptions] = useState<AdvancedExportOptions>({
     quality: 85,
@@ -149,6 +154,16 @@ export function AdvancedExportSystem({
 
   const selectedFormatData = EXPORT_FORMATS.find((f) => f.id === selectedFormat);
 
+  const isPlanLocked = (formatId: string): boolean => {
+    if (formatId.startsWith("pdf")) {
+      return !canExportFormat(userPlan, "pdf");
+    }
+    if (formatId === "pptx") {
+      return !canExportFormat(userPlan, "pptx");
+    }
+    return false;
+  };
+
   const handleExport = async () => {
     if (!selectedFormat) {
       toast.error("Please select an export format");
@@ -159,7 +174,15 @@ export function AdvancedExportSystem({
       toast.error("Selected format not found");
       return;
     }
-    if (selectedFormatData.isPremium) {
+    if (isPlanLocked(selectedFormatData.id)) {
+      setUpgradeOpen(true);
+      return;
+    }
+    if (
+      selectedFormatData.isPremium &&
+      !selectedFormatData.id.startsWith("pdf") &&
+      selectedFormatData.id !== "pptx"
+    ) {
       toast.info("This format requires a premium plan");
       return;
     }
@@ -403,6 +426,8 @@ export function AdvancedExportSystem({
           💾 Advanced export system with quality controls, compression, and multiple format support for any use case.
         </p>
       </div>
+
+      <UpgradePrompt open={upgradeOpen} onOpenChange={setUpgradeOpen} />
     </div>
   );
 }

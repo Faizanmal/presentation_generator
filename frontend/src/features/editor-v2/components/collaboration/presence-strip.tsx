@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { WifiOff } from "lucide-react";
 import { motionTiming, motionEase } from "../../lib/motion";
 import type { PresenceUser } from "../../types";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 interface PresenceStripProps {
   connected: boolean;
@@ -68,7 +69,7 @@ export function PresenceStrip({ connected, participants }: PresenceStripProps) {
       </div>
 
       <div className="flex items-center gap-2 text-pd-muted">
-        <span>Presentation Designer v2</span>
+        <span>{PRODUCT_NAME} v2</span>
       </div>
     </motion.div>
   );

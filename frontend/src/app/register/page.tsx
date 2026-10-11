@@ -13,6 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuthStore } from "@/stores/auth-store";
 import { ThemeToggleButton } from "@/components/ui/enhanced-ui";
+import { PRODUCT_NAME } from "@/lib/brand";
+import { PLAN_LIMITS } from "@/lib/plans";
 
 const registerSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -68,7 +70,8 @@ export default function RegisterPage() {
   };
 
   const handleGoogleSignup = () => {
-    window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'}/auth/google`;
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+    window.location.assign(new URL('auth/google', apiBase.endsWith('/') ? apiBase : `${apiBase}/`).href);
   };
 
   // Password strength indicator
@@ -101,11 +104,11 @@ export default function RegisterPage() {
           <ul className="space-y-4 text-lg text-blue-100">
             <li className="flex items-center gap-3">
               <div className="h-6 w-6 rounded-full bg-white/20 flex items-center justify-center">✓</div>
-              3 free presentations
+              {PLAN_LIMITS.FREE.presentations} free presentations
             </li>
             <li className="flex items-center gap-3">
               <div className="h-6 w-6 rounded-full bg-white/20 flex items-center justify-center">✓</div>
-              AI-powered generation
+              {PLAN_LIMITS.FREE.aiGenerationsPerMonth} AI generations per month
             </li>
             <li className="flex items-center gap-3">
               <div className="h-6 w-6 rounded-full bg-white/20 flex items-center justify-center">✓</div>
@@ -127,7 +130,7 @@ export default function RegisterPage() {
               <Sparkles className="h-5 w-5 text-white" />
             </div>
             <span className="text-xl font-bold text-slate-900 dark:text-white">
-              Presentation Designer
+              {PRODUCT_NAME}
             </span>
           </Link>
 

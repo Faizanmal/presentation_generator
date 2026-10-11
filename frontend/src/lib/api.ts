@@ -46,6 +46,7 @@ import type {
   ThinkingState,
   ThinkingPresentation,
 } from '@/types';
+import { PRODUCT_NAME } from '@/lib/brand';
 
 // Demo mode only when explicitly enabled (must be off for Vercel → Render)
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
@@ -55,7 +56,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 // Mock demo project
 const MOCK_PROJECT: Project = {
   id: 'demo-project-1',
-  title: 'Welcome to Demo Presentation Designer',
+  title: `Welcome to Demo ${PRODUCT_NAME}`,
   description: 'This is a demo project to help you explore the features',
   type: 'PRESENTATION',
   status: 'DRAFT',
@@ -154,7 +155,9 @@ class ApiClient {
     const redirect = encodeURIComponent(
       `${window.location.pathname}${window.location.search}`,
     );
-    window.location.href = `/login?redirect=${redirect}`;
+    // Axios interceptor runs outside React; hard navigate is required for auth recovery
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- not a Client Component
+    window.location.assign(`/login?redirect=${redirect}`);
   }
 
   constructor() {
@@ -1927,9 +1930,18 @@ class ApiClient {
   }
 
   async generateSpeakerNotes(slideContent: string): Promise<{ notes: string }> {
-    const { data } = await this.client.post('/ai/generate-speaker-notes', {
-      content: slideContent,
-    });
+    const { data } = await this.client.post<{ speakerNotes?: string; notes?: string; content?: string }>(
+      '/ai/speaker-notes',
+      {
+        slideContent,
+        content: slideContent,
+      }
+    );
+    return { notes: data.notes || data.speakerNotes || data.content || '' };
+  }
+
+  async acceptInvitation(token: string): Promise<{ success: boolean }> {
+    const { data } = await this.client.post<{ success: boolean }>(`/invitations/${token}/accept`);
     return data;
   }
 

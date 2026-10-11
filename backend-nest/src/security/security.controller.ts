@@ -288,10 +288,7 @@ export class SecurityController {
   async getSecurityAlerts(@Query('status') status?: string) {
     return this.siemService.getAlerts(
       status as unknown as
-        | 'open'
-        | 'investigating'
-        | 'resolved'
-        | 'false_positive',
+        'open' | 'investigating' | 'resolved' | 'false_positive',
     );
   }
 

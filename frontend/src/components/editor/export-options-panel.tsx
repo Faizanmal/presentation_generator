@@ -42,6 +42,9 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
+import { useAuthStore } from '@/stores/auth-store';
+import { canExportFormat, type ExportFormat as PlanExportFormat } from '@/lib/plans';
+import { ProBadge, UpgradePrompt } from '@/components/ui/pro-badge';
 
 interface ExportOptionsPanelProps {
   projectId: string;
@@ -74,7 +77,7 @@ const EXPORT_OPTIONS: ExportOption[] = [
     name: 'PDF Document',
     description: 'Standard PDF for sharing and printing',
     icon: <FileText className="h-5 w-5" />,
-    isPremium: false,
+    isPremium: true,
     fileExtension: 'pdf',
   },
   {
@@ -116,6 +119,9 @@ export function ExportOptionsPanel({
   projectTitle,
   className,
 }: ExportOptionsPanelProps) {
+  const subscription = useAuthStore((state) => state.subscription);
+  const userPlan = subscription?.plan || 'FREE';
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('pdf');
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
@@ -132,7 +138,43 @@ export function ExportOptionsPanel({
   const [videoJobId, setVideoJobId] = useState<string | null>(null);
   const [videoStatus, setVideoStatus] = useState<'pending' | 'processing' | 'completed' | 'failed' | null>(null);
 
+  const planFormatForOption = (id: ExportFormat): PlanExportFormat | null => {
+    if (id === 'pdf' || id === 'pdf-hifi') {
+      return 'pdf';
+    }
+    if (id === 'pptx') {
+      return 'pptx';
+    }
+    if (id === 'html') {
+      return 'html';
+    }
+    if (id === 'json') {
+      return 'json';
+    }
+    return null;
+  };
+
+  const isPlanLocked = (id: ExportFormat): boolean => {
+    const planFormat = planFormatForOption(id);
+    if (!planFormat) {
+      return false;
+    }
+    return !canExportFormat(userPlan, planFormat);
+  };
+
+  const selectFormat = (id: ExportFormat) => {
+    if (isPlanLocked(id)) {
+      setUpgradeOpen(true);
+      return;
+    }
+    setSelectedFormat(id);
+  };
+
   const handleExport = async () => {
+    if (isPlanLocked(selectedFormat)) {
+      setUpgradeOpen(true);
+      return;
+    }
     setIsExporting(true);
     setExportProgress(0);
 
@@ -337,7 +379,7 @@ export function ExportOptionsPanel({
                   'cursor-pointer transition-all hover:border-blue-400',
                   selectedFormat === option.id && 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
                 )}
-                onClick={() => setSelectedFormat(option.id)}
+                onClick={() => selectFormat(option.id)}
               >
                 <CardContent className="p-3">
                   <div className="flex items-start justify-between">
@@ -355,10 +397,8 @@ export function ExportOptionsPanel({
                         <p className="text-xs text-slate-500 truncate">{option.description}</p>
                       </div>
                     </div>
-                    {option.isPremium && (
-                      <Badge variant="secondary" className="bg-linear-to-r from-amber-100 to-yellow-100 text-amber-700 text-xs px-1.5 py-0.5 flex-shrink-0">
-                        Pro
-                      </Badge>
+                    {(option.isPremium || isPlanLocked(option.id)) && (
+                      <ProBadge className="shrink-0" />
                     )}
                     {option.id === 'pdf-hifi' && (
                       <Badge variant="secondary" className="bg-linear-to-r from-indigo-100 to-purple-100 text-indigo-700 text-xs px-1.5 py-0.5 flex-shrink-0">
@@ -489,6 +529,7 @@ export function ExportOptionsPanel({
           </Button>
         </DialogFooter>
       </DialogContent>
+      <UpgradePrompt open={upgradeOpen} onOpenChange={setUpgradeOpen} />
     </Dialog>
   );
 }

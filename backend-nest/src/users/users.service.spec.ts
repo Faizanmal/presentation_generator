@@ -202,13 +202,40 @@ describe('UsersService', () => {
   });
 
   describe('canGenerateAI', () => {
-    it('should return true if development mode or unlimited plan', async () => {
-      mockConfigService.get.mockImplementation((key: string) =>
-        key === 'NODE_ENV' ? 'development' : undefined,
-      );
+    it('should return true when ALLOW_UNLIMITED_IN_DEV is enabled', async () => {
+      mockConfigService.get.mockImplementation((key: string) => {
+        if (key === 'NODE_ENV') {
+          return 'development';
+        }
+        if (key === 'ALLOW_UNLIMITED_IN_DEV') {
+          return 'true';
+        }
+        return undefined;
+      });
 
       const result = await service.canGenerateAI('user1');
       expect(result).toBe(true);
+    });
+
+    it('should enforce AI limits from subscription row', async () => {
+      mockConfigService.get.mockReturnValue(undefined);
+      mockPrismaService.subscription.findFirst.mockResolvedValue({
+        plan: SubscriptionPlan.PRO,
+        aiGenerationsUsed: 999,
+        aiGenerationsLimit: 1000,
+        projectsLimit: 100,
+      });
+
+      expect(await service.canGenerateAI('user1')).toBe(true);
+
+      mockPrismaService.subscription.findFirst.mockResolvedValue({
+        plan: SubscriptionPlan.PRO,
+        aiGenerationsUsed: 1000,
+        aiGenerationsLimit: 1000,
+        projectsLimit: 100,
+      });
+
+      expect(await service.canGenerateAI('user1')).toBe(false);
     });
   });
 

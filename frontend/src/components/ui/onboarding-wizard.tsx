@@ -13,6 +13,7 @@ import {
     CheckCircle2,
 } from "lucide-react";
 import { Button } from "./button";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 interface OnboardingStep {
     id: string;
@@ -74,7 +75,7 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
     const steps: OnboardingStep[] = [
         {
             id: "welcome",
-            title: "Welcome to Presentation Designer! 🎉",
+            title: `Welcome to ${PRODUCT_NAME}! 🎉`,
             description: "Let's personalize your experience in just a few steps.",
             icon: <Sparkles className="h-8 w-8" />,
             content: (
@@ -87,7 +88,7 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
                     >
                         <Sparkles className="h-12 w-12 text-white" />
                     </motion.div>
-                    <h2 className="text-2xl font-bold mb-4">Welcome to Presentation Designer!</h2>
+                    <h2 className="text-2xl font-bold mb-4">Welcome to {PRODUCT_NAME}!</h2>
                     <p className="text-slate-600 dark:text-slate-400 max-w-md mx-auto">
                         Create stunning AI-powered presentations in seconds. Let&apos;s personalize your experience.
                     </p>

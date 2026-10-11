@@ -48,8 +48,8 @@ describe('shouldSkipCsrf', () => {
   });
 
   it('skips health checks', () => {
-    expect(
-      shouldSkipCsrf(req({ path: '/health/liveness', headers: {} })),
-    ).toBe(true);
+    expect(shouldSkipCsrf(req({ path: '/health/liveness', headers: {} }))).toBe(
+      true,
+    );
   });
 });

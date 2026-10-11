@@ -276,20 +276,20 @@ describe('ExportService', () => {
   });
 
   describe('canExport', () => {
-    it('should return true for users with valid subscription', async () => {
+    it('should allow PRO users to export PDF', async () => {
       mockUsersService.getSubscription.mockResolvedValue({
         plan: 'PRO',
       });
-      const result = await service.canExport('user-1');
+      const result = await service.canExport('user-1', 'pdf');
       expect(result).toBe(true);
     });
 
-    it('should return false for users with free subscription', async () => {
+    it('should allow FREE users to export HTML but not PDF', async () => {
       mockUsersService.getSubscription.mockResolvedValue({
         plan: 'FREE',
       });
-      const result = await service.canExport('user-1');
-      expect(result).toBe(false);
+      expect(await service.canExport('user-1', 'html')).toBe(true);
+      expect(await service.canExport('user-1', 'pdf')).toBe(false);
     });
 
     it('should return true when exportPremiumEnabled feature flag is on', async () => {
@@ -304,7 +304,7 @@ describe('ExportService', () => {
       mockUsersService.getSubscription.mockResolvedValue({
         plan: 'FREE',
       });
-      const result = await service.canExport('user-1');
+      const result = await service.canExport('user-1', 'pdf');
       expect(result).toBe(true);
     });
   });

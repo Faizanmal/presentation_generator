@@ -34,6 +34,7 @@ import {
   AlignLeft,
   X,
   FileUp,
+  ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -73,7 +74,12 @@ import { useRecentProjects } from "@/components/ui/favorites-recent";
 import { DocumentUploadDialog } from "@/components/editor/document-upload-panel";
 import { MasterSlidePanel } from "@/components/editor/master-slide-panel";
 import type { MasterSlideTemplate } from "@/components/editor/master-slide-panel";
+import { EmbedSharePanel } from "@/components/editor/embed-share-panel";
+import { useEditorAiActions } from "@/hooks/use-editor-ai-actions";
 import { Shield, SlidersHorizontal } from "lucide-react";
+import { canExportFormat } from "@/lib/plans";
+import { FEATURES } from "@/lib/features";
+import { ProBadge, UpgradePrompt } from "@/components/ui/pro-badge";
 
 type EditorCommandDetail = {
   type: "insert-block" | "ai-action" | "open-export" | "open-share" | "add-slide";
@@ -93,7 +99,10 @@ export default function EditorPage() {
   const router = useRouter();
   const projectId = params.id as string;
   const queryClient = useQueryClient();
-  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, subscription } = useAuthStore();
+  const [exportUpgradeOpen, setExportUpgradeOpen] = useState(false);
+  const [exportUpgradeFeature, setExportUpgradeFeature] = useState("PDF export");
+  const userPlan = subscription?.plan || "FREE";
 
   const project = useEditorStore((state) => state.project);
   const currentSlideIndex = useEditorStore((state) => state.currentSlideIndex);
@@ -119,6 +128,7 @@ export default function EditorPage() {
   const [showDocUpload, setShowDocUpload] = useState(false);
   const [showMasterSlides, setShowMasterSlides] = useState(false);
   const [showDesignControls, setShowDesignControls] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   const [layoutDensity, setLayoutDensity] = useState(62);
   const [toneOfVoice, setToneOfVoice] = useState(74);
   const notesSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -139,6 +149,8 @@ export default function EditorPage() {
   const { addToRecent } = useRecentProjects();
 
 
+
+  const { runAiAction } = useEditorAiActions(projectId);
 
   // Fetch project
   const { data: projectData, isLoading: projectLoading } = useQuery({
@@ -379,6 +391,20 @@ export default function EditorPage() {
     }
   }, [project, projectId]);
 
+  const requestExport = useCallback(
+    (format: "html" | "json" | "pdf" | "pptx") => {
+      if (!canExportFormat(userPlan, format)) {
+        setExportUpgradeFeature(
+          format === "pptx" ? "PowerPoint export" : "PDF export",
+        );
+        setExportUpgradeOpen(true);
+        return;
+      }
+      void handleExport(format);
+    },
+    [handleExport, userPlan],
+  );
+
   // Handle present
   const handlePresent = useCallback(() => {
     window.open(`/present/${projectId}`, "_blank");
@@ -398,18 +424,19 @@ export default function EditorPage() {
       }
 
       if (detail.type === "open-export") {
-        await handleExport("pdf");
+        requestExport("pdf");
         return;
       }
 
       if (detail.type === "open-share") {
-        toast.info("Share modal is coming soon.");
+        setShowShare(true);
         return;
       }
 
       if (detail.type === "ai-action") {
         const action = typeof detail.payload?.action === "string" ? detail.payload.action : "enhance";
-        toast.info(`AI action queued: ${action}`);
+        const prompt = typeof detail.payload?.prompt === "string" ? detail.payload.prompt : undefined;
+        await runAiAction(action, prompt);
         return;
       }
 
@@ -439,7 +466,7 @@ export default function EditorPage() {
     return () => {
       window.removeEventListener("presentation:editor-command", handleEditorCommand as EventListener);
     };
-  }, [addBlock, currentSlide, handleAddSlide, handleExport, projectId]);
+  }, [addBlock, currentSlide, handleAddSlide, projectId, requestExport, runAiAction]);
 
   if (authLoading || projectLoading) {
     return (
@@ -469,11 +496,14 @@ export default function EditorPage() {
     <div className="h-screen flex flex-col bg-slate-100 dark:bg-slate-900">
       {/* Header */}
       <header className="h-14 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 shrink-0 relative">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-3 py-0.5 rounded-b-md text-xs font-medium z-50">
-          <Link href={`/editor-v2/${projectId}`} className="hover:underline flex items-center gap-1">
-            Try New Editor <span className="material-symbols-outlined text-[10px]">open_in_new</span>
-          </Link>
-        </div>
+        {FEATURES.editorV2 && (
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-3 py-0.5 rounded-b-md text-xs font-medium z-50">
+            <Link href={`/editor-v2/${projectId}`} className="hover:underline flex items-center gap-1">
+              Try New Editor
+              <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
+            </Link>
+          </div>
+        )}
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
             <Link href="/dashboard">
@@ -639,7 +669,7 @@ export default function EditorPage() {
                   }))}
                   currentThemeId={project.theme?.id}
                   onThemeChange={handleDesignThemeChange}
-                  onExportPdf={() => handleExport("pdf")}
+                  onExportPdf={() => requestExport("pdf")}
                   onLayoutDensityChange={setLayoutDensity}
                   onToneChange={setToneOfVoice}
                 />
@@ -677,22 +707,28 @@ export default function EditorPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => handleExport("html")}>
+              <DropdownMenuItem onClick={() => requestExport("html")}>
                 Export as HTML
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport("json")}>
+              <DropdownMenuItem onClick={() => requestExport("json")}>
                 Export as JSON
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport("pdf")}>
-                Export as PDF
+              <DropdownMenuItem onClick={() => requestExport("pdf")}>
+                <span className="flex w-full items-center justify-between gap-2">
+                  Export as PDF
+                  {!canExportFormat(userPlan, "pdf") && <ProBadge />}
+                </span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport("pptx")}>
-                Export as PowerPoint
+              <DropdownMenuItem onClick={() => requestExport("pptx")}>
+                <span className="flex w-full items-center justify-between gap-2">
+                  Export as PowerPoint
+                  {!canExportFormat(userPlan, "pptx") && <ProBadge />}
+                </span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={() => setShowShare(true)}>
             <Share2 className="h-4 w-4 mr-2" />
             Share
           </Button>
@@ -877,9 +913,26 @@ export default function EditorPage() {
         canRedo={canRedo}
         onAddSlide={handleAddSlide}
         onPresent={handlePresent}
-        onExport={() => handleExport("pdf")}
+        onExport={() => requestExport("pdf")}
+        onShare={() => setShowShare(true)}
         isSaving={saveMutation.isPending}
         position="bottom"
+      />
+
+      <EmbedSharePanel
+        presentationId={projectId}
+        presentationTitle={project.title}
+        shareToken={project.shareToken}
+        isPublic={project.isPublic}
+        open={showShare}
+        onOpenChange={setShowShare}
+        showTrigger={false}
+        onProjectUpdated={(updated) => {
+          updateProject({
+            isPublic: updated.isPublic,
+            shareToken: updated.shareToken,
+          });
+        }}
       />
 
       {/* Document Upload Dialog */}
@@ -912,6 +965,12 @@ export default function EditorPage() {
             toast.error("Failed to insert generated slides");
           }
         }}
+      />
+
+      <UpgradePrompt
+        open={exportUpgradeOpen}
+        onOpenChange={setExportUpgradeOpen}
+        feature={exportUpgradeFeature}
       />
     </div>
   );

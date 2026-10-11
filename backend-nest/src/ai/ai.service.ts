@@ -425,8 +425,7 @@ export class AIService {
 
     // If response_format is json_object, add instruction
     const responseFormat = options.response_format as
-      | { type: string }
-      | undefined;
+      { type: string } | undefined;
     const finalPrompt =
       responseFormat?.type === 'json_object'
         ? `${prompt}\n\nRespond with valid JSON only.`
@@ -1829,8 +1828,7 @@ Return as JSON: { "prompts": ["Prompt 1", "Prompt 2", ...] }`,
   ): Promise<OpenAI.Chat.Completions.ChatCompletion> {
     const generationConfig: Record<string, unknown> = {};
     const responseFormat = options.response_format as
-      | { type?: string }
-      | undefined;
+      { type?: string } | undefined;
     if (responseFormat?.type === 'json_object') {
       generationConfig.responseMimeType = 'application/json';
     }
@@ -2082,8 +2080,7 @@ Return as JSON: { "prompts": ["Prompt 1", "Prompt 2", ...] }`,
       if (Array.isArray(parts)) {
         for (const part of parts) {
           const inline = (part as Record<string, unknown>).inlineData as
-            | Record<string, unknown>
-            | undefined;
+            Record<string, unknown> | undefined;
           if (inline && typeof inline.data === 'string') {
             return this.asDataImageUrl(
               inline.data,
@@ -3011,8 +3008,7 @@ Generate the complete ${type} with all metadata.`;
     );
 
     const metadata = typedParsed.metadata as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
 
     return {
       title: typedParsed.title,

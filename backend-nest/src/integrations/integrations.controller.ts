@@ -18,13 +18,7 @@ import { ConfigService } from '@nestjs/config';
 import { Feature } from '../common/decorators/feature.decorator';
 
 type IntegrationProvider =
-  | 'ZOOM'
-  | 'SLACK'
-  | 'TEAMS'
-  | 'GOOGLE_DRIVE'
-  | 'FIGMA'
-  | 'NOTION'
-  | 'DROPBOX';
+  'ZOOM' | 'SLACK' | 'TEAMS' | 'GOOGLE_DRIVE' | 'FIGMA' | 'NOTION' | 'DROPBOX';
 
 type AuthRequest = ExpressRequest & { user: { id: string } };
 

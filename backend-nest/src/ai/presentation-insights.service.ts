@@ -6,12 +6,7 @@ import { PrismaClient } from '@prisma/client';
 
 export interface PresentationInsight {
   category:
-    | 'content'
-    | 'engagement'
-    | 'structure'
-    | 'design'
-    | 'timing'
-    | 'audience';
+    'content' | 'engagement' | 'structure' | 'design' | 'timing' | 'audience';
   type: 'strength' | 'improvement' | 'suggestion' | 'warning';
   title: string;
   description: string;

@@ -23,6 +23,9 @@ import {
   Loader2,
 } from "lucide-react";
 import Image from "next/image";
+import { BRAND, PRODUCT_NAME } from "@/lib/brand";
+import { FEATURES } from "@/lib/features";
+import { PLAN_LIMITS, PLANS_LIST } from "@/lib/plans";
 import { motion } from "framer-motion";
 import {
   FadeInUp,
@@ -68,11 +71,6 @@ export default function Home() {
     );
   }
 
-  // If not mounted yet, show nothing to avoid hydration mismatch
-  if (!mounted) {
-    return null;
-  }
-
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white overflow-hidden">
       {/* Animated background */}
@@ -98,7 +96,7 @@ export default function Home() {
                 <Sparkles className="h-6 w-6 text-white" />
               </div>
               <span className="text-xl font-bold text-slate-900 dark:text-white">
-                Presentation Designer
+                {PRODUCT_NAME}
               </span>
             </div>
 
@@ -109,10 +107,10 @@ export default function Home() {
               <Link href="/dashboard" className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
                 Create
               </Link>
-              <Link href="#features" className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+              <Link href="/features" className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
                 Features
               </Link>
-              <Link href="#pricing" className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+              <Link href="/pricing" className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
                 Pricing
               </Link>
               <Link href="/marketplace" className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
@@ -190,7 +188,7 @@ export default function Home() {
 
             <FadeInUp delay={0.6}>
               <p className="text-sm text-slate-500 dark:text-slate-500 mt-6">
-                No credit card required • 3 free presentations • Cancel anytime
+                No credit card required • {PLAN_LIMITS.FREE.presentations} free presentations • Cancel anytime
               </p>
             </FadeInUp>
           </div>
@@ -221,8 +219,8 @@ export default function Home() {
                   {/* Preview content */}
                   <div className="aspect-video bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 relative group overflow-hidden">
                     <Image
-                      src="https://placehold.co/1200x675/1e293b/ffffff?text=Presentation+Designer+Dashboard"
-                      alt="Presentation Designer Dashboard"
+                      src={`https://placehold.co/1200x675/1e293b/ffffff?text=${encodeURIComponent(`${PRODUCT_NAME} Dashboard`)}`}
+                      alt={`${PRODUCT_NAME} Dashboard`}
                       fill
                       className="object-cover opacity-90 transition-opacity group-hover:opacity-100"
                       priority
@@ -266,25 +264,26 @@ export default function Home() {
             </div>
           </FadeInUp>
 
-          {/* Stats */}
-          <FadeInUp delay={0.9}>
-            <div className="mt-20 grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto">
-              {[
-                { value: 50000, label: "Presentations Created", suffix: "+" },
-                { value: 10000, label: "Happy Users", suffix: "+" },
-                { value: 99, label: "Uptime", suffix: "%" },
-                { value: 4.9, label: "User Rating", suffix: "/5" },
-              ].map((stat, index) => (
-                <div key={stat.label} className="text-center">
-                  <div className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white mb-2">
-                    <AnimatedCounter value={stat.value} duration={2 + index * 0.3} />
-                    {stat.suffix}
+          {FEATURES.homepageStats && (
+            <FadeInUp delay={0.9}>
+              <div className="mt-20 grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto">
+                {[
+                  { value: 50000, label: "Presentations Created", suffix: "+" },
+                  { value: 10000, label: "Happy Users", suffix: "+" },
+                  { value: 99, label: "Uptime", suffix: "%" },
+                  { value: 4.9, label: "User Rating", suffix: "/5" },
+                ].map((stat, index) => (
+                  <div key={stat.label} className="text-center">
+                    <div className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white mb-2">
+                      <AnimatedCounter value={stat.value} duration={2 + index * 0.3} />
+                      {stat.suffix}
+                    </div>
+                    <p className="text-slate-600 dark:text-slate-400 text-sm">{stat.label}</p>
                   </div>
-                  <p className="text-slate-600 dark:text-slate-400 text-sm">{stat.label}</p>
-                </div>
-              ))}
-            </div>
-          </FadeInUp>
+                ))}
+              </div>
+            </FadeInUp>
+          )}
         </section>
 
         {/* Features Section */}
@@ -406,63 +405,32 @@ export default function Home() {
             </FadeInUp>
 
             <StaggerContainer staggerDelay={0.15} className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-              <StaggerItem>
-                <PricingCard
-                  name="Free"
-                  price="$0"
-                  description="Perfect for trying out"
-                  features={[
-                    "3 presentations",
-                    "10 AI generations/month",
-                    "Basic themes",
-                    "Share links",
-                    "Community support",
-                  ]}
-                  buttonText="Get Started"
-                  buttonVariant="outline"
-                />
-              </StaggerItem>
-              <StaggerItem>
-                <PricingCard
-                  name="Pro"
-                  price="$29"
-                  period="/month"
-                  description="For power users — includes Thinking credits"
-                  features={[
-                    "100 presentations",
-                    "1,000 standard AI generations/month",
-                    "5 Thinking (high‑quality) generations/month",
-                    "All premium themes",
-                    "PDF/PPTX export",
-                    "Custom branding",
-                    "Analytics dashboard",
-                    "Priority support",
-                  ]}
-                  buttonText="Start Pro Trial"
-                  buttonVariant="default"
-                  highlighted
-                />
-              </StaggerItem>
-              <StaggerItem>
-                <PricingCard
-                  name="Enterprise"
-                  price="$49"
-                  period="/month"
-                  description="For teams"
-                  features={[
-                    "Unlimited presentations",
-                    "Unlimited AI generations",
-                    "Team collaboration",
-                    "SSO / SAML",
-                    "API access",
-                    "Audit logs",
-                    "Dedicated support",
-                    "Custom integrations",
-                  ]}
-                  buttonText="Contact Sales"
-                  buttonVariant="outline"
-                />
-              </StaggerItem>
+              {PLANS_LIST.map((plan) => (
+                <StaggerItem key={plan.id}>
+                  <PricingCard
+                    name={plan.name}
+                    price={`$${plan.priceMonthly}`}
+                    period={plan.priceMonthly > 0 ? "/month" : undefined}
+                    description={
+                      plan.id === "FREE"
+                        ? "Perfect for trying out"
+                        : plan.id === "PRO"
+                          ? "For power users — includes Thinking credits"
+                          : "For teams and organizations"
+                    }
+                    features={[...plan.features, ...(plan.id === "FREE" ? ["Community support"] : [])]}
+                    buttonText={
+                      plan.id === "FREE"
+                        ? "Get Started"
+                        : plan.id === "PRO"
+                          ? "Start Pro Trial"
+                          : "Contact Sales"
+                    }
+                    buttonVariant={plan.popular ? "default" : "outline"}
+                    highlighted={plan.popular}
+                  />
+                </StaggerItem>
+              ))}
             </StaggerContainer>
           </div>
         </section>
@@ -507,10 +475,10 @@ export default function Home() {
                   <div className="h-10 w-10 rounded-xl bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center">
                     <Sparkles className="h-6 w-6 text-white" />
                   </div>
-                  <span className="text-lg font-bold">Presentation Designer</span>
+                  <span className="text-lg font-bold">{PRODUCT_NAME}</span>
                 </div>
                 <p className="text-slate-600 dark:text-slate-400 text-sm">
-                  Create stunning AI-powered presentations in seconds.
+                  {BRAND.description}
                 </p>
               </div>
 
@@ -519,8 +487,8 @@ export default function Home() {
                 <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
                   <li><Link href="/dashboard" className="hover:text-slate-900 dark:hover:text-white transition-colors">Dashboard</Link></li>
                   <li><Link href="/dashboard" className="hover:text-slate-900 dark:hover:text-white transition-colors">Create Presentation</Link></li>
-                  <li><Link href="#features" className="hover:text-slate-900 dark:hover:text-white transition-colors">Features</Link></li>
-                  <li><Link href="#pricing" className="hover:text-slate-900 dark:hover:text-white transition-colors">Pricing</Link></li>
+                  <li><Link href="/features" className="hover:text-slate-900 dark:hover:text-white transition-colors">Features</Link></li>
+                  <li><Link href="/pricing" className="hover:text-slate-900 dark:hover:text-white transition-colors">Pricing</Link></li>
                   <li><Link href="/marketplace" className="hover:text-slate-900 dark:hover:text-white transition-colors">Templates</Link></li>
                   <li><a href="#" className="hover:text-slate-900 dark:hover:text-white transition-colors">Integrations</a></li>
                 </ul>
@@ -548,7 +516,7 @@ export default function Home() {
 
             <div className="pt-8 border-t border-slate-200 dark:border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4">
               <p className="text-sm text-slate-500 dark:text-slate-500">
-                © {new Date().getFullYear()} Presentation Designer. All rights reserved.
+                © {new Date().getFullYear()} {PRODUCT_NAME}. All rights reserved.
               </p>
               <div className="flex items-center gap-4">
                 <a href="#" className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">

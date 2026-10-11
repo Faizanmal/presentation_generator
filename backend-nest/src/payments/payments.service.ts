@@ -9,6 +9,7 @@ import Stripe from 'stripe';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
+import { PLAN_LIMITS } from '../common/subscription/plan-limits';
 
 type StripeClient = Stripe.Stripe;
 type StripeEvent = ReturnType<StripeClient['webhooks']['constructEvent']>;
@@ -236,8 +237,14 @@ export class PaymentsService {
         (subscription as unknown as { current_period_end: number })
           .current_period_end * 1000,
       ),
-      projectsLimit: plan === 'enterprise' ? 1000 : 50,
-      aiGenerationsLimit: plan === 'enterprise' ? 10000 : 500,
+      projectsLimit:
+        plan === 'enterprise'
+          ? PLAN_LIMITS.ENTERPRISE.presentations
+          : PLAN_LIMITS.PRO.presentations,
+      aiGenerationsLimit:
+        plan === 'enterprise'
+          ? PLAN_LIMITS.ENTERPRISE.aiGenerationsPerMonth
+          : PLAN_LIMITS.PRO.aiGenerationsPerMonth,
     });
 
     this.logger.log(`Subscription activated: ${userId} -> ${plan}`);
@@ -318,8 +325,8 @@ export class PaymentsService {
       status: SubscriptionStatus.CANCELED,
       stripeSubscriptionId: undefined,
       stripePriceId: undefined,
-      projectsLimit: 3,
-      aiGenerationsLimit: 10,
+      projectsLimit: PLAN_LIMITS.FREE.presentations,
+      aiGenerationsLimit: PLAN_LIMITS.FREE.aiGenerationsPerMonth,
     });
 
     this.logger.log(`Subscription canceled: ${userSubscription.userId}`);

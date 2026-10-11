@@ -5,13 +5,7 @@ import { Prisma } from '@prisma/client';
 import axios from 'axios';
 
 type IntegrationProvider =
-  | 'ZOOM'
-  | 'SLACK'
-  | 'TEAMS'
-  | 'GOOGLE_DRIVE'
-  | 'FIGMA'
-  | 'NOTION'
-  | 'DROPBOX';
+  'ZOOM' | 'SLACK' | 'TEAMS' | 'GOOGLE_DRIVE' | 'FIGMA' | 'NOTION' | 'DROPBOX';
 
 interface OAuthCallbackData {
   code: string;

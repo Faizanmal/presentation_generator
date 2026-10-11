@@ -15,8 +15,9 @@ import {
     StarOff,
     Trash2,
 } from "lucide-react";
-import Image from 'next/image';
+import Image from "next/image";
 import { Button } from "./button";
+import { ProjectCardThumbnail } from "./project-card-thumbnail";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -40,6 +41,13 @@ interface ProjectCardProps {
             name: string;
             avatar?: string | null;
         }>;
+        theme?: {
+            colors?: {
+                primary?: string;
+                accent?: string;
+                secondary?: string;
+            };
+        } | null;
         _count?: {
             slides: number;
         };
@@ -71,6 +79,9 @@ export const ProjectCard = memo(({
 }: ProjectCardProps) => {
     const [isHovered, setIsHovered] = useState(false);
 
+    const openProject = () => onOpen?.(project.id);
+    const themeColors = project.theme?.colors ?? null;
+
     const formatDate = (date: Date | string) => {
         const d = new Date(date);
         const now = new Date();
@@ -90,27 +101,35 @@ export const ProjectCard = memo(({
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 whileHover={{ backgroundColor: "rgba(0, 0, 0, 0.02)" }}
-                className="flex items-center gap-4 p-4 border-b border-slate-200 dark:border-slate-800 group"
+                className="flex items-center gap-4 p-4 border-b border-slate-200 dark:border-slate-800 group cursor-pointer"
+                onClick={openProject}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openProject();
+                    }
+                }}
             >
                 {/* Thumbnail */}
                 <div className="relative h-16 w-28 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 shrink-0">
-                    {project.thumbnail ? (
-                        <Image
-                            src={project.thumbnail}
-                            alt={project.title}
-                            className="h-full w-full object-cover"
-                        />
-                    ) : (
-                        <div className="h-full w-full flex items-center justify-center bg-linear-to-br from-blue-500/20 to-purple-500/20">
-                            <span className="text-2xl">📊</span>
-                        </div>
-                    )}
+                    <ProjectCardThumbnail
+                        title={project.title}
+                        seed={project.id}
+                        thumbnail={project.thumbnail}
+                        themeColors={themeColors}
+                        initialsClassName="text-lg font-bold text-white/95 tracking-tight drop-shadow-sm"
+                    />
                 </div>
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                        <h3 className="font-medium text-slate-900 dark:text-white truncate">
+                        <h3
+                            className="font-medium text-slate-900 dark:text-white line-clamp-2"
+                            title={project.title}
+                        >
                             {project.title}
                         </h3>
                         {isFavorite && <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />}
@@ -161,7 +180,10 @@ export const ProjectCard = memo(({
                 )}
 
                 {/* Actions */}
-                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div
+                    className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => e.stopPropagation()}
+                >
                     <Button variant="ghost" size="sm" onClick={() => onPresent?.(project.id)}>
                         <Play className="h-4 w-4" />
                     </Button>
@@ -223,30 +245,32 @@ export const ProjectCard = memo(({
             whileHover={{ y: -4 }}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            className="group relative bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-lg transition-all"
+            onClick={openProject}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    openProject();
+                }
+            }}
+            className="group relative bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-lg transition-all cursor-pointer"
         >
             {/* Thumbnail */}
             <div className="relative aspect-16/10 bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                {project.thumbnail ? (
-                    <Image
-                        src={project.thumbnail}
-                        alt={project.title}
-                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
-                ) : (
-                    <div className="h-full w-full flex items-center justify-center bg-linear-to-br from-blue-500/10 to-purple-500/10">
-                        <div className="text-center">
-                            <span className="text-4xl">📊</span>
-                            <p className="text-sm text-slate-400 mt-2">No preview</p>
-                        </div>
-                    </div>
-                )}
+                <ProjectCardThumbnail
+                    title={project.title}
+                    seed={project.id}
+                    thumbnail={project.thumbnail}
+                    themeColors={themeColors}
+                />
 
                 {/* Hover overlay */}
                 <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: isHovered ? 1 : 0 }}
                     className="absolute inset-0 bg-black/60 flex items-center justify-center gap-3"
+                    onClick={(e) => e.stopPropagation()}
                 >
                     <Button
                         size="sm"
@@ -294,7 +318,10 @@ export const ProjectCard = memo(({
             <div className="p-4">
                 <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-slate-900 dark:text-white truncate">
+                        <h3
+                            className="font-semibold text-slate-900 dark:text-white line-clamp-2"
+                            title={project.title}
+                        >
                             {project.title}
                         </h3>
                         {project.description && (
@@ -305,7 +332,12 @@ export const ProjectCard = memo(({
                     </div>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 shrink-0"
+                                onClick={(e) => e.stopPropagation()}
+                            >
                                 <MoreHorizontal className="h-4 w-4" />
                             </Button>
                         </DropdownMenuTrigger>

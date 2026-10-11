@@ -33,8 +33,7 @@ export class SendgridMailerService {
     }
 
     this.fromAddress = this.config.get('MAIL_FROM') || 'no-reply@example.com';
-    this.fromName =
-      this.config.get('MAIL_FROM_NAME') || 'Presentation Designer';
+    this.fromName = this.config.get('MAIL_FROM_NAME') || 'PresentPitch';
   }
 
   /**

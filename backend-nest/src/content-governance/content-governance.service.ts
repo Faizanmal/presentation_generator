@@ -9,11 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 
 export type ApprovalStatus =
-  | 'draft'
-  | 'pending_review'
-  | 'approved'
-  | 'rejected'
-  | 'changes_requested';
+  'draft' | 'pending_review' | 'approved' | 'rejected' | 'changes_requested';
 export type WorkflowStage =
   | 'draft'
   | 'internal_review'

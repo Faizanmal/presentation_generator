@@ -13,7 +13,7 @@ import { AIService, GeneratedPresentation, GeneratedBlock } from './ai.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UsersService } from '../users/users.service';
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, BadRequestException } from '@nestjs/common';
 import { BackgroundLibraryService } from './background-library.service';
 import { AutoLayoutService } from './auto-layout.service';
 import { AIChatService, SlideContext } from './ai-chat.service';
@@ -31,7 +31,8 @@ interface EnhanceContentDto {
 }
 
 interface SpeakerNotesDto {
-  slideContent: string;
+  slideContent?: string;
+  content?: string;
   context?: string;
 }
 
@@ -113,6 +114,11 @@ export class AIController {
       throw new ForbiddenException('AI generation limit reached');
     }
 
+    const slideContent = body.slideContent || body.content;
+    if (!slideContent) {
+      throw new BadRequestException('Slide content is required');
+    }
+
     const instruction = `Generate speaker notes for this slide content. The notes should:
 1. Help the presenter explain the key points naturally
 2. Include talking points and what to emphasize
@@ -121,7 +127,7 @@ export class AIController {
 ${body.context ? `Context: ${body.context}` : ''}`;
 
     const notes = await this.aiService.enhanceContent(
-      body.slideContent,
+      slideContent,
       instruction,
     );
     await this.usersService.incrementAIGenerations(user.id);

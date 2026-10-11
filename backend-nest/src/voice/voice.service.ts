@@ -325,11 +325,7 @@ export class VoiceService {
   private async updateRecordingStatus(
     recordingId: string,
     status:
-      | 'UPLOADING'
-      | 'TRANSCRIBING'
-      | 'GENERATING'
-      | 'COMPLETED'
-      | 'FAILED',
+      'UPLOADING' | 'TRANSCRIBING' | 'GENERATING' | 'COMPLETED' | 'FAILED',
   ) {
     return this.prisma.voiceRecording.update({
       where: { id: recordingId },

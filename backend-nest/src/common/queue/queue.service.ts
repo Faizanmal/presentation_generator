@@ -283,12 +283,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       return 'unknown';
     }
     const state = (await job.getState()) as
-      | 'completed'
-      | 'failed'
-      | 'active'
-      | 'delayed'
-      | 'waiting'
-      | 'unknown';
+      'completed' | 'failed' | 'active' | 'delayed' | 'waiting' | 'unknown';
     return state;
   }
 

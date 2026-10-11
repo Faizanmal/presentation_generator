@@ -10,7 +10,10 @@ import { PDFDocument, PDFPage, StandardFonts, rgb } from 'pdf-lib';
 import axios from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
-import { SubscriptionPlan } from '@prisma/client';
+import {
+  canExportFormat,
+  type ExportFormat,
+} from '../common/subscription/plan-limits';
 import { isGenericKicker } from '../ai/slide-recipes';
 
 // Types for export
@@ -125,9 +128,9 @@ export class ExportService {
   ) {}
 
   /**
-   * Check if user can export (premium feature)
+   * Check if user can export the given format (Free: html/json; Pro+: pdf/pptx).
    */
-  async canExport(userId: string): Promise<boolean> {
+  async canExport(userId: string, format?: ExportFormat): Promise<boolean> {
     const featureFlags = this.configService.get('features') as {
       exportPremiumEnabled?: boolean;
     };
@@ -138,7 +141,13 @@ export class ExportService {
     }
 
     const subscription = await this.usersService.getSubscription(userId);
-    return subscription.plan !== SubscriptionPlan.FREE;
+    if (!format) {
+      return (
+        canExportFormat(subscription.plan, 'html') ||
+        canExportFormat(subscription.plan, 'json')
+      );
+    }
+    return canExportFormat(subscription.plan, format);
   }
 
   /**
@@ -271,10 +280,10 @@ export class ExportService {
     options: ExportOptions,
   ): Promise<ExportResult> {
     // Check export permissions
-    const canExport = await this.canExport(userId);
+    const canExport = await this.canExport(userId, options.format);
     if (!canExport) {
       throw new ForbiddenException(
-        'Export is a premium feature. Please upgrade.',
+        `${options.format.toUpperCase()} export requires a Pro or Enterprise plan. Please upgrade.`,
       );
     }
 

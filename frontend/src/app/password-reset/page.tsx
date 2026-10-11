@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 // Schema for Step 1: Request Reset
 const requestResetSchema = z.object({
@@ -113,7 +114,7 @@ export default function PasswordResetPage() {
                             <Sparkles className="h-6 w-6 text-white" />
                         </div>
                         <span className="text-xl font-bold text-slate-900 dark:text-white">
-                            Presentation Designer
+                            {PRODUCT_NAME}
                         </span>
                     </Link>
                 </div>
