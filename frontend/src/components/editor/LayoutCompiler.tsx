@@ -222,21 +222,42 @@ export function LayoutCompiler({
 
   switch (resolvedLayout) {
     case 'title-hero':
+      // No media → full-bleed title layout (avoid empty left half)
+      if (mediaBlocks.length === 0) {
+        return (
+          <div
+            className={`w-full h-full flex flex-col justify-center min-h-0 overflow-hidden ${
+              isSpacious ? 'px-10 py-8' : isDense ? 'px-6 py-5' : 'px-8 py-6'
+            } ${verticalGap} relative z-10`}
+          >
+            <div className={`w-full max-w-3xl min-w-0 ${isSpacious ? 'gap-4' : 'gap-3'} flex flex-col`}>
+              {renderBlockList(titleBlocks, 't-')}
+              {bodyBlocks.length > 0 && (
+                <div className="min-w-0 overflow-hidden" style={{ opacity: bodyOpacity }}>
+                  {renderBlockList(bodyBlocks, 'b-')}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      }
       return (
-        <div className="w-full h-full grid grid-cols-2 items-stretch relative z-10 overflow-hidden">
+        <div className="w-full h-full grid grid-cols-2 items-stretch relative z-10 overflow-hidden min-h-0">
           <div
             className={bleedMediaClass}
             style={{ background: surface }}
           >
-            {mediaBlocks.length > 0 ? (
-              <div className="w-full h-full">{renderBlockList(mediaBlocks, 'm-')}</div>
-            ) : (
-              <div className="w-full h-full" style={{ background: theme?.colors?.primary || '#0F172A', opacity: 0.12 }} />
-            )}
+            <div className="w-full h-full">{renderBlockList(mediaBlocks, 'm-')}</div>
           </div>
-          <div className="flex flex-col justify-center min-h-0 min-w-0 px-10 py-8 gap-4 overflow-hidden">
-            {renderBlockList(titleBlocks, 't-')}
-            <div className="min-w-0" style={{ opacity: bodyOpacity }}>{renderBlockList(bodyBlocks, 'b-')}</div>
+          <div
+            className={`flex flex-col justify-center min-h-0 min-w-0 overflow-hidden ${
+              isSpacious ? 'px-8 py-6 gap-4' : isDense ? 'px-5 py-4 gap-2' : 'px-6 py-5 gap-3'
+            }`}
+          >
+            <div className="min-w-0 shrink-0 overflow-hidden">{renderBlockList(titleBlocks, 't-')}</div>
+            <div className="min-w-0 min-h-0 overflow-hidden" style={{ opacity: bodyOpacity }}>
+              {renderBlockList(bodyBlocks, 'b-')}
+            </div>
           </div>
         </div>
       );

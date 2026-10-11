@@ -186,19 +186,11 @@ export default function DashboardPage() {
                   description: `"${result.title}" has been added to your list.`,
                 });
 
+                // Refetch list so `_count.slides` (and other server fields) land;
+                // do not overwrite with the generation payload, which often lacks counts.
                 setTimeout(() => {
-                  queryClient
-                    .invalidateQueries({ queryKey: ["projects"] })
-                    .then(() => {
-                      queryClient.setQueryData<Project[] | undefined>(["projects"], (old) => {
-                        const existing = old as Project[] | undefined;
-                        if (existing) {
-                          return [result, ...existing.filter(p => p.id !== result.id)];
-                        }
-                        return [result];
-                      });
-                    });
-                }, 3000);
+                  void queryClient.invalidateQueries({ queryKey: ["projects"] });
+                }, 1500);
                 return;
               }
 
@@ -316,14 +308,17 @@ export default function DashboardPage() {
   }, [createProjectMutation]);
 
   const planId = (subscription?.plan || "FREE").toUpperCase();
+  const planLabel =
+    planId === "FREE" ? "Free" : planId === "PRO" ? "Pro" : planId === "ENTERPRISE" ? "Enterprise" : planId;
   const presentationsTotal =
     subscription?.projectsLimit ?? presentationLimit(planId);
   const aiGenerationsTotal =
     subscription?.aiGenerationsLimit ?? aiGenerationLimit(planId);
   const presentationsUsed =
     subscription?.projectsUsed ?? (projectsLoading ? undefined : projects?.length ?? 0);
+  // Don't flash 0/10 AI usage while subscription is still loading after reload
   const usageCardLoading =
-    projectsLoading && subscription?.projectsUsed === undefined;
+    !subscription || (projectsLoading && subscription?.projectsUsed === undefined);
 
   if (authLoading) {
     return (
@@ -342,7 +337,7 @@ export default function DashboardPage() {
         {/* Stats & Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
           <UsageCard
-            plan={subscription?.plan || "free"}
+            plan={planLabel}
             isLoading={usageCardLoading}
             presentations={{
               used: presentationsUsed ?? 0,

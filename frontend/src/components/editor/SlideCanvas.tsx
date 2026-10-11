@@ -409,12 +409,12 @@ export default function SlideCanvas({
     'two-column-image',
   ].includes(rawLayout);
   const isDenseCanvas = presentationDensity >= 66;
-  // Asymmetric safe margins (wider L/R) read more editorial than uniform padding
+  // Safe margins — keep content inside the 16:9 frame (previous py-9/11 clipped tall headings)
   const canvasPaddingClass = isDenseCanvas
-    ? 'px-10 py-7'
+    ? 'px-8 py-5'
     : presentationDensity < 34
-      ? 'px-14 py-11'
-      : 'px-12 py-9';
+      ? 'px-10 py-7'
+      : 'px-9 py-6';
 
   const isTitleSlide =
     slideLayout === 'title' ||

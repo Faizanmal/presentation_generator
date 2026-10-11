@@ -184,8 +184,8 @@ export function Sidebar({ className, isCollapsed = false, onCollapse, onLinkClic
                 </Button>
             </div>
 
-            {/* Subscription / Usage */}
-            {!isCollapsed && subscription && (
+            {/* Subscription / Usage — keep the box visible while subscription loads after reload */}
+            {!isCollapsed && user && (
                 <div className="px-4 py-2 mt-auto">
                     <div className="bg-slate-100 dark:bg-slate-900 rounded-lg p-3 border border-slate-200 dark:border-slate-800">
                         <div className="flex items-center justify-between mb-2">
@@ -194,12 +194,21 @@ export function Sidebar({ className, isCollapsed = false, onCollapse, onLinkClic
                                 AI Credits
                             </span>
                             <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                                {subscription.aiGenerationsUsed}/{subscription.aiGenerationsLimit}
+                                {subscription
+                                    ? `${subscription.aiGenerationsUsed}/${subscription.aiGenerationsLimit}`
+                                    : "—"}
                             </span>
                         </div>
-                        <Progress value={(subscription.aiGenerationsUsed / subscription.aiGenerationsLimit) * 100} className="h-1.5" />
+                        <Progress
+                            value={
+                                subscription && subscription.aiGenerationsLimit > 0
+                                    ? (subscription.aiGenerationsUsed / subscription.aiGenerationsLimit) * 100
+                                    : 0
+                            }
+                            className="h-1.5"
+                        />
 
-                        {subscription.plan === "FREE" && (
+                        {(subscription?.plan === "FREE" || !subscription) && (
                             <Link href="/settings/billing">
                                 <Button variant="outline" size="sm" className="w-full mt-3 h-7 text-xs">
                                     Upgrade Plan

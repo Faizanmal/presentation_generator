@@ -177,7 +177,22 @@ const BlockRenderer = React.memo(({
   // Block styling from the block's style property
   const blockStyle = block.style || {};
   const textAlign = (blockStyle.textAlign || block.formatting?.alignment || 'left') as React.CSSProperties['textAlign'];
-  const customFontSize = blockStyle.fontSize;
+  // Cap AI-provided px sizes so generated decks don't clip titles off the 16:9 canvas
+  const customFontSize = (() => {
+    const raw = blockStyle.fontSize;
+    if (raw == null || raw === '') return undefined;
+    if (typeof raw === 'number') {
+      return `${Math.min(raw, isDense ? 40 : 52)}px`;
+    }
+    const match = String(raw).match(/^([\d.]+)px$/i);
+    if (match) {
+      const px = parseFloat(match[1]);
+      if (!Number.isNaN(px)) {
+        return `${Math.min(px, isDense ? 40 : 52)}px`;
+      }
+    }
+    return String(raw);
+  })();
   const customColor = blockStyle.color || block.formatting?.color;
 
   // Render based on block type

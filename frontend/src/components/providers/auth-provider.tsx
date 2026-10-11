@@ -42,7 +42,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       pathname.startsWith('/present/') ||
       pathname.startsWith('/view/') ||
       pathname.startsWith('/embed/') ||
-      pathname.startsWith('/auth/google-callback');
+      pathname.startsWith('/auth/google-callback') ||
+      pathname.startsWith('/pricing') ||
+      pathname.startsWith('/features') ||
+      pathname.startsWith('/invite/');
 
     const isAuthOnlyRoute = AUTH_ONLY_ROUTES.some(route => pathname.startsWith(route));
 
@@ -56,16 +59,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [initialized, isAuthenticated, pathname, router, isMounting]);
 
-  // Prevent flashing of protected content while initializing
+  // Prevent flashing of protected content while initializing.
+  // If we already have a persisted session, render children immediately and
+  // refresh profile/subscription in the background (avoids a long cold-start spinner).
   if (!initialized || isMounting) {
     const isPublicRoute = PUBLIC_ROUTES.includes(pathname) ||
       pathname.startsWith('/present/') ||
       pathname.startsWith('/view/') ||
       pathname.startsWith('/embed/') ||
-      pathname.startsWith('/auth/google-callback');
+      pathname.startsWith('/auth/google-callback') ||
+      pathname.startsWith('/pricing') ||
+      pathname.startsWith('/features') ||
+      pathname.startsWith('/invite/');
     const isAuthOnlyRoute = AUTH_ONLY_ROUTES.some(route => pathname.startsWith(route));
 
-    if (!isPublicRoute && !isAuthOnlyRoute) {
+    if (!isPublicRoute && !isAuthOnlyRoute && !isAuthenticated) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600" />

@@ -90,19 +90,7 @@ const SlidePanel = React.memo(({
         } ${isDragging ? "opacity-50 scale-95" : ""}`}
       onClick={onClick}
     >
-      {/* Slide number badge */}
-      <div
-        className="absolute top-1.5 left-1.5 z-10 h-5 w-5 rounded-md text-white text-[10px] font-bold flex items-center justify-center shadow-sm"
-        style={{
-          background: isActive
-            ? `linear-gradient(135deg, ${primaryColor}, ${primaryColor}dd)`
-            : 'rgba(0,0,0,0.5)',
-        }}
-      >
-        {index + 1}
-      </div>
-
-      {/* Drag handle */}
+      {/* Drag handle (thumbnail corner — not over title text) */}
       <div
         {...attributes}
         {...listeners}
@@ -234,9 +222,19 @@ const SlidePanel = React.memo(({
         </div>
       </div>
 
-      {/* Title bar */}
-      <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 border-t border-slate-200/80 dark:border-slate-700/80">
-        <p className="text-[10px] text-slate-600 dark:text-slate-400 truncate font-medium">
+      {/* Title bar with slide number (kept out of the thumbnail so it never covers titles) */}
+      <div className="px-2 py-1.5 bg-slate-50 dark:bg-slate-900 border-t border-slate-200/80 dark:border-slate-700/80 flex items-center gap-1.5 min-w-0">
+        <span
+          className="h-4 min-w-4 px-1 rounded text-white text-[9px] font-bold flex items-center justify-center shrink-0"
+          style={{
+            background: isActive
+              ? `linear-gradient(135deg, ${primaryColor}, ${primaryColor}dd)`
+              : 'rgba(100,116,139,0.85)',
+          }}
+        >
+          {index + 1}
+        </span>
+        <p className="text-[10px] text-slate-600 dark:text-slate-400 truncate font-medium min-w-0">
           {slide.title || `Slide ${index + 1}`}
         </p>
       </div>

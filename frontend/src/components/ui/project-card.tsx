@@ -127,8 +127,12 @@ export const ProjectCard = memo(({
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                         <h3
-                            className="font-medium text-slate-900 dark:text-white line-clamp-2"
+                            className="font-medium text-slate-900 dark:text-white line-clamp-2 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
                             title={project.title}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                openProject();
+                            }}
                         >
                             {project.title}
                         </h3>
@@ -139,9 +143,15 @@ export const ProjectCard = memo(({
                             <Clock className="h-3.5 w-3.5" />
                             {formatDate(project.updatedAt)}
                         </span>
-                        {(project.slideCount !== undefined || project._count?.slides !== undefined) && (
-                            <span>{project.slideCount ?? project._count?.slides} slides</span>
-                        )}
+                        {(() => {
+                            const slides =
+                                project.slideCount ??
+                                project._count?.slides ??
+                                (Array.isArray((project as { slides?: unknown[] }).slides)
+                                    ? (project as { slides: unknown[] }).slides.length
+                                    : undefined);
+                            return slides !== undefined ? <span>{slides} slides</span> : null;
+                        })()}
                         {project.viewCount !== undefined && project.viewCount > 0 && (
                             <span className="flex items-center gap-1">
                                 <Eye className="h-3.5 w-3.5" />
@@ -257,7 +267,10 @@ export const ProjectCard = memo(({
             className="group relative bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-lg transition-all cursor-pointer"
         >
             {/* Thumbnail */}
-            <div className="relative aspect-16/10 bg-slate-100 dark:bg-slate-800 overflow-hidden">
+            <div
+                className="relative aspect-16/10 bg-slate-100 dark:bg-slate-800 overflow-hidden"
+                onClick={openProject}
+            >
                 <ProjectCardThumbnail
                     title={project.title}
                     seed={project.id}
@@ -265,11 +278,13 @@ export const ProjectCard = memo(({
                     themeColors={themeColors}
                 />
 
-                {/* Hover overlay */}
+                {/* Hover overlay — pointer-events only when visible so title/thumbnail clicks reach the card */}
                 <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: isHovered ? 1 : 0 }}
-                    className="absolute inset-0 bg-black/60 flex items-center justify-center gap-3"
+                    className={`absolute inset-0 bg-black/60 flex items-center justify-center gap-3 ${
+                        isHovered ? "pointer-events-auto" : "pointer-events-none"
+                    }`}
                     onClick={(e) => e.stopPropagation()}
                 >
                     <Button
@@ -319,8 +334,12 @@ export const ProjectCard = memo(({
                 <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                         <h3
-                            className="font-semibold text-slate-900 dark:text-white line-clamp-2"
+                            className="font-semibold text-slate-900 dark:text-white line-clamp-2 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
                             title={project.title}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                openProject();
+                            }}
                         >
                             {project.title}
                         </h3>
@@ -377,9 +396,15 @@ export const ProjectCard = memo(({
                             <Clock className="h-3.5 w-3.5" />
                             {formatDate(project.updatedAt)}
                         </span>
-                        {(project.slideCount !== undefined || project._count?.slides !== undefined) && (
-                            <span>{project.slideCount ?? project._count?.slides} slides</span>
-                        )}
+                        {(() => {
+                            const slides =
+                                project.slideCount ??
+                                project._count?.slides ??
+                                (Array.isArray((project as { slides?: unknown[] }).slides)
+                                    ? (project as { slides: unknown[] }).slides.length
+                                    : undefined);
+                            return slides !== undefined ? <span>{slides} slides</span> : null;
+                        })()}
                     </div>
 
                     {/* Collaborators */}

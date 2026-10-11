@@ -371,7 +371,7 @@ export function UsageCard({
                 <div>
                     <h3 className="font-semibold text-slate-900 dark:text-white">Usage</h3>
                     <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Current plan: <span className="font-medium capitalize">{plan}</span>
+                        Current plan: <span className="font-medium">{plan}</span>
                     </p>
                 </div>
                 {plan.toLowerCase() === "free" && onUpgrade && (

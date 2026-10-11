@@ -180,6 +180,7 @@ export const useAuthStore = create<AuthState>()(
           console.warn('[AuthStore] No token found, not authenticated');
           set({
             user: null,
+            subscription: null,
             isAuthenticated: false,
             isLoading: false,
             initialized: true
@@ -197,6 +198,9 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
             initialized: true,
           });
+          // Subscription is not persisted — always refresh after profile so AI usage
+          // and plan limits survive a full page reload.
+          void get().fetchSubscription();
         } catch (error: unknown) {
           const status =
             typeof error === 'object' && error !== null && 'response' in error
@@ -217,6 +221,7 @@ export const useAuthStore = create<AuthState>()(
             console.warn('[AuthStore] Clearing auth state due to 401/403 or missing token');
             set({
               user: null,
+              subscription: null,
               isAuthenticated: false,
               isLoading: false,
               initialized: true,
@@ -226,6 +231,8 @@ export const useAuthStore = create<AuthState>()(
               isLoading: false,
               initialized: true,
             });
+            // Soft failure (e.g. cold start) — still try to load subscription
+            void get().fetchSubscription();
           }
         }
       },
