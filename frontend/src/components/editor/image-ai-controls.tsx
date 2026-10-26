@@ -119,7 +119,7 @@ export function ImageAIControls({
                     )}
                 >
                     <Image
-                        src={imageUrl!}
+                        src={imageUrl || ''}
                         alt={imageAlt || 'Image'}
                         fill
                         sizes="(max-width: 768px) 100vw, 800px"

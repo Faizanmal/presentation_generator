@@ -463,7 +463,7 @@ export function LayoutCompiler({
           >
             {mediaPanel('m-')}
           </div>
-          <div className={`flex flex-col justify-center min-h-0 min-w-0 overflow-hidden gap-3 py-1`}>
+          <div className="flex flex-col justify-center min-h-0 min-w-0 overflow-hidden gap-3 py-1">
             <div className="shrink-0">{renderBlockList(titleBlocks, 't-', { compact: true })}</div>
             <div className="min-h-0 flex-1 overflow-hidden" style={{ opacity: bodyOpacity }}>
               {columnStack(bodyBlocks.slice(0, 4), 'content-')}
@@ -477,7 +477,7 @@ export function LayoutCompiler({
         <div
           className={`w-full h-full grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] ${columnGap} items-stretch relative z-10 ${contentPad} overflow-hidden min-h-0`}
         >
-          <div className={`flex flex-col justify-center min-h-0 min-w-0 overflow-hidden gap-3 py-1`}>
+          <div className="flex flex-col justify-center min-h-0 min-w-0 overflow-hidden gap-3 py-1">
             <div className="shrink-0">{renderBlockList(titleBlocks, 't-', { compact: true })}</div>
             <div className="min-h-0 flex-1 overflow-hidden" style={{ opacity: bodyOpacity }}>
               {columnStack(bodyBlocks.slice(0, 4), 'content-')}
