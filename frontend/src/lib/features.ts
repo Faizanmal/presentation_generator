@@ -44,6 +44,9 @@ export const FEATURES = {
   /** Presentation Coach / AI Co-Pilot hub entries (editor-only today) */
   presentationCoach: envFlag('NEXT_PUBLIC_FEATURE_PRESENTATION_COACH', false),
   aiCopilot: envFlag('NEXT_PUBLIC_FEATURE_AI_COPILOT', false),
+
+  /** White-Label SDK settings page (Enterprise). Off → Coming soon / Pro. */
+  whiteLabelSdk: envFlag('NEXT_PUBLIC_FEATURE_WHITE_LABEL_SDK', false),
 } as const;
 
 export type FeatureKey = keyof typeof FEATURES;
@@ -66,4 +69,5 @@ export const FEATURE_LABELS: Record<FeatureKey, string> = {
   crossSync: 'Cross-Sync',
   presentationCoach: 'Presentation Coach',
   aiCopilot: 'AI Co-Pilot',
+  whiteLabelSdk: 'White-Label SDK',
 };
