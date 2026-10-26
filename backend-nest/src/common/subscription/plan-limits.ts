@@ -3,9 +3,26 @@
  * Keep in sync with frontend/src/lib/plans.ts
  */
 
+import { ForbiddenException } from '@nestjs/common';
+
 export type PlanId = 'FREE' | 'PRO' | 'ENTERPRISE';
 
 export type ExportFormat = 'html' | 'json' | 'pdf' | 'pptx';
+
+/** Stable codes for plan-limit 403s — keep in sync with frontend/src/lib/api-errors.ts */
+export const PLAN_LIMIT_CODES = {
+  PRESENTATIONS: 'PLAN_LIMIT_PRESENTATIONS',
+  AI: 'PLAN_LIMIT_AI',
+} as const;
+
+export type PlanLimitCode =
+  (typeof PLAN_LIMIT_CODES)[keyof typeof PLAN_LIMIT_CODES];
+
+export interface PlanLimitDetails {
+  used: number;
+  limit: number;
+  plan: string;
+}
 
 export interface PlanLimitsConfig {
   id: PlanId;
@@ -75,4 +92,45 @@ export function canExportFormat(
 ): boolean {
   const normalized = format.toLowerCase() as ExportFormat;
   return getPlanLimits(plan).exports[normalized] === true;
+}
+
+/**
+ * Build a typed ForbiddenException for plan-limit failures.
+ * Filters forward `code` + `details` so the UI can map a clear upgrade message.
+ */
+export function planLimitForbidden(
+  code: PlanLimitCode,
+  message: string,
+  details: PlanLimitDetails,
+): ForbiddenException {
+  return new ForbiddenException({
+    statusCode: 403,
+    error: 'Forbidden',
+    message,
+    code,
+    details,
+  });
+}
+
+export function presentationsLimitMessage(
+  used: number,
+  limit: number,
+  plan: string,
+): string {
+  const planName = planDisplayName(plan);
+  return `You've used ${used} of ${limit} presentations on the ${planName} plan`;
+}
+
+export function aiLimitMessage(
+  used: number,
+  limit: number,
+  plan: string,
+): string {
+  const planName = planDisplayName(plan);
+  return `You've used ${used} of ${limit} AI credits on the ${planName} plan`;
+}
+
+function planDisplayName(plan: string): string {
+  const key = (plan || 'FREE').toUpperCase() as PlanId;
+  return PLAN_LIMITS[key]?.name ?? 'Free';
 }

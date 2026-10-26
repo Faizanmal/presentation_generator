@@ -7,7 +7,14 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
-import { getPlanLimits, PLAN_LIMITS } from '../common/subscription/plan-limits';
+import {
+  getPlanLimits,
+  PLAN_LIMITS,
+  PLAN_LIMIT_CODES,
+  planLimitForbidden,
+  presentationsLimitMessage,
+  aiLimitMessage,
+} from '../common/subscription/plan-limits';
 
 interface CreateUserDto {
   email: string;
@@ -343,6 +350,28 @@ export class UsersService {
   }
 
   /**
+   * Assert AI generation is allowed; throws typed PLAN_LIMIT_AI on failure.
+   * Does not increment usage — call only before starting work.
+   */
+  async assertCanGenerateAI(userId: string): Promise<void> {
+    if (this.allowUnlimitedInDev()) {
+      return;
+    }
+
+    const subscription = await this.getSubscription(userId);
+    const limit = this.resolveAiGenerationsLimit(subscription);
+    const used = subscription.aiGenerationsUsed;
+
+    if (used >= limit) {
+      throw planLimitForbidden(
+        PLAN_LIMIT_CODES.AI,
+        aiLimitMessage(used, limit, subscription.plan),
+        { used, limit, plan: subscription.plan },
+      );
+    }
+  }
+
+  /**
    * Check if user can create more projects
    */
   async canCreateProject(userId: string): Promise<boolean> {
@@ -358,6 +387,29 @@ export class UsersService {
     });
 
     return projectCount < limit;
+  }
+
+  /**
+   * Assert project creation is allowed; throws typed PLAN_LIMIT_PRESENTATIONS.
+   */
+  async assertCanCreateProject(userId: string): Promise<void> {
+    if (this.allowUnlimitedInDev()) {
+      return;
+    }
+
+    const subscription = await this.getSubscription(userId);
+    const limit = this.resolveProjectsLimit(subscription);
+    const used = await this.prisma.project.count({
+      where: { ownerId: userId, deletedAt: null },
+    });
+
+    if (used >= limit) {
+      throw planLimitForbidden(
+        PLAN_LIMIT_CODES.PRESENTATIONS,
+        presentationsLimitMessage(used, limit, subscription.plan),
+        { used, limit, plan: subscription.plan },
+      );
+    }
   }
 
   /**
