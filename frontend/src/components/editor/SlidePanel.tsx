@@ -77,8 +77,23 @@ const SlidePanel = React.memo(({
   const primaryColor = theme?.colors?.primary || "#3b82f6";
   const accentColor = theme?.colors?.accent || "#10b981";
 
-  // Determine if this is a title slide
-  const isTitleSlide = slide.layout === 'title' || index === 0;
+  const layout = (slide.layout || '').toLowerCase();
+  const isHeroSplit =
+    layout === 'title-hero' ||
+    layout === 'image-left' ||
+    layout === 'image-right' ||
+    layout === 'two-column-image';
+  const isTitleSlide = layout === 'title' || layout === 'title-subtitle';
+
+  const blocks = slide.blocks?.length ? slide.blocks : [];
+  const imageBlock = blocks.find((b) => {
+    const t = (b.type || b.blockType)?.toUpperCase();
+    return t === 'IMAGE' && typeof b.content?.url === 'string' && b.content.url;
+  });
+  const textBlocks = blocks.filter((b) => {
+    const t = (b.type || b.blockType)?.toUpperCase();
+    return t !== 'IMAGE' && t !== 'VIDEO';
+  }).slice(0, 4);
 
   return (
     <div
@@ -126,67 +141,68 @@ const SlidePanel = React.memo(({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Slide thumbnail */}
+      {/* Slide thumbnail — layout-aware wireframe (not a washed full-bleed strip) */}
       <div
-        className="aspect-16/10 p-2.5 relative overflow-hidden"
+        className="aspect-video relative overflow-hidden"
         style={{ backgroundColor: bgColor }}
       >
-        {/* Ambient mesh gradient decoration */}
-        {isTitleSlide && (
-          <>
+        {isHeroSplit ? (
+          <div className="absolute inset-0 grid grid-cols-2">
             <div
-              className="absolute -top-6 -right-6 w-20 h-20 rounded-full opacity-20 blur-md"
-              style={{
-                background: `radial-gradient(circle, ${primaryColor}, transparent)`,
-              }}
-            />
-            <div
-              className="absolute -bottom-4 -left-4 w-14 h-14 rounded-full opacity-10 blur-sm"
-              style={{
-                background: `radial-gradient(circle, ${accentColor || primaryColor}, transparent)`,
-              }}
-            />
-          </>
-        )}
-
-        {/* Mini representation of slide content */}
-        <div
-          className={`h-full flex flex-col gap-0.5 overflow-hidden min-w-0 ${
-            isTitleSlide ? "justify-center items-center text-center" : ""
-          }`}
-        >
-          {(slide.blocks?.length ? slide.blocks.slice(0, 4) : []).map((block) => {
-            const blockType = (block.type || block.blockType)?.toUpperCase();
-            const preview = blockPreviewLine(block);
-
-            if (blockType === "IMAGE") {
-              const url = block.content?.url;
-              return (
-                <div
-                  key={block.id}
-                  className="h-5 rounded-sm w-full overflow-hidden bg-slate-200/80 dark:bg-slate-600/80 shrink-0"
-                >
-                  {typeof url === "string" && url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={url} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="h-full w-full flex items-center justify-center text-[8px] text-slate-500">
-                      Image
-                    </div>
-                  )}
-                </div>
-              );
-            }
-
-            if (preview) {
-              const isHeading = blockType === "HEADING" || blockType === "SUBHEADING";
+              className="relative overflow-hidden"
+              style={{ background: `linear-gradient(145deg, ${primaryColor}cc, ${accentColor || primaryColor}99)` }}
+            >
+              {imageBlock?.content?.url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={String(imageBlock.content.url)}
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+              ) : null}
+            </div>
+            <div className="flex flex-col justify-center gap-1 p-2 min-w-0 overflow-hidden">
+              {textBlocks.slice(0, 3).map((block) => {
+                const preview = blockPreviewLine(block, 36);
+                if (!preview) {return null;}
+                const blockType = (block.type || block.blockType)?.toUpperCase();
+                const isHeading = blockType === 'HEADING' || blockType === 'SUBHEADING';
+                return (
+                  <p
+                    key={block.id}
+                    className={`leading-tight w-full min-w-0 ${
+                      isHeading ? 'font-semibold line-clamp-2 text-[8px]' : 'line-clamp-2 text-[7px] opacity-75'
+                    }`}
+                    style={{ color: isHeading ? primaryColor : textColor }}
+                  >
+                    {preview}
+                  </p>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div
+            className={`absolute inset-0 flex flex-col gap-1 p-2.5 overflow-hidden min-w-0 ${
+              isTitleSlide ? 'justify-center items-center text-center' : 'justify-start'
+            }`}
+          >
+            {isTitleSlide && (
+              <div
+                className="absolute -top-4 -right-4 w-16 h-16 rounded-full opacity-15 blur-md pointer-events-none"
+                style={{ background: `radial-gradient(circle, ${primaryColor}, transparent)` }}
+              />
+            )}
+            {textBlocks.map((block) => {
+              const preview = blockPreviewLine(block);
+              if (!preview) {return null;}
+              const blockType = (block.type || block.blockType)?.toUpperCase();
+              const isHeading = blockType === 'HEADING' || blockType === 'SUBHEADING';
               return (
                 <p
                   key={block.id}
                   className={`leading-tight shrink-0 w-full min-w-0 ${
-                    isHeading
-                      ? "font-semibold line-clamp-2 text-[9px]"
-                      : "line-clamp-2 text-[8px] opacity-80"
+                    isHeading ? 'font-semibold line-clamp-2 text-[9px]' : 'line-clamp-2 text-[8px] opacity-80'
                   }`}
                   style={{ color: isHeading ? primaryColor : textColor }}
                   title={preview}
@@ -194,32 +210,12 @@ const SlidePanel = React.memo(({
                   {preview}
                 </p>
               );
-            }
-
-            if (blockType === "CHART") {
-              return (
-                <div
-                  key={block.id}
-                  className="h-4 rounded-sm bg-slate-100/80 dark:bg-slate-700/80 w-full flex items-end gap-px px-1 pb-0.5 shrink-0"
-                >
-                  <div className="w-1 h-1.5 rounded-t-sm" style={{ backgroundColor: `${primaryColor}66` }} />
-                  <div className="w-1 h-2.5 rounded-t-sm" style={{ backgroundColor: `${primaryColor}88` }} />
-                  <div className="w-1 h-3 rounded-t-sm" style={{ backgroundColor: primaryColor }} />
-                </div>
-              );
-            }
-
-            return (
-              <div
-                key={block.id}
-                className="h-1 bg-slate-300/70 dark:bg-slate-600/70 w-full rounded-sm shrink-0"
-              />
-            );
-          })}
-          {!slide.blocks?.length && (
-            <p className="text-[8px] text-slate-400 italic">Empty slide</p>
-          )}
-        </div>
+            })}
+            {!blocks.length && (
+              <p className="text-[8px] text-slate-400 italic">Empty slide</p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Title bar with slide number (kept out of the thumbnail so it never covers titles) */}

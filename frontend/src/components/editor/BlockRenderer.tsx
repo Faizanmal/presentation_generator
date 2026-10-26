@@ -21,6 +21,7 @@ import { BentoGridBlock } from "./bento-grid-block";
 import { TimelineBlock } from "./timeline-block";
 import type { EmbedServiceType } from "./oembed-block";
 import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 import { isValidMediaUrl } from "@/lib/slide-media";
 import { BrandedMediaPlaceholder } from "./BrandedMediaPlaceholder";
 
@@ -31,6 +32,10 @@ interface BlockRendererProps {
   blockIndex?: number; // For stagger animation
   presentationDensity?: number;
   presentationTone?: number;
+  /** IMAGE blocks: fill parent height (bleed media columns) */
+  fillMedia?: boolean;
+  /** Tighter typography/padding for constrained layout cells */
+  compact?: boolean;
   onFocus?: () => void;
   onBlur?: () => void;
   onChange?: (content: Record<string, unknown>) => void;
@@ -76,6 +81,8 @@ const BlockRenderer = React.memo(({
   blockIndex = 0,
   presentationDensity = 60,
   presentationTone = 70,
+  fillMedia = false,
+  compact = false,
   onFocus,
   onBlur,
   onChange,
@@ -101,20 +108,24 @@ const BlockRenderer = React.memo(({
   const secondaryColor = theme?.colors?.secondary || "#8b5cf6";
   // surface color was used in earlier designs but is currently unused
   // const surfaceColor = theme?.colors?.surface || "#f8fafc";
-  const isDense = presentationDensity >= 66;
-  const isSpacious = presentationDensity < 34;
-  const bodyLineHeight = isDense ? 1.55 : 1.72;
+  const isDense = presentationDensity >= 66 || compact;
+  const isSpacious = !compact && presentationDensity < 34;
+  const bodyLineHeight = isDense ? 1.45 : 1.72;
   const readableWidth = isDense ? '36rem' : '42rem';
-  const headingScale = isSpacious
-    ? 'clamp(2.4rem, 4.8vw, 4.25rem)'
-    : isDense
-      ? 'clamp(1.85rem, 3.2vw, 2.75rem)'
-      : 'clamp(2.1rem, 4vw, 3.5rem)';
-  const subheadingScale = isSpacious
+  const headingScale = compact
     ? 'clamp(1.35rem, 2.4vw, 1.85rem)'
-    : isDense
-      ? 'clamp(1.15rem, 1.8vw, 1.45rem)'
-      : 'clamp(1.25rem, 2vw, 1.65rem)';
+    : isSpacious
+      ? 'clamp(2.2rem, 4.2vw, 3.5rem)'
+      : isDense
+        ? 'clamp(1.7rem, 3vw, 2.4rem)'
+        : 'clamp(1.9rem, 3.6vw, 3rem)';
+  const subheadingScale = compact
+    ? 'clamp(0.95rem, 1.5vw, 1.2rem)'
+    : isSpacious
+      ? 'clamp(1.25rem, 2.2vw, 1.65rem)'
+      : isDense
+        ? 'clamp(1.05rem, 1.6vw, 1.3rem)'
+        : 'clamp(1.15rem, 1.9vw, 1.45rem)';
   const bodyOpacity = presentationTone > 66 ? 0.92 : presentationTone < 34 ? 0.82 : 0.88;
 
   // Content state
@@ -146,7 +157,7 @@ const BlockRenderer = React.memo(({
   };
 
   // Cap list length so dense AI decks don't clip off the 16:9 canvas
-  const MAX_LIST_ITEMS = isDense ? 5 : 6;
+  const MAX_LIST_ITEMS = compact ? 4 : isDense ? 5 : 6;
   const bulletItems = useMemo(() => {
     const raw = (content?.items as string[]) || ["Item 1", "Item 2", "Item 3"];
     return raw.slice(0, MAX_LIST_ITEMS);
@@ -297,25 +308,26 @@ const BlockRenderer = React.memo(({
         if (isCard) {
           return (
             <div
-              className="relative p-5 rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5"
+              className={cn(
+                'relative rounded-2xl overflow-hidden min-h-0',
+                compact ? 'p-3' : 'p-4',
+              )}
               style={{
                 background: `linear-gradient(135deg, ${colorWithAlpha(primaryColor, 0.08)}, ${colorWithAlpha(secondaryColor, 0.06)})`,
                 backdropFilter: 'blur(8px)',
                 border: `1px solid ${colorWithAlpha(primaryColor, 0.15)}`,
               }}
             >
-              {/* Decorative corner accent */}
-              <div
-                className="absolute top-0 right-0 w-16 h-16 opacity-20 rounded-bl-full"
-                style={{ background: gradientFromColor(accentColor) }}
-              />
               <p
                 ref={contentRef}
                 contentEditable
                 onInput={handleTextChange}
                 onFocus={onFocus}
                 onBlur={onBlur}
-                className="outline-none relative z-10 font-medium text-[1.05rem] leading-8"
+                className={cn(
+                  'outline-none relative z-10 font-medium min-h-0',
+                  compact ? 'text-sm leading-6 line-clamp-6' : 'text-[1.02rem] leading-7',
+                )}
                 style={{
                   fontFamily: theme?.fonts?.body || 'var(--font-dm-sans), system-ui, sans-serif',
                   color: customColor?.startsWith('#') ? customColor : undefined,
@@ -414,19 +426,17 @@ const BlockRenderer = React.memo(({
 
       case "BULLET_LIST":
         return (
-          <ul className="space-y-4 pl-1 max-w-[42rem]">
+          <ul className={cn(compact ? 'space-y-2' : 'space-y-3', 'pl-1 max-w-[42rem] min-h-0')}>
             {keyedBulletItems.map(({ item, key }, i: number) => {
               return (
                 <li
                   key={key}
-                  className="flex items-start gap-3 group/item transition-all duration-200 hover:translate-x-1"
+                  className="flex items-start gap-2.5 group/item"
                 >
-                  {/* Custom gradient bullet */}
                   <span
-                    className="mt-2 w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
+                    className="mt-2 w-2 h-2 rounded-full shrink-0"
                     style={{
                       background: gradientFromColor(primaryColor),
-                      boxShadow: `0 0 8px ${colorWithAlpha(primaryColor, 0.3)}`,
                     }}
                   />
                   <span
@@ -438,7 +448,10 @@ const BlockRenderer = React.memo(({
                     }}
                     onFocus={onFocus}
                     onBlur={onBlur}
-                    className="outline-none flex-1 text-[1.02rem] leading-8"
+                    className={cn(
+                      'outline-none flex-1 min-w-0',
+                      compact ? 'text-sm leading-6 line-clamp-3' : 'text-[0.98rem] leading-7',
+                    )}
                     style={{
                       fontFamily: theme?.fonts?.body || 'var(--font-dm-sans), system-ui, sans-serif',
                       lineHeight: bodyLineHeight,
@@ -498,7 +511,12 @@ const BlockRenderer = React.memo(({
         const imageUrl = isValidMediaUrl(content?.url) ? String(content.url) : undefined;
         if (!imageUrl) {
           return (
-            <div className="relative group/image w-full h-full min-h-[8rem] overflow-hidden rounded-xl">
+            <div
+              className={cn(
+                'relative group/image w-full overflow-hidden',
+                fillMedia ? 'h-full min-h-0 rounded-none' : 'min-h-[8rem] rounded-xl',
+              )}
+            >
               <BrandedMediaPlaceholder
                 primary={primaryColor}
                 secondary={secondaryColor}
@@ -511,6 +529,9 @@ const BlockRenderer = React.memo(({
                     blockId={block.id}
                     slideId={block.slideId || ""}
                     projectId={block.projectId}
+                    fillContainer={fillMedia}
+                    primaryColor={primaryColor}
+                    secondaryColor={secondaryColor}
                     onImageUpdate={(newUrl, newAlt) => {
                       setContent({ ...content, url: newUrl, alt: newAlt || content?.alt });
                     }}
@@ -522,13 +543,16 @@ const BlockRenderer = React.memo(({
           );
         }
         return (
-          <div className="relative group/image w-full h-full min-h-0">
+          <div className={cn('relative group/image w-full min-h-0', fillMedia && 'h-full')}>
             <ImageAIControls
               imageUrl={imageUrl}
               imageAlt={content?.alt || "Image"}
               blockId={block.id}
               slideId={block.slideId || ""}
               projectId={block.projectId}
+              fillContainer={fillMedia}
+              primaryColor={primaryColor}
+              secondaryColor={secondaryColor}
               onImageUpdate={(newUrl, newAlt) => {
                 setContent({ ...content, url: newUrl, alt: newAlt || content?.alt });
               }}
@@ -580,26 +604,26 @@ const BlockRenderer = React.memo(({
       case "QUOTE":
         return (
           <div
-            className="relative pl-7 py-5 pr-5 rounded-2xl transition-all duration-300 max-w-[42rem]"
+            className={cn(
+              'relative rounded-2xl transition-all duration-300 max-w-[42rem] min-h-0 overflow-hidden',
+              compact ? 'pl-4 py-3 pr-3' : 'pl-7 py-4 pr-5',
+            )}
             style={{
               borderLeft: `4px solid ${accentColor}`,
               background: `linear-gradient(135deg, ${colorWithAlpha(accentColor, 0.06)}, ${colorWithAlpha(primaryColor, 0.03)})`,
             }}
           >
-            {/* Large decorative quote mark */}
-            <div
-              className="absolute -top-2 left-4 text-6xl font-serif leading-none opacity-15 select-none"
-              style={{ color: accentColor }}
-            >
-              &ldquo;
-            </div>
-
             <p
               contentEditable
               onInput={handleTextChange}
               onFocus={onFocus}
               onBlur={onBlur}
-              className="outline-none italic leading-[1.9] relative z-10 text-[clamp(1.2rem,2vw,1.6rem)]"
+              className={cn(
+                'outline-none italic relative z-10 min-h-0',
+                compact
+                  ? 'text-base leading-snug line-clamp-5'
+                  : 'leading-[1.6] text-[clamp(1.05rem,1.8vw,1.35rem)]',
+              )}
               style={{
                 fontFamily: theme?.fonts?.body || "'Georgia', serif",
                 textAlign,
@@ -608,7 +632,7 @@ const BlockRenderer = React.memo(({
               dangerouslySetInnerHTML={{ __html: content?.text || "Quote text..." }}
             />
             {content?.author && (
-              <footer className="mt-3 text-sm font-medium flex items-center gap-2 relative z-10">
+              <footer className="mt-2 text-sm font-medium flex items-center gap-2 relative z-10">
                 <div
                   className="w-8 h-0.5 rounded-full"
                   style={{ background: accentColor }}
@@ -713,28 +737,36 @@ const BlockRenderer = React.memo(({
         const comparisonItems = ((content?.items as string[]) || [
           "Option A: Fast and simple",
           "Option B: Powerful and flexible",
-        ]).map((text, idx) => ({ id: `cmp-${idx}`, text }));
+        ])
+          .slice(0, 3)
+          .map((text, idx) => ({ id: `cmp-${idx}`, text }));
+        const cols = comparisonItems.length >= 3 ? 3 : 2;
         return (
-          <div className="grid grid-cols-2 gap-5">
+          <div
+            className="grid gap-3 min-h-0"
+            style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+          >
             {comparisonItems.map((entry, i) => {
               const colors = [primaryColor, accentColor, secondaryColor];
               const color = colors[i % colors.length];
               return (
                 <div
                   key={entry.id}
-                  className="p-6 rounded-2xl transition-all duration-300 hover:shadow-xl hover:-translate-y-1 relative overflow-hidden"
+                  className={cn(
+                    'rounded-2xl relative overflow-hidden min-h-0 flex flex-col',
+                    compact ? 'p-3' : 'p-4',
+                  )}
                   style={{
                     background: `linear-gradient(135deg, ${colorWithAlpha(color, 0.08)}, ${colorWithAlpha(color, 0.03)})`,
                     border: `1px solid ${colorWithAlpha(color, 0.15)}`,
                   }}
                 >
-                  {/* Top accent line */}
                   <div
                     className="absolute top-0 left-0 right-0 h-1 rounded-b"
                     style={{ background: gradientFromColor(color, '90deg') }}
                   />
                   <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold mb-3 shadow-sm"
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold mb-2 shadow-sm shrink-0"
                     style={{ background: gradientFromColor(color) }}
                   >
                     {String.fromCharCode(65 + i)}
@@ -749,7 +781,10 @@ const BlockRenderer = React.memo(({
                     }}
                     onFocus={onFocus}
                     onBlur={onBlur}
-                    className="outline-none font-medium text-[1.02rem] leading-8"
+                    className={cn(
+                      'outline-none font-medium min-h-0',
+                      compact ? 'text-sm leading-6 line-clamp-6' : 'text-[0.95rem] leading-7',
+                    )}
                     style={{
                       fontFamily: theme?.fonts?.body || 'var(--font-dm-sans), system-ui, sans-serif',
                       lineHeight: bodyLineHeight,
@@ -823,34 +858,28 @@ const BlockRenderer = React.memo(({
       }
 
       case "CALL_TO_ACTION": {
-        const ctaText = content?.text || "🚀 Get Started Today";
+        const ctaText = content?.text || "Get Started Today";
         return (
           <div
-            className="relative p-10 rounded-3xl text-center overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 max-w-4xl mx-auto"
+            className={cn(
+              'relative text-center overflow-hidden max-w-4xl mx-auto min-h-0',
+              compact ? 'p-4 rounded-2xl' : 'p-6 rounded-3xl',
+            )}
             style={{
               background: gradientFromColor(primaryColor),
-              boxShadow: `0 8px 32px ${colorWithAlpha(primaryColor, 0.3)}`,
+              boxShadow: `0 8px 24px ${colorWithAlpha(primaryColor, 0.25)}`,
             }}
           >
-            {/* Animated shimmer overlay */}
-            <div
-              className="absolute inset-0 opacity-20"
-              style={{
-                background: `linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)`,
-                backgroundSize: '200% 100%',
-                animation: 'gradient-shimmer 3s linear infinite',
-              }}
-            />
-            {/* Decorative circles */}
-            <div className="absolute -top-6 -left-6 w-24 h-24 rounded-full bg-white/10" />
-            <div className="absolute -bottom-4 -right-4 w-16 h-16 rounded-full bg-white/10" />
             <p
               ref={contentRef}
               contentEditable
               onInput={handleTextChange}
               onFocus={onFocus}
               onBlur={onBlur}
-              className="text-2xl md:text-3xl font-extrabold text-white outline-none relative z-10 drop-shadow-sm leading-snug w-full max-w-full break-words [overflow-wrap:anywhere] text-balance px-2"
+              className={cn(
+                'font-extrabold text-white outline-none relative z-10 drop-shadow-sm leading-snug w-full max-w-full break-words [overflow-wrap:anywhere] text-balance px-1',
+                compact ? 'text-base line-clamp-4' : 'text-xl md:text-2xl',
+              )}
               style={{ fontFamily: theme?.fonts?.heading || 'var(--font-dm-sans), system-ui, sans-serif' }}
               dangerouslySetInnerHTML={{ __html: ctaText }}
             />
