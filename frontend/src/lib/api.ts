@@ -98,8 +98,8 @@ class ApiClient {
   private storedRefreshToken: string | null = null;
   private csrfToken: string | null = null;
   private csrfPromise: Promise<string> | null = null;
-  // Used to queue concurrent requests that arrive while a token refresh is in-flight
-  private isRefreshing = false;
+  // Single in-flight refresh — concurrent 401s share one promise
+  private refreshPromise: Promise<string> | null = null;
   private refreshSubscribers: Array<{
     resolve: (newToken: string) => void;
     reject: (error: unknown) => void;
@@ -120,6 +120,11 @@ class ApiClient {
   private notifyRefreshFailed(error: unknown) {
     this.refreshSubscribers.forEach(({ reject }) => reject(error));
     this.refreshSubscribers = [];
+  }
+
+  private isUnauthorizedRefresh(error: unknown): boolean {
+    const status = (error as { response?: { status?: number } })?.response?.status;
+    return status === 401 || status === 403;
   }
 
   private skipAuthHeader(url?: string) {
@@ -143,11 +148,19 @@ class ApiClient {
       path.startsWith('/present/') ||
       path.startsWith('/view/') ||
       path.startsWith('/embed/') ||
-      path.startsWith('/auth/')
+      path.startsWith('/auth/') ||
+      path.startsWith('/invite/')
     ) {
       return false;
     }
-    return !['/', '/marketplace', '/terms', '/offline'].includes(path);
+    return ![
+      '/',
+      '/marketplace',
+      '/pricing',
+      '/features',
+      '/terms',
+      '/offline',
+    ].includes(path);
   }
 
   private redirectToLogin() {
@@ -253,33 +266,30 @@ class ApiClient {
             return Promise.reject(error);
           }
 
-          if (this.isRefreshing) {
-            return new Promise<AxiosResponse>((resolve, reject) => {
-              this.subscribeTokenRefresh((newToken: string) => {
-                if (originalRequest.headers) {
-                  originalRequest.headers.Authorization = `Bearer ${newToken}`;
-                }
-                resolve(this.client(originalRequest));
-              }, reject);
+          originalRequest._retry = true;
+
+          if (!this.refreshPromise) {
+            this.refreshPromise = (async () => {
+              const { data } = await this.client.post<{
+                accessToken: string;
+                refreshToken: string;
+                expiresIn: number;
+              }>('/auth/refresh', { refreshToken: this.storedRefreshToken });
+              this.setToken(data.accessToken);
+              this.setRefreshToken(data.refreshToken);
+              this.csrfToken = null;
+              this.csrfPromise = null;
+              this.notifyRefreshed(data.accessToken);
+              return data.accessToken;
+            })().finally(() => {
+              this.refreshPromise = null;
             });
           }
 
-          originalRequest._retry = true;
-          this.isRefreshing = true;
-
           try {
-            const { data } = await this.client.post<{ accessToken: string; refreshToken: string; expiresIn: number }>(
-              '/auth/refresh',
-              { refreshToken: this.storedRefreshToken },
-            );
-            this.setToken(data.accessToken);
-            this.setRefreshToken(data.refreshToken);
-            // Clear CSRF token since session identifier changed
-            this.csrfToken = null;
-            this.csrfPromise = null;
-            this.notifyRefreshed(data.accessToken);
+            const newToken = await this.refreshPromise;
             if (originalRequest.headers) {
-              originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
+              originalRequest.headers.Authorization = `Bearer ${newToken}`;
             }
             return this.client(originalRequest);
           } catch (refreshError) {
@@ -288,16 +298,27 @@ class ApiClient {
                 ? refreshError
                 : new Error('Token refresh failed');
             console.warn('[ApiClient] Token refresh failed:', normalized.message);
-            this.clearToken();
             this.notifyRefreshFailed(normalized);
-            this.redirectToLogin();
+
+            // Cold-start / network blips must not log the user out
+            if (isLikelyColdStartError(refreshError)) {
+              return Promise.reject(normalized);
+            }
+
+            // Only redirect when the refresh itself was unauthorized
+            if (this.isUnauthorizedRefresh(refreshError)) {
+              this.clearToken();
+              this.redirectToLogin();
+            }
             return Promise.reject(normalized);
-          } finally {
-            this.isRefreshing = false;
           }
         }
 
-        if (error.response?.status === 401 && !originalRequest.url?.includes('/auth/refresh')) {
+        if (
+          error.response?.status === 401 &&
+          !originalRequest.url?.includes('/auth/refresh') &&
+          !originalRequest._retry
+        ) {
           this.clearToken();
           this.redirectToLogin();
         }

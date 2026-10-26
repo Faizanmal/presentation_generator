@@ -398,7 +398,14 @@ export default function DashboardPage() {
           <div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">My Presentations</h1>
             <p className="text-slate-600 dark:text-slate-400">
-              {filteredProjects?.length || 0} presentation{(filteredProjects?.length || 0) !== 1 ? "s" : ""}
+              {projectsLoading ? (
+                <span className="inline-block h-4 w-28 animate-pulse rounded bg-slate-200 dark:bg-slate-700 align-middle" />
+              ) : (
+                <>
+                  {filteredProjects?.length || 0} presentation
+                  {(filteredProjects?.length || 0) !== 1 ? "s" : ""}
+                </>
+              )}
             </p>
           </div>
 
@@ -443,8 +450,14 @@ export default function DashboardPage() {
 
         {/* Projects grid/list */}
         {projectsLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                // eslint-disable-next-line react/no-array-index-key
+                key={`skel-${i}`}
+                className="h-48 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900/50 animate-pulse"
+              />
+            ))}
           </div>
         ) : filteredProjects?.length === 0 ? (
           <div className="text-center py-12">

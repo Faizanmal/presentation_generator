@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Server, RefreshCw } from 'lucide-react';
+import { Server, RefreshCw, Loader2 } from 'lucide-react';
 import {
   ensureServerAwake,
   subscribeServerWake,
@@ -9,25 +9,31 @@ import {
 } from '@/lib/server-wakeup';
 
 /**
- * Background Render Free cold-start warmup. Shows a small bottom banner only
- * after all wake attempts fail — never blocks the page while connecting.
+ * Background Render Free cold-start warmup.
+ * Shows a friendly waking banner with retry — never raw 503s or forced logout.
  */
 export function ColdStartProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<'idle' | 'waking' | 'ready' | 'failed'>('idle');
   const [message, setMessage] = useState('');
+  const [attempt, setAttempt] = useState(0);
+  const [maxAttempts, setMaxAttempts] = useState(0);
 
   useEffect(() => {
     warmupServerInBackground();
     return subscribeServerWake((state) => {
       setStatus(state.status);
       setMessage(state.message);
+      setAttempt(state.attempt);
+      setMaxAttempts(state.maxAttempts);
     });
   }, []);
+
+  const showBanner = status === 'waking' || status === 'failed';
 
   return (
     <>
       {children}
-      {status === 'failed' && (
+      {showBanner && (
         <div
           className="fixed inset-x-0 bottom-0 z-[100] flex justify-center p-4 pointer-events-none sm:bottom-6"
           role="status"
@@ -36,14 +42,24 @@ export function ColdStartProvider({ children }: { children: React.ReactNode }) {
           <div className="pointer-events-auto w-full max-w-md rounded-xl border border-slate-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400">
-                <Server className="h-4 w-4" />
+                {status === 'waking' ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Server className="h-4 w-4" />
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                  Server unavailable
+                  {status === 'waking' ? 'Waking up the server' : 'Server unavailable'}
                 </p>
                 <p className="text-xs text-slate-600 dark:text-slate-300">
-                  {message || 'Could not reach the API. Please try again.'}
+                  {message ||
+                    (status === 'waking'
+                      ? 'This usually takes about 20 seconds…'
+                      : 'Could not reach the API. Please try again.')}
+                  {status === 'waking' && maxAttempts > 0
+                    ? ` (${attempt}/${maxAttempts})`
+                    : ''}
                 </p>
               </div>
               <button
@@ -52,7 +68,7 @@ export function ColdStartProvider({ children }: { children: React.ReactNode }) {
                 className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
               >
                 <RefreshCw className="h-3.5 w-3.5" />
-                Try again
+                Retry
               </button>
             </div>
           </div>

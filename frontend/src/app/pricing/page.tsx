@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Sparkles, CheckCircle2, ArrowRight } from "lucide-react";
+import { CheckCircle2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BRAND, PRODUCT_NAME } from "@/lib/brand";
-import { PLANS_LIST } from "@/lib/plans";
-import { ThemeToggleButton } from "@/components/ui/enhanced-ui";
+import { PLANS_LIST, type PlanId } from "@/lib/plans";
 import { ScaleOnHover } from "@/components/ui/animations";
+import { MarketingHeader } from "@/components/marketing/marketing-header";
+import { useAuthStore } from "@/stores/auth-store";
 
 const PLAN_DESCRIPTIONS: Record<string, string> = {
   FREE: "Perfect for trying out",
@@ -14,7 +15,35 @@ const PLAN_DESCRIPTIONS: Record<string, string> = {
   ENTERPRISE: "For teams and organizations",
 };
 
+function planCta(planId: PlanId, currentPlan: PlanId | null, loggedIn: boolean) {
+  if (!loggedIn) {
+    return {
+      href: "/register",
+      label: planId === "ENTERPRISE" ? "Get started" : "Sign up free",
+      disabled: false,
+    };
+  }
+
+  if (currentPlan === planId) {
+    return { href: "/settings/billing", label: "Current plan", disabled: true };
+  }
+
+  if (planId === "FREE") {
+    return { href: "/dashboard", label: "Go to dashboard", disabled: false };
+  }
+
+  return { href: "/settings/billing", label: "Upgrade", disabled: false };
+}
+
 export default function PricingPage() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const initialized = useAuthStore((s) => s.initialized);
+  const subscription = useAuthStore((s) => s.subscription);
+  const loggedIn = initialized && isAuthenticated;
+  const currentPlan = (
+    (subscription?.plan || "FREE").toUpperCase() as PlanId
+  );
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white overflow-hidden">
       <div className="fixed inset-0 z-0">
@@ -24,45 +53,7 @@ export default function PricingPage() {
       </div>
 
       <div className="relative z-10">
-        <nav className="container mx-auto px-6 py-6">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
-                <Sparkles className="h-6 w-6 text-white" />
-              </div>
-              <span className="text-xl font-bold">{PRODUCT_NAME}</span>
-            </Link>
-
-            <div className="hidden md:flex items-center gap-8">
-              <Link href="/" className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
-                Home
-              </Link>
-              <Link href="/features" className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
-                Features
-              </Link>
-              <Link href="/pricing" className="text-blue-600 dark:text-blue-400 font-medium">
-                Pricing
-              </Link>
-              <Link href="/marketplace" className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
-                Templates
-              </Link>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <ThemeToggleButton />
-              <Link href="/login">
-                <Button variant="ghost" className="text-slate-700 dark:text-slate-300">
-                  Log in
-                </Button>
-              </Link>
-              <Link href="/register">
-                <Button className="bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                  Sign up
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </nav>
+        <MarketingHeader active="pricing" />
 
         <main className="container mx-auto px-6 py-16 pb-24">
           <div className="text-center mb-16 max-w-2xl mx-auto">
@@ -74,71 +65,82 @@ export default function PricingPage() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {PLANS_LIST.map((plan) => (
-              <ScaleOnHover key={plan.id} scale={1.02}>
-                <div
-                  className={`relative h-full p-8 rounded-2xl border backdrop-blur-sm transition-all ${
-                    plan.popular
-                      ? "bg-linear-to-b from-blue-100 to-purple-100 border-blue-300 dark:from-blue-950/50 dark:to-purple-950/50 dark:border-blue-500/50 shadow-2xl shadow-blue-500/10"
-                      : "bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800"
-                  }`}
-                >
-                  {plan.popular && (
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-linear-to-r from-blue-600 to-purple-600 rounded-full text-sm font-medium text-white">
-                      Most Popular
-                    </div>
-                  )}
-
-                  <div className="text-center mb-8">
-                    <h2 className="text-lg font-semibold mb-2">{plan.name}</h2>
-                    <div className="flex items-baseline justify-center gap-1">
-                      <span className="text-5xl font-bold">${plan.priceMonthly}</span>
-                      {plan.priceMonthly > 0 && (
-                        <span className="text-slate-600 dark:text-slate-400">/month</span>
-                      )}
-                    </div>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
-                      {PLAN_DESCRIPTIONS[plan.id] ?? BRAND.tagline}
-                    </p>
-                  </div>
-
-                  <ul className="space-y-4 mb-8">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-center gap-3 text-slate-700 dark:text-slate-300">
-                        <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
-                        {feature}
-                      </li>
-                    ))}
-                    {plan.id === "FREE" && (
-                      <li className="flex items-center gap-3 text-slate-700 dark:text-slate-300">
-                        <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
-                        Community support
-                      </li>
+            {PLANS_LIST.map((plan) => {
+              const cta = planCta(plan.id, loggedIn ? currentPlan : null, loggedIn);
+              return (
+                <ScaleOnHover key={plan.id} scale={1.02}>
+                  <div
+                    className={`relative h-full p-8 rounded-2xl border backdrop-blur-sm transition-all ${
+                      plan.popular
+                        ? "bg-linear-to-b from-blue-100 to-purple-100 border-blue-300 dark:from-blue-950/50 dark:to-purple-950/50 dark:border-blue-500/50 shadow-2xl shadow-blue-500/10"
+                        : "bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800"
+                    }`}
+                  >
+                    {plan.popular && (
+                      <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-linear-to-r from-blue-600 to-purple-600 rounded-full text-sm font-medium text-white">
+                        Most Popular
+                      </div>
                     )}
-                  </ul>
 
-                  <Link href="/register" className="block">
-                    <Button
-                      variant={plan.popular ? "default" : "outline"}
-                      className={`w-full ${
-                        plan.popular
-                          ? "bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 border-0"
-                          : ""
-                      }`}
-                    >
-                      {plan.id === "ENTERPRISE" ? "Get started" : "Sign up free"}
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </Link>
-                  <p className="text-center text-xs text-slate-500 mt-3">
-                    Already have an account?{" "}
-                    <Link href="/login" className="text-blue-600 hover:underline">
-                      Log in
-                    </Link>
-                  </p>
-                </div>
-              </ScaleOnHover>
-            ))}
+                    <div className="text-center mb-8">
+                      <h2 className="text-lg font-semibold mb-2">{plan.name}</h2>
+                      <div className="flex items-baseline justify-center gap-1">
+                        <span className="text-5xl font-bold">${plan.priceMonthly}</span>
+                        {plan.priceMonthly > 0 && (
+                          <span className="text-slate-600 dark:text-slate-400">/month</span>
+                        )}
+                      </div>
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
+                        {PLAN_DESCRIPTIONS[plan.id] ?? BRAND.tagline}
+                      </p>
+                    </div>
+
+                    <ul className="space-y-4 mb-8">
+                      {plan.features.map((feature) => (
+                        <li key={feature} className="flex items-center gap-3 text-slate-700 dark:text-slate-300">
+                          <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
+                          {feature}
+                        </li>
+                      ))}
+                      {plan.id === "FREE" && (
+                        <li className="flex items-center gap-3 text-slate-700 dark:text-slate-300">
+                          <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
+                          Community support
+                        </li>
+                      )}
+                    </ul>
+
+                    {cta.disabled ? (
+                      <Button variant="outline" className="w-full" disabled>
+                        {cta.label}
+                      </Button>
+                    ) : (
+                      <Link href={cta.href} className="block">
+                        <Button
+                          variant={plan.popular ? "default" : "outline"}
+                          className={`w-full ${
+                            plan.popular
+                              ? "bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 border-0"
+                              : ""
+                          }`}
+                        >
+                          {cta.label}
+                          <ArrowRight className="ml-2 h-4 w-4" />
+                        </Button>
+                      </Link>
+                    )}
+                    {!loggedIn && (
+                      <p className="text-center text-xs text-slate-500 mt-3">
+                        Already have an account?{" "}
+                        <Link href="/login" className="text-blue-600 hover:underline">
+                          Log in
+                        </Link>
+                      </p>
+                    )}
+                  </div>
+                </ScaleOnHover>
+              );
+            })}
           </div>
         </main>
 
@@ -149,6 +151,7 @@ export default function PricingPage() {
               <Link href="/" className="hover:text-slate-900 dark:hover:text-white">Home</Link>
               <Link href="/features" className="hover:text-slate-900 dark:hover:text-white">Features</Link>
               <Link href="/marketplace" className="hover:text-slate-900 dark:hover:text-white">Marketplace</Link>
+              <Link href="/terms" className="hover:text-slate-900 dark:hover:text-white">Terms</Link>
             </div>
           </div>
         </footer>

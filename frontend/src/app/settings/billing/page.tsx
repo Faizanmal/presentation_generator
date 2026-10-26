@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
 import { PRODUCT_NAME } from "@/lib/brand";
-import { PLANS_LIST, type PlanId } from "@/lib/plans";
+import { PLANS_LIST, getPlanLimits, type PlanId } from "@/lib/plans";
 
 const PLAN_ICONS: Record<PlanId, typeof Zap> = {
   FREE: Zap,
@@ -134,7 +134,7 @@ export default function BillingPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-semibold text-slate-900 dark:text-white">
-                    Current Plan: {subscription.plan}
+                    Current Plan: {getPlanLimits(subscription.plan).name}
                   </h3>
                   <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
                     {subscription.status === "ACTIVE"

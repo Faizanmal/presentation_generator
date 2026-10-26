@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import {
-  Sparkles,
   Bot,
   Palette,
   FileOutput,
@@ -13,7 +12,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BRAND, PRODUCT_NAME } from "@/lib/brand";
-import { ThemeToggleButton } from "@/components/ui/enhanced-ui";
+import { MarketingHeader } from "@/components/marketing/marketing-header";
+import { useAuthStore } from "@/stores/auth-store";
 
 const CAPABILITIES = [
   {
@@ -61,6 +61,10 @@ const CAPABILITIES = [
 ] as const;
 
 export default function FeaturesPage() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const initialized = useAuthStore((s) => s.initialized);
+  const loggedIn = initialized && isAuthenticated;
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white overflow-hidden">
       <div className="fixed inset-0 z-0">
@@ -69,45 +73,7 @@ export default function FeaturesPage() {
       </div>
 
       <div className="relative z-10">
-        <nav className="container mx-auto px-6 py-6">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
-                <Sparkles className="h-6 w-6 text-white" />
-              </div>
-              <span className="text-xl font-bold">{PRODUCT_NAME}</span>
-            </Link>
-
-            <div className="hidden md:flex items-center gap-8">
-              <Link href="/" className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
-                Home
-              </Link>
-              <Link href="/features" className="text-blue-600 dark:text-blue-400 font-medium">
-                Features
-              </Link>
-              <Link href="/pricing" className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
-                Pricing
-              </Link>
-              <Link href="/marketplace" className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
-                Templates
-              </Link>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <ThemeToggleButton />
-              <Link href="/login">
-                <Button variant="ghost" className="text-slate-700 dark:text-slate-300">
-                  Log in
-                </Button>
-              </Link>
-              <Link href="/register">
-                <Button className="bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                  Get Started Free
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </nav>
+        <MarketingHeader active="features" />
 
         <main className="container mx-auto px-6 py-16 pb-24">
           <div className="text-center mb-16 max-w-3xl mx-auto">
@@ -136,9 +102,9 @@ export default function FeaturesPage() {
           </div>
 
           <div className="mt-20 text-center">
-            <Link href="/register">
+            <Link href={loggedIn ? "/dashboard" : "/register"}>
               <Button size="lg" className="bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                Start creating with {PRODUCT_NAME}
+                {loggedIn ? `Open ${PRODUCT_NAME}` : `Start creating with ${PRODUCT_NAME}`}
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
@@ -158,6 +124,7 @@ export default function FeaturesPage() {
               <Link href="/" className="hover:text-slate-900 dark:hover:text-white">Home</Link>
               <Link href="/pricing" className="hover:text-slate-900 dark:hover:text-white">Pricing</Link>
               <Link href="/marketplace" className="hover:text-slate-900 dark:hover:text-white">Marketplace</Link>
+              <Link href="/terms" className="hover:text-slate-900 dark:hover:text-white">Terms</Link>
             </div>
           </div>
         </footer>
