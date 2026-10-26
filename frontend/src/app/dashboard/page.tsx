@@ -39,11 +39,18 @@ import dynamic from "next/dynamic";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
 import { aiGenerationLimit, presentationLimit } from "@/lib/plans";
+import {
+  generationFailureMessage,
+  isPlanLimitError,
+  parseApiError,
+  planLimitUserMessage,
+} from "@/lib/api-errors";
 import { analytics } from "@/lib/analytics";
 import type { Project } from "@/types";
 import { FeaturesHub } from "@/components/dashboard/features-hub";
 import { FEATURES } from "@/lib/features";
 import { ComingSoonModal } from "@/components/ui/coming-soon";
+import { UpgradePrompt } from "@/components/ui/pro-badge";
 
 // Dynamically import heavy/secondary components for performance
 const CommandPalette = dynamic(() => import("@/components/ui/command-palette").then(mod => mod.CommandPalette), { ssr: false });
@@ -80,6 +87,8 @@ export default function DashboardPage() {
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
   const [showInviteTeam, setShowInviteTeam] = useState(false);
   const [showInviteComingSoon, setShowInviteComingSoon] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [upgradeDescription, setUpgradeDescription] = useState<string | undefined>();
 
   // Favorites and recent projects
   const { favorites, toggleFavorite, isFavorite } = useFavorites();
@@ -122,16 +131,46 @@ export default function DashboardPage() {
     enabled: isAuthenticated,
   });
 
+  const showPlanLimitError = useCallback(
+    (error: unknown) => {
+      const message = planLimitUserMessage(error, {
+        presentationsUsed: subscription?.projectsUsed,
+        presentationsLimit:
+          subscription?.projectsLimit ?? presentationLimit(subscription?.plan),
+        aiUsed: subscription?.aiGenerationsUsed,
+        aiLimit:
+          subscription?.aiGenerationsLimit ??
+          aiGenerationLimit(subscription?.plan),
+        plan: subscription?.plan,
+      });
+      setUpgradeDescription(message);
+      setUpgradeOpen(true);
+      toast.error(message, {
+        action: {
+          label: "Upgrade",
+          onClick: () => router.push("/settings/billing"),
+        },
+      });
+    },
+    [router, subscription],
+  );
+
   // Create project mutation
   const createProjectMutation = useMutation({
     mutationFn: (data: { title: string; type: string }) => api.projects.create(data),
     onSuccess: (project) => {
+      void fetchSubscription();
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       analytics.project.create('blank');
       router.push(`/editor/${project.id}`);
     },
-    onError: () => {
-      toast.error("Failed to create project");
+    onError: (error) => {
+      if (isPlanLimitError(error)) {
+        showPlanLimitError(error);
+        return;
+      }
+      const { message } = parseApiError(error);
+      toast.error(message || "Failed to create project");
     },
   });
 
@@ -237,9 +276,16 @@ export default function DashboardPage() {
         queryClient.invalidateQueries({ queryKey: ["projects"] });
       }
     },
-    onError: () => {
-      toast.error("Failed to generate presentation");
+    onError: (error) => {
       setIsGenerating(false);
+      // Limit failures never reach the worker, so AI counter is unchanged —
+      // still refresh subscription so the modal stays in sync with the server.
+      void fetchSubscription();
+      if (isPlanLimitError(error)) {
+        showPlanLimitError(error);
+        return;
+      }
+      toast.error(generationFailureMessage(error));
     },
   });
 
@@ -316,9 +362,21 @@ export default function DashboardPage() {
     subscription?.aiGenerationsLimit ?? aiGenerationLimit(planId);
   const presentationsUsed =
     subscription?.projectsUsed ?? (projectsLoading ? undefined : projects?.length ?? 0);
+  const aiGenerationsUsed = subscription?.aiGenerationsUsed ?? 0;
+  const presentationsAtLimit =
+    typeof presentationsUsed === "number" &&
+    presentationsTotal > 0 &&
+    presentationsUsed >= presentationsTotal;
+  const aiAtLimit =
+    aiGenerationsTotal > 0 && aiGenerationsUsed >= aiGenerationsTotal;
   // Don't flash 0/10 AI usage while subscription is still loading after reload
   const usageCardLoading =
     !subscription || (projectsLoading && subscription?.projectsUsed === undefined);
+
+  const openCreateModal = useCallback(() => {
+    void fetchSubscription();
+    setIsCreateModalOpen(true);
+  }, [fetchSubscription]);
 
   if (authLoading) {
     return (
@@ -352,11 +410,11 @@ export default function DashboardPage() {
           <QuickActionsGrid
             onCreateNew={() => {
               analytics.engagement.featureClick('quick_action_create_new');
-              setIsCreateModalOpen(true);
+              openCreateModal();
             }}
             onAIGenerate={() => {
               analytics.engagement.featureClick('quick_action_ai_generate');
-              setIsCreateModalOpen(true);
+              openCreateModal();
             }}
             onViewAnalytics={() => {
               analytics.engagement.featureClick('quick_action_view_analytics');
@@ -434,7 +492,7 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            <Button onClick={() => setIsCreateModalOpen(true)}>
+            <Button onClick={openCreateModal}>
               <Plus className="h-4 w-4 mr-2" />
               New
             </Button>
@@ -458,7 +516,7 @@ export default function DashboardPage() {
                 : "Create your first presentation to get started"}
             </p>
             {!searchQuery && (
-              <Button onClick={() => setIsCreateModalOpen(true)}>
+              <Button onClick={openCreateModal}>
                 <Plus className="h-4 w-4 mr-2" />
                 Create presentation
               </Button>
@@ -529,6 +587,21 @@ export default function DashboardPage() {
           generateProjectMutation.mutate(data);
         }}
         isGenerating={isGenerating}
+        planLabel={planLabel}
+        presentationsUsed={presentationsUsed ?? 0}
+        presentationsTotal={presentationsTotal}
+        aiUsed={aiGenerationsUsed}
+        aiTotal={aiGenerationsTotal}
+        presentationsAtLimit={presentationsAtLimit}
+        aiAtLimit={aiAtLimit}
+        onUpgrade={() => router.push("/settings/billing")}
+      />
+
+      <UpgradePrompt
+        open={upgradeOpen}
+        onOpenChange={setUpgradeOpen}
+        feature="Higher limits"
+        description={upgradeDescription}
       />
 
       {/* Delete Confirmation Dialog */}
@@ -575,7 +648,7 @@ export default function DashboardPage() {
 
       {/* Command Palette */}
       <CommandPalette
-        onNewProject={() => setIsCreateModalOpen(true)}
+        onNewProject={openCreateModal}
         onShowKeyboardShortcuts={() => setShowKeyboardShortcuts(true)}
       />
 
@@ -595,12 +668,28 @@ function CreateProjectModal({
   onCreateBlank,
   onGenerate,
   isGenerating,
+  planLabel,
+  presentationsUsed,
+  presentationsTotal,
+  aiUsed,
+  aiTotal,
+  presentationsAtLimit,
+  aiAtLimit,
+  onUpgrade,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onCreateBlank: () => void;
   onGenerate: (data: { topic: string; tone: string; audience: string; length: number; type: string; generateImages?: boolean; imageSource?: 'ai' | 'stock'; qualityMode?: boolean }) => void;
   isGenerating: boolean;
+  planLabel: string;
+  presentationsUsed: number;
+  presentationsTotal: number;
+  aiUsed: number;
+  aiTotal: number;
+  presentationsAtLimit: boolean;
+  aiAtLimit: boolean;
+  onUpgrade: () => void;
 }) {
   const [mode, setMode] = useState<"select" | "generate">("select");
   const [topic, setTopic] = useState("");
@@ -610,7 +699,20 @@ function CreateProjectModal({
   const [generateImages, setGenerateImages] = useState(true);
   const [qualityMode, setQualityMode] = useState(false);
 
+  const generateBlocked = presentationsAtLimit || aiAtLimit;
+  const limitWarning = presentationsAtLimit
+    ? `You've used ${presentationsUsed} of ${presentationsTotal} presentations on the ${planLabel} plan`
+    : aiAtLimit
+      ? `You've used ${aiUsed} of ${aiTotal} AI credits on the ${planLabel} plan`
+      : null;
+
   const handleGenerate = () => {
+    if (generateBlocked) {
+      toast.error(limitWarning || "Plan limit reached", {
+        action: { label: "Upgrade", onClick: onUpgrade },
+      });
+      return;
+    }
     if (!topic.trim()) {
       toast.error("Please enter a topic");
       return;
@@ -625,6 +727,17 @@ function CreateProjectModal({
       imageSource: "stock",
       qualityMode,
     });
+  };
+
+  const handleCreateBlank = () => {
+    if (presentationsAtLimit) {
+      toast.error(
+        `You've used ${presentationsUsed} of ${presentationsTotal} presentations on the ${planLabel} plan`,
+        { action: { label: "Upgrade", onClick: onUpgrade } },
+      );
+      return;
+    }
+    onCreateBlank();
   };
 
   const resetForm = () => {
@@ -655,11 +768,25 @@ function CreateProjectModal({
               <DialogDescription>Choose how you want to start</DialogDescription>
             </DialogHeader>
 
+            {limitWarning && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
+                <p className="font-medium">{limitWarning}</p>
+                <Button
+                  variant="link"
+                  className="h-auto p-0 mt-1 text-amber-900 dark:text-amber-100 underline"
+                  onClick={onUpgrade}
+                >
+                  Upgrade for more
+                </Button>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 py-4 items-stretch bg-white dark:bg-gray-900 rounded-lg p-2">
               {/* make cards fully opaque with explicit light/dark backgrounds and stronger hover shadows */}
               <button
-                onClick={onCreateBlank}
-                className="flex flex-col justify-between items-center gap-3 p-6 min-h-45 border-2 border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-gray-900 shadow-md hover:shadow-lg transition-all opacity-100 h-full"
+                onClick={handleCreateBlank}
+                disabled={presentationsAtLimit}
+                className="flex flex-col justify-between items-center gap-3 p-6 min-h-45 border-2 border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-gray-900 shadow-md hover:shadow-lg transition-all opacity-100 h-full disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-md"
                 type="button"
               >
                 <div className="h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
@@ -673,7 +800,8 @@ function CreateProjectModal({
 
               <button
                 onClick={() => setMode("generate")}
-                className="flex flex-col justify-between items-center gap-3 p-6 min-h-45 border-2 border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-gray-900 shadow-md hover:shadow-lg transition-all opacity-100 h-full"
+                disabled={generateBlocked}
+                className="flex flex-col justify-between items-center gap-3 p-6 min-h-45 border-2 border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-gray-900 shadow-md hover:shadow-lg transition-all opacity-100 h-full disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-md"
                 type="button"
               >
                 <div className="h-12 w-12 rounded-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center">
@@ -685,21 +813,40 @@ function CreateProjectModal({
                 </div>
               </button>
 
-              <Link
-                href="/dashboard/ai-thinking"
-                className="flex flex-col justify-between items-center gap-3 p-6 min-h-45 border-2 border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-gray-900 shadow-md hover:shadow-lg transition-all opacity-100 relative overflow-hidden h-full"
-              >
-                <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-indigo-500 text-white text-[10px] font-medium">
-                  NEW
-                </div>
-                <div className="h-12 w-12 rounded-full bg-linear-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center animate-pulse">
-                  <Sparkles className="h-6 w-6 text-white" />
-                </div>
-                <div className="text-center">
-                  <p className="font-medium text-slate-900 dark:text-white">AI Thinking</p>
-                  <p className="text-sm text-slate-500">Premium quality</p>
-                </div>
-              </Link>
+              {generateBlocked ? (
+                <button
+                  type="button"
+                  disabled
+                  className="flex flex-col justify-between items-center gap-3 p-6 min-h-45 border-2 border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-gray-900 shadow-md opacity-50 cursor-not-allowed relative overflow-hidden h-full"
+                >
+                  <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-indigo-500 text-white text-[10px] font-medium">
+                    NEW
+                  </div>
+                  <div className="h-12 w-12 rounded-full bg-linear-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center">
+                    <Sparkles className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="text-center">
+                    <p className="font-medium text-slate-900 dark:text-white">AI Thinking</p>
+                    <p className="text-sm text-slate-500">Premium quality</p>
+                  </div>
+                </button>
+              ) : (
+                <Link
+                  href="/dashboard/ai-thinking"
+                  className="flex flex-col justify-between items-center gap-3 p-6 min-h-45 border-2 border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-gray-900 shadow-md hover:shadow-lg transition-all opacity-100 relative overflow-hidden h-full"
+                >
+                  <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-indigo-500 text-white text-[10px] font-medium">
+                    NEW
+                  </div>
+                  <div className="h-12 w-12 rounded-full bg-linear-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center animate-pulse">
+                    <Sparkles className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="text-center">
+                    <p className="font-medium text-slate-900 dark:text-white">AI Thinking</p>
+                    <p className="text-sm text-slate-500">Premium quality</p>
+                  </div>
+                </Link>
+              )}
             </div>
           </>
         ) : (
@@ -713,6 +860,19 @@ function CreateProjectModal({
 
             {/* wrap generation form in a solid card so the overlay doesn’t show through */}
             <div className="space-y-4 py-4 bg-white dark:bg-gray-900 rounded-lg">
+              {limitWarning && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
+                  <p className="font-medium">{limitWarning}</p>
+                  <Button
+                    variant="link"
+                    className="h-auto p-0 mt-1 text-amber-900 dark:text-amber-100 underline"
+                    onClick={onUpgrade}
+                  >
+                    Upgrade for more
+                  </Button>
+                </div>
+              )}
+
               <div>
                 <Label htmlFor="topic">Topic / Idea</Label>
                 <Textarea
@@ -721,6 +881,7 @@ function CreateProjectModal({
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
                   className="mt-1.5 h-24"
+                  disabled={generateBlocked}
                 />
               </div>
 
@@ -805,7 +966,10 @@ function CreateProjectModal({
                 <Button variant="outline" onClick={() => setMode("select")} disabled={isGenerating}>
                   Back
                 </Button>
-                <Button onClick={handleGenerate} disabled={isGenerating || !topic.trim()}>
+                <Button
+                  onClick={handleGenerate}
+                  disabled={isGenerating || generateBlocked || !topic.trim()}
+                >
                   {isGenerating ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />

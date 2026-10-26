@@ -1,4 +1,13 @@
-import { PLAN_LIMITS, canExportFormat, getPlanLimits } from './plan-limits';
+import { ForbiddenException } from '@nestjs/common';
+import {
+  PLAN_LIMITS,
+  PLAN_LIMIT_CODES,
+  aiLimitMessage,
+  canExportFormat,
+  getPlanLimits,
+  planLimitForbidden,
+  presentationsLimitMessage,
+} from './plan-limits';
 
 describe('plan-limits', () => {
   describe('getPlanLimits', () => {
@@ -26,6 +35,29 @@ describe('plan-limits', () => {
     it('allows PRO all export formats', () => {
       expect(canExportFormat('PRO', 'pdf')).toBe(true);
       expect(canExportFormat('PRO', 'pptx')).toBe(true);
+    });
+  });
+
+  describe('planLimitForbidden', () => {
+    it('embeds a stable code and details for the UI', () => {
+      const err = planLimitForbidden(
+        PLAN_LIMIT_CODES.PRESENTATIONS,
+        presentationsLimitMessage(3, 3, 'FREE'),
+        { used: 3, limit: 3, plan: 'FREE' },
+      );
+      expect(err).toBeInstanceOf(ForbiddenException);
+      const body = err.getResponse() as Record<string, unknown>;
+      expect(body.code).toBe(PLAN_LIMIT_CODES.PRESENTATIONS);
+      expect(body.message).toBe(
+        "You've used 3 of 3 presentations on the Free plan",
+      );
+      expect(body.details).toEqual({ used: 3, limit: 3, plan: 'FREE' });
+    });
+
+    it('formats AI limit messages', () => {
+      expect(aiLimitMessage(10, 10, 'FREE')).toBe(
+        "You've used 10 of 10 AI credits on the Free plan",
+      );
     });
   });
 });

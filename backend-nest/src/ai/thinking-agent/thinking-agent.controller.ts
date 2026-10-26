@@ -106,10 +106,7 @@ export class ThinkingAgentController {
     @CurrentUser() user: { id: string },
     @Body() body: ThinkingGenerationDto,
   ): Promise<ThinkingQueuedResponse> {
-    const canGenerate = await this.usersService.canGenerateAI(user.id);
-    if (!canGenerate) {
-      throw new ForbiddenException('AI generation limit reached');
-    }
+    await this.usersService.assertCanGenerateAI(user.id);
 
     const params: EnhancedGenerationParams = {
       topic: body.topic,
@@ -166,10 +163,7 @@ export class ThinkingAgentController {
     @CurrentUser() user: { id: string },
     @Body() body: ThinkingGenerationDto,
   ): Promise<ThinkingApiGenerationResult> {
-    const canGenerate = await this.usersService.canGenerateAI(user.id);
-    if (!canGenerate) {
-      throw new ForbiddenException('AI generation limit reached');
-    }
+    await this.usersService.assertCanGenerateAI(user.id);
 
     const params: EnhancedGenerationParams = {
       topic: body.topic,
@@ -366,17 +360,8 @@ export class ThinkingAgentController {
     @CurrentUser() user: { id: string },
     @Body() body: ThinkingGenerationDto & CreateProjectDto,
   ): Promise<ThinkingQueuedResponse> {
-    const canGenerate = await this.usersService.canGenerateAI(user.id);
-    if (!canGenerate) {
-      throw new ForbiddenException('AI generation limit reached');
-    }
-
-    const canCreate = await this.usersService.canCreateProject(user.id);
-    if (!canCreate) {
-      throw new ForbiddenException(
-        'Project limit reached. Upgrade to create more projects.',
-      );
-    }
+    await this.usersService.assertCanCreateProject(user.id);
+    await this.usersService.assertCanGenerateAI(user.id);
 
     // Generate with thinking
     const params: EnhancedGenerationParams = {

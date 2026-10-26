@@ -50,13 +50,7 @@ export class ProjectsService {
    * Create a new empty project
    */
   async create(userId: string, createProjectDto: CreateProjectDto) {
-    // Check if user can create more projects
-    const canCreate = await this.usersService.canCreateProject(userId);
-    if (!canCreate) {
-      throw new ForbiddenException(
-        'Project limit reached. Upgrade to create more projects.',
-      );
-    }
+    await this.usersService.assertCanCreateProject(userId);
 
     const project = await this.prisma.project.create({
       data: {
@@ -121,21 +115,10 @@ export class ProjectsService {
    * Generate a new project using AI
    */
   async generate(userId: string, generateDto: GenerateProjectDto) {
-    // Check if user can generate AI content
-    const canGenerate = await this.usersService.canGenerateAI(userId);
-    if (!canGenerate) {
-      throw new ForbiddenException(
-        'AI generation limit reached. Upgrade for unlimited generations.',
-      );
-    }
-
-    // Check if user can create more projects
-    const canCreate = await this.usersService.canCreateProject(userId);
-    if (!canCreate) {
-      throw new ForbiddenException(
-        'Project limit reached. Upgrade to create more projects.',
-      );
-    }
+    // Enforce limits before enqueue — never increments AI counter on failure.
+    // Presentations first so a full deck slot surfaces clearly when both are hit.
+    await this.usersService.assertCanCreateProject(userId);
+    await this.usersService.assertCanGenerateAI(userId);
 
     // Add to queue. Keep completed jobs so the dashboard can poll status
     // (global removeOnComplete:true used to delete them immediately).
@@ -199,6 +182,10 @@ export class ProjectsService {
    */
   async processGeneration(userId: string, generateDto: GenerateProjectDto) {
     this.logger.log(`Processing generation for user ${userId}`);
+
+    // Re-check before creating/incrementing (enqueue already checked; race-safe).
+    await this.usersService.assertCanCreateProject(userId);
+    await this.usersService.assertCanGenerateAI(userId);
 
     const length = generateDto.length ?? 10;
     const generateImages = generateDto.generateImages !== false;

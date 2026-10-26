@@ -23,9 +23,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const request = ctx.getRequest<Request>();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
-    let message = 'Internal server error';
+    let message: string | string[] = 'Internal server error';
     let error = 'InternalServerError';
     let details: unknown = undefined;
+    let code: string | undefined;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -35,9 +36,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
         message = exceptionResponse;
       } else if (typeof exceptionResponse === 'object') {
         const responseObj = exceptionResponse as Record<string, unknown>;
-        message = (responseObj.message as string) || message;
+        message = (responseObj.message as string | string[]) || message;
         error = (responseObj.error as string) || error;
         details = responseObj.details;
+        if (typeof responseObj.code === 'string') {
+          code = responseObj.code;
+        }
       }
     } else if (
       exception instanceof Error &&
@@ -67,13 +71,18 @@ export class AllExceptionsFilter implements ExceptionFilter {
       details = undefined;
     }
 
+    const normalizedMessage = Array.isArray(message)
+      ? message.join(', ')
+      : message;
+
     const errorResponse = {
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
       method: request.method,
       error,
-      message,
+      message: normalizedMessage,
+      ...(code ? { code } : {}),
       ...(details ? { details } : {}),
       ...(process.env.NODE_ENV === 'development' &&
         exception instanceof Error && {
@@ -91,13 +100,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (!isPortScan) {
       if (status >= 500) {
         this.logger.error(
-          `${request.method} ${request.url} ${status} - ${message}`,
+          `${request.method} ${request.url} ${status} - ${normalizedMessage}`,
           exception instanceof Error ? exception.stack : undefined,
           'ExceptionFilter',
         );
       } else {
         this.logger.warn(
-          `${request.method} ${request.url} ${status} - ${message}`,
+          `${request.method} ${request.url} ${status} - ${normalizedMessage}`,
           'ExceptionFilter',
         );
       }
@@ -125,25 +134,35 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     let message: string | string[];
     let error: string;
+    let code: string | undefined;
+    let details: unknown;
 
     if (typeof exceptionResponse === 'string') {
       message = exceptionResponse;
       error = exception.name;
     } else {
       const responseObj = exceptionResponse as Record<string, unknown>;
-      message = (responseObj.message as string) || 'An error occurred';
+      message = (responseObj.message as string | string[]) || 'An error occurred';
       error = (responseObj.error as string) || exception.name;
+      details = responseObj.details;
+      if (typeof responseObj.code === 'string') {
+        code = responseObj.code;
+      }
     }
+
+    const normalizedMessage = Array.isArray(message)
+      ? message.join(', ')
+      : message;
 
     // Log based on severity
     if (status >= 500) {
       this.logger.error(
-        `${request.method} ${request.url} ${status} - ${JSON.stringify(message)}`,
+        `${request.method} ${request.url} ${status} - ${JSON.stringify(normalizedMessage)}`,
         exception.stack,
       );
     } else if (status >= 400) {
       this.logger.warn(
-        `${request.method} ${request.url} ${status} - ${JSON.stringify(message)}`,
+        `${request.method} ${request.url} ${status} - ${JSON.stringify(normalizedMessage)}`,
       );
     }
 
@@ -153,7 +172,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
       path: request.url,
       method: request.method,
       error,
-      message,
+      message: normalizedMessage,
+      ...(code ? { code } : {}),
+      ...(details ? { details } : {}),
       ...(process.env.NODE_ENV === 'development' && {
         stack: exception.stack,
       }),
