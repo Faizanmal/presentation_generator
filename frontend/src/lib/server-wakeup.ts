@@ -42,7 +42,7 @@ const listeners = new Set<WakeListener>();
 function emit() {
   const message =
     status === 'waking'
-      ? 'Connecting to the server…'
+      ? 'Waking up the server…'
       : status === 'failed'
         ? 'Could not reach the server. Please try again.'
         : status === 'ready'
@@ -170,6 +170,19 @@ export function isLikelyColdStartError(error: unknown): boolean {
   const statusCode = err.response?.status;
   // Render often surfaces 502/503/504 while spinning up
   if (statusCode === 502 || statusCode === 503 || statusCode === 504) {
+    return true;
+  }
+
+  const bodyMessage = String(
+    (err.response as { data?: { message?: string } } | undefined)?.data
+      ?.message ||
+      err.message ||
+      '',
+  ).toLowerCase();
+  if (
+    bodyMessage.includes('service waking up') ||
+    bodyMessage.includes('waking up')
+  ) {
     return true;
   }
 

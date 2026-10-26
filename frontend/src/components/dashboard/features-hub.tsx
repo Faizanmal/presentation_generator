@@ -7,7 +7,7 @@ import {
   Accessibility, Globe, BrainCog, UsersRound, Target,
 } from 'lucide-react';
 import { FEATURES } from '@/lib/features';
-import { SoonBadge } from '@/components/ui/soon-badge';
+import { DisabledFeatureCard } from '@/components/ui/disabled-feature-card';
 
 const featureCategories = [
   {
@@ -82,12 +82,9 @@ export function FeaturesHub() {
             <div className="space-y-2">
               {cat.features.map((f) => {
                 const Icon = f.icon;
-                return (
-                  <Link
-                    key={f.name}
-                    href={f.href}
-                    className="flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md transition-all group"
-                  >
+                const isSoon = 'soon' in f && Boolean(f.soon);
+                const card = (
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md transition-all group">
                     <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-900 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 transition-colors">
                       <Icon className={`w-4 h-4 ${f.color}`} />
                     </div>
@@ -97,8 +94,7 @@ export function FeaturesHub() {
                           {f.name}
                         </span>
                         <div className="flex items-center gap-1 shrink-0">
-                          {'soon' in f && f.soon && <SoonBadge />}
-                          {'badge' in f && f.badge && (
+                          {'badge' in f && f.badge && !isSoon && (
                             <span className="text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 px-1.5 py-0.5 rounded-full font-medium">
                               {f.badge}
                             </span>
@@ -106,7 +102,23 @@ export function FeaturesHub() {
                         </div>
                       </div>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all" />
+                    {!isSoon && (
+                      <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all" />
+                    )}
+                  </div>
+                );
+
+                if (isSoon) {
+                  return (
+                    <DisabledFeatureCard key={f.name} tooltip={`${f.name} — Coming soon`}>
+                      {card}
+                    </DisabledFeatureCard>
+                  );
+                }
+
+                return (
+                  <Link key={f.name} href={f.href}>
+                    {card}
                   </Link>
                 );
               })}

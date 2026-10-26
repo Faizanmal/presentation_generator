@@ -67,6 +67,7 @@ import {
 } from '@/hooks/use-organization';
 import type { Organization } from '@/types';
 import Image from 'next/image';
+import { getPlanLimits } from '@/lib/plans';
 // import { cn } from '@/lib/utils';
 
 interface OrganizationSettingsProps {
@@ -97,7 +98,7 @@ export function OrganizationSettings({ orgId }: OrganizationSettingsProps) {
           </p>
         </div>
         <Badge variant={(organization as Organization).plan === 'ENTERPRISE' ? 'default' : 'secondary'}>
-          {(organization as Organization).plan} Plan
+          {getPlanLimits((organization as Organization).plan).name} Plan
         </Badge>
       </div>
 

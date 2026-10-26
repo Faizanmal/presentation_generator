@@ -132,36 +132,46 @@ export function Sidebar({ className, isCollapsed = false, onCollapse, onLinkClic
 
                             {group.items.map((item) => {
                                 const isActive = pathname === item.href;
+                                const isSoon =
+                                    'featureKey' in item &&
+                                    Boolean(item.featureKey) &&
+                                    !FEATURES[item.featureKey as FeatureKey];
+                                const button = (
+                                    <Button
+                                        variant={isActive && !isSoon ? "secondary" : "ghost"}
+                                        className={cn(
+                                            "w-full justify-start",
+                                            isActive && !isSoon && "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300",
+                                            isSoon && "opacity-60 cursor-not-allowed",
+                                            isCollapsed ? "px-2 justify-center" : "px-3"
+                                        )}
+                                        disabled={isSoon}
+                                        aria-disabled={isSoon}
+                                    >
+                                        <item.icon className={cn("h-4 w-4", isCollapsed ? "mr-0" : "mr-3", isActive && !isSoon && "text-blue-600 dark:text-blue-400")} />
+                                        {!isCollapsed && (
+                                            <span className="flex items-center gap-2 min-w-0">
+                                                <span className="truncate">{item.title}</span>
+                                                {isSoon && <SoonBadge />}
+                                            </span>
+                                        )}
+                                    </Button>
+                                );
                                 return (
                                     <TooltipProvider key={item.href} delayDuration={0}>
                                         <Tooltip>
                                             <TooltipTrigger asChild>
-                                                <Link href={item.href} onClick={onLinkClick}>
-                                                    <Button
-                                                        variant={isActive ? "secondary" : "ghost"}
-                                                        className={cn(
-                                                            "w-full justify-start",
-                                                            isActive && "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300",
-                                                            isCollapsed ? "px-2 justify-center" : "px-3"
-                                                        )}
-                                                    >
-                                                        <item.icon className={cn("h-4 w-4", isCollapsed ? "mr-0" : "mr-3", isActive && "text-blue-600 dark:text-blue-400")} />
-                                                        {!isCollapsed && (
-                                                            <span className="flex items-center gap-2 min-w-0">
-                                                                <span className="truncate">{item.title}</span>
-                                                                {'featureKey' in item && item.featureKey && !FEATURES[item.featureKey] && (
-                                                                    <SoonBadge />
-                                                                )}
-                                                            </span>
-                                                        )}
-                                                    </Button>
-                                                </Link>
+                                                {isSoon ? (
+                                                    <div className="w-full">{button}</div>
+                                                ) : (
+                                                    <Link href={item.href} onClick={onLinkClick}>
+                                                        {button}
+                                                    </Link>
+                                                )}
                                             </TooltipTrigger>
-                                            {isCollapsed && (
-                                                <TooltipContent side="right" className="font-medium">
-                                                    {item.title}
-                                                </TooltipContent>
-                                            )}
+                                            <TooltipContent side="right" className="font-medium">
+                                                {isSoon ? `${item.title} — Coming soon` : item.title}
+                                            </TooltipContent>
                                         </Tooltip>
                                     </TooltipProvider>
                                 );

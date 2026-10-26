@@ -58,15 +58,24 @@ export default function Home() {
     }
   }, [isAuthenticated, isAuthLoading, initialized, router, mounted]);
 
-  // If authenticated, show a loading screen while redirecting to avoid flashing the home page
-  if (mounted && isAuthenticated) {
+  // Only show redirect chrome after auth has initialized — avoids a hung
+  // "Redirecting…" state when persisted isAuthenticated is stale during cold start.
+  if (mounted && initialized && !isAuthLoading && isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center">
         <div className="h-16 w-16 rounded-2xl bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-2xl shadow-blue-500/20 mb-6 scale-110">
           <Sparkles className="h-10 w-10 text-slate-900 dark:text-white animate-pulse" />
         </div>
         <Loader2 className="h-8 w-8 animate-spin text-blue-500 mb-4" />
-        <p className="text-slate-600 dark:text-slate-400 font-medium animate-pulse text-lg">Redirecting to dashboard...</p>
+        <p className="text-slate-600 dark:text-slate-400 font-medium animate-pulse text-lg">Opening dashboard…</p>
+      </div>
+    );
+  }
+
+  if (mounted && (!initialized || isAuthLoading)) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
       </div>
     );
   }
