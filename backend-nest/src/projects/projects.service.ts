@@ -12,6 +12,11 @@ import { UsersService } from '../users/users.service';
 import { AIService, GeneratedPresentation } from '../ai/ai.service';
 import { materializeGeneratedBlocks } from '../ai/presentation-block-mapper';
 import { recipeForSlideIndex, isGenericKicker } from '../ai/slide-recipes';
+import {
+  analyzeSectionContent,
+  pickLayoutForContent,
+  simplerLayoutFallback,
+} from '../ai/layout-fit';
 import { ThinkingAgentOrchestratorService } from '../ai/thinking-agent/thinking-agent-orchestrator.service';
 import { ThinkingProjectService } from '../ai/thinking-agent/thinking-project.service';
 import { SlidesService } from '../slides/slides.service';
@@ -602,56 +607,63 @@ export class ProjectsService {
     designStyle: GenerationDesignStyle,
     recipeLayout?: string,
   ): string {
-    if (index === 0) {
-      const opening = sections[0].layout;
+    const section = sections[index];
+    const signals = analyzeSectionContent(section);
+    const isOpening = index === 0;
+
+    let preferred: string;
+    if (isOpening) {
+      const opening = section.layout;
       if (
         opening === 'title-hero' ||
         opening === 'title-subtitle' ||
         opening === 'image-full'
       ) {
-        return opening;
+        preferred = opening;
+      } else {
+        preferred = recipeLayout || 'title-hero';
       }
-      return recipeLayout || 'title-hero';
-    }
-
-    if (recipeLayout) {
+    } else if (recipeLayout) {
       const prev = index > 0 ? sections[index - 1].layout : '';
       const prev2 = index > 1 ? sections[index - 2].layout : '';
-      if (recipeLayout !== prev || recipeLayout !== prev2) {
-        return recipeLayout;
-      }
+      preferred =
+        recipeLayout !== prev || recipeLayout !== prev2
+          ? recipeLayout
+          : section.layout || recipeLayout || 'title-content';
+    } else {
+      const fallbackSequence =
+        designStyle === GenerationDesignStyle.MANIFESTO
+          ? [
+              'title-content',
+              'quote-highlight',
+              'image-full',
+              'comparison',
+              'image-right',
+              'title-content',
+              'quote-highlight',
+            ]
+          : [
+              'three-column',
+              'image-right',
+              'stats-grid',
+              'comparison',
+              'timeline',
+              'image-left',
+              'bento-grid',
+            ];
+
+      const aiLayout = section.layout || 'title-content';
+      const prev = index > 0 ? sections[index - 1].layout : '';
+      const prev2 = index > 1 ? sections[index - 2].layout : '';
+
+      preferred =
+        aiLayout === prev && aiLayout === prev2
+          ? fallbackSequence[index % fallbackSequence.length]
+          : aiLayout;
     }
 
-    const fallbackSequence =
-      designStyle === GenerationDesignStyle.MANIFESTO
-        ? [
-            'title-content',
-            'quote-highlight',
-            'image-full',
-            'comparison',
-            'image-right',
-            'title-content',
-            'quote-highlight',
-          ]
-        : [
-            'three-column',
-            'image-right',
-            'stats-grid',
-            'comparison',
-            'timeline',
-            'image-left',
-            'bento-grid',
-          ];
-
-    const aiLayout = sections[index].layout || recipeLayout || 'title-content';
-    const prev = index > 0 ? sections[index - 1].layout : '';
-    const prev2 = index > 1 ? sections[index - 2].layout : '';
-
-    if (aiLayout === prev && aiLayout === prev2) {
-      return fallbackSequence[index % fallbackSequence.length];
-    }
-
-    return aiLayout;
+    const contentAware = pickLayoutForContent(preferred, signals, { isOpening });
+    return simplerLayoutFallback(contentAware, signals);
   }
 
   private getHeadingStyle(
@@ -664,10 +676,10 @@ export class ProjectsService {
         fontFamily: styleTokens.headingFont,
         fontSize:
           designStyle === GenerationDesignStyle.BOLD
-            ? 50
+            ? 42
             : designStyle === GenerationDesignStyle.MANIFESTO
-              ? 54
-              : 46,
+              ? 44
+              : 40,
         fontWeight: 700,
         lineHeight: 1.12,
         color: styleTokens.headingColor,

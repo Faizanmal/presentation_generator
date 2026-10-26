@@ -19,14 +19,26 @@ function splitPipe(value: string): string[] {
     .filter((part) => part.length > 0);
 }
 
+const MAX_LIST_ITEMS = 6;
+const HTTP_URL = /^https?:\/\/\S+/i;
+
+export function isValidMediaUrl(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 2048) return false;
+  if (/\s/.test(trimmed) && !HTTP_URL.test(trimmed)) return false;
+  return HTTP_URL.test(trimmed);
+}
+
 function asItems(block: GeneratedBlock): string[] {
-  if (block.items?.length) {
-    return block.items.map((item) => item.trim()).filter(Boolean);
-  }
-  if (block.content.includes('|')) {
-    return splitPipe(block.content);
-  }
-  return block.content ? [block.content] : [];
+  const items = block.items?.length
+    ? block.items.map((item) => item.trim()).filter(Boolean)
+    : block.content.includes('|')
+      ? splitPipe(block.content)
+      : block.content
+        ? [block.content]
+        : [];
+  return items.slice(0, MAX_LIST_ITEMS);
 }
 
 export function mapGeneratedBlock(
@@ -52,10 +64,17 @@ export function mapGeneratedBlock(
   }
 
   if (aiType === 'image' || aiType === 'image-placeholder') {
+    const url = isValidMediaUrl(block.embedUrl)
+      ? String(block.embedUrl).trim()
+      : isValidMediaUrl(block.content)
+        ? String(block.content).trim()
+        : null;
+    // Prompt strings are not images — skip so layouts can collapse media zones
+    if (!url) return null;
     return {
       blockType: BlockType.IMAGE,
       content: {
-        url: block.embedUrl || block.content,
+        url,
         alt: block.label || 'Generated image',
       },
       style: {},
@@ -205,7 +224,7 @@ export function mergeConsecutiveLists(
       prev.content.items = [
         ...(prev.content.items as string[]),
         ...(block.content.items as string[]),
-      ];
+      ].slice(0, MAX_LIST_ITEMS);
       continue;
     }
     const isStats = block.blockType === BlockType.STATS_GRID;
@@ -219,14 +238,14 @@ export function mergeConsecutiveLists(
       prev.content.items = [
         ...(prev.content.items as string[]),
         ...(block.content.items as string[]),
-      ];
+      ].slice(0, MAX_LIST_ITEMS);
       const prevStats = Array.isArray(prev.content.stats)
         ? prev.content.stats
         : [];
       const nextStats = Array.isArray(block.content.stats)
         ? block.content.stats
         : [];
-      prev.content.stats = [...prevStats, ...nextStats];
+      prev.content.stats = [...prevStats, ...nextStats].slice(0, MAX_LIST_ITEMS);
       continue;
     }
     result.push(block);

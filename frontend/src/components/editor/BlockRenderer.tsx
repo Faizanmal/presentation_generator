@@ -21,6 +21,8 @@ import { BentoGridBlock } from "./bento-grid-block";
 import { TimelineBlock } from "./timeline-block";
 import type { EmbedServiceType } from "./oembed-block";
 import { motion } from "framer-motion";
+import { isValidMediaUrl } from "@/lib/slide-media";
+import { BrandedMediaPlaceholder } from "./BrandedMediaPlaceholder";
 
 interface BlockRendererProps {
   block: Block;
@@ -143,10 +145,18 @@ const BlockRenderer = React.memo(({
     setContent({ ...content, text });
   };
 
-  const bulletItems = useMemo(() => (content?.items as string[]) || ["Item 1", "Item 2", "Item 3"], [content?.items]);
+  // Cap list length so dense AI decks don't clip off the 16:9 canvas
+  const MAX_LIST_ITEMS = isDense ? 5 : 6;
+  const bulletItems = useMemo(() => {
+    const raw = (content?.items as string[]) || ["Item 1", "Item 2", "Item 3"];
+    return raw.slice(0, MAX_LIST_ITEMS);
+  }, [content?.items, MAX_LIST_ITEMS]);
   const keyedBulletItems = useMemo(() => buildKeyedTextItems(bulletItems, "bullet"), [bulletItems]);
 
-  const numberedItems = useMemo(() => (content?.items as string[]) || ["Item 1", "Item 2", "Item 3"], [content?.items]);
+  const numberedItems = useMemo(() => {
+    const raw = (content?.items as string[]) || ["Item 1", "Item 2", "Item 3"];
+    return raw.slice(0, MAX_LIST_ITEMS);
+  }, [content?.items, MAX_LIST_ITEMS]);
   const keyedNumberedItems = useMemo(() => buildKeyedTextItems(numberedItems, "numbered"), [numberedItems]);
 
   const rows = useMemo(() => (content?.rows as string[][]) || [
@@ -180,15 +190,17 @@ const BlockRenderer = React.memo(({
   // Cap AI-provided px sizes so generated decks don't clip titles off the 16:9 canvas
   const customFontSize = (() => {
     const raw = blockStyle.fontSize;
-    if (raw == null || raw === '') return undefined;
+    if (raw == null || raw === '') {
+      return undefined;
+    }
     if (typeof raw === 'number') {
-      return `${Math.min(raw, isDense ? 40 : 52)}px`;
+      return `${Math.min(raw, isDense ? 36 : 44)}px`;
     }
     const match = String(raw).match(/^([\d.]+)px$/i);
     if (match) {
       const px = parseFloat(match[1]);
       if (!Number.isNaN(px)) {
-        return `${Math.min(px, isDense ? 40 : 52)}px`;
+        return `${Math.min(px, isDense ? 36 : 44)}px`;
       }
     }
     return String(raw);
@@ -482,11 +494,37 @@ const BlockRenderer = React.memo(({
           </ol>
         );
 
-      case "IMAGE":
+      case "IMAGE": {
+        const imageUrl = isValidMediaUrl(content?.url) ? String(content.url) : undefined;
+        if (!imageUrl) {
+          return (
+            <div className="relative group/image w-full h-full min-h-[8rem] overflow-hidden rounded-xl">
+              <BrandedMediaPlaceholder
+                primary={primaryColor}
+                secondary={secondaryColor}
+              />
+              {onChange && (
+                <div className="absolute inset-x-0 bottom-0 p-2 opacity-0 group-hover/image:opacity-100 transition-opacity">
+                  <ImageAIControls
+                    imageUrl={undefined}
+                    imageAlt={content?.alt || "Image"}
+                    blockId={block.id}
+                    slideId={block.slideId || ""}
+                    projectId={block.projectId}
+                    onImageUpdate={(newUrl, newAlt) => {
+                      setContent({ ...content, url: newUrl, alt: newAlt || content?.alt });
+                    }}
+                    onDelete={onDelete}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        }
         return (
-          <div className="relative group/image">
+          <div className="relative group/image w-full h-full min-h-0">
             <ImageAIControls
-              imageUrl={content?.url}
+              imageUrl={imageUrl}
               imageAlt={content?.alt || "Image"}
               blockId={block.id}
               slideId={block.slideId || ""}
@@ -496,27 +534,9 @@ const BlockRenderer = React.memo(({
               }}
               onDelete={onDelete}
             />
-            {!content?.url && (
-              <div
-                className="aspect-video rounded-xl flex flex-col items-center justify-center gap-3 transition-all duration-300 hover:shadow-lg cursor-pointer"
-                style={{
-                  background: `linear-gradient(135deg, ${colorWithAlpha(primaryColor, 0.05)}, ${colorWithAlpha(secondaryColor, 0.08)})`,
-                  border: `2px dashed ${colorWithAlpha(primaryColor, 0.25)}`,
-                }}
-              >
-                <div
-                  className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
-                  style={{
-                    background: `linear-gradient(135deg, ${colorWithAlpha(primaryColor, 0.1)}, ${colorWithAlpha(accentColor, 0.1)})`,
-                  }}
-                >
-                  🖼️
-                </div>
-                <span className="text-slate-500 text-sm font-medium">Click to add image</span>
-              </div>
-            )}
           </div>
         );
+      }
 
       case "CODE":
         return (

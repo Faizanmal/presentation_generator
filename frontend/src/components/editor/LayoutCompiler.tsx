@@ -4,6 +4,8 @@ import React, { useMemo } from 'react';
 import type { Block, Theme } from '@/types';
 import BlockRenderer from './BlockRenderer';
 import { AnimatePresence } from 'framer-motion';
+import { mediaUrlFromBlockContent } from '@/lib/slide-media';
+import { BrandedMediaPlaceholder } from './BrandedMediaPlaceholder';
 
 interface LayoutCompilerProps {
   layoutType: string;
@@ -155,11 +157,25 @@ export function LayoutCompiler({
 
   const mediaBlocks = useMemo(
     () =>
-      blocks.filter((block) =>
-        ['IMAGE', 'VIDEO', 'EMBED', 'OEMBED', 'CHART', 'AUDIO', '3D_MODEL', 'SHAPE'].includes(getBlockType(block))
-      ),
-    [blocks]
+      blocks.filter((block) => {
+        const type = getBlockType(block);
+        if (
+          !['IMAGE', 'VIDEO', 'EMBED', 'OEMBED', 'CHART', 'AUDIO', '3D_MODEL', 'SHAPE'].includes(
+            type,
+          )
+        ) {
+          return false;
+        }
+        // IMAGE/VIDEO without a real URL must not reserve a media column
+        if (type === 'IMAGE' || type === 'VIDEO') {
+          return Boolean(mediaUrlFromBlockContent(block.content));
+        }
+        return true;
+      }),
+    [blocks],
   );
+
+  const hasValidMedia = mediaBlocks.length > 0;
 
   const bodyBlocks = useMemo(
     () =>
@@ -213,17 +229,39 @@ export function LayoutCompiler({
 
   const columnStack = (list: Block[], keyPrefix: string, extraClass = '') => (
     <div
-      className={`flex flex-col min-w-0 ${isDense ? 'gap-3' : 'gap-4'} ${extraClass}`}
+      className={`flex flex-col min-h-0 min-w-0 overflow-hidden ${isDense ? 'gap-3' : 'gap-4'} ${extraClass}`}
       style={{ opacity: bodyOpacity }}
     >
       {renderBlockList(list, keyPrefix)}
     </div>
   );
 
-  switch (resolvedLayout) {
+  const mediaPanel = (keyPrefix: string) => {
+    if (hasValidMedia) {
+      return <div className="w-full h-full">{renderBlockList(mediaBlocks, keyPrefix)}</div>;
+    }
+    return (
+      <BrandedMediaPlaceholder
+        primary={theme?.colors?.primary}
+        secondary={theme?.colors?.secondary || theme?.colors?.accent}
+      />
+    );
+  };
+
+  // Image-dependent layouts without a real asset: collapse to text-only so we never leave a blank half.
+  const effectiveLayout =
+    !hasValidMedia &&
+    (resolvedLayout === 'image-left' ||
+      resolvedLayout === 'image-right' ||
+      resolvedLayout === 'two-column-image' ||
+      resolvedLayout === 'image-full')
+      ? 'single-column'
+      : resolvedLayout;
+
+  switch (effectiveLayout) {
     case 'title-hero':
       // No media → full-bleed title layout (avoid empty left half)
-      if (mediaBlocks.length === 0) {
+      if (!hasValidMedia) {
         return (
           <div
             className={`w-full h-full flex flex-col justify-center min-h-0 overflow-hidden ${
@@ -247,15 +285,15 @@ export function LayoutCompiler({
             className={bleedMediaClass}
             style={{ background: surface }}
           >
-            <div className="w-full h-full">{renderBlockList(mediaBlocks, 'm-')}</div>
+            {mediaPanel('m-')}
           </div>
           <div
             className={`flex flex-col justify-center min-h-0 min-w-0 overflow-hidden ${
               isSpacious ? 'px-8 py-6 gap-4' : isDense ? 'px-5 py-4 gap-2' : 'px-6 py-5 gap-3'
             }`}
           >
-            <div className="min-w-0 shrink-0 overflow-hidden">{renderBlockList(titleBlocks, 't-')}</div>
-            <div className="min-w-0 min-h-0 overflow-hidden" style={{ opacity: bodyOpacity }}>
+            <div className="min-w-0 shrink-0 overflow-hidden max-h-[45%]">{renderBlockList(titleBlocks, 't-')}</div>
+            <div className="min-w-0 min-h-0 flex-1 overflow-hidden" style={{ opacity: bodyOpacity }}>
               {renderBlockList(bodyBlocks, 'b-')}
             </div>
           </div>
@@ -324,18 +362,23 @@ export function LayoutCompiler({
     }
 
     case 'three-column': {
-      const cols = splitIntoColumns(bodyBlocks.length ? bodyBlocks : blocks.filter((b) => !titleBlocks.includes(b)), 3);
+      const source = bodyBlocks.length
+        ? bodyBlocks
+        : blocks.filter((b) => !titleBlocks.includes(b));
+      // Cap at 3 cards; overflow items fold into the last column to avoid clipping a 4th card
+      const capped = source.slice(0, 9);
+      const cols = splitIntoColumns(capped, 3).map((col) => col.slice(0, 3));
       return (
-        <div className={`w-full h-full flex flex-col ${contentPad} ${verticalGap} relative z-10 overflow-hidden`}>
+        <div className={`w-full h-full flex flex-col ${contentPad} ${verticalGap} relative z-10 overflow-hidden min-h-0`}>
           {titleBlocks.length > 0 && (
-            <div className="shrink-0 max-w-4xl">{renderBlockList(titleBlocks, 't-')}</div>
+            <div className="shrink-0 max-w-4xl overflow-hidden max-h-[28%]">{renderBlockList(titleBlocks, 't-')}</div>
           )}
-          <div className={`flex-1 grid grid-cols-3 ${columnGap} items-start min-h-0`}>
+          <div className={`flex-1 grid grid-cols-3 ${columnGap} items-stretch min-h-0`}>
             {cols.map((col, i) => (
               <div
                 // eslint-disable-next-line react/no-array-index-key
                 key={`col-${i}`}
-                className={`flex flex-col min-w-0 ${isDense ? 'gap-3' : 'gap-4'} ${borderSubtle} rounded-2xl p-4`}
+                className={`flex flex-col min-w-0 min-h-0 overflow-hidden ${isDense ? 'gap-2' : 'gap-3'} ${borderSubtle} rounded-2xl p-4`}
                 style={{ background: surface, opacity: bodyOpacity }}
               >
                 {renderBlockList(col, `c${i}-`)}
@@ -350,21 +393,19 @@ export function LayoutCompiler({
     case 'image-left':
       return (
         <div
-          className={`w-full h-full grid grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] ${columnGap} items-stretch relative z-10 ${contentPad} overflow-hidden`}
+          className={`w-full h-full grid grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] ${columnGap} items-stretch relative z-10 ${contentPad} overflow-hidden min-h-0`}
         >
           <div
             className={`${bleedMediaClass} ${borderSubtle} shadow-sm`}
             style={{ borderRadius: radius, background: surface }}
           >
-            {mediaBlocks.length > 0 ? (
-              <div className="w-full h-full">{renderBlockList(mediaBlocks, 'm-')}</div>
-            ) : (
-              <div className="text-slate-400 text-sm font-medium tracking-wide uppercase">Visual</div>
-            )}
+            {mediaPanel('m-')}
           </div>
-          <div className={`flex flex-col justify-center min-h-0 ${isDense ? 'gap-3' : 'gap-4'} py-1`}>
-            {renderBlockList(titleBlocks, 't-')}
-            <div style={{ opacity: bodyOpacity }}>{columnStack(bodyBlocks, 'content-')}</div>
+          <div className={`flex flex-col justify-center min-h-0 min-w-0 overflow-hidden ${isDense ? 'gap-3' : 'gap-4'} py-1`}>
+            <div className="shrink-0 overflow-hidden max-h-[40%]">{renderBlockList(titleBlocks, 't-')}</div>
+            <div className="min-h-0 flex-1 overflow-hidden" style={{ opacity: bodyOpacity }}>
+              {columnStack(bodyBlocks, 'content-')}
+            </div>
           </div>
         </div>
       );
@@ -372,21 +413,19 @@ export function LayoutCompiler({
     case 'image-right':
       return (
         <div
-          className={`w-full h-full grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] ${columnGap} items-stretch relative z-10 ${contentPad} overflow-hidden`}
+          className={`w-full h-full grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] ${columnGap} items-stretch relative z-10 ${contentPad} overflow-hidden min-h-0`}
         >
-          <div className={`flex flex-col justify-center min-h-0 ${isDense ? 'gap-3' : 'gap-4'} py-1`}>
-            {renderBlockList(titleBlocks, 't-')}
-            <div style={{ opacity: bodyOpacity }}>{columnStack(bodyBlocks, 'content-')}</div>
+          <div className={`flex flex-col justify-center min-h-0 min-w-0 overflow-hidden ${isDense ? 'gap-3' : 'gap-4'} py-1`}>
+            <div className="shrink-0 overflow-hidden max-h-[40%]">{renderBlockList(titleBlocks, 't-')}</div>
+            <div className="min-h-0 flex-1 overflow-hidden" style={{ opacity: bodyOpacity }}>
+              {columnStack(bodyBlocks, 'content-')}
+            </div>
           </div>
           <div
             className={`${bleedMediaClass} ${borderSubtle} shadow-sm`}
             style={{ borderRadius: radius, background: surface }}
           >
-            {mediaBlocks.length > 0 ? (
-              <div className="w-full h-full">{renderBlockList(mediaBlocks, 'm-')}</div>
-            ) : (
-              <div className="text-slate-400 text-sm font-medium tracking-wide uppercase">Visual</div>
-            )}
+            {mediaPanel('m-')}
           </div>
         </div>
       );
@@ -413,31 +452,42 @@ export function LayoutCompiler({
     case 'quote-highlight':
       return (
         <div
-          className={`w-full h-full flex flex-col items-center justify-center ${
-            isSpacious ? 'p-14' : 'p-10'
+          className={`w-full h-full flex flex-col items-center justify-center min-h-0 ${
+            isSpacious ? 'p-10' : 'p-6'
           } text-center relative z-10 overflow-hidden`}
         >
           <div
-            className="w-10 h-10 mb-6 rounded-full flex items-center justify-center text-2xl font-serif opacity-40"
+            className="w-10 h-10 mb-4 shrink-0 rounded-full flex items-center justify-center text-2xl font-serif opacity-40"
             style={{ color: theme?.colors?.accent || theme?.colors?.primary, background: surface }}
           >
             &ldquo;
           </div>
-          <div className={`max-w-3xl flex flex-col ${isSpacious ? 'gap-6' : 'gap-4'}`} style={{ opacity: bodyOpacity }}>
-            {renderBlockList([...titleBlocks, ...bodyBlocks], 'content-')}
+          <div
+            className={`max-w-3xl min-h-0 flex-1 flex flex-col justify-center overflow-hidden ${isSpacious ? 'gap-4' : 'gap-3'}`}
+            style={{ opacity: bodyOpacity }}
+          >
+            {renderBlockList([...titleBlocks, ...bodyBlocks].slice(0, 4), 'content-')}
           </div>
         </div>
       );
 
     case 'stats-grid': {
-      const gridItems = [...statBlocks, ...bodyBlocks.filter((b) => !statBlocks.includes(b)), ...mediaBlocks];
+      // Prefer stats + short body; keep images out of the card grid to avoid overlap
+      const gridItems = [
+        ...statBlocks,
+        ...bodyBlocks.filter((b) => !statBlocks.includes(b)),
+      ].slice(0, 4);
       const count = Math.max(gridItems.length, 1);
       const cols = count <= 2 ? 2 : count === 3 ? 3 : 2;
       return (
-        <div className={`w-full h-full flex flex-col ${contentPad} ${verticalGap} relative z-10 overflow-hidden`}>
-          {titleBlocks.length > 0 && <div className="shrink-0 max-w-4xl">{renderBlockList(titleBlocks, 't-')}</div>}
+        <div className={`w-full h-full flex flex-col ${contentPad} ${verticalGap} relative z-10 overflow-hidden min-h-0`}>
+          {titleBlocks.length > 0 && (
+            <div className="shrink-0 max-w-4xl overflow-hidden max-h-[28%]">
+              {renderBlockList(titleBlocks, 't-')}
+            </div>
+          )}
           <div
-            className="flex-1 grid gap-4 min-h-0 content-center"
+            className="flex-1 grid gap-4 min-h-0 content-stretch overflow-hidden"
             style={{
               gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
               opacity: bodyOpacity,
@@ -446,7 +496,7 @@ export function LayoutCompiler({
             {gridItems.map((block, index) => (
               <div
                 key={block.id}
-                className={`flex flex-col justify-center ${borderSubtle} rounded-2xl p-5 min-h-0`}
+                className={`flex flex-col justify-center overflow-hidden ${borderSubtle} rounded-2xl p-5 min-h-0`}
                 style={{ background: surface }}
               >
                 {renderBlockNode(block, index)}
@@ -478,23 +528,27 @@ export function LayoutCompiler({
       );
 
     case 'bento-grid': {
-      const items = [...bodyBlocks, ...mediaBlocks];
+      const items = [...bodyBlocks, ...mediaBlocks].slice(0, 5);
       return (
-        <div className={`w-full h-full flex flex-col ${contentPad} ${verticalGap} relative z-10 overflow-hidden`}>
-          {titleBlocks.length > 0 && <div className="shrink-0 max-w-4xl">{renderBlockList(titleBlocks, 't-')}</div>}
+        <div className={`w-full h-full flex flex-col ${contentPad} ${verticalGap} relative z-10 overflow-hidden min-h-0`}>
+          {titleBlocks.length > 0 && (
+            <div className="shrink-0 max-w-4xl overflow-hidden max-h-[24%]">
+              {renderBlockList(titleBlocks, 't-')}
+            </div>
+          )}
           <div
-            className="flex-1 grid grid-cols-3 grid-rows-2 gap-3 min-h-0"
+            className="flex-1 grid grid-cols-3 grid-rows-2 gap-3 min-h-0 overflow-hidden"
             style={{ opacity: bodyOpacity }}
           >
             {items.map((block, index) => {
               const span =
-                index === 0 ? 'lg:col-span-2 lg:row-span-1' :
-                index === 1 ? 'lg:row-span-2' :
-                index === items.length - 1 && items.length >= 4 ? 'lg:col-span-2' : '';
+                index === 0 ? 'col-span-2 row-span-1' :
+                index === 1 ? 'row-span-2' :
+                index === items.length - 1 && items.length >= 4 ? 'col-span-2' : '';
               return (
                 <div
                   key={block.id}
-                  className={`flex flex-col justify-center min-w-0 min-h-0 overflow-hidden ${borderSubtle} rounded-2xl p-4 ${span}`}
+                  className={`flex flex-col justify-center min-w-0 min-h-0 overflow-hidden ${borderSubtle} rounded-2xl p-3 ${span}`}
                   style={{ background: surface }}
                 >
                   {renderBlockNode(block, index)}
