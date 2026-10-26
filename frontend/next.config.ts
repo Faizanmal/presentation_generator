@@ -112,6 +112,17 @@ const nextConfig: NextConfig = {
     ];
   },
 
+  async redirects() {
+    return [
+      { source: '/templates', destination: '/marketplace', permanent: false },
+      {
+        source: '/dashboard/templates',
+        destination: '/marketplace',
+        permanent: false,
+      },
+    ];
+  },
+
   async rewrites() {
     return { beforeFiles: [], afterFiles: [], fallback: [] };
   },
