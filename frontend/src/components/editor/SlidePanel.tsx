@@ -90,9 +90,14 @@ const SlidePanel = React.memo(({
     const t = (b.type || b.blockType)?.toUpperCase();
     return t === 'IMAGE' && typeof b.content?.url === 'string' && b.content.url;
   });
+  const headingBlock = blocks.find((b) => {
+    const t = (b.type || b.blockType)?.toUpperCase();
+    return t === 'HEADING' || t === 'SUBHEADING';
+  });
+  const headingText = headingBlock ? blockPreviewLine(headingBlock, 40) : slide.title || '';
   const textBlocks = blocks.filter((b) => {
     const t = (b.type || b.blockType)?.toUpperCase();
-    return t !== 'IMAGE' && t !== 'VIDEO';
+    return t !== 'IMAGE' && t !== 'VIDEO' && b !== headingBlock;
   }).slice(0, 4);
 
   return (
@@ -141,7 +146,7 @@ const SlidePanel = React.memo(({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Slide thumbnail — layout-aware wireframe (not a washed full-bleed strip) */}
+      {/* Slide thumbnail — layout-aware wireframe */}
       <div
         className="aspect-video relative overflow-hidden"
         style={{ backgroundColor: bgColor }}
@@ -150,7 +155,7 @@ const SlidePanel = React.memo(({
           <div className="absolute inset-0 grid grid-cols-2">
             <div
               className="relative overflow-hidden"
-              style={{ background: `linear-gradient(145deg, ${primaryColor}cc, ${accentColor || primaryColor}99)` }}
+              style={{ background: `linear-gradient(135deg, ${primaryColor}, ${accentColor || primaryColor})` }}
             >
               {imageBlock?.content?.url ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -159,21 +164,31 @@ const SlidePanel = React.memo(({
                   alt=""
                   className="absolute inset-0 h-full w-full object-cover"
                 />
-              ) : null}
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-5 h-5 rounded-md bg-white/20 flex items-center justify-center text-white text-[10px] font-bold">
+                    {(headingText || 'P').slice(0, 1).toUpperCase()}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex flex-col justify-center gap-1 p-2 min-w-0 overflow-hidden">
-              {textBlocks.slice(0, 3).map((block) => {
-                const preview = blockPreviewLine(block, 36);
-                if (!preview) {return null;}
-                const blockType = (block.type || block.blockType)?.toUpperCase();
-                const isHeading = blockType === 'HEADING' || blockType === 'SUBHEADING';
+              {headingText && (
+                <p
+                  className="leading-tight w-full min-w-0 font-bold line-clamp-2 text-[8px]"
+                  style={{ color: primaryColor }}
+                >
+                  {headingText}
+                </p>
+              )}
+              {textBlocks.slice(0, 2).map((block) => {
+                const preview = blockPreviewLine(block, 28);
+                if (!preview) return null;
                 return (
                   <p
                     key={block.id}
-                    className={`leading-tight w-full min-w-0 ${
-                      isHeading ? 'font-semibold line-clamp-2 text-[8px]' : 'line-clamp-2 text-[7px] opacity-75'
-                    }`}
-                    style={{ color: isHeading ? primaryColor : textColor }}
+                    className="leading-tight w-full min-w-0 line-clamp-1 text-[7px] opacity-75"
+                    style={{ color: textColor }}
                   >
                     {preview}
                   </p>
@@ -181,38 +196,135 @@ const SlidePanel = React.memo(({
               })}
             </div>
           </div>
-        ) : (
-          <div
-            className={`absolute inset-0 flex flex-col gap-1 p-2.5 overflow-hidden min-w-0 ${
-              isTitleSlide ? 'justify-center items-center text-center' : 'justify-start'
-            }`}
-          >
-            {isTitleSlide && (
-              <div
-                className="absolute -top-4 -right-4 w-16 h-16 rounded-full opacity-15 blur-md pointer-events-none"
-                style={{ background: `radial-gradient(circle, ${primaryColor}, transparent)` }}
-              />
+        ) : isTitleSlide ? (
+          <div className="absolute inset-0 flex flex-col justify-center items-center text-center p-2.5 overflow-hidden min-w-0">
+            <div
+              className="absolute -top-4 -right-4 w-16 h-16 rounded-full opacity-15 blur-md pointer-events-none"
+              style={{ background: `radial-gradient(circle, ${primaryColor}, transparent)` }}
+            />
+            <p
+              className="font-bold text-[10px] line-clamp-2 leading-snug w-full max-w-full"
+              style={{ color: primaryColor }}
+            >
+              {headingText || 'Title'}
+            </p>
+            {textBlocks[0] && (
+              <p
+                className="text-[7px] opacity-75 line-clamp-1 mt-1 max-w-full"
+                style={{ color: textColor }}
+              >
+                {blockPreviewLine(textBlocks[0], 36)}
+              </p>
             )}
-            {textBlocks.map((block) => {
-              const preview = blockPreviewLine(block);
-              if (!preview) {return null;}
-              const blockType = (block.type || block.blockType)?.toUpperCase();
-              const isHeading = blockType === 'HEADING' || blockType === 'SUBHEADING';
+          </div>
+        ) : layout === 'three-column' ? (
+          <div className="absolute inset-0 flex flex-col p-2 overflow-hidden min-w-0 gap-1 justify-between">
+            <p className="font-bold text-[8px] line-clamp-1 shrink-0" style={{ color: primaryColor }}>
+              {headingText || 'Three Column'}
+            </p>
+            <div className="grid grid-cols-3 gap-1 h-9 flex-1 min-h-0">
+              {[0, 1, 2].map((colIdx) => (
+                <div
+                  key={colIdx}
+                  className="rounded-md bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 p-1 flex flex-col justify-center gap-0.5 overflow-hidden"
+                >
+                  <div className="h-1 w-3/4 rounded-full" style={{ background: primaryColor, opacity: 0.8 }} />
+                  <div className="h-0.5 w-full rounded-full bg-slate-300 dark:bg-slate-600" />
+                  <div className="h-0.5 w-1/2 rounded-full bg-slate-200 dark:bg-slate-700" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : layout === 'comparison' || layout === 'two-column' ? (
+          <div className="absolute inset-0 flex flex-col p-2 overflow-hidden min-w-0 gap-1 justify-between">
+            <p className="font-bold text-[8px] line-clamp-1 shrink-0" style={{ color: primaryColor }}>
+              {headingText || 'Comparison'}
+            </p>
+            <div className="grid grid-cols-2 gap-1.5 h-9 flex-1 min-h-0">
+              {[0, 1].map((colIdx) => (
+                <div
+                  key={colIdx}
+                  className="rounded-md bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 p-1.5 flex flex-col justify-center gap-1 overflow-hidden"
+                >
+                  <div className="h-1 w-2/3 rounded-full" style={{ background: colIdx === 0 ? primaryColor : accentColor, opacity: 0.8 }} />
+                  <div className="h-0.5 w-full rounded-full bg-slate-300 dark:bg-slate-600" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : layout === 'timeline' ? (
+          <div className="absolute inset-0 flex flex-col p-2 overflow-hidden min-w-0 gap-1 justify-between">
+            <p className="font-bold text-[8px] line-clamp-1 shrink-0" style={{ color: primaryColor }}>
+              {headingText || 'Timeline'}
+            </p>
+            <div className="flex items-center justify-between px-3 h-8 flex-1 min-h-0 relative">
+              <div className="absolute left-4 right-4 top-1/2 h-0.5 -translate-y-1/2 bg-slate-200 dark:bg-slate-700" />
+              {[0, 1, 2].map((stepIdx) => (
+                <div
+                  key={stepIdx}
+                  className="w-2.5 h-2.5 rounded-full z-10 border-2 bg-white dark:bg-slate-900 shrink-0"
+                  style={{ borderColor: primaryColor }}
+                />
+              ))}
+            </div>
+          </div>
+        ) : layout === 'stats-grid' ? (
+          <div className="absolute inset-0 flex flex-col p-2 overflow-hidden min-w-0 gap-1 justify-between">
+            <p className="font-bold text-[8px] line-clamp-1 shrink-0" style={{ color: primaryColor }}>
+              {headingText || 'Metrics'}
+            </p>
+            <div className="grid grid-cols-2 gap-1 h-9 flex-1 min-h-0">
+              {[0, 1].map((statIdx) => (
+                <div
+                  key={statIdx}
+                  className="rounded-md bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 p-1 flex flex-col justify-center items-center overflow-hidden"
+                >
+                  <span className="font-extrabold text-[8px]" style={{ color: primaryColor }}>
+                    {statIdx === 0 ? '95%' : '3×'}
+                  </span>
+                  <div className="h-0.5 w-2/3 rounded-full bg-slate-300 dark:bg-slate-600 mt-0.5" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : layout === 'bento-grid' ? (
+          <div className="absolute inset-0 flex flex-col p-2 overflow-hidden min-w-0 gap-1 justify-between">
+            <p className="font-bold text-[8px] line-clamp-1 shrink-0" style={{ color: primaryColor }}>
+              {headingText || 'Takeaway'}
+            </p>
+            <div className="grid grid-cols-2 gap-1 h-9 flex-1 min-h-0">
+              <div className="rounded-md bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 p-1 flex flex-col justify-center gap-0.5">
+                <div className="h-1 w-3/4 rounded-full" style={{ background: primaryColor }} />
+                <div className="h-0.5 w-full bg-slate-300 dark:bg-slate-600 rounded" />
+              </div>
+              <div
+                className="rounded-md p-1 flex flex-col justify-center items-center text-white text-[7px] font-bold"
+                style={{ background: primaryColor }}
+              >
+                CTA
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="absolute inset-0 flex flex-col gap-1 p-2 overflow-hidden min-w-0 justify-start">
+            <p className="font-bold text-[9px] line-clamp-1 shrink-0" style={{ color: primaryColor }}>
+              {headingText || `Slide ${index + 1}`}
+            </p>
+            {textBlocks.slice(0, 2).map((block) => {
+              const preview = blockPreviewLine(block, 40);
+              if (!preview) return null;
               return (
                 <p
                   key={block.id}
-                  className={`leading-tight shrink-0 w-full min-w-0 ${
-                    isHeading ? 'font-semibold line-clamp-2 text-[9px]' : 'line-clamp-2 text-[8px] opacity-80'
-                  }`}
-                  style={{ color: isHeading ? primaryColor : textColor }}
-                  title={preview}
+                  className="leading-tight shrink-0 w-full min-w-0 line-clamp-1 text-[7px] opacity-80"
+                  style={{ color: textColor }}
                 >
                   {preview}
                 </p>
               );
             })}
             {!blocks.length && (
-              <p className="text-[8px] text-slate-400 italic">Empty slide</p>
+              <p className="text-[7px] text-slate-400 italic">Empty slide</p>
             )}
           </div>
         )}

@@ -37,9 +37,10 @@ function normalizeTimelineItems(raw: unknown): TimelineItem[] {
   return raw.map((entry, index) => {
     const fallbackId = `timeline-${index}`;
     if (typeof entry === 'string') {
-      const colon = entry.indexOf(':');
-      const title = colon > 0 ? entry.slice(0, colon).trim() : entry.trim();
-      const description = colon > 0 ? entry.slice(colon + 1).trim() : '';
+      const sepMatch = entry.match(/[:\u2013\u2014\-]/);
+      const sepIdx = sepMatch ? entry.indexOf(sepMatch[0]) : -1;
+      const title = sepIdx > 0 ? entry.slice(0, sepIdx).trim() : entry.trim();
+      const description = sepIdx > 0 ? entry.slice(sepIdx + 1).trim() : '';
       return {
         id: fallbackId,
         title: title || `Phase ${index + 1}`,

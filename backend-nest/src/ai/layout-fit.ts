@@ -26,8 +26,11 @@ export interface SectionContentSignals {
   bulletCount: number;
   bodyTextLength: number;
   hasComparison: boolean;
+  hasTimeline: boolean;
   hasQuote: boolean;
   hasStats: boolean;
+  hasCards: boolean;
+  cardCount: number;
   blockCount: number;
 }
 
@@ -38,8 +41,10 @@ export function analyzeSectionContent(
   let bodyTextLength = 0;
   let hasValidImage = false;
   let hasComparison = false;
+  let hasTimeline = false;
   let hasQuote = false;
   let hasStats = false;
+  let cardCount = 0;
 
   for (const block of section.blocks || []) {
     const type = (block.type || '').toLowerCase();
@@ -61,11 +66,17 @@ export function analyzeSectionContent(
     if (type === 'comparison' || type === 'comparison-item') {
       hasComparison = true;
     }
+    if (type === 'timeline' || type === 'timeline-item') {
+      hasTimeline = true;
+    }
     if (type === 'quote') {
       hasQuote = true;
     }
     if (type === 'statistic' || type === 'stats-grid') {
       hasStats = true;
+    }
+    if (type === 'card' || type === 'icon-text') {
+      cardCount++;
     }
   }
 
@@ -78,8 +89,11 @@ export function analyzeSectionContent(
     bulletCount,
     bodyTextLength,
     hasComparison,
+    hasTimeline,
     hasQuote,
     hasStats,
+    hasCards: cardCount > 0,
+    cardCount,
     blockCount: section.blocks?.length || 0,
   };
 }
@@ -92,15 +106,47 @@ export function pickLayoutForContent(
   let layout = preferred || 'single-column';
   const { isOpening } = options || {};
 
+  // Slide 1 (opening) special handling
+  if (isOpening) {
+    return signals.hasValidImage ? 'title-hero' : 'title-subtitle';
+  }
+
+  // Content type takes highest priority over mismatched recipes
+  if (signals.hasTimeline) {
+    return 'timeline';
+  }
+
+  if (signals.hasComparison) {
+    return 'comparison';
+  }
+
+  // stats-grid or bento-grid requested but no stats in content -> route to appropriate structural layout
+  if ((layout === 'stats-grid' || layout === 'bento-grid') && !signals.hasStats) {
+    if (signals.cardCount >= 3) {
+      return 'three-column';
+    }
+    if (signals.cardCount === 2) {
+      return 'two-column';
+    }
+    if (signals.hasQuote && signals.bodyTextLength < 400) {
+      return 'quote-highlight';
+    }
+    if (signals.hasValidImage) {
+      return 'image-right';
+    }
+    return 'two-column';
+  }
+
+  // Media-dependent layouts without valid images fall back gracefully
   if (MEDIA_DEPENDENT.has(layout) && !signals.hasValidImage) {
-    if (isOpening) {
-      layout = 'title-subtitle';
-    } else if (signals.hasQuote) {
-      layout = 'quote-highlight';
-    } else if (signals.hasStats) {
+    if (signals.hasStats) {
       layout = 'stats-grid';
-    } else if (signals.hasComparison) {
-      layout = 'comparison';
+    } else if (signals.hasQuote && signals.bodyTextLength < 400) {
+      layout = 'quote-highlight';
+    } else if (signals.cardCount >= 3) {
+      layout = 'three-column';
+    } else if (signals.cardCount === 2) {
+      layout = 'two-column';
     } else {
       layout = 'single-column';
     }
@@ -121,20 +167,12 @@ export function pickLayoutForContent(
     layout = 'single-column';
   }
 
-  if (
-    signals.hasComparison &&
-    signals.hasValidImage &&
-    (layout === 'stats-grid' || layout === 'bento-grid')
-  ) {
-    layout = 'comparison';
-  }
-
   // Dense mixed content → prefer simpler column layouts
   if (
     signals.blockCount > 7 &&
     (layout === 'bento-grid' || layout === 'stats-grid')
   ) {
-    layout = signals.hasComparison ? 'comparison' : 'single-column';
+    layout = 'two-column';
   }
 
   return layout;

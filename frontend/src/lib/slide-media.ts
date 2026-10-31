@@ -54,8 +54,12 @@ export function pickLayoutForContent(input: {
   bulletCount: number;
   bodyTextLength: number;
   hasComparison: boolean;
+  hasTimeline?: boolean;
   hasQuote: boolean;
   hasStats: boolean;
+  hasCards?: boolean;
+  cardCount?: number;
+  blockCount?: number;
   isOpening?: boolean;
 }): string {
   const {
@@ -64,22 +68,53 @@ export function pickLayoutForContent(input: {
     bulletCount,
     bodyTextLength,
     hasComparison,
+    hasTimeline,
     hasQuote,
     hasStats,
+    cardCount = 0,
+    blockCount = 0,
     isOpening,
   } = input;
 
   let layout = preferred || 'single-column';
 
+  if (isOpening) {
+    return hasValidImage ? 'title-hero' : 'title-subtitle';
+  }
+
+  if (hasTimeline) {
+    return 'timeline';
+  }
+
+  if (hasComparison) {
+    return 'comparison';
+  }
+
+  if ((layout === 'stats-grid' || layout === 'bento-grid') && !hasStats) {
+    if (cardCount >= 3) {
+      return 'three-column';
+    }
+    if (cardCount === 2) {
+      return 'two-column';
+    }
+    if (hasQuote && bodyTextLength < 400) {
+      return 'quote-highlight';
+    }
+    if (hasValidImage) {
+      return 'image-right';
+    }
+    return 'two-column';
+  }
+
   if (MEDIA_DEPENDENT_LAYOUTS.has(layout) && !hasValidImage) {
-    if (isOpening) {
-      layout = 'title-subtitle';
-    } else if (hasQuote) {
-      layout = 'quote-highlight';
-    } else if (hasStats) {
+    if (hasStats) {
       layout = 'stats-grid';
-    } else if (hasComparison) {
-      layout = 'comparison';
+    } else if (hasQuote && bodyTextLength < 400) {
+      layout = 'quote-highlight';
+    } else if (cardCount >= 3) {
+      layout = 'three-column';
+    } else if (cardCount === 2) {
+      layout = 'two-column';
     } else {
       layout = 'single-column';
     }
@@ -97,13 +132,8 @@ export function pickLayoutForContent(input: {
     layout = 'single-column';
   }
 
-  if (
-    hasComparison &&
-    hasValidImage &&
-    (layout === 'stats-grid' || layout === 'bento-grid')
-  ) {
-    // Avoid dumping comparison cards + image into one crowded grid
-    layout = 'comparison';
+  if (blockCount > 7 && (layout === 'bento-grid' || layout === 'stats-grid')) {
+    layout = 'two-column';
   }
 
   return layout;

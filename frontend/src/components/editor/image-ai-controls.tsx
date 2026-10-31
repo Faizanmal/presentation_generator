@@ -50,6 +50,7 @@ export function ImageAIControls({
 }: ImageAIControlsProps) {
     const [isHovered, setIsHovered] = useState(false);
     const [loadFailed, setLoadFailed] = useState(false);
+    const [isImageLoading, setIsImageLoading] = useState(true);
 
     const regenerateImageMutation = useMutation({
         mutationFn: async () => {
@@ -125,9 +126,26 @@ export function ImageAIControls({
                         sizes="(max-width: 768px) 100vw, 800px"
                         unoptimized
                         className="object-cover"
-                        onError={() => setLoadFailed(true)}
-                        onLoadingComplete={() => setLoadFailed(false)}
+                        onError={() => {
+                            setIsImageLoading(false);
+                            setLoadFailed(true);
+                        }}
+                        onLoadingComplete={() => {
+                            setIsImageLoading(false);
+                            setLoadFailed(false);
+                        }}
                     />
+
+                    {isImageLoading && !loadFailed && (
+                        <div
+                            className="absolute inset-0 flex items-center justify-center animate-pulse"
+                            style={{
+                                background: `linear-gradient(145deg, ${primaryColor}22, ${secondaryColor}33)`,
+                            }}
+                        >
+                            <ImageIcon className="h-8 w-8 text-slate-400/50 animate-pulse" />
+                        </div>
+                    )}
 
                     <div className="absolute inset-0 bg-linear-to-t from-slate-900/40 to-transparent opacity-0 group-hover/image:opacity-100 transition-opacity" />
 
@@ -198,7 +216,7 @@ export function ImageAIControls({
                     </div>
                 </div>
             ) : imageUrl && loadFailed ? (
-                <div className={cn('w-full overflow-hidden', fillContainer ? 'h-full' : 'aspect-video rounded-xl')}>
+                <div className={cn('w-full overflow-hidden', fillContainer ? 'h-full min-h-0' : 'aspect-video rounded-xl')}>
                     <BrandedMediaPlaceholder
                         primary={primaryColor}
                         secondary={secondaryColor}

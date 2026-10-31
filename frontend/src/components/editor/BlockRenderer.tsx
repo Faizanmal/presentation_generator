@@ -12,18 +12,20 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { ChartBlock } from "./chart-block";
+import dynamic from "next/dynamic";
 import { ImageAIControls } from "./image-ai-controls";
-import RichTextEditor from "./RichTextEditor";
 import { OEmbedBlock } from "./oembed-block";
-import { ThreeDBlock } from "./three-d-block";
 import { BentoGridBlock } from "./bento-grid-block";
 import { TimelineBlock } from "./timeline-block";
 import type { EmbedServiceType } from "./oembed-block";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { isValidMediaUrl } from "@/lib/slide-media";
+import { isValidMediaUrl, mediaUrlFromBlockContent } from "@/lib/slide-media";
 import { BrandedMediaPlaceholder } from "./BrandedMediaPlaceholder";
+
+const ChartBlock = dynamic(() => import("./chart-block").then((m) => m.ChartBlock), { ssr: false });
+const ThreeDBlock = dynamic(() => import("./three-d-block").then((m) => m.ThreeDBlock), { ssr: false });
+const RichTextEditor = dynamic(() => import("./RichTextEditor"), { ssr: false });
 
 interface BlockRendererProps {
   block: Block;
@@ -508,7 +510,7 @@ const BlockRenderer = React.memo(({
         );
 
       case "IMAGE": {
-        const imageUrl = isValidMediaUrl(content?.url) ? String(content.url) : undefined;
+        const imageUrl = mediaUrlFromBlockContent(content) || (isValidMediaUrl(content?.url) ? String(content.url) : undefined);
         if (!imageUrl) {
           return (
             <div
@@ -965,10 +967,14 @@ const BlockRenderer = React.memo(({
         mass: 0.8,
         layout: { type: "spring", stiffness: 200, damping: 25 },
       }}
-      className={`group relative rounded-xl transition-shadow duration-300 ${isActive
-        ? "ring-2 ring-blue-500/70 shadow-lg shadow-blue-500/10"
-        : "hover:ring-1 hover:ring-slate-300/80 hover:shadow-md"
-        } ${isDragging ? "opacity-50 scale-[0.98] z-50" : ""}`}
+      className={cn(
+        "group relative transition-shadow duration-300",
+        fillMedia ? "h-full min-h-0 rounded-none w-full" : "rounded-xl",
+        isActive
+          ? "ring-2 ring-blue-500/70 shadow-lg shadow-blue-500/10"
+          : "hover:ring-1 hover:ring-slate-300/80 hover:shadow-md",
+        isDragging ? "opacity-50 scale-[0.98] z-50" : ""
+      )}
     >
       {/* Controls */}
       <div className="absolute -left-9 top-1/2 -translate-y-1/2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
@@ -998,7 +1004,7 @@ const BlockRenderer = React.memo(({
       </div>
 
       {/* Block content */}
-      <div className="p-3">
+      <div className={cn("w-full min-w-0", fillMedia ? "h-full min-h-0 p-0" : "p-3")}>
         {renderBlockContent()}
       </div>
     </motion.div>

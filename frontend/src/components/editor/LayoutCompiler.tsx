@@ -137,7 +137,7 @@ export function LayoutCompiler({
   const borderSubtle = 'border border-black/5 dark:border-white/8';
 
   const bleedMediaClass =
-    'relative h-full min-h-0 overflow-hidden';
+    'relative w-full h-full min-h-0 overflow-hidden';
 
   const titleBlocks = useMemo(() => {
     const titles = blocks.filter((block) =>
@@ -263,28 +263,73 @@ export function LayoutCompiler({
       // First media block fills the panel; extras are ignored to avoid stacked strips
       const primary = mediaBlocks.slice(0, 1);
       return (
-        <div className="absolute inset-0 w-full h-full">
+        <div className="relative w-full h-full min-h-0 overflow-hidden">
           {renderBlockList(primary, keyPrefix, { fillMedia: true })}
         </div>
       );
     }
     return (
-      <BrandedMediaPlaceholder
-        primary={theme?.colors?.primary}
-        secondary={theme?.colors?.secondary || theme?.colors?.accent}
-      />
+      <div className="relative w-full h-full min-h-0 overflow-hidden">
+        <BrandedMediaPlaceholder
+          primary={theme?.colors?.primary}
+          secondary={theme?.colors?.secondary || theme?.colors?.accent}
+        />
+      </div>
     );
   };
 
-  // Image-dependent layouts without a real asset: collapse to text-only so we never leave a blank half.
-  const effectiveLayout =
-    !hasValidMedia &&
-    (resolvedLayout === 'image-left' ||
-      resolvedLayout === 'image-right' ||
-      resolvedLayout === 'two-column-image' ||
-      resolvedLayout === 'image-full')
-      ? 'single-column'
-      : resolvedLayout;
+  const hasComparison = useMemo(
+    () => bodyBlocks.some((b) => getBlockType(b) === 'COMPARISON'),
+    [bodyBlocks],
+  );
+  const hasTimeline = useMemo(
+    () => bodyBlocks.some((b) => getBlockType(b) === 'TIMELINE'),
+    [bodyBlocks],
+  );
+  const hasQuote = useMemo(
+    () => bodyBlocks.some((b) => getBlockType(b) === 'QUOTE'),
+    [bodyBlocks],
+  );
+
+  // Auto-correct layout mismatches and missing media
+  const effectiveLayout = useMemo(() => {
+    // Media-dependent layouts without a real asset collapse to text-only
+    if (
+      !hasValidMedia &&
+      (resolvedLayout === 'image-left' ||
+        resolvedLayout === 'image-right' ||
+        resolvedLayout === 'two-column-image' ||
+        resolvedLayout === 'image-full')
+    ) {
+      return 'single-column';
+    }
+
+    // Timeline content routed to wrong layout
+    if (hasTimeline && ['comparison', 'stats-grid', 'quote-highlight'].includes(resolvedLayout)) {
+      return 'timeline';
+    }
+
+    // Comparison content routed to wrong layout
+    if (hasComparison && ['stats-grid', 'image-left', 'image-right'].includes(resolvedLayout)) {
+      return 'comparison';
+    }
+
+    // Quote layout without an actual quote (e.g. Slide 5 "THE PATH")
+    if (resolvedLayout === 'quote-highlight' && !hasQuote) {
+      if (hasTimeline) return 'timeline';
+      if (hasComparison) return 'comparison';
+      if (bodyBlocks.length >= 3) return 'three-column';
+      return 'single-column';
+    }
+
+    // Stats-grid layout without actual stats
+    if (resolvedLayout === 'stats-grid' && statBlocks.length === 0 && !hasComparison) {
+      if (bodyBlocks.length >= 3) return 'three-column';
+      return 'single-column';
+    }
+
+    return resolvedLayout;
+  }, [hasValidMedia, resolvedLayout, hasTimeline, hasComparison, hasQuote, statBlocks.length, bodyBlocks.length]);
 
   switch (effectiveLayout) {
     case 'title-hero':
@@ -300,7 +345,13 @@ export function LayoutCompiler({
               {renderBlockList(titleBlocks, 't-', { compact: true })}
               {bodyBlocks.length > 0 && (
                 <div className="min-w-0 min-h-0 overflow-hidden" style={{ opacity: bodyOpacity }}>
-                  {renderBlockList(bodyBlocks.slice(0, 3), 'b-', { compact: true })}
+                  {renderBlockList(
+                    bodyBlocks.filter((b) => getBlockType(b) !== 'QUOTE').slice(0, 2).length > 0
+                      ? bodyBlocks.filter((b) => getBlockType(b) !== 'QUOTE').slice(0, 2)
+                      : bodyBlocks.slice(0, 1),
+                    'b-',
+                    { compact: true },
+                  )}
                 </div>
               )}
             </div>
@@ -321,7 +372,13 @@ export function LayoutCompiler({
               {renderBlockList(titleBlocks, 't-', { compact: true })}
             </div>
             <div className="min-w-0 min-h-0 flex-1 overflow-hidden" style={{ opacity: bodyOpacity }}>
-              {renderBlockList(bodyBlocks.slice(0, 3), 'b-', { compact: true })}
+              {renderBlockList(
+                bodyBlocks.filter((b) => getBlockType(b) !== 'QUOTE').slice(0, 2).length > 0
+                  ? bodyBlocks.filter((b) => getBlockType(b) !== 'QUOTE').slice(0, 2)
+                  : bodyBlocks.slice(0, 1),
+                'b-',
+                { compact: true },
+              )}
             </div>
           </div>
         </div>
@@ -423,16 +480,31 @@ export function LayoutCompiler({
       const source = bodyBlocks.length
         ? bodyBlocks
         : blocks.filter((b) => !titleBlocks.includes(b) && getBlockType(b) !== 'IMAGE');
-      // Prefer one block per column so cards share height without a clipped third
-      const cols: Block[][] =
-        source.length >= 3
-          ? source.slice(0, 3).map((c) => [c])
-          : splitIntoColumns(source.slice(0, 6), 3).map((col) => col.slice(0, 2));
+      // If there's an intro lead + 3 cards, render lead above and 1 card per column
+      let lead: Block | null = null;
+      let cols: Block[][] = [];
+
+      if (source.length === 4 || source.length === 5) {
+        lead = source[0];
+        cols = [[source[1]], [source[2]], [source[3]]];
+      } else if (source.length === 3) {
+        cols = [[source[0]], [source[1]], [source[2]]];
+      } else if (source.length >= 6) {
+        cols = splitIntoColumns(source.slice(0, 6), 3).map((col) => col.slice(0, 2));
+      } else {
+        cols = splitIntoColumns(source, 3);
+      }
+
       return (
-        <div className={`w-full h-full flex flex-col ${contentPad} gap-3 relative z-10 overflow-hidden min-h-0`}>
+        <div className={`w-full h-full flex flex-col ${contentPad} gap-2.5 relative z-10 overflow-hidden min-h-0`}>
           {titleBlocks.length > 0 && (
             <div className="shrink-0 max-w-4xl">
               {renderBlockList(titleBlocks, 't-', { compact: true })}
+            </div>
+          )}
+          {lead && (
+            <div className="shrink-0 max-w-3xl text-sm" style={{ opacity: bodyOpacity }}>
+              {renderBlockNode(lead, 0, { compact: true })}
             </div>
           )}
           <div className={`flex-1 grid grid-cols-3 ${columnGap} items-stretch min-h-0`}>
@@ -466,7 +538,7 @@ export function LayoutCompiler({
           <div className="flex flex-col justify-center min-h-0 min-w-0 overflow-hidden gap-3 py-1">
             <div className="shrink-0">{renderBlockList(titleBlocks, 't-', { compact: true })}</div>
             <div className="min-h-0 flex-1 overflow-hidden" style={{ opacity: bodyOpacity }}>
-              {columnStack(bodyBlocks.slice(0, 4), 'content-')}
+              {columnStack(bodyBlocks.slice(0, 3), 'content-', '', { compact: true })}
             </div>
           </div>
         </div>
@@ -480,7 +552,7 @@ export function LayoutCompiler({
           <div className="flex flex-col justify-center min-h-0 min-w-0 overflow-hidden gap-3 py-1">
             <div className="shrink-0">{renderBlockList(titleBlocks, 't-', { compact: true })}</div>
             <div className="min-h-0 flex-1 overflow-hidden" style={{ opacity: bodyOpacity }}>
-              {columnStack(bodyBlocks.slice(0, 4), 'content-')}
+              {columnStack(bodyBlocks.slice(0, 3), 'content-', '', { compact: true })}
             </div>
           </div>
           <div
@@ -530,6 +602,23 @@ export function LayoutCompiler({
       );
 
     case 'stats-grid': {
+      // If a self-contained COMPARISON or TIMELINE block ended up here, render it full-width
+      const comparisonBlock = bodyBlocks.find((b) => getBlockType(b) === 'COMPARISON');
+      if (comparisonBlock) {
+        return (
+          <div className={`w-full h-full flex flex-col ${contentPad} ${verticalGap} relative z-10 overflow-hidden min-h-0`}>
+            {titleBlocks.length > 0 && (
+              <div className="mb-1 shrink-0 max-w-4xl">
+                {renderBlockList(titleBlocks, 't-', { compact: true })}
+              </div>
+            )}
+            <div className="flex-1 min-h-0 overflow-hidden" style={{ opacity: bodyOpacity }}>
+              {renderBlockNode(comparisonBlock, 0, { compact: true })}
+            </div>
+          </div>
+        );
+      }
+
       // Prefer stats + short body; keep images out of the card grid to avoid overlap
       const gridItems = [
         ...statBlocks,
@@ -587,7 +676,9 @@ export function LayoutCompiler({
 
     case 'bento-grid': {
       // Prefer text/CTA cells; keep media out so quote+CTA aren't crushed by an image tile
-      const items = bodyBlocks.slice(0, 5);
+      const items = bodyBlocks.slice(0, 4);
+      const isTwoCol = items.length <= 2;
+      const isThreeItem = items.length === 3;
       return (
         <div className={`w-full h-full flex flex-col ${contentPad} gap-3 relative z-10 overflow-hidden min-h-0`}>
           {titleBlocks.length > 0 && (
@@ -596,19 +687,21 @@ export function LayoutCompiler({
             </div>
           )}
           <div
-            className="flex-1 grid grid-cols-3 grid-rows-2 gap-2 min-h-0 overflow-hidden"
+            className={`flex-1 grid ${isTwoCol ? 'grid-cols-2 gap-4' : isThreeItem ? 'grid-cols-2 gap-3' : 'grid-cols-2 grid-rows-2 gap-3'} min-h-0 overflow-hidden content-stretch`}
             style={{ opacity: bodyOpacity }}
           >
             {items.map((block, index) => {
-              const span =
-                index === 0 ? 'col-span-2 row-span-1' :
-                index === 1 ? 'row-span-2' :
-                index === items.length - 1 && items.length >= 4 ? 'col-span-2' : '';
+              const type = getBlockType(block);
+              const isHeroCard = isThreeItem && index === 0;
+              const span = isHeroCard ? 'col-span-2' : '';
+              const isSelfStyled = type === 'CALL_TO_ACTION' || type === 'QUOTE';
               return (
                 <div
                   key={block.id}
-                  className={`flex flex-col justify-center min-w-0 min-h-0 overflow-hidden ${borderSubtle} rounded-xl p-2.5 ${span}`}
-                  style={{ background: surface }}
+                  className={`flex flex-col justify-center min-w-0 min-h-0 overflow-hidden ${
+                    isSelfStyled ? 'p-0' : `${borderSubtle} rounded-xl p-3`
+                  } ${span}`}
+                  style={{ background: isSelfStyled ? 'transparent' : surface }}
                 >
                   {renderBlockNode(block, index, { compact: true })}
                 </div>
@@ -620,10 +713,33 @@ export function LayoutCompiler({
     }
 
     case 'timeline': {
-      // Never dump IMAGE blocks into the timeline rail — they wipe out titles like "THE PATH"
+      // Check if bodyBlocks contains a rich TIMELINE block
+      const timelineBlock = bodyBlocks.find((b) => getBlockType(b) === 'TIMELINE');
+      if (timelineBlock) {
+        const otherBody = bodyBlocks.filter((b) => b !== timelineBlock);
+        return (
+          <div className={`w-full h-full flex flex-col ${contentPad} gap-2 relative z-10 overflow-hidden min-h-0`}>
+            {titleBlocks.length > 0 && (
+              <div className="shrink-0 max-w-4xl">
+                {renderBlockList(titleBlocks, 't-', { compact: true })}
+              </div>
+            )}
+            {otherBody.length > 0 && (
+              <div className="shrink-0 max-w-3xl text-sm" style={{ opacity: bodyOpacity }}>
+                {renderBlockList(otherBody.slice(0, 1), 'lead-', { compact: true })}
+              </div>
+            )}
+            <div className="flex-1 flex items-center justify-center min-h-0 overflow-hidden" style={{ opacity: bodyOpacity }}>
+              {renderBlockNode(timelineBlock, 0, { compact: true })}
+            </div>
+          </div>
+        );
+      }
+
+      // Fallback for step paragraphs without a TIMELINE block
       const steps = bodyBlocks
         .filter((b) => !['IMAGE', 'VIDEO', 'CHART'].includes(getBlockType(b)))
-        .slice(0, 5);
+        .slice(0, 4);
       return (
         <div className={`w-full h-full flex flex-col ${contentPad} gap-3 relative z-10 overflow-hidden min-h-0`}>
           {titleBlocks.length > 0 && (

@@ -573,6 +573,22 @@ export class ProjectsService {
       ...bulletBlocks,
     ];
 
+    if (_slideIndex === 0) {
+      // Opening hero slide: keep it clean and uncluttered (1 media + 1-2 supporting text blocks, no quotes)
+      const heroBlocks = composed.filter((b) => b.type.toLowerCase() !== 'quote');
+      const maxHeroBlocks = 3;
+      const deduped: GeneratedPresentation['sections'][number]['blocks'] = [];
+      const seen = new Set<string>();
+      for (const block of heroBlocks) {
+        const key = `${block.type}:${block.content.toLowerCase()}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        deduped.push(block);
+        if (deduped.length >= maxHeroBlocks) break;
+      }
+      return deduped;
+    }
+
     const maxBlocks = designStyle === GenerationDesignStyle.MANIFESTO ? 8 : 8;
     const minBlocks = 2;
     const deduped: GeneratedPresentation['sections'][number]['blocks'] = [];
@@ -600,23 +616,24 @@ export class ProjectsService {
 
     let preferred: string;
     if (isOpening) {
-      const opening = section.layout;
-      if (
-        opening === 'title-hero' ||
-        opening === 'title-subtitle' ||
-        opening === 'image-full'
-      ) {
-        preferred = opening;
-      } else {
-        preferred = recipeLayout || 'title-hero';
-      }
+      preferred = signals.hasValidImage ? 'title-hero' : 'title-subtitle';
+    } else if (signals.hasTimeline) {
+      preferred = 'timeline';
+    } else if (signals.hasComparison) {
+      preferred = 'comparison';
+    } else if (
+      section.layout &&
+      section.layout !== 'title-content' &&
+      section.layout !== 'content'
+    ) {
+      preferred = section.layout;
     } else if (recipeLayout) {
       const prev = index > 0 ? sections[index - 1].layout : '';
       const prev2 = index > 1 ? sections[index - 2].layout : '';
       preferred =
         recipeLayout !== prev || recipeLayout !== prev2
           ? recipeLayout
-          : section.layout || recipeLayout || 'title-content';
+          : section.layout || recipeLayout || 'single-column';
     } else {
       const fallbackSequence =
         designStyle === GenerationDesignStyle.MANIFESTO

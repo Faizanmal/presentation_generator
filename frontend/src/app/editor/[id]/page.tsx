@@ -57,29 +57,60 @@ import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useEditorStore } from "@/stores/editor-store";
 import type { Project, Theme, Slide, BlockType, BlockStyle } from "@/types";
+import dynamic from "next/dynamic";
 import SlidePanel from "@/components/editor/SlidePanel";
 import SlideCanvas from "@/components/editor/SlideCanvas";
-import ThemeSelector from "@/components/editor/ThemeSelector";
 import BlockToolbar from "@/components/editor/BlockToolbar";
-import { SlideDesignControls } from "@/components/editor/slide-design-controls";
 
-// New usability components
-import { CommandPalette } from "@/components/ui/command-palette";
-import { KeyboardShortcutsDialog } from "@/components/ui/keyboard-shortcuts";
+// Usability and dialog components dynamically loaded for fast initial paint
+const ThemeSelector = dynamic(() => import("@/components/editor/ThemeSelector"), { ssr: false });
+const SlideDesignControls = dynamic(
+  () => import("@/components/editor/slide-design-controls").then((m) => m.SlideDesignControls),
+  { ssr: false },
+);
+const CommandPalette = dynamic(
+  () => import("@/components/ui/command-palette").then((m) => m.CommandPalette),
+  { ssr: false },
+);
+const KeyboardShortcutsDialog = dynamic(
+  () => import("@/components/ui/keyboard-shortcuts").then((m) => m.KeyboardShortcutsDialog),
+  { ssr: false },
+);
+const SlideTemplatesDialog = dynamic(
+  () => import("@/components/editor/slide-templates").then((m) => m.SlideTemplatesDialog),
+  { ssr: false },
+);
+const DocumentUploadDialog = dynamic(
+  () => import("@/components/editor/document-upload-panel").then((m) => m.DocumentUploadDialog),
+  { ssr: false },
+);
+const MasterSlidePanel = dynamic(
+  () => import("@/components/editor/master-slide-panel").then((m) => m.MasterSlidePanel),
+  { ssr: false },
+);
+const EmbedSharePanel = dynamic(
+  () => import("@/components/editor/embed-share-panel").then((m) => m.EmbedSharePanel),
+  { ssr: false },
+);
+const UndoHistoryPanel = dynamic(
+  () => import("@/components/editor/undo-history").then((m) => m.UndoHistoryPanel),
+  { ssr: false },
+);
+const UpgradePrompt = dynamic(
+  () => import("@/components/ui/pro-badge").then((m) => m.UpgradePrompt),
+  { ssr: false },
+);
+
 import { SlideOutline } from "@/components/editor/slide-outline";
-import { UndoHistoryPanel, UndoRedoButtons, useUndoHistory } from "@/components/editor/undo-history";
+import { UndoRedoButtons, useUndoHistory } from "@/components/editor/undo-history";
 import { QuickActionsToolbar } from "@/components/editor/quick-actions-toolbar";
-import { SlideTemplatesDialog } from "@/components/editor/slide-templates";
 import { useRecentProjects } from "@/components/ui/favorites-recent";
-import { DocumentUploadDialog } from "@/components/editor/document-upload-panel";
-import { MasterSlidePanel } from "@/components/editor/master-slide-panel";
 import type { MasterSlideTemplate } from "@/components/editor/master-slide-panel";
-import { EmbedSharePanel } from "@/components/editor/embed-share-panel";
 import { useEditorAiActions } from "@/hooks/use-editor-ai-actions";
 import { Shield, SlidersHorizontal } from "lucide-react";
 import { canExportFormat } from "@/lib/plans";
 import { FEATURES } from "@/lib/features";
-import { ProBadge, UpgradePrompt } from "@/components/ui/pro-badge";
+import { ProBadge } from "@/components/ui/pro-badge";
 
 type EditorCommandDetail = {
   type: "insert-block" | "ai-action" | "open-export" | "open-share" | "add-slide";
