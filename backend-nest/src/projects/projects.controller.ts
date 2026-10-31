@@ -132,6 +132,19 @@ export class ProjectsController {
   }
 
   /**
+   * Regenerate slide layouts and topic-matched images for an existing deck
+   */
+  @Post(':id/regenerate-layout')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async regenerateLayout(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+  ) {
+    return this.projectsService.regenerateLayout(id, user.id);
+  }
+
+  /**
    * Duplicate a project
    */
   @Post(':id/duplicate')

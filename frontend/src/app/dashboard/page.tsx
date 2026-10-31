@@ -128,7 +128,7 @@ export default function DashboardPage() {
   const { data: projects, isLoading: projectsLoading } = useQuery({
     queryKey: ["projects"],
     queryFn: () => api.projects.getAll(),
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && initialized,
   });
 
   const showPlanLimitError = useCallback(
@@ -393,7 +393,7 @@ export default function DashboardPage() {
   
 
         {/* Stats & Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
           <UsageCard
             plan={planLabel}
             isLoading={usageCardLoading}

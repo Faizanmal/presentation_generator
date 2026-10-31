@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { stripHtmlText } from "@/lib/project-preview";
+import { mediaUrlFromBlockContent } from "@/lib/slide-media";
 import type { Block } from "@/types";
 
 function blockPreviewLine(block: Block, maxLen = 48): string | null {
@@ -86,10 +87,6 @@ const SlidePanel = React.memo(({
   const isTitleSlide = layout === 'title' || layout === 'title-subtitle';
 
   const blocks = slide.blocks?.length ? slide.blocks : [];
-  const imageBlock = blocks.find((b) => {
-    const t = (b.type || b.blockType)?.toUpperCase();
-    return t === 'IMAGE' && typeof b.content?.url === 'string' && b.content.url;
-  });
   const headingBlock = blocks.find((b) => {
     const t = (b.type || b.blockType)?.toUpperCase();
     return t === 'HEADING' || t === 'SUBHEADING';
@@ -99,6 +96,20 @@ const SlidePanel = React.memo(({
     const t = (b.type || b.blockType)?.toUpperCase();
     return t !== 'IMAGE' && t !== 'VIDEO' && b !== headingBlock;
   }).slice(0, 4);
+  const slideContext = [
+    slide.title,
+    headingText,
+    ...textBlocks.map((b) => blockPreviewLine(b, 80)),
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const imageBlock = blocks.find((b) => {
+    const t = (b.type || b.blockType)?.toUpperCase();
+    return t === 'IMAGE' && Boolean(mediaUrlFromBlockContent(b.content, slideContext, index));
+  });
+  const resolvedThumbImageUrl = imageBlock
+    ? mediaUrlFromBlockContent(imageBlock.content, slideContext, index)
+    : undefined;
 
   return (
     <div
@@ -157,10 +168,10 @@ const SlidePanel = React.memo(({
               className="relative overflow-hidden"
               style={{ background: `linear-gradient(135deg, ${primaryColor}, ${accentColor || primaryColor})` }}
             >
-              {imageBlock?.content?.url ? (
+              {resolvedThumbImageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={String(imageBlock.content.url)}
+                  src={resolvedThumbImageUrl}
                   alt=""
                   className="absolute inset-0 h-full w-full object-cover"
                 />

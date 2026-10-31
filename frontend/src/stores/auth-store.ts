@@ -176,22 +176,21 @@ export const useAuthStore = create<AuthState>()(
         }
 
         const token = api.getToken();
-        if (!token) {
-          console.warn('[AuthStore] No token found, not authenticated');
+        const hasRefreshToken =
+          typeof window !== 'undefined' && Boolean(localStorage.getItem('refreshToken'));
+        if (!token && !hasRefreshToken) {
           set({
             user: null,
             subscription: null,
             isAuthenticated: false,
             isLoading: false,
-            initialized: true
+            initialized: true,
           });
           return;
         }
 
-        console.warn('[AuthStore] Fetching profile with token:', `${token.substring(0, 20)  }...`);
         try {
           const user = await api.getProfile();
-          console.warn('[AuthStore] Profile fetched successfully:', user.email);
           set({
             user,
             isAuthenticated: true,
@@ -212,13 +211,14 @@ export const useAuthStore = create<AuthState>()(
               : typeof error === 'string'
                 ? error
                 : 'Profile request failed';
-        // Interceptor may already have cleared tokens on a failed refresh
           const tokenCleared = !api.getToken();
-          const authFailed = status === 401 || status === 403 || tokenCleared;
+          const authFailed =
+            status === 401 ||
+            status === 403 ||
+            tokenCleared ||
+            message === 'No active session';
 
-          console.warn('[AuthStore] Profile fetch failed:', message, status ?? '');
           if (authFailed) {
-            console.warn('[AuthStore] Clearing auth state due to 401/403 or missing token');
             set({
               user: null,
               subscription: null,

@@ -5,6 +5,10 @@ import {
   projectPlaceholderGradient,
   stripHtmlText,
 } from "@/lib/project-preview";
+import {
+  mediaUrlFromBlockContent,
+  upgradeLegacyImageUrl,
+} from "@/lib/slide-media";
 
 interface SlideBlockLike {
   id?: string;
@@ -42,10 +46,11 @@ export function ProjectCardThumbnail({
   className = "h-full w-full",
 }: ProjectCardThumbnailProps) {
   if (thumbnail) {
+    const resolvedThumb = upgradeLegacyImageUrl(thumbnail, title, 0) || thumbnail;
     return (
       <div className={`relative ${className}`}>
         <Image
-          src={thumbnail}
+          src={resolvedThumb}
           alt={title}
           fill
           className="object-cover transition-transform duration-300 group-hover:scale-105"
@@ -61,12 +66,6 @@ export function ProjectCardThumbnail({
 
   // Extract blocks from the first slide if available
   const blocks = firstSlide?.blocks || [];
-  const imageBlock = blocks.find((b) => {
-    const t = (b.type || b.blockType || b.kind || '').toUpperCase();
-    return t === 'IMAGE' && typeof b.content?.url === 'string' && b.content.url.trim().length > 0;
-  });
-  const imageUrl = imageBlock ? String(imageBlock.content?.url) : null;
-
   const headingBlock = blocks.find((b) => {
     const t = (b.type || b.blockType || b.kind || '').toUpperCase();
     return t === 'HEADING' || t === 'TITLE';
@@ -89,6 +88,17 @@ export function ProjectCardThumbnail({
   });
   const bodyText = bodyBlock?.content?.text
     ? stripHtmlText(String(bodyBlock.content.text))
+    : null;
+
+  const topicContext = [title, headingText, kickerText, bodyText]
+    .filter(Boolean)
+    .join(' ');
+  const imageBlock = blocks.find((b) => {
+    const t = (b.type || b.blockType || b.kind || '').toUpperCase();
+    return t === 'IMAGE' && Boolean(mediaUrlFromBlockContent(b.content, topicContext, 0));
+  });
+  const imageUrl = imageBlock
+    ? mediaUrlFromBlockContent(imageBlock.content, topicContext, 0) || null
     : null;
 
   // Real slide preview with image

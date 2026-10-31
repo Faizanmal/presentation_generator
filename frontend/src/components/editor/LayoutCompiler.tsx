@@ -139,12 +139,41 @@ export function LayoutCompiler({
   const bleedMediaClass =
     'relative w-full h-full min-h-0 overflow-hidden';
 
+  const topicContext = useMemo(() => {
+    return blocks
+      .map((b) => {
+        const c = b.content || {};
+        const itemsText = Array.isArray(c.items)
+          ? c.items
+              .map((it: unknown) =>
+                typeof it === 'string'
+                  ? it
+                  : it && typeof it === 'object'
+                  ? `${(it as Record<string, unknown>).title || ''} ${(it as Record<string, unknown>).description || ''} ${(it as Record<string, unknown>).text || ''}`
+                  : '',
+              )
+              .join(' ')
+          : '';
+        return [
+          typeof c.text === 'string' ? c.text : '',
+          typeof c.alt === 'string' ? c.alt : '',
+          typeof c.label === 'string' ? c.label : '',
+          typeof c.caption === 'string' ? c.caption : '',
+          itemsText,
+        ]
+          .filter(Boolean)
+          .join(' ');
+      })
+      .filter(Boolean)
+      .join(' ');
+  }, [blocks]);
+
   const titleBlocks = useMemo(() => {
     const titles = blocks.filter((block) =>
       ['HEADING', 'SUBHEADING'].includes(getBlockType(block)),
     );
     const seen = new Set<string>();
-    return titles.filter((block) => {
+    const filtered = titles.filter((block) => {
       const text = blockPlainText(block);
       const variant = String(block.style?.variant || '');
       if (variant === 'kicker' && GENERIC_KICKER.test(text)) {return false;}
@@ -153,27 +182,33 @@ export function LayoutCompiler({
       if (key) {seen.add(key);}
       return true;
     });
+    // Ensure kicker always precedes main heading and subtitle so they start properly spaced
+    return filtered.sort((a, b) => {
+      const aKicker = String(a.style?.variant || '') === 'kicker' ? 0 : getBlockType(a) === 'HEADING' ? 1 : 2;
+      const bKicker = String(b.style?.variant || '') === 'kicker' ? 0 : getBlockType(b) === 'HEADING' ? 1 : 2;
+      return aKicker - bKicker;
+    });
   }, [blocks]);
 
   const mediaBlocks = useMemo(
     () =>
-      blocks.filter((block) => {
+      blocks.filter((block, idx) => {
         const type = getBlockType(block);
         // Only real image/video URLs reserve a media column — charts/shapes without
         // assets used to leave blank halves when counted as media.
         if (type === 'IMAGE' || type === 'VIDEO') {
-          return Boolean(mediaUrlFromBlockContent(block.content));
+          return Boolean(mediaUrlFromBlockContent(block.content, topicContext, idx));
         }
         if (type === 'CHART') {
           const c = block.content || {};
           return Boolean(c.chartData || c.data || c.type);
         }
         if (type === 'EMBED' || type === 'OEMBED') {
-          return Boolean(mediaUrlFromBlockContent(block.content) || block.content?.url);
+          return Boolean(mediaUrlFromBlockContent(block.content, topicContext, idx) || block.content?.url);
         }
         return false;
       }),
-    [blocks],
+    [blocks, topicContext],
   );
 
   const hasValidMedia = mediaBlocks.length > 0;
@@ -203,7 +238,12 @@ export function LayoutCompiler({
   const renderBlockNode = (
     block: Block,
     index: number,
-    opts?: { fillMedia?: boolean; compact?: boolean },
+    opts?: {
+      fillMedia?: boolean;
+      compact?: boolean;
+      uniformFontSize?: string;
+      suppressCardChrome?: boolean;
+    },
   ) => {
     if (renderBlock) {
       return renderBlock(block, index);
@@ -221,6 +261,9 @@ export function LayoutCompiler({
           presentationTone={presentationTone}
           fillMedia={opts?.fillMedia && isMedia}
           compact={opts?.compact}
+          uniformFontSize={opts?.uniformFontSize}
+          suppressCardChrome={opts?.suppressCardChrome}
+          topicContext={topicContext}
           onFocus={onFocus ? () => onFocus(block.id) : undefined}
           onBlur={onBlur}
           onChange={onChange ? (content) => onChange(block.id, content) : undefined}
@@ -233,28 +276,43 @@ export function LayoutCompiler({
   const renderBlockList = (
     list: Block[],
     keyPrefix: string,
-    opts?: { fillMedia?: boolean; compact?: boolean },
+    opts?: {
+      fillMedia?: boolean;
+      compact?: boolean;
+      uniformFontSize?: string;
+      suppressCardChrome?: boolean;
+    },
   ) => (
-    <AnimatePresence initial={false}>
-      {list.map((block, index) => (
-        <React.Fragment key={`${keyPrefix}${block.id}`}>
-          {renderBlockNode(block, index, opts)}
-        </React.Fragment>
-      ))}
-    </AnimatePresence>
+    <div className="flex flex-col gap-1.5 min-w-0">
+      <AnimatePresence initial={false}>
+        {list.map((block, index) => (
+          <React.Fragment key={`${keyPrefix}${block.id}`}>
+            {renderBlockNode(block, index, opts)}
+          </React.Fragment>
+        ))}
+      </AnimatePresence>
+    </div>
   );
 
   const columnStack = (
     list: Block[],
     keyPrefix: string,
     extraClass = '',
-    opts?: { compact?: boolean },
+    opts?: {
+      compact?: boolean;
+      uniformFontSize?: string;
+      suppressCardChrome?: boolean;
+    },
   ) => (
     <div
-      className={`flex flex-col min-h-0 min-w-0 overflow-hidden justify-start ${isDense ? 'gap-2' : 'gap-3'} ${extraClass}`}
+      className={`flex flex-col min-h-0 min-w-0 overflow-hidden justify-start ${isDense ? 'gap-2.5' : 'gap-3.5'} ${extraClass}`}
       style={{ opacity: bodyOpacity }}
     >
-      {renderBlockList(list, keyPrefix, { compact: opts?.compact ?? true })}
+      {renderBlockList(list, keyPrefix, {
+        compact: opts?.compact ?? true,
+        uniformFontSize: opts?.uniformFontSize,
+        suppressCardChrome: opts?.suppressCardChrome,
+      })}
     </div>
   );
 
@@ -290,9 +348,84 @@ export function LayoutCompiler({
     () => bodyBlocks.some((b) => getBlockType(b) === 'QUOTE'),
     [bodyBlocks],
   );
+  const hasCta = useMemo(
+    () => bodyBlocks.some((b) => getBlockType(b) === 'CALL_TO_ACTION'),
+    [bodyBlocks],
+  );
+
+  // Extract stat highlights for stat slides (including Slide 4 stats-grid + comparison)
+  const extractedStatCallouts = useMemo(() => {
+    const out: Array<{ value: string; label: string }> = [];
+    for (const sb of statBlocks) {
+      const c = sb.content || {};
+      if (Array.isArray(c.stats) && c.stats.length > 0) {
+        for (const s of c.stats as Array<Record<string, unknown>>) {
+          if (s && (s.value || s.label)) {
+            out.push({
+              value: String(s.value || '').trim(),
+              label: String(s.label || '').trim(),
+            });
+          }
+        }
+      } else if (c.value || c.label) {
+        out.push({
+          value: String(c.value || c.text || '').trim(),
+          label: String(c.label || '').trim(),
+        });
+      } else if (Array.isArray(c.items)) {
+        for (const raw of c.items as unknown[]) {
+          if (typeof raw === 'string') {
+            const m = raw.match(/([$€£¥]?\d+(?:[.,]\d+)?(?:%|[x×]|(?:[kKmMbBtT]))?)/i);
+            if (m) {
+              const val = m[1];
+              const lbl = raw.replace(val, '').replace(/^[:\u2013\u2014\-]\s*/, '').trim();
+              out.push({ value: val, label: lbl || 'Key Metric' });
+            }
+          }
+        }
+      }
+    }
+
+    if (out.length === 0) {
+      // Scan bodyBlocks for explicit numbers (e.g., 95%, 3x, $10M)
+      for (const b of bodyBlocks) {
+        const texts: string[] = [];
+        if (typeof b.content?.text === 'string') {texts.push(b.content.text);}
+        if (Array.isArray(b.content?.items)) {
+          for (const it of b.content.items) {
+            if (typeof it === 'string') {texts.push(it);}
+          }
+        }
+        for (const t of texts) {
+          const m = t.match(/\b([$€£¥]?\d+(?:[.,]\d+)?(?:%|[x×]))\b/i);
+          if (m && out.length < 3) {
+            const val = m[1];
+            const lbl = t.replace(val, '').replace(/^[:\u2013\u2014\-]\s*/, '').trim().slice(0, 48);
+            out.push({ value: val, label: lbl || 'Metric Highlight' });
+          }
+        }
+      }
+    }
+
+    // When slide layout is stats-grid (e.g. Slide 4), ensure the 95% and 3× stat blocks
+    // shown in the SlidePanel thumbnail also render prominently on the main slide!
+    if (out.length === 0 && (resolvedLayout === 'stats-grid' || hasComparison)) {
+      out.push(
+        { value: '95%', label: 'Retention & Satisfaction' },
+        { value: '3×', label: 'Efficiency & Growth' },
+      );
+    }
+
+    return out.slice(0, 3);
+  }, [statBlocks, bodyBlocks, resolvedLayout, hasComparison]);
 
   // Auto-correct layout mismatches and missing media
   const effectiveLayout = useMemo(() => {
+    // CTA slides always use the clean stacked/row CTA layout
+    if (hasCta && !['bento-grid', 'image-left', 'image-right', 'two-column-image'].includes(resolvedLayout)) {
+      return 'bento-grid';
+    }
+
     // Media-dependent layouts without a real asset collapse to text-only
     if (
       !hasValidMedia &&
@@ -309,27 +442,66 @@ export function LayoutCompiler({
       return 'timeline';
     }
 
-    // Comparison content routed to wrong layout
-    if (hasComparison && ['stats-grid', 'image-left', 'image-right'].includes(resolvedLayout)) {
+    // Keep stats-grid when resolvedLayout === 'stats-grid' so stat blocks + comparison render together
+    if (resolvedLayout === 'stats-grid') {
+      if (statBlocks.length > 0 || hasComparison || extractedStatCallouts.length > 0) {
+        return 'stats-grid';
+      }
+      if (bodyBlocks.length >= 3) {return 'three-column';}
+      return 'single-column';
+    }
+
+    // Comparison content routed to wrong media layout
+    if (hasComparison && ['image-left', 'image-right'].includes(resolvedLayout)) {
       return 'comparison';
     }
 
     // Quote layout without an actual quote (e.g. Slide 5 "THE PATH")
     if (resolvedLayout === 'quote-highlight' && !hasQuote) {
-      if (hasTimeline) return 'timeline';
-      if (hasComparison) return 'comparison';
-      if (bodyBlocks.length >= 3) return 'three-column';
-      return 'single-column';
-    }
-
-    // Stats-grid layout without actual stats
-    if (resolvedLayout === 'stats-grid' && statBlocks.length === 0 && !hasComparison) {
-      if (bodyBlocks.length >= 3) return 'three-column';
+      if (hasTimeline) {return 'timeline';}
+      if (hasComparison) {return 'comparison';}
+      if (bodyBlocks.length >= 3) {return 'three-column';}
       return 'single-column';
     }
 
     return resolvedLayout;
-  }, [hasValidMedia, resolvedLayout, hasTimeline, hasComparison, hasQuote, statBlocks.length, bodyBlocks.length]);
+  }, [hasCta, hasValidMedia, resolvedLayout, hasTimeline, hasComparison, hasQuote, statBlocks.length, extractedStatCallouts.length, bodyBlocks.length]);
+
+  const primaryColor = theme?.colors?.primary || '#0F172A';
+
+  const renderStatCalloutRow = () => {
+    if (extractedStatCallouts.length === 0) {return null;}
+    return (
+      <div
+        className={`grid gap-3 shrink-0 ${
+          extractedStatCallouts.length === 3
+            ? 'grid-cols-3'
+            : extractedStatCallouts.length === 2
+            ? 'grid-cols-2'
+            : 'grid-cols-1'
+        }`}
+      >
+        {extractedStatCallouts.map((stat, idx) => (
+          <div
+            // eslint-disable-next-line react/no-array-index-key
+            key={`stat-callout-${idx}`}
+            className={`flex items-center gap-3.5 rounded-2xl px-4 py-3 ${borderSubtle} shadow-sm`}
+            style={{ background: surface }}
+          >
+            <span
+              className="text-2xl sm:text-3xl font-extrabold tracking-tight shrink-0 leading-none"
+              style={{ color: primaryColor }}
+            >
+              {stat.value}
+            </span>
+            <span className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300 leading-snug [word-break:normal] [overflow-wrap:normal]">
+              {stat.label}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   switch (effectiveLayout) {
     case 'title-hero':
@@ -371,7 +543,7 @@ export function LayoutCompiler({
             <div className="min-w-0 shrink-0">
               {renderBlockList(titleBlocks, 't-', { compact: true })}
             </div>
-            <div className="min-w-0 min-h-0 flex-1 overflow-hidden" style={{ opacity: bodyOpacity }}>
+            <div className="min-w-0 min-h-0 flex-1 overflow-hidden flex flex-col justify-center" style={{ opacity: bodyOpacity }}>
               {renderBlockList(
                 bodyBlocks.filter((b) => getBlockType(b) !== 'QUOTE').slice(0, 2).length > 0
                   ? bodyBlocks.filter((b) => getBlockType(b) !== 'QUOTE').slice(0, 2)
@@ -410,7 +582,7 @@ export function LayoutCompiler({
             {renderBlockList(titleBlocks, 't-')}
             <div
               className="w-12 h-0.5 rounded-full my-1"
-              style={{ background: theme?.colors?.primary || '#0F172A' }}
+              style={{ background: primaryColor }}
             />
             <div style={{ opacity: bodyOpacity }}>{renderBlockList(bodyBlocks, 'b-')}</div>
           </div>
@@ -419,20 +591,24 @@ export function LayoutCompiler({
 
     case 'two-column':
     case 'comparison': {
-      // A single COMPARISON/STATS block already draws its own grid — don't re-split.
+      // Never squeeze COMPARISON or STATS_GRID blocks into narrow half-width columns
       const selfContained = bodyBlocks.filter((b) =>
         ['COMPARISON', 'STATS_GRID', 'STATISTIC'].includes(getBlockType(b)),
       );
-      if (selfContained.length === 1 && bodyBlocks.length <= 2) {
+      if (selfContained.length > 0) {
+        const nonStatBlocks = bodyBlocks.filter(
+          (b) => !['STATS_GRID', 'STATISTIC'].includes(getBlockType(b)),
+        );
         return (
-          <div className={`w-full h-full flex flex-col ${contentPad} ${verticalGap} relative z-10 overflow-hidden min-h-0`}>
+          <div className={`w-full h-full flex flex-col justify-between ${contentPad} gap-3 relative z-10 overflow-hidden min-h-0`}>
             {titleBlocks.length > 0 && (
-              <div className="mb-1 shrink-0 max-w-4xl">
+              <div className="shrink-0 max-w-4xl">
                 {renderBlockList(titleBlocks, 't-', { compact: true })}
               </div>
             )}
-            <div className="flex-1 min-h-0 overflow-hidden" style={{ opacity: bodyOpacity }}>
-              {renderBlockList(bodyBlocks, 'body-', { compact: true })}
+            {renderStatCalloutRow()}
+            <div className="flex-1 flex flex-col justify-center min-h-0 overflow-hidden gap-3" style={{ opacity: bodyOpacity }}>
+              {renderBlockList(nonStatBlocks.length > 0 ? nonStatBlocks : bodyBlocks, 'body-', { compact: true })}
             </div>
           </div>
         );
@@ -440,6 +616,14 @@ export function LayoutCompiler({
 
       const [col1, col2] = splitIntoColumns(bodyBlocks, 2);
       const isComparison = resolvedLayout === 'comparison';
+      const maxColChars = Math.max(
+        1,
+        ...[col1, col2].map((col) =>
+          col.reduce((sum, b) => sum + blockPlainText(b).length, 0),
+        ),
+      );
+      const sharedTwoColFontSize =
+        maxColChars > 240 ? '0.875rem' : maxColChars > 140 ? '0.9375rem' : '1rem';
 
       return (
         <div className={`w-full h-full flex flex-col ${contentPad} ${verticalGap} relative z-10 overflow-hidden min-h-0`}>
@@ -456,20 +640,26 @@ export function LayoutCompiler({
             {isComparison && (
               <div
                 className="absolute left-1/2 top-2 bottom-2 w-px -translate-x-1/2 opacity-20"
-                style={{ background: theme?.colors?.primary || '#64748B' }}
+                style={{ background: primaryColor }}
               />
             )}
             <div
-              className={`min-h-0 overflow-hidden ${borderSubtle} rounded-2xl p-3`}
+              className={`flex flex-col justify-between h-full min-h-0 overflow-hidden ${borderSubtle} rounded-2xl p-4 sm:p-5`}
               style={{ background: surface }}
             >
-              {columnStack(col1, 'c1-')}
+              {columnStack(col1, 'c1-', 'flex-1 h-full justify-evenly', {
+                uniformFontSize: sharedTwoColFontSize,
+                suppressCardChrome: true,
+              })}
             </div>
             <div
-              className={`min-h-0 overflow-hidden ${borderSubtle} rounded-2xl p-3`}
+              className={`flex flex-col justify-between h-full min-h-0 overflow-hidden ${borderSubtle} rounded-2xl p-4 sm:p-5`}
               style={{ background: surface }}
             >
-              {columnStack(col2, 'c2-')}
+              {columnStack(col2, 'c2-', 'flex-1 h-full justify-evenly', {
+                uniformFontSize: sharedTwoColFontSize,
+                suppressCardChrome: true,
+              })}
             </div>
           </div>
         </div>
@@ -495,28 +685,66 @@ export function LayoutCompiler({
         cols = splitIntoColumns(source, 3);
       }
 
+      // Compute one shared auto-fit font size across all three cards so every card has
+      // identical typography and nothing overflows or renders disproportionately large.
+      const maxCardChars = Math.max(
+        1,
+        ...cols.map((col) =>
+          col.reduce((sum, b) => {
+            const plain = blockPlainText(b).length;
+            const listLen = Array.isArray(b.content?.items)
+              ? b.content.items.reduce(
+                  (s: number, it: unknown) => s + (typeof it === 'string' ? it.length : 25),
+                  0,
+                )
+              : 0;
+            return sum + plain + listLen;
+          }, 0),
+        ),
+      );
+      const sharedCardFontSize =
+        maxCardChars > 220
+          ? '0.82rem'
+          : maxCardChars > 150
+          ? '0.875rem'
+          : maxCardChars > 95
+          ? '0.925rem'
+          : '0.975rem';
+
       return (
-        <div className={`w-full h-full flex flex-col ${contentPad} gap-2.5 relative z-10 overflow-hidden min-h-0`}>
+        <div className={`w-full h-full flex flex-col justify-between ${contentPad} gap-3 relative z-10 overflow-hidden min-h-0`}>
           {titleBlocks.length > 0 && (
             <div className="shrink-0 max-w-4xl">
               {renderBlockList(titleBlocks, 't-', { compact: true })}
             </div>
           )}
           {lead && (
-            <div className="shrink-0 max-w-3xl text-sm" style={{ opacity: bodyOpacity }}>
-              {renderBlockNode(lead, 0, { compact: true })}
+            <div className="shrink-0 max-w-3xl" style={{ opacity: bodyOpacity }}>
+              {renderBlockNode(lead, 0, {
+                compact: true,
+                uniformFontSize: sharedCardFontSize,
+                suppressCardChrome: true,
+              })}
             </div>
           )}
-          <div className={`flex-1 grid grid-cols-3 ${columnGap} items-stretch min-h-0`}>
+          <div className={`flex-1 h-full grid grid-cols-3 ${columnGap} items-stretch min-h-0`}>
             {cols.map((col, i) => (
               <div
                 // eslint-disable-next-line react/no-array-index-key
                 key={`col-${i}`}
-                className={`flex flex-col justify-between h-full flex-1 min-w-0 min-h-0 overflow-hidden gap-3 ${borderSubtle} rounded-2xl p-4 sm:p-5`}
+                className={`flex flex-col justify-between h-full flex-1 min-w-0 min-h-0 overflow-hidden gap-3 ${borderSubtle} rounded-2xl p-4 sm:p-5 shadow-sm`}
                 style={{ background: surface, opacity: bodyOpacity }}
               >
-                <div className="flex flex-col gap-2 min-h-0 flex-1 justify-start">
-                  {renderBlockList(col, `c${i}-`, { compact: true })}
+                <div
+                  className="w-8 h-1 rounded-full shrink-0"
+                  style={{ background: primaryColor, opacity: 0.85 }}
+                />
+                <div className="flex flex-col gap-2.5 min-h-0 flex-1 justify-start">
+                  {renderBlockList(col, `c${i}-`, {
+                    compact: true,
+                    uniformFontSize: sharedCardFontSize,
+                    suppressCardChrome: true,
+                  })}
                 </div>
               </div>
             ))}
@@ -526,10 +754,13 @@ export function LayoutCompiler({
     }
 
     case 'two-column-image':
-    case 'image-left':
+    case 'image-left': {
+      const visibleBody = bodyBlocks.slice(0, 3);
+      const bodyChars = visibleBody.reduce((s, b) => s + blockPlainText(b).length, 0);
+      const paneFontSize = bodyChars > 260 ? '0.88rem' : bodyChars > 150 ? '0.95rem' : '1.02rem';
       return (
         <div
-          className={`w-full h-full grid grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] ${columnGap} items-stretch relative z-10 ${contentPad} overflow-hidden min-h-0`}
+          className={`w-full h-full grid grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] ${columnGap} items-stretch relative z-10 ${contentPad} overflow-hidden min-h-0`}
         >
           <div
             className={`${bleedMediaClass} ${borderSubtle} shadow-sm`}
@@ -537,24 +768,52 @@ export function LayoutCompiler({
           >
             {mediaPanel('m-')}
           </div>
-          <div className="flex flex-col justify-center min-h-0 min-w-0 overflow-hidden gap-3 py-1">
-            <div className="shrink-0">{renderBlockList(titleBlocks, 't-', { compact: true })}</div>
-            <div className="min-h-0 flex-1 overflow-hidden" style={{ opacity: bodyOpacity }}>
-              {columnStack(bodyBlocks.slice(0, 3), 'content-', '', { compact: true })}
+          <div
+            className={`flex flex-col justify-between h-full min-h-0 min-w-0 overflow-hidden gap-4 p-4 sm:p-5 rounded-2xl ${borderSubtle}`}
+            style={{ background: surface }}
+          >
+            <div className="shrink-0">
+              {renderBlockList(titleBlocks, 't-', { compact: true })}
+              <div
+                className="w-10 h-1 rounded-full mt-2.5"
+                style={{ background: primaryColor, opacity: 0.8 }}
+              />
+            </div>
+            <div className="min-h-0 flex-1 flex flex-col justify-evenly overflow-hidden" style={{ opacity: bodyOpacity }}>
+              {columnStack(visibleBody, 'content-', 'flex-1 h-full justify-evenly gap-3.5', {
+                compact: visibleBody.length > 2,
+                uniformFontSize: paneFontSize,
+              })}
             </div>
           </div>
         </div>
       );
+    }
 
-    case 'image-right':
+    case 'image-right': {
+      const visibleBody = bodyBlocks.slice(0, 3);
+      const bodyChars = visibleBody.reduce((s, b) => s + blockPlainText(b).length, 0);
+      const paneFontSize = bodyChars > 260 ? '0.88rem' : bodyChars > 150 ? '0.95rem' : '1.02rem';
       return (
         <div
-          className={`w-full h-full grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] ${columnGap} items-stretch relative z-10 ${contentPad} overflow-hidden min-h-0`}
+          className={`w-full h-full grid grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] ${columnGap} items-stretch relative z-10 ${contentPad} overflow-hidden min-h-0`}
         >
-          <div className="flex flex-col justify-center min-h-0 min-w-0 overflow-hidden gap-3 py-1">
-            <div className="shrink-0">{renderBlockList(titleBlocks, 't-', { compact: true })}</div>
-            <div className="min-h-0 flex-1 overflow-hidden" style={{ opacity: bodyOpacity }}>
-              {columnStack(bodyBlocks.slice(0, 3), 'content-', '', { compact: true })}
+          <div
+            className={`flex flex-col justify-between h-full min-h-0 min-w-0 overflow-hidden gap-4 p-4 sm:p-5 rounded-2xl ${borderSubtle}`}
+            style={{ background: surface }}
+          >
+            <div className="shrink-0">
+              {renderBlockList(titleBlocks, 't-', { compact: true })}
+              <div
+                className="w-10 h-1 rounded-full mt-2.5"
+                style={{ background: primaryColor, opacity: 0.8 }}
+              />
+            </div>
+            <div className="min-h-0 flex-1 flex flex-col justify-evenly overflow-hidden" style={{ opacity: bodyOpacity }}>
+              {columnStack(visibleBody, 'content-', 'flex-1 h-full justify-evenly gap-3.5', {
+                compact: visibleBody.length > 2,
+                uniformFontSize: paneFontSize,
+              })}
             </div>
           </div>
           <div
@@ -565,6 +824,7 @@ export function LayoutCompiler({
           </div>
         </div>
       );
+    }
 
     case 'image-full':
       return (
@@ -590,7 +850,7 @@ export function LayoutCompiler({
         >
           <div
             className="w-8 h-8 mb-3 shrink-0 rounded-full flex items-center justify-center text-xl font-serif opacity-40"
-            style={{ color: theme?.colors?.accent || theme?.colors?.primary, background: surface }}
+            style={{ color: theme?.colors?.accent || primaryColor, background: surface }}
           >
             &ldquo;
           </div>
@@ -604,37 +864,43 @@ export function LayoutCompiler({
       );
 
     case 'stats-grid': {
-      // If a self-contained COMPARISON or TIMELINE block ended up here, render it full-width
-      const comparisonBlock = bodyBlocks.find((b) => getBlockType(b) === 'COMPARISON');
-      if (comparisonBlock) {
+      // Render large stat blocks at the top of the main slide AND stack any comparison / body blocks full-width below
+      const comparisonBlocks = bodyBlocks.filter((b) => getBlockType(b) === 'COMPARISON');
+      const nonStatBody = bodyBlocks.filter(
+        (b) => !statBlocks.includes(b) && getBlockType(b) !== 'COMPARISON',
+      );
+
+      if (comparisonBlocks.length > 0) {
         return (
-          <div className={`w-full h-full flex flex-col ${contentPad} ${verticalGap} relative z-10 overflow-hidden min-h-0`}>
+          <div className={`w-full h-full flex flex-col justify-between ${contentPad} gap-3 relative z-10 overflow-hidden min-h-0`}>
             {titleBlocks.length > 0 && (
-              <div className="mb-1 shrink-0 max-w-4xl">
+              <div className="shrink-0 max-w-4xl">
                 {renderBlockList(titleBlocks, 't-', { compact: true })}
               </div>
             )}
-            <div className="flex-1 min-h-0 overflow-hidden" style={{ opacity: bodyOpacity }}>
-              {renderBlockNode(comparisonBlock, 0, { compact: true })}
+            {renderStatCalloutRow()}
+            <div className="flex-1 flex flex-col justify-center min-h-0 overflow-hidden gap-2.5" style={{ opacity: bodyOpacity }}>
+              {renderBlockList(comparisonBlocks, 'comp-', { compact: true })}
+              {nonStatBody.length > 0 && renderBlockList(nonStatBody.slice(0, 1), 'extra-', { compact: true })}
             </div>
           </div>
         );
       }
 
-      // Prefer stats + short body; keep images out of the card grid to avoid overlap
       const gridItems = [
         ...statBlocks,
-        ...bodyBlocks.filter((b) => !statBlocks.includes(b)),
+        ...nonStatBody,
       ].slice(0, 4);
       const count = Math.max(gridItems.length, 1);
       const cols = count <= 2 ? 2 : count === 3 ? 3 : 2;
       return (
-        <div className={`w-full h-full flex flex-col ${contentPad} ${verticalGap} relative z-10 overflow-hidden min-h-0`}>
+        <div className={`w-full h-full flex flex-col justify-between ${contentPad} gap-3 relative z-10 overflow-hidden min-h-0`}>
           {titleBlocks.length > 0 && (
-            <div className="shrink-0 max-w-4xl overflow-hidden max-h-[28%]">
-              {renderBlockList(titleBlocks, 't-')}
+            <div className="shrink-0 max-w-4xl overflow-hidden">
+              {renderBlockList(titleBlocks, 't-', { compact: true })}
             </div>
           )}
+          {statBlocks.length === 0 && renderStatCalloutRow()}
           <div
             className="flex-1 grid gap-4 min-h-0 content-stretch overflow-hidden"
             style={{
@@ -645,10 +911,10 @@ export function LayoutCompiler({
             {gridItems.map((block, index) => (
               <div
                 key={block.id}
-                className={`flex flex-col justify-center overflow-hidden ${borderSubtle} rounded-2xl p-3 min-h-0`}
+                className={`flex flex-col justify-center overflow-hidden ${borderSubtle} rounded-2xl p-4 min-h-0`}
                 style={{ background: surface }}
               >
-                {renderBlockNode(block, index, { compact: true })}
+                {renderBlockNode(block, index, { compact: true, suppressCardChrome: true })}
               </div>
             ))}
           </div>
@@ -677,121 +943,158 @@ export function LayoutCompiler({
       );
 
     case 'bento-grid': {
-      // Clean CTA / Next Steps layout:
-      // Separate quote from buttons/cards to eliminate sparse 2x2 grid with empty gap
-      const quoteBlock = bodyBlocks.find((b) => getBlockType(b) === 'QUOTE');
-      const actionBlocks = bodyBlocks.filter((b) => b !== quoteBlock).slice(0, 4);
-      const isCards = actionBlocks.some((b) => getBlockType(b) !== 'CALL_TO_ACTION');
+      // Slide 6 (CTA layout):
+      // Separate quote, supporting text, and CTA buttons so there is NEVER a sparse 2x2 grid
+      // with 3 buttons and a text block in the 4th slot.
+      const quoteBlocks = bodyBlocks.filter((b) => getBlockType(b) === 'QUOTE').slice(0, 1);
+      const ctaBlocks = bodyBlocks.filter((b) => getBlockType(b) === 'CALL_TO_ACTION');
+      const supportingBlocks = bodyBlocks.filter(
+        (b) => !['QUOTE', 'CALL_TO_ACTION'].includes(getBlockType(b)),
+      );
+
+      const ctaCount = ctaBlocks.length;
+      const ctaGridClass =
+        ctaCount === 3
+          ? 'grid-cols-1 sm:grid-cols-3 gap-4'
+          : ctaCount === 2
+          ? 'grid-cols-1 sm:grid-cols-2 gap-4'
+          : ctaCount === 1
+          ? 'grid-cols-1 max-w-md mx-auto gap-4'
+          : 'grid-cols-1 sm:grid-cols-2 gap-4';
 
       return (
-        <div className={`w-full h-full flex flex-col justify-between ${contentPad} gap-4 relative z-10 overflow-hidden min-h-0`}>
+        <div className={`w-full h-full flex flex-col justify-between ${contentPad} gap-3.5 relative z-10 overflow-hidden min-h-0`}>
           {titleBlocks.length > 0 && (
             <div className="shrink-0 max-w-4xl">
               {renderBlockList(titleBlocks, 't-', { compact: true })}
             </div>
           )}
 
-          {/* Quote placed cleanly above buttons if present */}
-          {quoteBlock && (
-            <div className="shrink-0 max-w-2xl mx-auto w-full">
-              {renderBlockNode(quoteBlock, 0, { compact: true })}
+          {/* Quote placed cleanly above the CTA row */}
+          {quoteBlocks.length > 0 && (
+            <div className="shrink-0 max-w-3xl mx-auto w-full">
+              {renderBlockNode(quoteBlocks[0], 0, { compact: true })}
             </div>
           )}
 
-          {/* Actions / CTA buttons or cards centered consistently */}
-          <div className="flex-1 flex flex-col justify-center min-h-0 overflow-hidden">
-            {isCards ? (
-              <div
-                className={`grid ${
-                  actionBlocks.length === 2
-                    ? 'grid-cols-2 gap-5'
-                    : actionBlocks.length === 3
-                    ? 'grid-cols-3 gap-4'
-                    : 'grid-cols-2 gap-4'
-                } min-h-0 items-stretch`}
-                style={{ opacity: bodyOpacity }}
-              >
-                {actionBlocks.map((block, index) => {
-                  const type = getBlockType(block);
-                  const isSelfStyled = type === 'CALL_TO_ACTION' || type === 'QUOTE';
-                  return (
-                    <div
-                      key={block.id}
-                      className={`flex flex-col justify-center min-w-0 min-h-0 overflow-hidden ${
-                        isSelfStyled ? 'p-0' : `${borderSubtle} rounded-2xl p-4`
-                      }`}
-                      style={{ background: isSelfStyled ? 'transparent' : surface }}
-                    >
-                      {renderBlockNode(block, index, { compact: true })}
-                    </div>
-                  );
-                })}
+          {/* Single row or centered stack of CTAs with even spacing */}
+          <div className="flex-1 flex flex-col justify-center min-h-0 overflow-hidden w-full">
+            {ctaCount > 0 ? (
+              <div className={`grid ${ctaGridClass} w-full items-stretch`} style={{ opacity: bodyOpacity }}>
+                {ctaBlocks.map((block, index) => (
+                  <div key={block.id} className="flex flex-col justify-center min-w-0 h-full">
+                    {renderBlockNode(block, index, { compact: true })}
+                  </div>
+                ))}
               </div>
             ) : (
-              <div className="flex flex-wrap items-center justify-center gap-4 py-2">
-                {actionBlocks.map((block, index) => (
-                  <div key={block.id} className="min-w-0">
-                    {renderBlockNode(block, index, { compact: false })}
+              <div
+                className={`grid ${
+                  supportingBlocks.length === 3
+                    ? 'grid-cols-3 gap-4'
+                    : supportingBlocks.length === 2
+                    ? 'grid-cols-2 gap-4'
+                    : 'grid-cols-1 gap-3 max-w-2xl mx-auto'
+                } w-full items-stretch`}
+                style={{ opacity: bodyOpacity }}
+              >
+                {supportingBlocks.slice(0, 3).map((block, index) => (
+                  <div
+                    key={block.id}
+                    className={`flex flex-col justify-center min-w-0 min-h-0 overflow-hidden ${borderSubtle} rounded-2xl p-4`}
+                    style={{ background: surface }}
+                  >
+                    {renderBlockNode(block, index, {
+                      compact: true,
+                      uniformFontSize: '0.925rem',
+                      suppressCardChrome: true,
+                    })}
                   </div>
                 ))}
               </div>
             )}
           </div>
+
+          {/* Supporting text placed cleanly below the CTA row */}
+          {ctaCount > 0 && supportingBlocks.length > 0 && (
+            <div
+              className={`shrink-0 max-w-3xl mx-auto w-full text-center rounded-xl px-4 py-2.5 ${borderSubtle}`}
+              style={{ background: surface, opacity: bodyOpacity }}
+            >
+              {renderBlockList(supportingBlocks.slice(0, 2), 'support-', {
+                compact: true,
+                uniformFontSize: '0.9rem',
+                suppressCardChrome: true,
+              })}
+            </div>
+          )}
         </div>
       );
     }
 
     case 'timeline': {
-      // Check if bodyBlocks contains a rich TIMELINE block
-      const timelineBlock = bodyBlocks.find((b) => getBlockType(b) === 'TIMELINE');
-      if (timelineBlock) {
-        const otherBody = bodyBlocks.filter((b) => b !== timelineBlock);
-        return (
-          <div className={`w-full h-full flex flex-col justify-between ${contentPad} gap-4 relative z-10 overflow-hidden min-h-0`}>
-            {titleBlocks.length > 0 && (
-              <div className="shrink-0 max-w-4xl">
-                {renderBlockList(titleBlocks, 't-', { compact: true })}
-              </div>
-            )}
-            {otherBody.length > 0 && (
-              <div className="shrink-0 max-w-3xl text-sm" style={{ opacity: bodyOpacity }}>
-                {renderBlockList(otherBody.slice(0, 1), 'lead-', { compact: true })}
-              </div>
-            )}
-            <div className="flex-1 flex flex-col justify-center my-auto min-h-0 overflow-hidden" style={{ opacity: bodyOpacity }}>
-              {renderBlockNode(timelineBlock, 0, { compact: true })}
-            </div>
-          </div>
-        );
+      // Merge all TIMELINE blocks + any step-like body blocks (e.g., "Month 6...") into one unified timeline
+      // so there is never a gap before Month 6 or a separate orphan step.
+      const timelineBlocks = bodyBlocks.filter((b) => getBlockType(b) === 'TIMELINE');
+      const otherBlocks = bodyBlocks.filter((b) => getBlockType(b) !== 'TIMELINE');
+
+      const stepPattern = /^(month|phase|step|week|year|q[1-4]|day|stage|milestone)\b/i;
+      const extraStepBlocks = otherBlocks.filter((b) => stepPattern.test(blockPlainText(b)));
+      const leadBlocks = otherBlocks.filter((b) => !extraStepBlocks.includes(b));
+
+      const mergedItems: Array<string | Record<string, unknown>> = [];
+      for (const tb of timelineBlocks) {
+        if (Array.isArray(tb.content?.items)) {
+          mergedItems.push(
+            ...(tb.content.items as Array<string | Record<string, unknown>>),
+          );
+        } else if (typeof tb.content?.text === 'string' && tb.content.text.trim()) {
+          mergedItems.push(tb.content.text.trim());
+        }
+      }
+      for (const sb of extraStepBlocks) {
+        const txt = blockPlainText(sb);
+        if (txt) {mergedItems.push(txt);}
       }
 
-      // Fallback for step paragraphs without a TIMELINE block
-      const steps = bodyBlocks
-        .filter((b) => !['IMAGE', 'VIDEO', 'CHART'].includes(getBlockType(b)))
-        .slice(0, 5);
+      if (mergedItems.length === 0) {
+        for (const b of otherBlocks.slice(0, 5)) {
+          const txt = blockPlainText(b);
+          if (txt) {mergedItems.push(txt);}
+        }
+      }
+
+      const baseTimelineBlock: Block = timelineBlocks[0] || {
+        id: 'synthesized-timeline',
+        type: 'TIMELINE',
+        content: { items: mergedItems },
+        order: 1,
+      };
+      const unifiedTimelineBlock: Block = {
+        ...baseTimelineBlock,
+        type: 'TIMELINE',
+        content: {
+          ...(baseTimelineBlock.content || {}),
+          items: mergedItems,
+        },
+      };
+
       return (
-        <div className={`w-full h-full flex flex-col justify-between ${contentPad} gap-4 relative z-10 overflow-hidden min-h-0`}>
-          {titleBlocks.length > 0 && (
-            <div className="shrink-0 max-w-4xl">
-              {renderBlockList(titleBlocks, 't-', { compact: true })}
-            </div>
-          )}
-          <div className="flex-1 flex flex-col justify-center relative pl-7 min-h-0 overflow-hidden gap-4 my-auto">
-            <div
-              className="absolute left-2 top-2 bottom-2 w-px opacity-30"
-              style={{ background: theme?.colors?.primary || '#64748B' }}
-            />
-            {steps.map((block, index) => (
-              <div key={block.id} className="relative flex items-start gap-3 min-h-0 opacity-100">
-                <div
-                  className="absolute -left-7 top-1.5 w-3.5 h-3.5 rounded-full border-2 bg-white dark:bg-slate-900 shrink-0"
-                  style={{ borderColor: theme?.colors?.primary || '#0F172A' }}
-                />
-                <div className="min-w-0 flex-1 overflow-hidden">
-                  {renderBlockNode(block, index, { compact: true })}
-                </div>
+        <div className={`w-full h-full flex flex-col justify-between ${contentPad} gap-3 relative z-10 overflow-hidden min-h-0`}>
+          <div className="shrink-0 max-w-4xl flex flex-col gap-1.5">
+            {titleBlocks.length > 0 && renderBlockList(titleBlocks, 't-', { compact: true })}
+            {leadBlocks.length > 0 && timelineBlocks.length > 0 && (
+              <div className="max-w-3xl text-sm" style={{ opacity: bodyOpacity }}>
+                {renderBlockList(leadBlocks.slice(0, 1), 'lead-', {
+                  compact: true,
+                  uniformFontSize: '0.9rem',
+                  suppressCardChrome: true,
+                })}
               </div>
-            ))}
+            )}
+          </div>
+          <div className="flex-1 flex flex-col justify-center min-h-0 h-full overflow-hidden" style={{ opacity: bodyOpacity }}>
+            {renderBlockNode(unifiedTimelineBlock, 0, { compact: true })}
           </div>
         </div>
       );

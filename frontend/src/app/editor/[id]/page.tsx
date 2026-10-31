@@ -35,8 +35,10 @@ import {
   X,
   FileUp,
   ExternalLink,
+  RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
+import { resolveTopicImageUrl, upgradeLegacyImageUrl } from "@/lib/slide-media";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -197,13 +199,142 @@ export default function EditorPage() {
     enabled: isAuthenticated,
   });
 
+  const [isRegeneratingLayout, setIsRegeneratingLayout] = useState(false);
+
+  const migrateDeckSlidesClientSide = useCallback(
+    (proj: Project, forceRegenerate = false): Project => {
+      if (!proj?.slides || !Array.isArray(proj.slides)) {
+        return proj;
+      }
+
+      const deckContext = [proj.title || "", proj.description || ""]
+        .filter(Boolean)
+        .join(" ");
+
+      const updatedSlides = proj.slides.map((slide, sIdx) => {
+        const blocks = Array.isArray(slide.blocks) ? slide.blocks : [];
+        const slideTextContext = [
+          deckContext,
+          ...blocks.map((b) => {
+            const c = b.content || {};
+            const items = Array.isArray(c.items)
+              ? c.items.map((it) => (typeof it === "string" ? it : "")).join(" ")
+              : "";
+            return [
+              typeof c.text === "string" ? c.text : "",
+              typeof c.alt === "string" ? c.alt : "",
+              typeof c.label === "string" ? c.label : "",
+              items,
+            ]
+              .filter(Boolean)
+              .join(" ");
+          }),
+        ]
+          .filter(Boolean)
+          .join(" ");
+
+        let hasTimeline = false;
+        let hasComparison = false;
+        let hasCta = false;
+        let hasStats = false;
+
+        const updatedBlocks = blocks.map((b) => {
+          const bType = String(b.type || b.blockType || "").toUpperCase();
+          if (bType === "TIMELINE") {hasTimeline = true;}
+          if (bType === "COMPARISON") {hasComparison = true;}
+          if (bType === "CALL_TO_ACTION") {hasCta = true;}
+          if (bType === "STATS_GRID" || bType === "STATISTIC") {hasStats = true;}
+
+          const nextContent = { ...(b.content || {}) };
+          const nextStyle = { ...(b.style || {}) };
+
+          if (bType === "IMAGE") {
+            const rawUrl = String(nextContent.url || nextContent.src || nextContent.imageUrl || "");
+            const upgraded = forceRegenerate
+              ? resolveTopicImageUrl(slideTextContext, slide.order ?? sIdx)
+              : upgradeLegacyImageUrl(rawUrl, slideTextContext, slide.order ?? sIdx);
+            if (upgraded && upgraded !== rawUrl) {
+              nextContent.url = upgraded;
+              if (nextContent.src) {nextContent.src = upgraded;}
+              if (nextContent.imageUrl) {nextContent.imageUrl = upgraded;}
+            }
+          }
+
+          const rawStyle = nextStyle as Record<string, unknown>;
+          if (
+            bType === "PARAGRAPH" &&
+            (rawStyle.fontSize === 21 ||
+              rawStyle.fontSize === 22 ||
+              rawStyle.fontSize === "21" ||
+              rawStyle.fontSize === "22" ||
+              rawStyle.fontSize === "21px" ||
+              rawStyle.fontSize === "22px" ||
+              rawStyle.maxWidth === "88%")
+          ) {
+            delete rawStyle.fontSize;
+            delete rawStyle.maxWidth;
+          }
+
+          return {
+            ...b,
+            content: nextContent,
+            style: nextStyle,
+          };
+        });
+
+        let nextLayout = slide.layout || "single-column";
+        if (hasTimeline && nextLayout !== "timeline") {
+          nextLayout = "timeline";
+        } else if (hasCta && nextLayout !== "bento-grid") {
+          nextLayout = "bento-grid";
+        } else if (hasStats && nextLayout !== "stats-grid") {
+          nextLayout = "stats-grid";
+        } else if (hasComparison && !["stats-grid", "comparison"].includes(nextLayout)) {
+          nextLayout = "comparison";
+        }
+
+        return {
+          ...slide,
+          layout: nextLayout,
+          blocks: updatedBlocks,
+        };
+      });
+
+      return {
+        ...proj,
+        slides: updatedSlides,
+      };
+    },
+    [],
+  );
+
   // Load project into store and add to recent
   useEffect(() => {
     if (projectData) {
-      loadProject(projectData);
+      const migrated = migrateDeckSlidesClientSide(projectData, false);
+      loadProject(migrated);
       addToRecent(projectData.id);
     }
-  }, [projectData, loadProject, addToRecent]);
+  }, [projectData, loadProject, addToRecent, migrateDeckSlidesClientSide]);
+
+  const handleRegenerateLayout = useCallback(async () => {
+    if (!project) {return;}
+    setIsRegeneratingLayout(true);
+    try {
+      let updated: Project;
+      try {
+        const fromApi = await api.regenerateProjectLayout(projectId);
+        updated = migrateDeckSlidesClientSide(fromApi, true);
+      } catch {
+        updated = migrateDeckSlidesClientSide(project, true);
+      }
+      loadProject(updated);
+      queryClient.setQueryData(["project", projectId], updated);
+      toast.success("Layouts and topic visuals updated while keeping your edits");
+    } finally {
+      setIsRegeneratingLayout(false);
+    }
+  }, [project, projectId, migrateDeckSlidesClientSide, loadProject, queryClient]);
 
   // Sync title input with project title
   const [prevProjectTitle, setPrevProjectTitle] = useState(projectData?.title);
@@ -605,6 +736,18 @@ export default function EditorPage() {
               if (slide) { handleDuplicateSlide(slide); }
             }}
           />
+
+          {/* Regenerate layout for existing decks */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRegenerateLayout}
+            disabled={isRegeneratingLayout}
+            title="Re-render slide layouts and topic visuals while keeping your text and edits"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isRegeneratingLayout ? "animate-spin" : ""}`} />
+            Regenerate layout
+          </Button>
 
           {/* Templates */}
           <Button

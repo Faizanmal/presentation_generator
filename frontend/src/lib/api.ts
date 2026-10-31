@@ -127,6 +127,85 @@ class ApiClient {
     return status === 401 || status === 403;
   }
 
+  private isJwtExpired(token: string | null): boolean {
+    if (!token) {return true;}
+    if (token.startsWith('demo-token-') || token.startsWith('demo-refresh-')) {
+      return false;
+    }
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) {return false;}
+      const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+      const decoded =
+        typeof window !== 'undefined' && typeof window.atob === 'function'
+          ? window.atob(padded)
+          : Buffer.from(padded, 'base64').toString('utf-8');
+      const payload = JSON.parse(decoded) as { exp?: number };
+      if (typeof payload.exp === 'number') {
+        return payload.exp * 1000 <= Date.now() + 15_000;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  private async ensureValidAccessToken(): Promise<string | null> {
+    if (typeof window !== 'undefined') {
+      if (!this.token) {
+        this.token = localStorage.getItem('token');
+      }
+      if (!this.storedRefreshToken) {
+        this.storedRefreshToken = localStorage.getItem('refreshToken');
+      }
+    }
+
+    if (this.token && !this.isJwtExpired(this.token)) {
+      return this.token;
+    }
+
+    if (this.storedRefreshToken && !this.isJwtExpired(this.storedRefreshToken)) {
+      if (!this.refreshPromise) {
+        this.refreshPromise = (async () => {
+          const { data } = await axios.post<{
+            accessToken: string;
+            refreshToken: string;
+            expiresIn: number;
+          }>(
+            `${API_URL}/auth/refresh`,
+            { refreshToken: this.storedRefreshToken },
+            { withCredentials: true, timeout: 25_000 },
+          );
+          this.setToken(data.accessToken);
+          if (data.refreshToken) {
+            this.setRefreshToken(data.refreshToken);
+          }
+          this.csrfToken = null;
+          this.csrfPromise = null;
+          this.notifyRefreshed(data.accessToken);
+          return data.accessToken;
+        })().finally(() => {
+          this.refreshPromise = null;
+        });
+      }
+
+      try {
+        return await this.refreshPromise;
+      } catch (err) {
+        if (this.isUnauthorizedRefresh(err)) {
+          this.clearToken();
+        }
+        return null;
+      }
+    }
+
+    if (this.token && this.isJwtExpired(this.token)) {
+      this.clearToken();
+    }
+    return null;
+  }
+
   private skipAuthHeader(url?: string) {
     if (!url) {return false;}
     return (
@@ -186,14 +265,11 @@ class ApiClient {
 
     // Request interceptor to add auth token
     this.client.interceptors.request.use(async (config) => {
-      // Add Auth token
-      // Note: Refresh token from localStorage in case it was set after ApiClient init
-      if (!this.token && typeof window !== 'undefined') {
-        this.token = localStorage.getItem('token');
-      }
-      
-      if (this.token && !this.skipAuthHeader(config.url)) {
-        config.headers.Authorization = `Bearer ${this.token}`;
+      if (!this.skipAuthHeader(config.url)) {
+        const activeToken = await this.ensureValidAccessToken();
+        if (activeToken) {
+          config.headers.Authorization = `Bearer ${activeToken}`;
+        }
       }
 
       // Add CSRF token for mutation requests (login/refresh are token-authenticated)
@@ -517,6 +593,11 @@ class ApiClient {
       };
     }
 
+    const activeToken = await this.ensureValidAccessToken();
+    if (!activeToken) {
+      throw new Error('No active session');
+    }
+
     const { data } = await this.client.get<User>('/auth/me');
     return data;
   }
@@ -798,6 +879,11 @@ class ApiClient {
 
   async duplicateProject(id: string): Promise<Project> {
     const { data } = await this.client.post<Project>(`/projects/${id}/duplicate`);
+    return data;
+  }
+
+  async regenerateProjectLayout(id: string): Promise<Project> {
+    const { data } = await this.client.post<Project>(`/projects/${id}/regenerate-layout`);
     return data;
   }
 

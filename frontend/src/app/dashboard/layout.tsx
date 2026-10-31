@@ -20,10 +20,10 @@ export default function DashboardLayout({
     return (
         <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-900">
 
-            {/* Desktop Sidebar */}
+            {/* Desktop Sidebar (collapsed into drawer below lg 1024px so 640px viewports have full width) */}
             <aside
                 className={cn(
-                    "hidden md:flex flex-col border-r h-full transition-all duration-300 ease-in-out",
+                    "hidden lg:flex flex-col border-r h-full transition-all duration-300 ease-in-out shrink-0",
                     isCollapsed ? "w-17.5" : "w-64"
                 )}
             >
@@ -34,7 +34,7 @@ export default function DashboardLayout({
                 />
             </aside>
 
-            {/* Mobile Sidebar */}
+            {/* Mobile / Tablet Sidebar Drawer */}
             <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
                 <SheetContent side="left" className="p-0 w-72">
                     <Sidebar
@@ -45,23 +45,28 @@ export default function DashboardLayout({
             </Sheet>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col h-full overflow-hidden">
+            <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
 
-                {/* Mobile Header */}
-                <header className="md:hidden flex items-center justify-between p-4 border-b bg-white/50 dark:bg-slate-950/50 backdrop-blur-sm">
-                    <div className="flex items-center gap-2 font-bold text-lg">
-                        <span className="text-xl">{PRODUCT_NAME}</span>
+                {/* Mobile / Tablet Header */}
+                <header className="lg:hidden flex items-center justify-between px-4 py-3 border-b bg-white/80 dark:bg-slate-950/80 backdrop-blur-sm shrink-0">
+                    <div className="flex items-center gap-2 font-bold text-lg truncate">
+                        <span className="text-xl truncate">{PRODUCT_NAME}</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                         <ThemeToggleSimple />
-                        <Button variant="ghost" size="icon" onClick={() => setIsMobileOpen(true)}>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setIsMobileOpen(true)}
+                            aria-label="Open navigation menu"
+                        >
                             <Menu className="h-6 w-6" />
                         </Button>
                     </div>
                 </header>
 
                 {/* Content Area */}
-                <main className="flex-1 overflow-y-auto p-4 md:p-8">
+                <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
                     <div className="max-w-7xl mx-auto w-full h-full">
                         {children}
                     </div>

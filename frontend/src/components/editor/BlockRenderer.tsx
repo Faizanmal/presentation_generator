@@ -38,6 +38,12 @@ interface BlockRendererProps {
   fillMedia?: boolean;
   /** Tighter typography/padding for constrained layout cells */
   compact?: boolean;
+  /** Enforce identical font size across all cards in a multi-card row */
+  uniformFontSize?: string;
+  /** Avoid double card borders when parent layout cell is already a card */
+  suppressCardChrome?: boolean;
+  /** Topic context from deck/slide for topic-matched image resolution */
+  topicContext?: string;
   onFocus?: () => void;
   onBlur?: () => void;
   onChange?: (content: Record<string, unknown>) => void;
@@ -85,6 +91,9 @@ const BlockRenderer = React.memo(({
   presentationTone = 70,
   fillMedia = false,
   compact = false,
+  uniformFontSize,
+  suppressCardChrome = false,
+  topicContext = '',
   onFocus,
   onBlur,
   onChange,
@@ -200,19 +209,32 @@ const BlockRenderer = React.memo(({
   // Block styling from the block's style property
   const blockStyle = block.style || {};
   const textAlign = (blockStyle.textAlign || block.formatting?.alignment || 'left') as React.CSSProperties['textAlign'];
-  // Cap AI-provided px sizes so generated decks don't clip titles off the 16:9 canvas
+  // Cap AI-provided px sizes so generated decks don't clip titles off the 16:9 canvas.
+  // In compact/card layouts, ignore legacy default backend fontSizes (21/22/24px) so all cards match.
   const customFontSize = (() => {
+    if (uniformFontSize) {
+      return uniformFontSize;
+    }
+    if (compact || suppressCardChrome) {
+      return undefined;
+    }
     const raw = blockStyle.fontSize;
     if (raw == null || raw === '') {
       return undefined;
     }
     if (typeof raw === 'number') {
+      if (raw >= 20 && raw <= 24) {
+        return undefined;
+      }
       return `${Math.min(raw, isDense ? 36 : 44)}px`;
     }
     const match = String(raw).match(/^([\d.]+)px$/i);
     if (match) {
       const px = parseFloat(match[1]);
       if (!Number.isNaN(px)) {
+        if (px >= 20 && px <= 24) {
+          return undefined;
+        }
         return `${Math.min(px, isDense ? 36 : 44)}px`;
       }
     }
@@ -245,7 +267,7 @@ const BlockRenderer = React.memo(({
               onInput={handleTextChange}
               onFocus={onFocus}
               onBlur={onBlur}
-              className="outline-none font-extrabold leading-[1.08] tracking-[-0.025em] transition-all duration-200 w-full max-w-full break-words [overflow-wrap:anywhere] text-balance"
+              className="outline-none font-extrabold leading-[1.12] tracking-[-0.02em] transition-all duration-200 w-full max-w-full [word-break:normal] [overflow-wrap:normal] [hyphens:none]"
               style={{
                 fontFamily: theme?.fonts?.heading || 'var(--font-dm-sans), system-ui, sans-serif',
                 color: customColor?.startsWith('#') ? customColor : (theme?.colors?.text || primaryColor),
@@ -286,14 +308,14 @@ const BlockRenderer = React.memo(({
             onInput={handleTextChange}
             onFocus={onFocus}
             onBlur={onBlur}
-            className="outline-none font-semibold leading-snug transition-all duration-200 text-[clamp(1.45rem,2.3vw,2.25rem)] w-full max-w-full break-words [overflow-wrap:anywhere]"
+            className="outline-none font-semibold leading-snug transition-all duration-200 text-[clamp(1.25rem,2vw,1.9rem)] w-full max-w-full [word-break:normal] [overflow-wrap:normal] [hyphens:none]"
             style={{
               fontFamily: theme?.fonts?.heading || 'var(--font-dm-sans), system-ui, sans-serif',
               color: customColor?.startsWith('#') ? customColor : undefined,
               textAlign,
               fontSize: customFontSize || subheadingScale,
               opacity: 0.9,
-              maxWidth: readableWidth,
+              maxWidth: '100%',
             }}
             dangerouslySetInnerHTML={{ __html: content?.text || "Subheading" }}
           />
@@ -306,12 +328,12 @@ const BlockRenderer = React.memo(({
         const isIconText = variant === 'icon-text';
         const textContent = content?.text || "Start typing...";
 
-        // Card variant - glassmorphism style
-        if (isCard) {
+        // Card variant - glassmorphism style (skip nested border when parent is already a column card)
+        if (isCard && !suppressCardChrome) {
           return (
             <div
               className={cn(
-                'relative rounded-2xl overflow-hidden min-h-0 flex-1',
+                'relative rounded-2xl overflow-hidden min-h-0 flex-1 flex flex-col justify-between h-full',
                 compact ? 'p-3.5' : 'p-4',
               )}
               style={{
@@ -327,16 +349,17 @@ const BlockRenderer = React.memo(({
                 onFocus={onFocus}
                 onBlur={onBlur}
                 className={cn(
-                  'outline-none relative z-10 font-medium min-h-0 break-words whitespace-normal',
+                  'outline-none relative z-10 font-medium min-h-0 [word-break:normal] [overflow-wrap:normal] [hyphens:none] whitespace-normal',
                   compact ? 'text-sm leading-relaxed' : 'text-[1.02rem] leading-relaxed',
                 )}
                 style={{
                   fontFamily: theme?.fonts?.body || 'var(--font-dm-sans), system-ui, sans-serif',
                   color: customColor?.startsWith('#') ? customColor : undefined,
                   textAlign,
+                  fontSize: uniformFontSize || undefined,
                   lineHeight: bodyLineHeight,
                   opacity: bodyOpacity,
-                  maxWidth: readableWidth,
+                  maxWidth: '100%',
                 }}
                 dangerouslySetInnerHTML={{ __html: textContent }}
               />
@@ -363,10 +386,11 @@ const BlockRenderer = React.memo(({
                 onInput={handleTextChange}
                 onFocus={onFocus}
                 onBlur={onBlur}
-                className="outline-none flex-1 pt-1.5 text-sm sm:text-base leading-relaxed break-words whitespace-normal"
+                className="outline-none flex-1 pt-1.5 text-sm sm:text-base leading-relaxed [word-break:normal] [overflow-wrap:normal] [hyphens:none] whitespace-normal"
                 style={{
                   fontFamily: theme?.fonts?.body || 'var(--font-dm-sans), system-ui, sans-serif',
                   color: customColor?.startsWith('#') ? customColor : undefined,
+                  fontSize: uniformFontSize || undefined,
                   lineHeight: bodyLineHeight,
                   opacity: bodyOpacity,
                 }}
@@ -380,7 +404,7 @@ const BlockRenderer = React.memo(({
         const trimmed = textContent.trim();
         const statOnlyMatch = /^[\d$€£¥%.,MBKmkb+\-×x\s]+$/i.test(trimmed) && trimmed.length < 14;
         const statWithLabelMatch = trimmed.match(/^([$€£¥]?\d+(?:[.,]\d+)?(?:%|[x×]|(?:[kKmMbBtT]))?)\s*[:–—\-]?\s+(.+)$/i);
-        const isBigStat = statOnlyMatch || Boolean(statWithLabelMatch && statWithLabelMatch[1] && statWithLabelMatch[1].length < 10);
+        const isBigStat = !suppressCardChrome && (statOnlyMatch || Boolean(statWithLabelMatch && statWithLabelMatch[1] && statWithLabelMatch[1].length < 10));
 
         if (isBigStat) {
           const statValue = statWithLabelMatch ? statWithLabelMatch[1] : trimmed;
@@ -428,17 +452,17 @@ const BlockRenderer = React.memo(({
             onFocus={onFocus}
             onBlur={onBlur}
             className={cn(
-              "outline-none transition-colors duration-200 break-words whitespace-normal",
+              "outline-none transition-colors duration-200 [word-break:normal] [overflow-wrap:normal] [hyphens:none] whitespace-normal",
               compact ? "text-sm leading-relaxed" : "text-[1.02rem] leading-relaxed"
             )}
             style={{
               fontFamily: theme?.fonts?.body || 'var(--font-dm-sans), system-ui, sans-serif',
               color: customColor?.startsWith('#') ? customColor : undefined,
               textAlign,
-              fontSize: customFontSize || undefined,
+              fontSize: uniformFontSize || customFontSize || undefined,
               opacity: blockStyle.opacity ? Number(blockStyle.opacity) : bodyOpacity,
               lineHeight: bodyLineHeight,
-              maxWidth: readableWidth,
+              maxWidth: compact || suppressCardChrome ? '100%' : readableWidth,
             }}
             dangerouslySetInnerHTML={{ __html: textContent }}
           />
@@ -447,7 +471,7 @@ const BlockRenderer = React.memo(({
 
       case "BULLET_LIST":
         return (
-          <ul className={cn(compact ? 'space-y-2' : 'space-y-3', 'pl-1 max-w-[42rem] min-h-0')}>
+          <ul className={cn(compact ? 'space-y-2' : 'space-y-3', 'pl-1 max-w-full min-h-0')}>
             {keyedBulletItems.map(({ item, key }, i: number) => {
               return (
                 <li
@@ -470,11 +494,12 @@ const BlockRenderer = React.memo(({
                     onFocus={onFocus}
                     onBlur={onBlur}
                     className={cn(
-                      'outline-none flex-1 min-w-0',
-                      compact ? 'text-sm leading-6 line-clamp-3' : 'text-[0.98rem] leading-7',
+                      'outline-none flex-1 min-w-0 [word-break:normal] [overflow-wrap:normal] [hyphens:none]',
+                      compact ? 'text-sm leading-relaxed' : 'text-[0.98rem] leading-7',
                     )}
                     style={{
                       fontFamily: theme?.fonts?.body || 'var(--font-dm-sans), system-ui, sans-serif',
+                      fontSize: uniformFontSize || undefined,
                       lineHeight: bodyLineHeight,
                       opacity: bodyOpacity,
                     }}
@@ -529,7 +554,9 @@ const BlockRenderer = React.memo(({
         );
 
       case "IMAGE": {
-        const imageUrl = mediaUrlFromBlockContent(content) || (isValidMediaUrl(content?.url) ? String(content.url) : undefined);
+        const imageUrl =
+          mediaUrlFromBlockContent(content, topicContext, blockIndex) ||
+          (isValidMediaUrl(content?.url) ? String(content.url) : undefined);
         if (!imageUrl) {
           return (
             <div
@@ -797,13 +824,20 @@ const BlockRenderer = React.memo(({
         ])
           .slice(0, 4)
           .map((text, idx) => ({ id: `cmp-${idx}`, text }));
-        const isFourCards = comparisonItems.length === 4;
-        const cols = isFourCards ? 2 : comparisonItems.length >= 3 ? 3 : 2;
+        const maxItemLen = Math.max(...comparisonItems.map((c) => c.text.length), 0);
+        const stackVertically = comparisonItems.length === 3 || maxItemLen > 45;
+        const isFourCards = comparisonItems.length === 4 && !stackVertically;
         return (
           <div
             className={cn(
-              "grid gap-4 min-h-0 items-stretch",
-              isFourCards ? "grid-cols-2" : cols === 3 ? "grid-cols-3" : "grid-cols-2"
+              "grid gap-3 min-h-0 items-stretch w-full",
+              stackVertically
+                ? "grid-cols-1"
+                : isFourCards
+                  ? "grid-cols-2"
+                  : comparisonItems.length >= 3
+                    ? "grid-cols-3"
+                    : "grid-cols-2"
             )}
           >
             {comparisonItems.map((entry, i) => {
@@ -813,8 +847,10 @@ const BlockRenderer = React.memo(({
                 <div
                   key={entry.id}
                   className={cn(
-                    'rounded-2xl relative overflow-hidden min-h-0 flex flex-col justify-start',
-                    compact ? 'p-3.5' : 'p-5',
+                    'rounded-2xl relative overflow-hidden min-h-0',
+                    stackVertically
+                      ? 'flex flex-row items-start gap-3.5 p-3.5 sm:p-4'
+                      : 'flex flex-col justify-start p-4',
                   )}
                   style={{
                     background: `linear-gradient(135deg, ${colorWithAlpha(color, 0.08)}, ${colorWithAlpha(color, 0.03)})`,
@@ -826,7 +862,10 @@ const BlockRenderer = React.memo(({
                     style={{ background: gradientFromColor(color, '90deg') }}
                   />
                   <div
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold mb-2 shadow-sm shrink-0"
+                    className={cn(
+                      'w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold shadow-sm shrink-0',
+                      stackVertically ? 'mt-0.5' : 'mb-2',
+                    )}
                     style={{ background: gradientFromColor(color) }}
                   >
                     {String.fromCharCode(65 + i)}
@@ -841,9 +880,10 @@ const BlockRenderer = React.memo(({
                     }}
                     onFocus={onFocus}
                     onBlur={onBlur}
-                    className="outline-none font-medium min-h-0 text-sm sm:text-base leading-relaxed break-words whitespace-normal"
+                    className="outline-none font-medium min-h-0 flex-1 min-w-0 text-sm sm:text-[0.95rem] leading-relaxed [word-break:normal] [overflow-wrap:normal] [hyphens:none] whitespace-normal"
                     style={{
                       fontFamily: theme?.fonts?.body || 'var(--font-dm-sans), system-ui, sans-serif',
+                      fontSize: uniformFontSize || undefined,
                       lineHeight: bodyLineHeight,
                       opacity: bodyOpacity,
                     }}
@@ -916,11 +956,30 @@ const BlockRenderer = React.memo(({
 
       case "CALL_TO_ACTION": {
         const ctaText = content?.text || "Get Started Today";
+        if (suppressCardChrome) {
+          return (
+            <p
+              ref={contentRef}
+              contentEditable
+              onInput={handleTextChange}
+              onFocus={onFocus}
+              onBlur={onBlur}
+              className="outline-none font-medium [word-break:normal] [overflow-wrap:normal] [hyphens:none] whitespace-normal text-sm leading-relaxed"
+              style={{
+                fontFamily: theme?.fonts?.body || 'var(--font-dm-sans), system-ui, sans-serif',
+                fontSize: uniformFontSize || undefined,
+                lineHeight: bodyLineHeight,
+                opacity: bodyOpacity,
+              }}
+              dangerouslySetInnerHTML={{ __html: ctaText }}
+            />
+          );
+        }
         return (
           <div
             className={cn(
-              'relative text-center overflow-hidden max-w-4xl mx-auto min-h-0',
-              compact ? 'p-4 rounded-2xl' : 'p-6 rounded-3xl',
+              'relative text-center overflow-hidden w-full h-full flex items-center justify-center mx-auto min-h-0',
+              compact ? 'p-4 rounded-2xl' : 'p-5 rounded-2xl',
             )}
             style={{
               background: gradientFromColor(primaryColor),
@@ -934,10 +993,13 @@ const BlockRenderer = React.memo(({
               onFocus={onFocus}
               onBlur={onBlur}
               className={cn(
-                'font-extrabold text-white outline-none relative z-10 drop-shadow-sm leading-snug w-full max-w-full break-words [overflow-wrap:anywhere] text-balance px-1',
-                compact ? 'text-base line-clamp-4' : 'text-xl md:text-2xl',
+                'font-bold text-white outline-none relative z-10 drop-shadow-sm leading-snug w-full max-w-full [word-break:normal] [overflow-wrap:normal] [hyphens:none] px-1',
+                compact ? 'text-sm sm:text-base' : 'text-base sm:text-lg',
               )}
-              style={{ fontFamily: theme?.fonts?.heading || 'var(--font-dm-sans), system-ui, sans-serif' }}
+              style={{
+                fontFamily: theme?.fonts?.heading || 'var(--font-dm-sans), system-ui, sans-serif',
+                fontSize: uniformFontSize || undefined,
+              }}
               dangerouslySetInnerHTML={{ __html: ctaText }}
             />
           </div>
@@ -1006,22 +1068,12 @@ const BlockRenderer = React.memo(({
   return (
     <motion.div
       ref={setNodeRef}
-      layoutId={`block-${block.id}`}
       style={{
         ...style,
       }}
-      initial={{ opacity: 0, y: 30, scale: 0.98, filter: "blur(4px)" }}
-      whileInView={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-      viewport={{ once: true, margin: "-40px" }}
-      exit={{ opacity: 0, y: -12, scale: 0.95, filter: "blur(4px)", transition: { duration: 0.2 } }}
-      transition={{
-        delay: blockIndex * 0.05,
-        type: "spring",
-        stiffness: 250,
-        damping: 25,
-        mass: 0.8,
-        layout: { type: "spring", stiffness: 200, damping: 25 },
-      }}
+      initial={{ opacity: 1, y: 0, scale: 1 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, transition: { duration: 0.15 } }}
       className={cn(
         "group relative transition-shadow duration-300",
         fillMedia ? "h-full min-h-0 rounded-none w-full" : "rounded-xl",
@@ -1059,7 +1111,7 @@ const BlockRenderer = React.memo(({
       </div>
 
       {/* Block content */}
-      <div className={cn("w-full min-w-0", fillMedia ? "h-full min-h-0 p-0" : "p-3")}>
+      <div className={cn("w-full min-w-0", fillMedia ? "h-full min-h-0 p-0" : suppressCardChrome ? "p-0.5" : "p-1.5")}>
         {renderBlockContent()}
       </div>
     </motion.div>

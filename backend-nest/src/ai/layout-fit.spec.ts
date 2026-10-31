@@ -47,8 +47,11 @@ describe('layout-fit', () => {
       bulletCount: 2,
       bodyTextLength: 400,
       hasComparison: true,
+      hasTimeline: false,
       hasQuote: false,
       hasStats: true,
+      hasCards: false,
+      cardCount: 0,
       blockCount: 6,
     };
     expect(sectionLikelyOverflows('stats-grid', signals)).toBe(true);
@@ -61,8 +64,11 @@ describe('layout-fit', () => {
       bulletCount: 3,
       bodyTextLength: 950,
       hasComparison: false,
+      hasTimeline: false,
       hasQuote: false,
       hasStats: false,
+      hasCards: false,
+      cardCount: 0,
       blockCount: 4,
     };
     expect(pickLayoutForContent('three-column', signals)).toBe('two-column');

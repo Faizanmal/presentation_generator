@@ -252,6 +252,7 @@ export class ProjectsService {
       } else {
         images = await this.aiService.generateStockImages(
           generatedContent.sections,
+          generateDto.topic,
         );
       }
 
@@ -762,10 +763,8 @@ export class ProjectsService {
 
     return {
       fontFamily: styleTokens.bodyFont,
-      fontSize: 21,
-      lineHeight: 1.42,
+      lineHeight: 1.5,
       color: styleTokens.bodyColor,
-      maxWidth: '88%',
     };
   }
 
@@ -887,6 +886,10 @@ export class ProjectsService {
       this.prisma.project.count({ where }),
     ]);
 
+    await Promise.all(
+      projects.map((p) => this.migrateLegacyDeckIfNeeded(p, false)),
+    );
+
     return {
       data: projects,
       meta: {
@@ -947,6 +950,205 @@ export class ProjectsService {
       }
     }
 
+    await this.migrateLegacyDeckIfNeeded(project, false);
+
+    return project;
+  }
+
+  /**
+   * One-time migration / explicit layout regeneration for existing decks.
+   * Upgrades legacy random stock URLs (picsum.photos / source.unsplash.com / placehold.co)
+   * to topic-matched images, removes legacy hardcoded fontSize overrides on cards/paragraphs,
+   * and re-aligns slide layouts with the corrected templates while preserving all user text and edits.
+   */
+  private async migrateLegacyDeckIfNeeded(
+    project: {
+      id: string;
+      title?: string | null;
+      description?: string | null;
+      generatedFromPrompt?: string | null;
+      slides?: Array<{
+        id: string;
+        order: number;
+        layout?: string | null;
+        blocks?: Array<{
+          id: string;
+          blockType: BlockType | string;
+          content: unknown;
+          style?: unknown;
+        }>;
+      }>;
+    },
+    forceRegenerate = false,
+  ): Promise<void> {
+    if (!project?.slides || !Array.isArray(project.slides)) {
+      return;
+    }
+
+    const deckTopicContext = [
+      project.title || '',
+      project.generatedFromPrompt || '',
+      project.description || '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    const legacyUrlPattern =
+      /picsum\.photos|source\.unsplash\.com|placehold\.co|via\.placeholder\.com/i;
+
+    for (let sIdx = 0; sIdx < project.slides.length; sIdx++) {
+      const slide = project.slides[sIdx];
+      const blocks = Array.isArray(slide.blocks) ? slide.blocks : [];
+
+      const slideTextContext = [
+        deckTopicContext,
+        ...blocks.map((b) => {
+          const c =
+            b.content && typeof b.content === 'object'
+              ? (b.content as Record<string, unknown>)
+              : {};
+          const items = Array.isArray(c.items)
+            ? c.items
+                .map((it) => (typeof it === 'string' ? it : ''))
+                .join(' ')
+            : '';
+          return [
+            typeof c.text === 'string' ? c.text : '',
+            typeof c.alt === 'string' ? c.alt : '',
+            typeof c.label === 'string' ? c.label : '',
+            items,
+          ]
+            .filter(Boolean)
+            .join(' ');
+        }),
+      ]
+        .filter(Boolean)
+        .join(' ');
+
+      let hasTimeline = false;
+      let hasComparison = false;
+      let hasCta = false;
+      let hasStats = false;
+
+      for (const block of blocks) {
+        const bType = String(block.blockType || '').toUpperCase();
+        if (bType === 'TIMELINE') hasTimeline = true;
+        if (bType === 'COMPARISON') hasComparison = true;
+        if (bType === 'CALL_TO_ACTION') hasCta = true;
+        if (bType === 'STATS_GRID') hasStats = true;
+
+        const c =
+          block.content && typeof block.content === 'object'
+            ? { ...(block.content as Record<string, unknown>) }
+            : {};
+        const st =
+          block.style && typeof block.style === 'object'
+            ? { ...(block.style as Record<string, unknown>) }
+            : {};
+
+        let contentChanged = false;
+        let styleChanged = false;
+
+        if (bType === 'IMAGE') {
+          const rawUrl = String(c.url || c.src || c.imageUrl || '').trim();
+          if (
+            !rawUrl ||
+            legacyUrlPattern.test(rawUrl) ||
+            (forceRegenerate && !rawUrl.startsWith('data:'))
+          ) {
+            const newUrl = this.aiService.resolveTopicMatchedImageUrl(
+              slideTextContext,
+              slide.order ?? sIdx,
+            );
+            c.url = newUrl;
+            if (c.src) c.src = newUrl;
+            if (c.imageUrl) c.imageUrl = newUrl;
+            block.content = c;
+            contentChanged = true;
+          }
+        }
+
+        if (
+          bType === 'PARAGRAPH' &&
+          (st.fontSize === 21 || st.fontSize === 22 || st.maxWidth === '88%')
+        ) {
+          delete st.fontSize;
+          delete st.maxWidth;
+          block.style = st;
+          styleChanged = true;
+        }
+
+        if (
+          (contentChanged || styleChanged) &&
+          this.prisma?.block &&
+          typeof this.prisma.block.update === 'function'
+        ) {
+          try {
+            await this.prisma.block.update({
+              where: { id: block.id },
+              data: {
+                ...(contentChanged
+                  ? { content: c as Prisma.InputJsonValue }
+                  : {}),
+                ...(styleChanged ? { style: st as Prisma.InputJsonValue } : {}),
+              },
+            });
+          } catch {
+            // Ignore persistence errors during read-time migration
+          }
+        }
+      }
+
+      // Fix legacy layout mismatches
+      let targetLayout = slide.layout || 'single-column';
+      if (hasTimeline && targetLayout !== 'timeline') {
+        targetLayout = 'timeline';
+      } else if (hasCta && targetLayout !== 'bento-grid') {
+        targetLayout = 'bento-grid';
+      } else if (hasStats && targetLayout !== 'stats-grid') {
+        targetLayout = 'stats-grid';
+      } else if (
+        hasComparison &&
+        !['stats-grid', 'comparison'].includes(targetLayout)
+      ) {
+        targetLayout = 'comparison';
+      } else if (
+        forceRegenerate &&
+        slide.order > 0 &&
+        targetLayout === 'quote-highlight' &&
+        !blocks.some((b) => String(b.blockType).toUpperCase() === 'QUOTE')
+      ) {
+        targetLayout = 'single-column';
+      }
+
+      if (
+        targetLayout !== slide.layout &&
+        this.prisma?.slide &&
+        typeof this.prisma.slide.update === 'function'
+      ) {
+        slide.layout = targetLayout;
+        try {
+          await this.prisma.slide.update({
+            where: { id: slide.id },
+            data: { layout: targetLayout },
+          });
+        } catch {
+          // Ignore persistence errors during read-time migration
+        }
+      }
+    }
+  }
+
+  /**
+   * Explicitly regenerate slide layouts and topic-matched images for an existing deck,
+   * preserving all user text and edits.
+   */
+  async regenerateLayout(id: string, userId: string) {
+    const project = await this.findOne(id, userId);
+    if (project.ownerId !== userId) {
+      throw new ForbiddenException('You cannot edit this project');
+    }
+    await this.migrateLegacyDeckIfNeeded(project, true);
     return project;
   }
 
@@ -983,6 +1185,8 @@ export class ProjectsService {
     if (!project.isPublic) {
       throw new ForbiddenException('This project is not public');
     }
+
+    await this.migrateLegacyDeckIfNeeded(project, false);
 
     return project;
   }

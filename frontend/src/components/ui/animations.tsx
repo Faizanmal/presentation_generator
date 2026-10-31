@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { Variants } from "framer-motion";
-import { motion, useInView, useAnimation } from "framer-motion";
+import { motion } from "framer-motion";
 
-// Fade in from bottom animation
+// Fade in from bottom animation (visible immediately so sections below the fold are never blank)
 export function FadeInUp({
     children,
     delay = 0,
-    duration = 0.5,
+    duration = 0.35,
     className = "",
 }: {
     children: React.ReactNode;
@@ -16,25 +16,11 @@ export function FadeInUp({
     duration?: number;
     className?: string;
 }) {
-    const ref = useRef(null);
-    const isInView = useInView(ref, { once: true, margin: "-50px" });
-    const controls = useAnimation();
-
-    useEffect(() => {
-        if (isInView) {
-            controls.start("visible");
-        }
-    }, [isInView, controls]);
-
     return (
         <motion.div
-            ref={ref}
-            initial="hidden"
-            animate={controls}
-            variants={{
-                hidden: { opacity: 0, y: 30 },
-                visible: { opacity: 1, y: 0, transition: { delay, duration } },
-            }}
+            initial={{ opacity: 1, y: 0 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay, duration }}
             className={className}
         >
             {children}
@@ -45,18 +31,15 @@ export function FadeInUp({
 // Stagger children animation
 export function StaggerContainer({
     children,
-    staggerDelay = 0.1,
+    staggerDelay = 0.08,
     className = "",
 }: {
     children: React.ReactNode;
     staggerDelay?: number;
     className?: string;
 }) {
-    const ref = useRef(null);
-    const isInView = useInView(ref, { once: true, margin: "-50px" });
-
     const containerVariants: Variants = {
-        hidden: { opacity: 0 },
+        hidden: { opacity: 1 },
         visible: {
             opacity: 1,
             transition: {
@@ -67,9 +50,8 @@ export function StaggerContainer({
 
     return (
         <motion.div
-            ref={ref}
-            initial="hidden"
-            animate={isInView ? "visible" : "hidden"}
+            initial="visible"
+            animate="visible"
             variants={containerVariants}
             className={className}
         >
@@ -86,8 +68,8 @@ export function StaggerItem({
     className?: string;
 }) {
     const itemVariants: Variants = {
-        hidden: { opacity: 0, y: 20 },
-        visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+        hidden: { opacity: 1, y: 0 },
+        visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
     };
 
     return (
@@ -191,9 +173,8 @@ export function TypewriterText({
 // Slide in animation
 export function SlideIn({
     children,
-    direction = "left",
     delay = 0,
-    duration = 0.5,
+    duration = 0.35,
     className = "",
 }: {
     children: React.ReactNode;
@@ -202,25 +183,10 @@ export function SlideIn({
     duration?: number;
     className?: string;
 }) {
-    const ref = useRef(null);
-    const isInView = useInView(ref, { once: true, margin: "-50px" });
-
-    const directionOffset = {
-        left: { x: -100, y: 0 },
-        right: { x: 100, y: 0 },
-        top: { x: 0, y: -100 },
-        bottom: { x: 0, y: 100 },
-    };
-
     return (
         <motion.div
-            ref={ref}
-            initial={{ opacity: 0, ...directionOffset[direction] }}
-            animate={
-                isInView
-                    ? { opacity: 1, x: 0, y: 0 }
-                    : { opacity: 0, ...directionOffset[direction] }
-            }
+            initial={{ opacity: 1, x: 0, y: 0 }}
+            animate={{ opacity: 1, x: 0, y: 0 }}
             transition={{ delay, duration, ease: "easeOut" }}
             className={className}
         >
@@ -258,40 +224,15 @@ export function PulseAnimation({
 // Counter animation
 export function AnimatedCounter({
     value,
-    duration = 2,
     className = "",
 }: {
     value: number;
     duration?: number;
     className?: string;
 }) {
-    const [count, setCount] = useState(0);
-    const ref = useRef(null);
-    const isInView = useInView(ref, { once: true });
-
-    useEffect(() => {
-        if (!isInView) {return;}
-
-        let startTime: number;
-        let animationFrame: number;
-
-        const animate = (timestamp: number) => {
-            if (!startTime) {startTime = timestamp;}
-            const progress = Math.min((timestamp - startTime) / (duration * 1000), 1);
-            setCount(Math.floor(progress * value));
-
-            if (progress < 1) {
-                animationFrame = requestAnimationFrame(animate);
-            }
-        };
-
-        animationFrame = requestAnimationFrame(animate);
-        return () => cancelAnimationFrame(animationFrame);
-    }, [isInView, value, duration]);
-
     return (
-        <span ref={ref} className={className}>
-            {count.toLocaleString()}
+        <span className={className}>
+            {value.toLocaleString()}
         </span>
     );
 }

@@ -93,25 +93,33 @@ export function QuickActionCard({
 }: QuickActionCardProps) {
     return (
         <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.99 }}
             onClick={onClick}
-            className="w-full text-left p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all group"
+            className="w-full h-full text-left p-4 sm:p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all group overflow-hidden"
         >
-            <div className="flex items-start gap-4">
+            <div className="flex items-start gap-3 sm:gap-4 min-w-0">
                 <div
-                    className={`h-12 w-12 rounded-xl bg-linear-to-br ${color} flex items-center justify-center text-white shrink-0 group-hover:scale-110 transition-transform`}
+                    className={`h-11 w-11 sm:h-12 sm:w-12 rounded-xl bg-linear-to-br ${color} flex items-center justify-center text-white shrink-0 group-hover:scale-105 transition-transform`}
                 >
                     {icon}
                 </div>
-                <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-slate-900 dark:text-white mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors flex items-center gap-2">
-                        {title}
-                        {showSoonBadge && <SoonBadge />}
-                    </h3>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">{description}</p>
+                <div className="flex-1 min-w-0 overflow-hidden">
+                    <div className="flex flex-wrap items-center gap-1.5 mb-1 min-w-0">
+                        <h3 className="font-semibold text-sm sm:text-base text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors leading-snug [word-break:normal] [overflow-wrap:normal]">
+                            {title}
+                        </h3>
+                        {showSoonBadge && (
+                            <span className="shrink-0">
+                                <SoonBadge />
+                            </span>
+                        )}
+                    </div>
+                    <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-snug [word-break:normal] [overflow-wrap:normal]">
+                        {description}
+                    </p>
                 </div>
-                <ArrowRight className="h-5 w-5 text-slate-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all shrink-0 mt-1" />
+                <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 text-slate-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all shrink-0 mt-1" />
             </div>
         </motion.button>
     );
@@ -190,7 +198,7 @@ export function QuickActionsGrid({
     inviteTeamComingSoon,
 }: QuickActionsGridProps) {
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
             <QuickActionCard
                 title="Create New Presentation"
                 description="Start from scratch or use a template"
@@ -340,7 +348,7 @@ export function UsageProgress({
                     className={`h-full rounded-full ${isCritical
                             ? "bg-red-500"
                             : isWarning
-                                ? "bg-yellow-500"
+                                ? "text-yellow-500"
                                 : color
                         }`}
                 />

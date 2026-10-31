@@ -248,6 +248,22 @@ export function mergeConsecutiveLists(
       prev.content.stats = [...prevStats, ...nextStats].slice(0, MAX_LIST_ITEMS);
       continue;
     }
+    const isTimelineOrComparison =
+      block.blockType === BlockType.TIMELINE ||
+      block.blockType === BlockType.COMPARISON;
+    if (
+      isTimelineOrComparison &&
+      prev &&
+      prev.blockType === block.blockType &&
+      Array.isArray(prev.content.items) &&
+      Array.isArray(block.content.items)
+    ) {
+      prev.content.items = [
+        ...(prev.content.items as string[]),
+        ...(block.content.items as string[]),
+      ].slice(0, MAX_LIST_ITEMS);
+      continue;
+    }
     result.push(block);
   }
   return result;

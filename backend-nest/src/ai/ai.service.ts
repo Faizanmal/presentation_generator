@@ -3165,21 +3165,104 @@ Use the advanced presentation JSON format with layouts and image suggestions.`,
     }
   }
   /**
-   * Generate stock images using Unsplash Source API (high-quality, free).
-   * Falls back to Picsum Photos if Unsplash is unavailable.
+   * Resolve a topic-matched image URL from deck topic + slide heading + content keywords.
+   */
+  public resolveTopicMatchedImageUrl(
+    contextText: string,
+    slideIndex = 0,
+  ): string {
+    const pools: Array<{ pattern: RegExp; urls: string[] }> = [
+      {
+        pattern:
+          /\b(coffee|espresso|barista|cafe|café|roast|roastery|latte|brew|cappuccino|arabica|beans)\b/i,
+        urls: [
+          'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=1400&q=85',
+          'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1400&q=85',
+          'https://images.unsplash.com/photo-1442512595331-e89e73853f31?auto=format&fit=crop&w=1400&q=85',
+          'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=1400&q=85',
+          'https://images.unsplash.com/photo-1511920170033-f8396924c348?auto=format&fit=crop&w=1400&q=85',
+        ],
+      },
+      {
+        pattern:
+          /\b(meal|prep|nutrition|food|healthy|diet|recipe|cooking|kitchen|fresh|culinary|organic|grocery|protein|lunch|dinner)\b/i,
+        urls: [
+          'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=1400&q=85',
+          'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=1400&q=85',
+          'https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=1400&q=85',
+          'https://images.unsplash.com/photo-1543353071-873f17a7a088?auto=format&fit=crop&w=1400&q=85',
+          'https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=1400&q=85',
+        ],
+      },
+      {
+        pattern:
+          /\b(remote\s*work|hybrid\s*work|work\s*from\s*home|distributed\s*team|coworking|home\s*office|async|telecommut|digital\s*nomad|workspace|collaboration)\b/i,
+        urls: [
+          'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1400&q=85',
+          'https://images.unsplash.com/photo-1593642632823-8f785ba67e45?auto=format&fit=crop&w=1400&q=85',
+          'https://images.unsplash.com/photo-1600880292203-757bb62b4baf?auto=format&fit=crop&w=1400&q=85',
+          'https://images.unsplash.com/photo-1497215728101-856f4ea42174?auto=format&fit=crop&w=1400&q=85',
+        ],
+      },
+      {
+        pattern:
+          /\b(ai|artificial\s*intelligence|machine\s*learning|software|saas|cloud|cyber|automation|analytics|tech)\b/i,
+        urls: [
+          'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1400&q=85',
+          'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1400&q=85',
+          'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1400&q=85',
+        ],
+      },
+      {
+        pattern:
+          /\b(finance|fintech|investment|revenue|venture|startup|market|growth|strategy|executive|enterprise)\b/i,
+        urls: [
+          'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=1400&q=85',
+          'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?auto=format&fit=crop&w=1400&q=85',
+          'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=1400&q=85',
+        ],
+      },
+    ];
+
+    const normalized = (contextText || '').toLowerCase();
+    for (const pool of pools) {
+      if (pool.pattern.test(normalized)) {
+        let hash = slideIndex;
+        for (let i = 0; i < normalized.length; i++) {
+          hash = (hash * 31 + normalized.charCodeAt(i)) >>> 0;
+        }
+        return pool.urls[hash % pool.urls.length];
+      }
+    }
+
+    const keywords =
+      (contextText || '')
+        .replace(/https?:\/\/\S+/g, ' ')
+        .replace(/[^\w\s-]/g, ' ')
+        .split(/\s+/)
+        .filter((w) => w.length > 2)
+        .slice(0, 8)
+        .join(' ')
+        .trim() || 'modern business presentation';
+
+    return `https://image.pollinations.ai/prompt/${encodeURIComponent(
+      `${keywords} professional editorial photography`,
+    )}?width=1600&height=900&nologo=true`;
+  }
+
+  /**
+   * Generate stock images using topic-matched photography pools and Pollinations fallback.
    */
   generateStockImages(
-    // Similar to the method above, we only care about the suggestedImage value
-    // so we allow the broader union.  We also optionally accept a `heading`
-    // property used when falling back to Picsum seed generation.
     sections: {
       suggestedImage?: GeneratedSection['suggestedImage'];
       heading?: string;
+      blocks?: { content?: string; items?: string[] }[];
     }[],
+    deckTopic?: string,
   ): Promise<Map<number, ImageGenerationResult>> {
     const imageMap = new Map<number, ImageGenerationResult>();
 
-    // local helper for converting the union to a plain prompt string
     const promptFromSuggestion = (
       suggestion?: GeneratedSection['suggestedImage'],
     ): string => {
@@ -3194,10 +3277,17 @@ Use the advanced presentation JSON format with layouts and image suggestions.`,
     for (const { section, index } of sectionsWithImages) {
       try {
         const description = promptFromSuggestion(section.suggestedImage);
-        // Build rich semantic topic keywords from suggested image prompt and slide heading
+        const blockKeywords = Array.isArray(section.blocks)
+          ? section.blocks
+              .map((b) => [b.content, ...(b.items || [])].filter(Boolean).join(' '))
+              .join(' ')
+              .slice(0, 160)
+          : '';
         const rawKeywords = [
-          description,
+          deckTopic,
           section.heading,
+          description,
+          blockKeywords,
         ]
           .filter(Boolean)
           .join(' ')
@@ -3206,8 +3296,7 @@ Use the advanced presentation JSON format with layouts and image suggestions.`,
           .trim();
 
         const queryTerm = rawKeywords || 'modern presentation slide';
-        // Pollinations AI renders topic-matched imagery based on exact prompt keywords
-        const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(queryTerm)}?width=1600&height=900&nologo=true`;
+        const imageUrl = this.resolveTopicMatchedImageUrl(queryTerm, index);
         imageMap.set(index, {
           imageUrl,
           revisedPrompt: queryTerm,
@@ -3218,10 +3307,12 @@ Use the advanced presentation JSON format with layouts and image suggestions.`,
           `Failed to get stock image for section ${index}`,
           error,
         );
-        // Fallback: Pollinations with heading or seed
-        const queryTerm = (section.heading || `presentation slide ${index}`).trim();
+        const queryTerm = [deckTopic, section.heading || `presentation slide ${index}`]
+          .filter(Boolean)
+          .join(' ')
+          .trim();
         imageMap.set(index, {
-          imageUrl: `https://image.pollinations.ai/prompt/${encodeURIComponent(queryTerm)}?width=1600&height=900&nologo=true`,
+          imageUrl: this.resolveTopicMatchedImageUrl(queryTerm, index),
           revisedPrompt: queryTerm,
           provider: 'pollinations',
         });
