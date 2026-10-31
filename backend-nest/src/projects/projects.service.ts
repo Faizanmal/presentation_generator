@@ -863,6 +863,16 @@ export class ProjectsService {
         where,
         include: {
           theme: true,
+          slides: {
+            take: 1,
+            orderBy: { order: 'asc' },
+            include: {
+              blocks: {
+                take: 5,
+                orderBy: { order: 'asc' },
+              },
+            },
+          },
           _count: {
             select: {
               slides: true,

@@ -21,7 +21,7 @@ export default function TermsPage() {
                     </CardHeader>
                     <CardContent>
                         <p className="leading-7">
-                            By using our application (&quot;PresentationDesigner&quot;), you agree to be bound by these Terms of Service.
+                            By using our application (&quot;PresentPitch&quot;), you agree to be bound by these Terms of Service.
                             If you do not agree to these terms, please do not use our services.
                         </p>
                     </CardContent>
@@ -76,7 +76,7 @@ export default function TermsPage() {
                     </CardHeader>
                     <CardContent>
                         <p>
-                            PresentationDesigner is provided on an &quot;AS IS&quot; and &quot;AS AVAILABLE&quot; basis. We disclaim all liability for any
+                            PresentPitch is provided on an &quot;AS IS&quot; and &quot;AS AVAILABLE&quot; basis. We disclaim all liability for any
                             damages arising from your use of the service, including but not limited to direct, indirect, incidental,
                             punitive, and consequential damages.
                         </p>

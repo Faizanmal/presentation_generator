@@ -3194,14 +3194,23 @@ Use the advanced presentation JSON format with layouts and image suggestions.`,
     for (const { section, index } of sectionsWithImages) {
       try {
         const description = promptFromSuggestion(section.suggestedImage);
-        const seed =
-          (section.heading || description || `section-${index}`)
-            .replace(/[^a-zA-Z0-9]/g, '')
-            .substring(0, 24) || `slide${index}`;
-        const imageUrl = `https://picsum.photos/seed/${seed}/1600/900`;
+        // Build rich semantic topic keywords from suggested image prompt and slide heading
+        const rawKeywords = [
+          description,
+          section.heading,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .replace(/[^\w\s-]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        const queryTerm = rawKeywords || 'modern presentation slide';
+        // Pollinations AI renders topic-matched imagery based on exact prompt keywords
+        const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(queryTerm)}?width=1600&height=900&nologo=true`;
         imageMap.set(index, {
           imageUrl,
-          revisedPrompt: description || section.heading || `slide ${index}`,
+          revisedPrompt: queryTerm,
           provider: 'pollinations',
         });
       } catch (error) {
@@ -3209,15 +3218,12 @@ Use the advanced presentation JSON format with layouts and image suggestions.`,
           `Failed to get stock image for section ${index}`,
           error,
         );
-        // Fallback: Picsum with seed for consistency
-        const seed = (section.heading || `section-${index}`)
-          .replace(/[^a-zA-Z0-9]/g, '')
-          .substring(0, 20);
+        // Fallback: Pollinations with heading or seed
+        const queryTerm = (section.heading || `presentation slide ${index}`).trim();
         imageMap.set(index, {
-          imageUrl: `https://picsum.photos/seed/${seed}/1600/900`,
-          revisedPrompt: section.suggestedImage
-            ? promptFromSuggestion(section.suggestedImage)
-            : section.heading || '',
+          imageUrl: `https://image.pollinations.ai/prompt/${encodeURIComponent(queryTerm)}?width=1600&height=900&nologo=true`,
+          revisedPrompt: queryTerm,
+          provider: 'pollinations',
         });
       }
     }

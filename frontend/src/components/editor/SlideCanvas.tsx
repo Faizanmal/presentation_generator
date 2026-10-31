@@ -143,12 +143,6 @@ const getDecoPattern = (primaryColor: string, accentColor: string, layout: strin
   if (layout === 'quote-highlight') {
     return (
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        <div
-          className="absolute -top-10 left-10 text-[300px] leading-none font-serif opacity-[0.02] pointer-events-none select-none"
-          style={{ color: primaryColor }}
-        >
-          &ldquo;
-        </div>
         <motion.div
           animate={{ scale: [1, 1.05, 1], opacity: [0.3, 0.5, 0.3] }}
           transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
@@ -444,8 +438,8 @@ export default function SlideCanvas({
         {/* Decorative background pattern based on layout */}
         {getDecoPattern(primaryColor, accentColor, isTitleSlide ? 'title' : slideLayout)}
 
-        {/* Quieter 3D ambient — title/hero only */}
-        {isTitleSlide && (
+        {/* Quieter 3D ambient — title only (never title-hero to avoid overlapping kicker/title) */}
+        {isTitleSlide && rawLayout !== 'title-hero' && (
           <Ambient3DBackground
             primaryColor={primaryColor}
             accentColor={accentColor}

@@ -37,6 +37,7 @@ import {
   GlowOnHover,
 } from "@/components/ui/animations";
 import { ThemeToggleButton } from "@/components/ui/enhanced-ui";
+import { warmupServerInBackground } from "@/lib/server-wakeup";
 
 export default function Home() {
   const router = useRouter();
@@ -44,6 +45,7 @@ export default function Home() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    warmupServerInBackground();
     // Use requestAnimationFrame to avoid synchronous state update during effect commit
     const frame = requestAnimationFrame(() => {
       setMounted(true);
@@ -220,7 +222,7 @@ export default function Home() {
                     </div>
                     <div className="flex-1 flex justify-center">
                       <div className="px-4 py-1 bg-slate-200/50 dark:bg-slate-200 dark:bg-slate-700/50 rounded-lg text-xs text-slate-600 dark:text-slate-400">
-                        app.presentationdesigner.ai
+                        app.presentpitch.com
                       </div>
                     </div>
                   </div>

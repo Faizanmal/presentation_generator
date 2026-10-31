@@ -222,17 +222,22 @@ const SlidePanel = React.memo(({
             <p className="font-bold text-[8px] line-clamp-1 shrink-0" style={{ color: primaryColor }}>
               {headingText || 'Three Column'}
             </p>
-            <div className="grid grid-cols-3 gap-1 h-9 flex-1 min-h-0">
-              {[0, 1, 2].map((colIdx) => (
-                <div
-                  key={colIdx}
-                  className="rounded-md bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 p-1 flex flex-col justify-center gap-0.5 overflow-hidden"
-                >
-                  <div className="h-1 w-3/4 rounded-full" style={{ background: primaryColor, opacity: 0.8 }} />
-                  <div className="h-0.5 w-full rounded-full bg-slate-300 dark:bg-slate-600" />
-                  <div className="h-0.5 w-1/2 rounded-full bg-slate-200 dark:bg-slate-700" />
-                </div>
-              ))}
+            <div className="grid grid-cols-3 gap-1 h-9 flex-1 min-h-0 items-stretch">
+              {[0, 1, 2].map((colIdx) => {
+                const block = textBlocks[colIdx];
+                const text = block ? blockPreviewLine(block, 20) : null;
+                return (
+                  <div
+                    key={colIdx}
+                    className="rounded-md bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 p-1 flex flex-col justify-start gap-0.5 overflow-hidden"
+                  >
+                    <div className="h-1 w-3/4 rounded-full shrink-0" style={{ background: primaryColor, opacity: 0.8 }} />
+                    <p className="text-[6.5px] leading-tight text-slate-600 dark:text-slate-300 line-clamp-2 mt-0.5">
+                      {text || `Point ${colIdx + 1}`}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         ) : layout === 'comparison' || layout === 'two-column' ? (
@@ -240,16 +245,22 @@ const SlidePanel = React.memo(({
             <p className="font-bold text-[8px] line-clamp-1 shrink-0" style={{ color: primaryColor }}>
               {headingText || 'Comparison'}
             </p>
-            <div className="grid grid-cols-2 gap-1.5 h-9 flex-1 min-h-0">
-              {[0, 1].map((colIdx) => (
-                <div
-                  key={colIdx}
-                  className="rounded-md bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 p-1.5 flex flex-col justify-center gap-1 overflow-hidden"
-                >
-                  <div className="h-1 w-2/3 rounded-full" style={{ background: colIdx === 0 ? primaryColor : accentColor, opacity: 0.8 }} />
-                  <div className="h-0.5 w-full rounded-full bg-slate-300 dark:bg-slate-600" />
-                </div>
-              ))}
+            <div className="grid grid-cols-2 gap-1.5 h-9 flex-1 min-h-0 items-stretch">
+              {[0, 1].map((colIdx) => {
+                const block = textBlocks[colIdx];
+                const text = block ? blockPreviewLine(block, 24) : null;
+                return (
+                  <div
+                    key={colIdx}
+                    className="rounded-md bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 p-1 flex flex-col justify-start gap-0.5 overflow-hidden"
+                  >
+                    <div className="h-1 w-2/3 rounded-full shrink-0" style={{ background: colIdx === 0 ? primaryColor : accentColor, opacity: 0.8 }} />
+                    <p className="text-[6.5px] leading-tight text-slate-600 dark:text-slate-300 line-clamp-2 mt-0.5">
+                      {text || `Option ${String.fromCharCode(65 + colIdx)}`}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         ) : layout === 'timeline' ? (
@@ -257,51 +268,85 @@ const SlidePanel = React.memo(({
             <p className="font-bold text-[8px] line-clamp-1 shrink-0" style={{ color: primaryColor }}>
               {headingText || 'Timeline'}
             </p>
-            <div className="flex items-center justify-between px-3 h-8 flex-1 min-h-0 relative">
-              <div className="absolute left-4 right-4 top-1/2 h-0.5 -translate-y-1/2 bg-slate-200 dark:bg-slate-700" />
-              {[0, 1, 2].map((stepIdx) => (
-                <div
-                  key={stepIdx}
-                  className="w-2.5 h-2.5 rounded-full z-10 border-2 bg-white dark:bg-slate-900 shrink-0"
-                  style={{ borderColor: primaryColor }}
-                />
-              ))}
+            <div className="flex items-center justify-between px-1 h-9 flex-1 min-h-0 relative">
+              <div className="absolute left-2 right-2 top-1/2 h-0.5 -translate-y-1/2 bg-slate-200 dark:bg-slate-700" />
+              {(() => {
+                const timelineBlock = blocks.find((b) => (b.type || b.blockType)?.toUpperCase() === 'TIMELINE');
+                const rawItems = Array.isArray(timelineBlock?.content?.items) ? timelineBlock?.content?.items : [];
+                const stepCount = Math.min(Math.max(rawItems.length, textBlocks.length, 3), 4);
+                return Array.from({ length: stepCount }).map((_, stepIdx) => {
+                  const item = rawItems[stepIdx];
+                  const label = typeof item === 'string'
+                    ? item.split(/[:–—-]/)[0]?.trim()
+                    : typeof item === 'object' && item
+                    ? ((item as any).title || (item as any).label)
+                    : textBlocks[stepIdx]
+                    ? blockPreviewLine(textBlocks[stepIdx], 10)
+                    : `M${stepIdx + 1}`;
+
+                  return (
+                    <div key={stepIdx} className="flex flex-col items-center z-10 min-w-0 max-w-[28%]">
+                      <div
+                        className="w-2.5 h-2.5 rounded-full border-2 bg-white dark:bg-slate-900 shrink-0 mb-0.5"
+                        style={{ borderColor: primaryColor }}
+                      />
+                      <span className="text-[6px] font-bold text-slate-700 dark:text-slate-300 truncate max-w-full">
+                        {String(label || `P${stepIdx + 1}`)}
+                      </span>
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </div>
         ) : layout === 'stats-grid' ? (
           <div className="absolute inset-0 flex flex-col p-2 overflow-hidden min-w-0 gap-1 justify-between">
             <p className="font-bold text-[8px] line-clamp-1 shrink-0" style={{ color: primaryColor }}>
-              {headingText || 'Metrics'}
+              {headingText || 'Key Metrics'}
             </p>
-            <div className="grid grid-cols-2 gap-1 h-9 flex-1 min-h-0">
-              {[0, 1].map((statIdx) => (
-                <div
-                  key={statIdx}
-                  className="rounded-md bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 p-1 flex flex-col justify-center items-center overflow-hidden"
-                >
-                  <span className="font-extrabold text-[8px]" style={{ color: primaryColor }}>
-                    {statIdx === 0 ? '95%' : '3×'}
-                  </span>
-                  <div className="h-0.5 w-2/3 rounded-full bg-slate-300 dark:bg-slate-600 mt-0.5" />
-                </div>
-              ))}
+            <div className="grid grid-cols-2 gap-1 h-9 flex-1 min-h-0 items-stretch">
+              {[0, 1].map((statIdx) => {
+                const block = textBlocks[statIdx];
+                const blockText = block ? (blockPreviewLine(block, 24) || '') : '';
+                const numMatch = blockText.match(/([$€£¥]?\d+(?:[.,]\d+)?(?:%|[x×]|(?:[kKmMbBtT]))?)/i);
+                const displayVal = numMatch ? numMatch[1] : statIdx === 0 ? '95%' : '3×';
+                const labelText = blockText.replace(displayVal, '').replace(/^[:–—-]\s*/, '').trim();
+
+                return (
+                  <div
+                    key={statIdx}
+                    className="rounded-md bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 p-1 flex flex-col justify-center items-center overflow-hidden"
+                  >
+                    <span className="font-extrabold text-[8px] leading-tight" style={{ color: primaryColor }}>
+                      {displayVal}
+                    </span>
+                    <span className="text-[6px] text-slate-500 dark:text-slate-400 truncate max-w-full text-center mt-0.5">
+                      {labelText || (statIdx === 0 ? 'Retention' : 'Growth')}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         ) : layout === 'bento-grid' ? (
           <div className="absolute inset-0 flex flex-col p-2 overflow-hidden min-w-0 gap-1 justify-between">
             <p className="font-bold text-[8px] line-clamp-1 shrink-0" style={{ color: primaryColor }}>
-              {headingText || 'Takeaway'}
+              {headingText || 'Next Steps'}
             </p>
-            <div className="grid grid-cols-2 gap-1 h-9 flex-1 min-h-0">
-              <div className="rounded-md bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 p-1 flex flex-col justify-center gap-0.5">
-                <div className="h-1 w-3/4 rounded-full" style={{ background: primaryColor }} />
-                <div className="h-0.5 w-full bg-slate-300 dark:bg-slate-600 rounded" />
+            <div className="grid grid-cols-2 gap-1 h-9 flex-1 min-h-0 items-stretch">
+              <div className="rounded-md bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 p-1 flex flex-col justify-start gap-0.5 overflow-hidden">
+                <div className="h-1 w-3/4 rounded-full shrink-0" style={{ background: primaryColor }} />
+                <p className="text-[6.5px] leading-tight text-slate-600 dark:text-slate-300 line-clamp-2 mt-0.5">
+                  {textBlocks[0] ? blockPreviewLine(textBlocks[0], 22) : 'Key outcome'}
+                </p>
               </div>
               <div
-                className="rounded-md p-1 flex flex-col justify-center items-center text-white text-[7px] font-bold"
+                className="rounded-md p-1 flex flex-col justify-center items-center text-white text-[7px] font-bold text-center"
                 style={{ background: primaryColor }}
               >
-                CTA
+                <span className="truncate max-w-full px-1">
+                  {String(blocks.find((b) => (b.type || b.blockType)?.toUpperCase() === 'CALL_TO_ACTION')?.content?.text || 'Get Started')}
+                </span>
               </div>
             </div>
           </div>
@@ -310,8 +355,8 @@ const SlidePanel = React.memo(({
             <p className="font-bold text-[9px] line-clamp-1 shrink-0" style={{ color: primaryColor }}>
               {headingText || `Slide ${index + 1}`}
             </p>
-            {textBlocks.slice(0, 2).map((block) => {
-              const preview = blockPreviewLine(block, 40);
+            {textBlocks.slice(0, 3).map((block) => {
+              const preview = blockPreviewLine(block, 45);
               if (!preview) return null;
               return (
                 <p

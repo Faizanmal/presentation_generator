@@ -204,7 +204,7 @@ class ApiClient {
         !config.url?.includes('/auth/refresh')
       ) {
         if (!this.csrfToken) {
-          await this.fetchCsrfToken().catch(err => console.error('[ApiClient] CSRF fetch failed', err));
+          await this.fetchCsrfToken().catch(err => console.warn('[ApiClient] CSRF fetch skipped/pending', (err as Error)?.message || err));
         }
 
         if (this.csrfToken) {
@@ -389,17 +389,17 @@ class ApiClient {
           this.csrfToken = response.data.token || (response.data as { csrfToken?: string }).csrfToken || null;
 
           if (!this.csrfToken) {
-            console.error('[ApiClient] CSRF response data structure mismatch', response.data);
+            console.warn('[ApiClient] CSRF response data structure mismatch', response.data);
             throw new Error('CSRF token not found in response');
           }
 
           return this.csrfToken;
         } else {
-          console.error('[ApiClient] CSRF response missing body', response);
+          console.warn('[ApiClient] CSRF response missing body', response);
           throw new Error('CSRF response missing body');
         }
       } catch (error) {
-        console.error('[ApiClient] Failed to fetch CSRF token', error);
+        console.warn('[ApiClient] Failed to fetch CSRF token:', (error as Error)?.message || error);
         this.csrfToken = null;
         throw error;
       } finally {
@@ -1638,8 +1638,37 @@ class ApiClient {
   // ============================================
 
   async getBrandProfiles(): Promise<BrandProfile[]> {
-    const { data } = await this.client.get<BrandProfile[]>('/personalization/brand-profiles');
-    return data;
+    try {
+      const { data } = await this.client.get<BrandProfile[]>('/personalization/brand-profiles', {
+        timeout: 10_000,
+      });
+      return Array.isArray(data) ? data : [];
+    } catch (error) {
+      // Fallback: try singular /personalization/brand
+      try {
+        const { data } = await this.client.get<any>('/personalization/brand', { timeout: 8_000 });
+        if (!data) return [];
+        const palette = (data.colorPalette as { primary?: string; secondary?: string; accent?: string }) || {};
+        return [{
+          id: data.id || 'brand-1',
+          userId: data.userId || 'current-user',
+          name: data.companyName || 'Default Brand',
+          logo: data.logoUrl,
+          primaryColor: palette.primary || '#3b82f6',
+          secondaryColor: palette.secondary || '#64748b',
+          accentColor: palette.accent || '#10b981',
+          headingFont: 'Inter',
+          bodyFont: 'Inter',
+          voiceTone: data.brandVoice || 'professional',
+          industry: data.industry || 'Technology',
+          isDefault: true,
+          createdAt: data.createdAt || new Date().toISOString(),
+          updatedAt: data.updatedAt || new Date().toISOString(),
+        }];
+      } catch {
+        throw error;
+      }
+    }
   }
 
   async getBrandProfile(id: string): Promise<BrandProfile> {

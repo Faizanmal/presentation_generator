@@ -185,7 +185,7 @@ async function navigationHandler(request) {
       `<!DOCTYPE html>
       <html>
         <head>
-          <title>Offline - Presentation Designer</title>
+          <title>Offline - PresentPitch</title>
           <style>
             body {
               font-family: system-ui, sans-serif;

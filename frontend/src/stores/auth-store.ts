@@ -248,7 +248,7 @@ export const useAuthStore = create<AuthState>()(
           const subscription = await api.getSubscription();
           set({ subscription });
         } catch (error) {
-          console.error('Failed to fetch subscription:', error);
+          console.warn('[AuthStore] Subscription fetch skipped/delayed:', (error as Error)?.message || error);
         }
       },
 

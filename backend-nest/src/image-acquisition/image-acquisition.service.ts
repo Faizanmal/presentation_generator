@@ -51,6 +51,8 @@ const ALLOWED_IMAGE_DOMAINS = [
   'googleusercontent.com',
   'picsum.photos',
   'fastly.picsum.photos',
+  'pollinations.ai',
+  'image.pollinations.ai',
 ];
 
 @Injectable()
@@ -646,12 +648,30 @@ export class ImageAcquisitionService implements OnModuleDestroy {
       }
     }
 
-    // Fallback to Lorem Picsum if all else fails
+    // Fallback to Pollinations AI with topic keywords, then Lorem Picsum if needed
+    try {
+      const width = options?.orientation === 'portrait' ? 1080 : 1920;
+      const height = options?.orientation === 'portrait' ? 1920 : 1080;
+      const cleanQuery = query.replace(/[^\w\s-]/g, ' ').replace(/\s+/g, ' ').trim();
+
+      return await this.acquireImage({
+        source: 'url',
+        url: `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanQuery)}?width=${width}&height=${height}&nologo=true`,
+        width,
+        height,
+        query: cleanQuery,
+      });
+    } catch (pollinationsError) {
+      this.logger.warn(
+        `Pollinations fallback failed for "${query}":`,
+        pollinationsError,
+      );
+    }
+
     try {
       this.logger.warn(
-        `All primary sources failed for "${query}". Using fallback source (Picsum).`,
+        `All primary sources failed for "${query}". Using Picsum fallback.`,
       );
-      // Use a consistent seed based on query to get the same image for the same term
       const seed = query.replace(/[^a-zA-Z0-9]/g, '');
       const width = options?.orientation === 'portrait' ? 1080 : 1920;
       const height = options?.orientation === 'portrait' ? 1920 : 1080;

@@ -311,8 +311,8 @@ const BlockRenderer = React.memo(({
           return (
             <div
               className={cn(
-                'relative rounded-2xl overflow-hidden min-h-0',
-                compact ? 'p-3' : 'p-4',
+                'relative rounded-2xl overflow-hidden min-h-0 flex-1',
+                compact ? 'p-3.5' : 'p-4',
               )}
               style={{
                 background: `linear-gradient(135deg, ${colorWithAlpha(primaryColor, 0.08)}, ${colorWithAlpha(secondaryColor, 0.06)})`,
@@ -327,8 +327,8 @@ const BlockRenderer = React.memo(({
                 onFocus={onFocus}
                 onBlur={onBlur}
                 className={cn(
-                  'outline-none relative z-10 font-medium min-h-0',
-                  compact ? 'text-sm leading-6 line-clamp-6' : 'text-[1.02rem] leading-7',
+                  'outline-none relative z-10 font-medium min-h-0 break-words whitespace-normal',
+                  compact ? 'text-sm leading-relaxed' : 'text-[1.02rem] leading-relaxed',
                 )}
                 style={{
                   fontFamily: theme?.fonts?.body || 'var(--font-dm-sans), system-ui, sans-serif',
@@ -363,7 +363,7 @@ const BlockRenderer = React.memo(({
                 onInput={handleTextChange}
                 onFocus={onFocus}
                 onBlur={onBlur}
-                className="outline-none flex-1 pt-1.5 text-[1.05rem] leading-8"
+                className="outline-none flex-1 pt-1.5 text-sm sm:text-base leading-relaxed break-words whitespace-normal"
                 style={{
                   fontFamily: theme?.fonts?.body || 'var(--font-dm-sans), system-ui, sans-serif',
                   color: customColor?.startsWith('#') ? customColor : undefined,
@@ -376,34 +376,50 @@ const BlockRenderer = React.memo(({
           );
         }
 
-        // Check if this looks like a big stat number (e.g., "98%", "$1.5M")
-        const isBigStat = /^[\d$€£¥%.,MBKmkb+\-\s]+$/.test(textContent.trim()) && textContent.trim().length < 12;
+        // Check if this looks like a big stat number (e.g., "95%", "3×", "3x", "$1.5M", or "95% Customer Retention")
+        const trimmed = textContent.trim();
+        const statOnlyMatch = /^[\d$€£¥%.,MBKmkb+\-×x\s]+$/i.test(trimmed) && trimmed.length < 14;
+        const statWithLabelMatch = trimmed.match(/^([$€£¥]?\d+(?:[.,]\d+)?(?:%|[x×]|(?:[kKmMbBtT]))?)\s*[:–—\-]?\s+(.+)$/i);
+        const isBigStat = statOnlyMatch || Boolean(statWithLabelMatch && statWithLabelMatch[1] && statWithLabelMatch[1].length < 10);
 
         if (isBigStat) {
+          const statValue = statWithLabelMatch ? statWithLabelMatch[1] : trimmed;
+          const statLabel = statWithLabelMatch ? statWithLabelMatch[2] : '';
+
           return (
-            <div className="py-3" style={{ textAlign }}>
+            <div className="py-2.5 flex flex-col justify-center" style={{ textAlign }}>
               <p
                 ref={contentRef}
                 contentEditable
                 onInput={handleTextChange}
                 onFocus={onFocus}
                 onBlur={onBlur}
-                className="outline-none font-extrabold tracking-tight bg-clip-text text-transparent"
+                className="outline-none font-extrabold tracking-tight bg-clip-text text-transparent text-4xl sm:text-5xl"
                 style={{
                   fontFamily: theme?.fonts?.heading || 'var(--font-dm-sans), system-ui, sans-serif',
-                  fontSize: customFontSize || (isDense ? '3.1rem' : '3.75rem'),
                   lineHeight: 1.1,
                   backgroundImage: gradientFromColor(primaryColor),
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
                 }}
-                dangerouslySetInnerHTML={{ __html: textContent }}
+                dangerouslySetInnerHTML={{ __html: statValue }}
               />
+              {statLabel && (
+                <p
+                  className="mt-1.5 text-sm font-medium tracking-wide opacity-80"
+                  style={{
+                    fontFamily: theme?.fonts?.body || 'var(--font-dm-sans), system-ui, sans-serif',
+                    color: customColor?.startsWith('#') ? customColor : undefined,
+                  }}
+                >
+                  {statLabel}
+                </p>
+              )}
             </div>
           );
         }
 
-        // Regular paragraph with refined styling
+        // Regular paragraph with refined styling and consistent compact size
         return (
           <p
             ref={contentRef}
@@ -411,7 +427,10 @@ const BlockRenderer = React.memo(({
             onInput={handleTextChange}
             onFocus={onFocus}
             onBlur={onBlur}
-            className="outline-none transition-colors duration-200 text-[1.05rem] leading-8"
+            className={cn(
+              "outline-none transition-colors duration-200 break-words whitespace-normal",
+              compact ? "text-sm leading-relaxed" : "text-[1.02rem] leading-relaxed"
+            )}
             style={{
               fontFamily: theme?.fonts?.body || 'var(--font-dm-sans), system-ui, sans-serif',
               color: customColor?.startsWith('#') ? customColor : undefined,
@@ -731,6 +750,42 @@ const BlockRenderer = React.memo(({
         );
       }
 
+      case "STATISTIC": {
+        const value = String(content?.value || content?.text || '95%');
+        const label = String(content?.label || '');
+        return (
+          <div className="py-2 flex flex-col justify-center" style={{ textAlign }}>
+            <p
+              ref={contentRef}
+              contentEditable
+              onInput={handleTextChange}
+              onFocus={onFocus}
+              onBlur={onBlur}
+              className="outline-none font-extrabold tracking-tight bg-clip-text text-transparent text-4xl sm:text-5xl"
+              style={{
+                fontFamily: theme?.fonts?.heading || 'var(--font-dm-sans), system-ui, sans-serif',
+                lineHeight: 1.1,
+                backgroundImage: gradientFromColor(primaryColor),
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              }}
+              dangerouslySetInnerHTML={{ __html: value }}
+            />
+            {label && (
+              <p
+                className="mt-1.5 text-sm font-medium tracking-wide opacity-80"
+                style={{
+                  fontFamily: theme?.fonts?.body || 'var(--font-dm-sans), system-ui, sans-serif',
+                  color: customColor?.startsWith('#') ? customColor : undefined,
+                }}
+              >
+                {label}
+              </p>
+            )}
+          </div>
+        );
+      }
+
       case "BENTO_GRID":
         return <BentoGridBlock content={content} theme={theme} onChange={setContent} isEditing={isActive} />;
       case "TIMELINE":
@@ -740,23 +795,26 @@ const BlockRenderer = React.memo(({
           "Option A: Fast and simple",
           "Option B: Powerful and flexible",
         ])
-          .slice(0, 3)
+          .slice(0, 4)
           .map((text, idx) => ({ id: `cmp-${idx}`, text }));
-        const cols = comparisonItems.length >= 3 ? 3 : 2;
+        const isFourCards = comparisonItems.length === 4;
+        const cols = isFourCards ? 2 : comparisonItems.length >= 3 ? 3 : 2;
         return (
           <div
-            className="grid gap-3 min-h-0"
-            style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+            className={cn(
+              "grid gap-4 min-h-0 items-stretch",
+              isFourCards ? "grid-cols-2" : cols === 3 ? "grid-cols-3" : "grid-cols-2"
+            )}
           >
             {comparisonItems.map((entry, i) => {
-              const colors = [primaryColor, accentColor, secondaryColor];
+              const colors = [primaryColor, accentColor, secondaryColor, '#f59e0b'];
               const color = colors[i % colors.length];
               return (
                 <div
                   key={entry.id}
                   className={cn(
-                    'rounded-2xl relative overflow-hidden min-h-0 flex flex-col',
-                    compact ? 'p-3' : 'p-4',
+                    'rounded-2xl relative overflow-hidden min-h-0 flex flex-col justify-start',
+                    compact ? 'p-3.5' : 'p-5',
                   )}
                   style={{
                     background: `linear-gradient(135deg, ${colorWithAlpha(color, 0.08)}, ${colorWithAlpha(color, 0.03)})`,
@@ -783,10 +841,7 @@ const BlockRenderer = React.memo(({
                     }}
                     onFocus={onFocus}
                     onBlur={onBlur}
-                    className={cn(
-                      'outline-none font-medium min-h-0',
-                      compact ? 'text-sm leading-6 line-clamp-6' : 'text-[0.95rem] leading-7',
-                    )}
+                    className="outline-none font-medium min-h-0 text-sm sm:text-base leading-relaxed break-words whitespace-normal"
                     style={{
                       fontFamily: theme?.fonts?.body || 'var(--font-dm-sans), system-ui, sans-serif',
                       lineHeight: bodyLineHeight,

@@ -8,6 +8,8 @@ import {
   Trash2,
   Star,
   Loader2,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -72,9 +74,16 @@ export function BrandProfileEditor() {
   const [editingProfile, setEditingProfile] = useState<BrandProfile | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
-  const { data: profiles, isLoading } = useQuery<BrandProfile[]>({
+  const {
+    data: profiles,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery<BrandProfile[]>({
     queryKey: ['brand-profiles'],
     queryFn: () => api.getBrandProfiles(),
+    retry: 1,
   });
 
   const createMutation = useMutation({
@@ -106,8 +115,35 @@ export function BrandProfileEditor() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      <div className="flex flex-col items-center justify-center h-64 gap-3 text-muted-foreground">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <p className="text-sm">Loading brand profiles…</p>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 rounded-2xl border border-destructive/20 bg-destructive/5 text-center gap-4">
+        <div className="w-12 h-12 rounded-full bg-destructive/10 text-destructive flex items-center justify-center">
+          <AlertCircle className="w-6 h-6" />
+        </div>
+        <div>
+          <h3 className="font-semibold text-base text-slate-900 dark:text-white">
+            Unable to load brand profiles
+          </h3>
+          <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+            {error instanceof Error ? error.message : 'The request timed out or the server could not be reached.'}
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => void refetch()}
+          className="gap-2"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Retry
+        </Button>
       </div>
     );
   }
@@ -138,9 +174,27 @@ export function BrandProfileEditor() {
         </Dialog>
       </div>
 
-      {/* Profile cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {profiles?.map((profile) => (
+      {/* Empty State */}
+      {(!profiles || profiles.length === 0) ? (
+        <Card className="border-dashed p-10 text-center flex flex-col items-center justify-center">
+          <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4">
+            <Palette className="w-7 h-7" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
+            No brand profiles yet
+          </h3>
+          <p className="text-sm text-muted-foreground max-w-md mb-6">
+            Set up your brand colors, typography, logos, and voice tone so AI generates slides matching your exact visual identity.
+          </p>
+          <Button onClick={() => setIsCreating(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Create your first brand profile
+          </Button>
+        </Card>
+      ) : (
+        /* Profile cards */
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {profiles.map((profile) => (
           <Card key={profile.id} className={profile.isDefault ? 'border-primary' : ''}>
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
@@ -242,24 +296,8 @@ export function BrandProfileEditor() {
             </CardContent>
           </Card>
         ))}
-
-        {profiles?.length === 0 && (
-          <Card className="col-span-full">
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <Palette className="w-12 h-12 text-muted-foreground mb-4" />
-              <h3 className="font-semibold">No brand profiles yet</h3>
-              <p className="text-sm text-muted-foreground text-center max-w-sm mt-1">
-                Create a brand profile to ensure AI-generated content matches your brand
-                identity.
-              </p>
-              <Button className="mt-4" onClick={() => setIsCreating(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Create Profile
-              </Button>
-            </CardContent>
-          </Card>
-        )}
       </div>
+      )}
 
       {/* Edit dialog */}
       <Dialog

@@ -140,6 +140,22 @@ export function warmupServerInBackground(): void {
   void ensureServerAwake();
 }
 
+/** Keep-alive ping interval (4 mins) to prevent Render Free from sleeping while app is open */
+const KEEP_ALIVE_INTERVAL_MS = 4 * 60 * 1000;
+
+export function startKeepAlive(): () => void {
+  if (typeof window === 'undefined') return () => {};
+  if (!isColdStartHandlingEnabled()) return () => {};
+
+  const interval = setInterval(() => {
+    if (!document.hidden && status === 'ready') {
+      void pingOnce();
+    }
+  }, KEEP_ALIVE_INTERVAL_MS);
+
+  return () => clearInterval(interval);
+}
+
 /**
  * True when an Axios/network error looks like a cold/sleeping host.
  */

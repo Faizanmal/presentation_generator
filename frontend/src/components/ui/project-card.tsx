@@ -124,6 +124,7 @@ export const ProjectCard = memo(({
                         seed={project.id}
                         thumbnail={project.thumbnail}
                         themeColors={themeColors}
+                        firstSlide={Array.isArray(project.slides) ? (project.slides[0] as any) : undefined}
                         initialsClassName="text-lg font-bold text-white/95 tracking-tight drop-shadow-sm"
                     />
                 </div>
@@ -273,6 +274,7 @@ export const ProjectCard = memo(({
                     seed={project.id}
                     thumbnail={project.thumbnail}
                     themeColors={themeColors}
+                    firstSlide={Array.isArray(project.slides) ? (project.slides[0] as any) : undefined}
                 />
 
                 {/* Hover overlay — pointer-events only when visible so title/thumbnail clicks reach the card */}
@@ -282,11 +284,17 @@ export const ProjectCard = memo(({
                     className={`absolute inset-0 bg-black/60 flex items-center justify-center gap-3 ${
                         isHovered ? "pointer-events-auto" : "pointer-events-none"
                     }`}
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        openProject();
+                    }}
                 >
                     <Button
                         size="sm"
-                        onClick={() => onOpen?.(project.id)}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onOpen?.(project.id);
+                        }}
                         className="bg-white text-slate-900 hover:bg-slate-100"
                     >
                         <Edit className="h-4 w-4 mr-2" />
@@ -295,7 +303,10 @@ export const ProjectCard = memo(({
                     <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => onPresent?.(project.id)}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onPresent?.(project.id);
+                        }}
                         className="border-white text-white hover:bg-white/10"
                     >
                         <Play className="h-4 w-4 mr-2" />
@@ -326,17 +337,19 @@ export const ProjectCard = memo(({
                 )}
             </div>
 
-            {/* Content */}
-            <div className="p-4">
+            {/* Content — clicking anywhere on the card body opens the editor */}
+            <div
+                className="p-4"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    openProject();
+                }}
+            >
                 <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                         <h3
                             className="font-semibold text-slate-900 dark:text-white line-clamp-2 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
                             title={project.title}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                openProject();
-                            }}
                         >
                             {project.title}
                         </h3>

@@ -87,11 +87,16 @@ export function TimelineBlock({ content, theme, onChange, isEditing = false }: T
   };
 
   return (
-    <div className="w-full py-8 my-4 relative">
+    <div className="w-full py-6 my-auto relative">
       {/* Background Line */}
-      <div className="absolute top-1/2 left-0 w-full h-1 -translate-y-1/2 bg-slate-200 rounded-full" />
+      <div
+        className="absolute top-1/2 left-4 right-4 h-1 -translate-y-1/2 rounded-full"
+        style={{
+          background: `linear-gradient(90deg, ${primaryColor}, ${primaryColor}99)`,
+        }}
+      />
       
-      <div className="flex justify-between relative z-10 w-full">
+      <div className="flex items-stretch justify-between relative z-10 w-full gap-2">
         {items.map((item, index) => {
           const isCompleted = item.status === 'completed';
           const isCurrent = item.status === 'current';
@@ -99,34 +104,38 @@ export function TimelineBlock({ content, theme, onChange, isEditing = false }: T
           return (
             <motion.div 
               key={item.id}
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.15, type: 'spring' }}
-              className="flex flex-col items-center relative w-1/3 px-4 group"
+              transition={{ delay: index * 0.1, type: 'spring' }}
+              className="flex flex-col items-center relative flex-1 min-w-0 px-2 group opacity-100"
             >
               <div 
                 className={cn(
-                  "w-12 h-12 rounded-full flex items-center justify-center border-4 transition-all duration-300 z-10 shadow-sm",
-                  isCompleted ? "bg-white" : isCurrent ? "bg-white scale-110 shadow-md" : "bg-white",
+                  "w-11 h-11 rounded-full flex items-center justify-center border-4 transition-all duration-300 z-10 shadow-sm shrink-0",
+                  isCurrent ? "bg-white scale-110 shadow-md" : "bg-white",
                 )}
                 style={{
-                  borderColor: isCompleted || isCurrent ? primaryColor : '#cbd5e1',
-                  color: isCompleted || isCurrent ? primaryColor : '#94a3b8'
+                  borderColor: primaryColor,
+                  color: primaryColor,
                 }}
               >
-                {isCompleted ? <CheckCircle2 className="w-6 h-6" /> : <Circle className="w-4 h-4 fill-current" />}
+                {isCompleted ? (
+                  <CheckCircle2 className="w-5 h-5 text-current" />
+                ) : (
+                  <span className="text-xs font-bold leading-none">{index + 1}</span>
+                )}
               </div>
               
-              <div className="mt-6 text-center bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-sm border border-slate-100 group-hover:shadow-md transition-shadow">
+              <div className="mt-4 text-center bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm p-3 rounded-xl shadow-sm border border-slate-200/80 dark:border-slate-800 w-full group-hover:shadow-md transition-shadow flex flex-col justify-start min-h-[5.5rem]">
                 <div 
-                  className="font-bold text-lg mb-2 outline-none empty:after:content-['Phase']"
+                  className="font-bold text-sm mb-1 outline-none break-words empty:after:content-['Phase'] text-slate-900 dark:text-white"
                   contentEditable={isEditing}
                   onBlur={(e) => handleTextChange(item.id, 'title', e.currentTarget.innerText)}
                 >
                   {item.title}
                 </div>
                 <div 
-                  className="text-sm outline-none empty:after:content-['Description']"
+                  className="text-xs outline-none leading-relaxed break-words empty:after:content-['Description'] line-clamp-4"
                   style={{ color: textBodyColor }}
                   contentEditable={isEditing}
                   onBlur={(e) => handleTextChange(item.id, 'description', e.currentTarget.innerText)}

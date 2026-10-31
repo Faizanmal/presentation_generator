@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Delete,
   Param,
   Body,
@@ -28,9 +29,95 @@ export class PersonalizationController {
   // BRAND PROFILE
   // ============================================
 
+  private normalizeProfile(profile: any, userId: string) {
+    if (!profile) return null;
+    const palette = (profile.colorPalette as { primary?: string; secondary?: string; accent?: string }) || {};
+    return {
+      id: profile.id,
+      userId: profile.userId || userId,
+      name: profile.companyName || profile.name || 'Default Brand',
+      logo: profile.logoUrl || profile.logo,
+      primaryColor: palette.primary || profile.primaryColor || '#3b82f6',
+      secondaryColor: palette.secondary || profile.secondaryColor || '#64748b',
+      accentColor: palette.accent || profile.accentColor || '#10b981',
+      headingFont: profile.headingFont || 'Inter',
+      bodyFont: profile.bodyFont || 'Inter',
+      voiceTone: profile.brandVoice || profile.voiceTone || 'professional',
+      industry: profile.industry || 'Technology',
+      isDefault: true,
+      createdAt: profile.createdAt ? new Date(profile.createdAt).toISOString() : new Date().toISOString(),
+      updatedAt: profile.updatedAt ? new Date(profile.updatedAt).toISOString() : new Date().toISOString(),
+    };
+  }
+
   @Get('brand')
   async getBrandProfile(@Request() req: { user: { id: string } }) {
     return this.personalizationService.getBrandProfile(req.user.id);
+  }
+
+  @Get('brand-profiles')
+  async getBrandProfiles(@Request() req: { user: { id: string } }) {
+    const profile = await this.personalizationService.getBrandProfile(req.user.id);
+    if (!profile) return [];
+    const normalized = this.normalizeProfile(profile, req.user.id);
+    return normalized ? [normalized] : [];
+  }
+
+  @Get('brand-profiles/:id')
+  async getBrandProfileById(
+    @Request() req: { user: { id: string } },
+    @Param('id') _id: string,
+  ) {
+    const profile = await this.personalizationService.getBrandProfile(req.user.id);
+    if (!profile) return null;
+    return this.normalizeProfile(profile, req.user.id);
+  }
+
+  @Post('brand-profiles')
+  async createBrandProfile(
+    @Request() req: { user: { id: string } },
+    @Body() body: any,
+  ) {
+    const palette = {
+      primary: body.primaryColor || '#3b82f6',
+      secondary: body.secondaryColor || '#64748b',
+      accent: body.accentColor || '#10b981',
+    };
+    const created = await this.personalizationService.upsertBrandProfile(req.user.id, {
+      companyName: body.name || body.companyName || 'My Brand',
+      brandVoice: body.voiceTone || body.brandVoice || 'professional',
+      industry: body.industry,
+      colorPalette: palette,
+    });
+    return this.normalizeProfile(created, req.user.id);
+  }
+
+  @Patch('brand-profiles/:id')
+  async updateBrandProfileById(
+    @Request() req: { user: { id: string } },
+    @Param('id') _id: string,
+    @Body() body: any,
+  ) {
+    const palette = {
+      primary: body.primaryColor || '#3b82f6',
+      secondary: body.secondaryColor || '#64748b',
+      accent: body.accentColor || '#10b981',
+    };
+    const updated = await this.personalizationService.upsertBrandProfile(req.user.id, {
+      companyName: body.name || body.companyName || 'My Brand',
+      brandVoice: body.voiceTone || body.brandVoice || 'professional',
+      industry: body.industry,
+      colorPalette: palette,
+    });
+    return this.normalizeProfile(updated, req.user.id);
+  }
+
+  @Delete('brand-profiles/:id')
+  async deleteBrandProfileById(
+    @Request() _req: { user: { id: string } },
+    @Param('id') _id: string,
+  ) {
+    return { success: true };
   }
 
   @Post('brand')

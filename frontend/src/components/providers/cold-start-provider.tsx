@@ -6,27 +6,46 @@ import {
   ensureServerAwake,
   subscribeServerWake,
   warmupServerInBackground,
+  startKeepAlive,
 } from '@/lib/server-wakeup';
 
 /**
  * Background Render Free cold-start warmup.
- * Shows a friendly waking banner with retry — never raw 503s or forced logout.
+ * Shows a friendly waking banner with retry and live timer — never raw 503s or forced logout.
  */
 export function ColdStartProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<'idle' | 'waking' | 'ready' | 'failed'>('idle');
   const [message, setMessage] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [maxAttempts, setMaxAttempts] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
     warmupServerInBackground();
-    return subscribeServerWake((state) => {
+    const stopKeepAlive = startKeepAlive();
+    const unsubscribe = subscribeServerWake((state) => {
       setStatus(state.status);
       setMessage(state.message);
       setAttempt(state.attempt);
       setMaxAttempts(state.maxAttempts);
     });
+    return () => {
+      stopKeepAlive();
+      unsubscribe();
+    };
   }, []);
+
+  // Live timer while server is waking up
+  useEffect(() => {
+    if (status !== 'waking') {
+      setElapsedSeconds(0);
+      return;
+    }
+    const timer = setInterval(() => {
+      setElapsedSeconds((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [status]);
 
   const showBanner = status === 'waking' || status === 'failed';
 
@@ -55,10 +74,10 @@ export function ColdStartProvider({ children }: { children: React.ReactNode }) {
                 <p className="text-xs text-slate-600 dark:text-slate-300">
                   {message ||
                     (status === 'waking'
-                      ? 'This usually takes about 20 seconds…'
+                      ? 'Starting services (usually ready in 25–45s)…'
                       : 'Could not reach the API. Please try again.')}
                   {status === 'waking' && maxAttempts > 0
-                    ? ` (${attempt}/${maxAttempts})`
+                    ? ` (${attempt}/${maxAttempts} • ${elapsedSeconds}s)`
                     : ''}
                 </p>
               </div>
