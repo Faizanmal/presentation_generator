@@ -30,6 +30,9 @@ import {
   ChevronRight,
   Palette,
   Save,
+  Check,
+  AlertCircle,
+  HelpCircle,
   Layout,
   AlignLeft,
   X,
@@ -38,8 +41,19 @@ import {
   RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
-import { resolveTopicImageUrl, upgradeLegacyImageUrl } from "@/lib/slide-media";
+import { resolveTopicImageUrl, upgradeLegacyImageUrl, mediaUrlFromBlockContent } from "@/lib/slide-media";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -186,7 +200,12 @@ export default function EditorPage() {
   const { runAiAction } = useEditorAiActions(projectId);
 
   // Fetch project
-  const { data: projectData, isLoading: projectLoading } = useQuery({
+  const {
+    data: projectData,
+    isLoading: projectLoading,
+    isError: projectError,
+    refetch: refetchProject,
+  } = useQuery({
     queryKey: ["project", projectId],
     queryFn: () => api.projects.getById(projectId),
     enabled: isAuthenticated && !!projectId,
@@ -308,18 +327,120 @@ export default function EditorPage() {
     [],
   );
 
+  // Save state tracking
+  type SaveStatus = "idle" | "saving" | "saved" | "error";
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const dirtySlideIdsRef = useRef<Set<string>>(new Set());
+  const lastSavedSnapshotsRef = useRef<Map<string, string>>(new Map());
+  const autoSaveDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Load project into store and add to recent
   useEffect(() => {
     if (projectData) {
       const migrated = migrateDeckSlidesClientSide(projectData, false);
       loadProject(migrated);
       addToRecent(projectData.id);
+
+      // Initialize snapshots
+      if (migrated.slides) {
+        migrated.slides.forEach((s) => {
+          lastSavedSnapshotsRef.current.set(
+            s.id,
+            JSON.stringify({ title: s.title, layout: s.layout, order: s.order, content: s.content })
+          );
+        });
+      }
     }
   }, [projectData, loadProject, addToRecent, migrateDeckSlidesClientSide]);
 
+  // Execute debounced autosave of changed slides (~800ms)
+  const executeAutosave = useCallback(async () => {
+    if (!project || dirtySlideIdsRef.current.size === 0) {
+      setSaveStatus("idle");
+      return;
+    }
+
+    const slideIdsToSave = Array.from(dirtySlideIdsRef.current);
+    setSaveStatus("saving");
+
+    try {
+      await Promise.all(
+        slideIdsToSave.map(async (slideId) => {
+          const slide = project.slides?.find((s) => s.id === slideId);
+          if (slide) {
+            await api.updateSlide(slideId, {
+              title: slide.title,
+              layout: slide.layout,
+              order: slide.order,
+              speakerNotes: slide.speakerNotes,
+              content: slide.content,
+            });
+            lastSavedSnapshotsRef.current.set(
+              slideId,
+              JSON.stringify({ title: slide.title, layout: slide.layout, order: slide.order, content: slide.content })
+            );
+            dirtySlideIdsRef.current.delete(slideId);
+          }
+        })
+      );
+
+      useEditorStore.setState({ isDirty: false });
+      setSaveStatus("saved");
+      setTimeout(() => {
+        setSaveStatus((prev) => (prev === "saved" ? "idle" : prev));
+      }, 2500);
+    } catch (err) {
+      console.error("[Autosave] Failed to save slides", err);
+      setSaveStatus("error");
+    }
+  }, [project]);
+
+  // Track project changes and trigger debounced 800ms autosave
+  useEffect(() => {
+    if (!project?.slides || !projectData) return;
+
+    let hasNewChanges = false;
+    for (const slide of project.slides) {
+      const snap = JSON.stringify({
+        title: slide.title,
+        layout: slide.layout,
+        order: slide.order,
+        content: slide.content,
+      });
+      const previousSnap = lastSavedSnapshotsRef.current.get(slide.id);
+      if (previousSnap && previousSnap !== snap) {
+        dirtySlideIdsRef.current.add(slide.id);
+        hasNewChanges = true;
+      }
+    }
+
+    if (hasNewChanges || isDirty) {
+      setSaveStatus("saving");
+      if (autoSaveDebounceTimerRef.current) {
+        clearTimeout(autoSaveDebounceTimerRef.current);
+      }
+      autoSaveDebounceTimerRef.current = setTimeout(() => {
+        void executeAutosave();
+      }, 800);
+    }
+  }, [project, projectData, isDirty, executeAutosave]);
+
+  useEffect(() => {
+    return () => {
+      if (autoSaveDebounceTimerRef.current) {
+        clearTimeout(autoSaveDebounceTimerRef.current);
+      }
+    };
+  }, []);
+
   const handleRegenerateLayout = useCallback(async () => {
     if (!project) {return;}
+    if (autoSaveDebounceTimerRef.current) {
+      clearTimeout(autoSaveDebounceTimerRef.current);
+    }
     setIsRegeneratingLayout(true);
+    setSaveStatus("saving");
+
     try {
       let updated: Project;
       try {
@@ -330,11 +451,84 @@ export default function EditorPage() {
       }
       loadProject(updated);
       queryClient.setQueryData(["project", projectId], updated);
+
+      // Persist regenerated layouts to server
+      if (updated.slides) {
+        await Promise.all(
+          updated.slides.map((s) =>
+            api.updateSlide(s.id, {
+              title: s.title,
+              layout: s.layout,
+              order: s.order,
+              content: s.content,
+            }).catch((err) => console.warn("[Regenerate] slide sync warning:", err))
+          )
+        );
+        updated.slides.forEach((s) => {
+          lastSavedSnapshotsRef.current.set(
+            s.id,
+            JSON.stringify({ title: s.title, layout: s.layout, order: s.order, content: s.content })
+          );
+        });
+      }
+      dirtySlideIdsRef.current.clear();
+      useEditorStore.setState({ isDirty: false });
+      setSaveStatus("saved");
+      setTimeout(() => {
+        setSaveStatus((prev) => (prev === "saved" ? "idle" : prev));
+      }, 2500);
       toast.success("Layouts and topic visuals updated while keeping your edits");
+    } catch (err) {
+      console.error("[Regenerate] Failed", err);
+      setSaveStatus("error");
+      toast.error("Failed to save layout changes. Click Retry to re-save.");
     } finally {
       setIsRegeneratingLayout(false);
     }
   }, [project, projectId, migrateDeckSlidesClientSide, loadProject, queryClient]);
+
+  // Keyboard navigation for next/previous slide
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable ||
+        target.closest('[contenteditable="true"]')
+      ) {
+        return;
+      }
+
+      if (e.key === "ArrowLeft" || e.key === "PageUp" || (e.key.toLowerCase() === "k" && !e.metaKey && !e.ctrlKey)) {
+        if (currentSlideIndex > 0) {
+          e.preventDefault();
+          setCurrentSlideIndex(currentSlideIndex - 1);
+        }
+      } else if (e.key === "ArrowRight" || e.key === "PageDown" || (e.key.toLowerCase() === "j" && !e.metaKey && !e.ctrlKey)) {
+        if (project?.slides && currentSlideIndex < project.slides.length - 1) {
+          e.preventDefault();
+          setCurrentSlideIndex(currentSlideIndex + 1);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [currentSlideIndex, project?.slides, setCurrentSlideIndex]);
+
+  // Preload first slide image
+  const firstSlideImageUrl = useMemo(() => {
+    const firstSlide = project?.slides?.[0];
+    if (!firstSlide?.blocks) return null;
+    const imgBlock = firstSlide.blocks.find((b) => {
+      const t = (b.type || (b as Block & { blockType?: string }).blockType)?.toUpperCase();
+      return t === "IMAGE";
+    });
+    if (!imgBlock) return null;
+    const context = [project?.title, firstSlide.title].filter(Boolean).join(" ");
+    return mediaUrlFromBlockContent(imgBlock.content, context, 0);
+  }, [project?.slides, project?.title]);
 
   // Sync title input with project title
   const [prevProjectTitle, setPrevProjectTitle] = useState(projectData?.title);
@@ -641,6 +835,24 @@ export default function EditorPage() {
     );
   }
 
+  if (projectError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900 p-4">
+        <div className="text-center p-8 max-w-md bg-white dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-3" />
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Failed to load presentation</h2>
+          <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">There was a problem loading this presentation. Please try again.</p>
+          <div className="flex justify-center gap-3">
+            <Button variant="outline" asChild>
+              <Link href="/dashboard">Back to Dashboard</Link>
+            </Button>
+            <Button onClick={() => void refetchProject()}>Retry</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!project) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900">
@@ -656,6 +868,11 @@ export default function EditorPage() {
 
   return (
     <div className="h-screen flex flex-col bg-slate-100 dark:bg-slate-900">
+      {/* Preload first slide image for speed */}
+      {firstSlideImageUrl && (
+        <link rel="preload" as="image" href={firstSlideImageUrl} />
+      )}
+
       {/* Header */}
       <header className="h-14 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 shrink-0 relative">
         {FEATURES.editorV2 && (
@@ -667,7 +884,7 @@ export default function EditorPage() {
           </div>
         )}
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Back to dashboard">
             <Link href="/dashboard">
               <ArrowLeft className="h-5 w-5" />
             </Link>
@@ -691,15 +908,67 @@ export default function EditorPage() {
             </button>
           )}
 
-          {isDirty && (
-            <span className="text-sm text-slate-500 flex items-center gap-1">
-              <Save className="h-3 w-3" />
+          {/* Save Status Indicator */}
+          {saveStatus === "saving" && (
+            <span className="text-sm text-slate-500 flex items-center gap-1.5 font-medium animate-pulse">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600" />
               Saving...
+            </span>
+          )}
+          {saveStatus === "saved" && (
+            <span className="text-sm text-green-600 flex items-center gap-1.5 font-medium">
+              <Check className="h-3.5 w-3.5 text-green-600" />
+              Saved
+            </span>
+          )}
+          {saveStatus === "error" && (
+            <span className="text-sm text-red-500 flex items-center gap-2 font-medium">
+              <AlertCircle className="h-3.5 w-3.5 text-red-500" />
+              Failed to save
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 px-2 text-xs border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                onClick={() => void executeAutosave()}
+              >
+                Retry
+              </Button>
             </span>
           )}
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Keyboard shortcuts help popover */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-slate-500"
+                aria-label="Keyboard shortcuts"
+                title="Keyboard shortcuts"
+              >
+                <HelpCircle className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-68 p-3 text-xs space-y-2">
+              <div className="font-semibold text-slate-900 dark:text-white border-b pb-1">Keyboard Shortcuts</div>
+              <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
+                <span>Next slide</span>
+                <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded font-mono text-[10px]">→ / J / PgDn</kbd>
+              </div>
+              <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
+                <span>Previous slide</span>
+                <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded font-mono text-[10px]">← / K / PgUp</kbd>
+              </div>
+              <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
+                <span>Undo / Redo</span>
+                <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded font-mono text-[10px]">Ctrl+Z / Ctrl+Y</kbd>
+              </div>
+              <div className="text-[10px] text-slate-400 pt-1 border-t">Autosaved every ~800ms</div>
+            </PopoverContent>
+          </Popover>
+
           {/* Undo/Redo with history */}
           <UndoRedoButtons
             canUndo={canUndo}
@@ -737,17 +1006,26 @@ export default function EditorPage() {
             }}
           />
 
-          {/* Regenerate layout for existing decks */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRegenerateLayout}
-            disabled={isRegeneratingLayout}
-            title="Re-render slide layouts and topic visuals while keeping your text and edits"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRegeneratingLayout ? "animate-spin" : ""}`} />
-            Regenerate layout
-          </Button>
+          {/* Regenerate layout with tooltip */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRegenerateLayout}
+                  disabled={isRegeneratingLayout}
+                  aria-label="Regenerate layout"
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isRegeneratingLayout ? "animate-spin" : ""}`} />
+                  Regenerate layout
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-xs text-xs">
+                Re-render slide layouts and topic visuals while keeping your text and edits.
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
 
           {/* Templates */}
           <Button

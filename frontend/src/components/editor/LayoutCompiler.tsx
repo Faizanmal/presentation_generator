@@ -12,6 +12,8 @@ interface LayoutCompilerProps {
   generateImages?: boolean;
   blocks: Block[];
   theme?: Theme;
+  slideTitle?: string;
+  slideIndex?: number;
   presentationDensity?: number;
   presentationTone?: number;
   activeBlockId?: string | null;
@@ -114,6 +116,8 @@ export function LayoutCompiler({
   layoutType,
   blocks,
   theme,
+  slideTitle,
+  slideIndex = 0,
   presentationDensity = 60,
   presentationTone = 70,
   activeBlockId,
@@ -140,21 +144,22 @@ export function LayoutCompiler({
     'relative w-full h-full min-h-0 overflow-hidden';
 
   const topicContext = useMemo(() => {
-    return blocks
-      .map((b) => {
-        const c = b.content || {};
-        const itemsText = Array.isArray(c.items)
-          ? c.items
-              .map((it: unknown) =>
-                typeof it === 'string'
-                  ? it
-                  : it && typeof it === 'object'
-                  ? `${(it as Record<string, unknown>).title || ''} ${(it as Record<string, unknown>).description || ''} ${(it as Record<string, unknown>).text || ''}`
-                  : '',
-              )
-              .join(' ')
-          : '';
-        return [
+    const parts = [slideTitle ? String(slideTitle).trim() : ''];
+    for (const b of blocks) {
+      const c = b.content || {};
+      const itemsText = Array.isArray(c.items)
+        ? c.items
+            .map((it: unknown) =>
+              typeof it === 'string'
+                ? it
+                : it && typeof it === 'object'
+                ? `${(it as Record<string, unknown>).title || ''} ${(it as Record<string, unknown>).description || ''} ${(it as Record<string, unknown>).text || ''}`
+                : '',
+            )
+            .join(' ')
+        : '';
+      parts.push(
+        [
           typeof c.text === 'string' ? c.text : '',
           typeof c.alt === 'string' ? c.alt : '',
           typeof c.label === 'string' ? c.label : '',
@@ -162,11 +167,11 @@ export function LayoutCompiler({
           itemsText,
         ]
           .filter(Boolean)
-          .join(' ');
-      })
-      .filter(Boolean)
-      .join(' ');
-  }, [blocks]);
+          .join(' ')
+      );
+    }
+    return parts.filter(Boolean).join(' ');
+  }, [blocks, slideTitle]);
 
   const titleBlocks = useMemo(() => {
     const titles = blocks.filter((block) =>
@@ -197,18 +202,18 @@ export function LayoutCompiler({
         // Only real image/video URLs reserve a media column — charts/shapes without
         // assets used to leave blank halves when counted as media.
         if (type === 'IMAGE' || type === 'VIDEO') {
-          return Boolean(mediaUrlFromBlockContent(block.content, topicContext, idx));
+          return Boolean(mediaUrlFromBlockContent(block.content, topicContext, slideIndex ?? idx));
         }
         if (type === 'CHART') {
           const c = block.content || {};
           return Boolean(c.chartData || c.data || c.type);
         }
         if (type === 'EMBED' || type === 'OEMBED') {
-          return Boolean(mediaUrlFromBlockContent(block.content, topicContext, idx) || block.content?.url);
+          return Boolean(mediaUrlFromBlockContent(block.content, topicContext, slideIndex ?? idx) || block.content?.url);
         }
         return false;
       }),
-    [blocks, topicContext],
+    [blocks, topicContext, slideIndex],
   );
 
   const hasValidMedia = mediaBlocks.length > 0;
@@ -257,6 +262,7 @@ export function LayoutCompiler({
           theme={theme}
           isActive={activeBlockId === block.id}
           blockIndex={index}
+          slideIndex={slideIndex}
           presentationDensity={presentationDensity}
           presentationTone={presentationTone}
           fillMedia={opts?.fillMedia && isMedia}
@@ -507,22 +513,23 @@ export function LayoutCompiler({
     case 'title-hero':
       // No media → full-bleed title layout (avoid empty left half)
       if (!hasValidMedia) {
+        const bodyChars = bodyBlocks.reduce((s, b) => s + blockPlainText(b).length, 0);
         return (
           <div
-            className={`w-full h-full flex flex-col justify-center min-h-0 overflow-hidden ${
+            className={`w-full h-full flex flex-col justify-center items-center text-center min-h-0 overflow-hidden ${
               isSpacious ? 'px-10 py-8' : isDense ? 'px-6 py-5' : 'px-8 py-6'
             } ${verticalGap} relative z-10`}
           >
-            <div className={`w-full max-w-3xl min-w-0 min-h-0 ${isSpacious ? 'gap-4' : 'gap-3'} flex flex-col`}>
-              {renderBlockList(titleBlocks, 't-', { compact: true })}
+            <div className={`w-full max-w-3xl min-w-0 min-h-0 my-auto ${isSpacious ? 'gap-5' : 'gap-4'} flex flex-col items-center justify-center`}>
+              {renderBlockList(titleBlocks, 't-', { compact: true, uniformFontSize: bodyChars < 90 ? '2rem' : undefined })}
               {bodyBlocks.length > 0 && (
-                <div className="min-w-0 min-h-0 overflow-hidden" style={{ opacity: bodyOpacity }}>
+                <div className="min-w-0 min-h-0 overflow-hidden max-w-2xl text-center" style={{ opacity: bodyOpacity }}>
                   {renderBlockList(
                     bodyBlocks.filter((b) => getBlockType(b) !== 'QUOTE').slice(0, 2).length > 0
                       ? bodyBlocks.filter((b) => getBlockType(b) !== 'QUOTE').slice(0, 2)
                       : bodyBlocks.slice(0, 1),
                     'b-',
-                    { compact: true },
+                    { compact: true, uniformFontSize: bodyChars < 90 ? '1.15rem' : undefined },
                   )}
                 </div>
               )}
@@ -709,7 +716,9 @@ export function LayoutCompiler({
           ? '0.875rem'
           : maxCardChars > 95
           ? '0.925rem'
-          : '0.975rem';
+          : maxCardChars > 45
+          ? '1.02rem'
+          : '1.08rem';
 
       return (
         <div className={`w-full h-full flex flex-col justify-between ${contentPad} gap-3 relative z-10 overflow-hidden min-h-0`}>
@@ -739,7 +748,7 @@ export function LayoutCompiler({
                   className="w-8 h-1 rounded-full shrink-0"
                   style={{ background: primaryColor, opacity: 0.85 }}
                 />
-                <div className="flex flex-col gap-2.5 min-h-0 flex-1 justify-start">
+                <div className={`flex flex-col gap-2.5 min-h-0 flex-1 ${maxCardChars < 120 ? 'justify-center my-auto' : 'justify-start'}`}>
                   {renderBlockList(col, `c${i}-`, {
                     compact: true,
                     uniformFontSize: sharedCardFontSize,
@@ -757,7 +766,7 @@ export function LayoutCompiler({
     case 'image-left': {
       const visibleBody = bodyBlocks.slice(0, 3);
       const bodyChars = visibleBody.reduce((s, b) => s + blockPlainText(b).length, 0);
-      const paneFontSize = bodyChars > 260 ? '0.88rem' : bodyChars > 150 ? '0.95rem' : '1.02rem';
+      const paneFontSize = bodyChars > 260 ? '0.88rem' : bodyChars > 150 ? '0.95rem' : bodyChars > 60 ? '1.04rem' : '1.12rem';
       return (
         <div
           className={`w-full h-full grid grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] ${columnGap} items-stretch relative z-10 ${contentPad} overflow-hidden min-h-0`}
@@ -779,7 +788,7 @@ export function LayoutCompiler({
                 style={{ background: primaryColor, opacity: 0.8 }}
               />
             </div>
-            <div className="min-h-0 flex-1 flex flex-col justify-evenly overflow-hidden" style={{ opacity: bodyOpacity }}>
+            <div className={`min-h-0 flex-1 flex flex-col ${bodyChars < 120 ? 'justify-center my-auto gap-4' : 'justify-evenly gap-3.5'} overflow-hidden`} style={{ opacity: bodyOpacity }}>
               {columnStack(visibleBody, 'content-', 'flex-1 h-full justify-evenly gap-3.5', {
                 compact: visibleBody.length > 2,
                 uniformFontSize: paneFontSize,
@@ -793,7 +802,7 @@ export function LayoutCompiler({
     case 'image-right': {
       const visibleBody = bodyBlocks.slice(0, 3);
       const bodyChars = visibleBody.reduce((s, b) => s + blockPlainText(b).length, 0);
-      const paneFontSize = bodyChars > 260 ? '0.88rem' : bodyChars > 150 ? '0.95rem' : '1.02rem';
+      const paneFontSize = bodyChars > 260 ? '0.88rem' : bodyChars > 150 ? '0.95rem' : bodyChars > 60 ? '1.04rem' : '1.12rem';
       return (
         <div
           className={`w-full h-full grid grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] ${columnGap} items-stretch relative z-10 ${contentPad} overflow-hidden min-h-0`}
@@ -809,7 +818,7 @@ export function LayoutCompiler({
                 style={{ background: primaryColor, opacity: 0.8 }}
               />
             </div>
-            <div className="min-h-0 flex-1 flex flex-col justify-evenly overflow-hidden" style={{ opacity: bodyOpacity }}>
+            <div className={`min-h-0 flex-1 flex flex-col ${bodyChars < 120 ? 'justify-center my-auto gap-4' : 'justify-evenly gap-3.5'} overflow-hidden`} style={{ opacity: bodyOpacity }}>
               {columnStack(visibleBody, 'content-', 'flex-1 h-full justify-evenly gap-3.5', {
                 compact: visibleBody.length > 2,
                 uniformFontSize: paneFontSize,

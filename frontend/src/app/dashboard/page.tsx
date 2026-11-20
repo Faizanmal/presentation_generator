@@ -14,6 +14,10 @@ import {
   Plus,
   Wand2,
   Sparkles,
+  Lock,
+  AlertCircle,
+  RefreshCw,
+  CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -124,11 +128,18 @@ export default function DashboardPage() {
     };
   }, [isAuthenticated, queryClient]);
 
-  // Fetch projects
-  const { data: projects, isLoading: projectsLoading } = useQuery({
+  // Fetch projects in parallel with user/subscription with stale-while-revalidate caching
+  const {
+    data: projects,
+    isLoading: projectsLoading,
+    isError: projectsError,
+    refetch: refetchProjects,
+  } = useQuery({
     queryKey: ["projects"],
     queryFn: () => api.projects.getAll(),
-    enabled: isAuthenticated && initialized,
+    enabled: isAuthenticated || !initialized,
+    staleTime: 60_000,
+    placeholderData: (prev) => prev,
   });
 
   const showPlanLimitError = useCallback(
@@ -225,11 +236,8 @@ export default function DashboardPage() {
                   description: `"${result.title}" has been added to your list.`,
                 });
 
-                // Refetch list so `_count.slides` (and other server fields) land;
-                // do not overwrite with the generation payload, which often lacks counts.
-                setTimeout(() => {
-                  void queryClient.invalidateQueries({ queryKey: ["projects"] });
-                }, 1500);
+                // Immediately open editor on slide 1
+                router.push(`/editor/${result.id}`);
                 return;
               }
 
@@ -378,14 +386,6 @@ export default function DashboardPage() {
     setIsCreateModalOpen(true);
   }, [fetchSubscription]);
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-8">
       {/* Main content */}
@@ -507,7 +507,21 @@ export default function DashboardPage() {
         </div>
 
         {/* Projects grid/list */}
-        {projectsLoading ? (
+        {projectsError ? (
+          <div className="text-center py-12 rounded-xl border border-dashed border-red-200 dark:border-red-900/50 bg-red-50/50 dark:bg-red-950/20 p-6">
+            <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-3" />
+            <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-1">
+              Failed to load presentations
+            </h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+              There was an issue fetching your presentations.
+            </p>
+            <Button variant="outline" onClick={() => void refetchProjects()}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry
+            </Button>
+          </div>
+        ) : projectsLoading || (authLoading && !projects) ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {Array.from({ length: 8 }).map((_, i) => (
               <div
@@ -712,6 +726,23 @@ function CreateProjectModal({
   const [generateImages, setGenerateImages] = useState(true);
   const [qualityMode, setQualityMode] = useState(false);
 
+  const [generationStage, setGenerationStage] = useState<number>(0);
+  useEffect(() => {
+    if (!isGenerating) {
+      setGenerationStage(0);
+      return;
+    }
+    setGenerationStage(1);
+    const t1 = setTimeout(() => setGenerationStage(2), 2200);
+    const t2 = setTimeout(() => setGenerationStage(3), 5000);
+    const t3 = setTimeout(() => setGenerationStage(4), 8500);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, [isGenerating]);
+
   const generateBlocked = presentationsAtLimit || aiAtLimit;
   const limitWarning = presentationsAtLimit
     ? `You've used ${presentationsUsed} of ${presentationsTotal} presentations on the ${planLabel} plan`
@@ -767,14 +798,72 @@ function CreateProjectModal({
     <Dialog
       open={isOpen}
       onOpenChange={(open) => {
-        if (!open) {
+        if (!open && !isGenerating) {
           onClose();
           resetForm();
         }
       }}
     >
-      <DialogContent className="sm:max-w-lg bg-white dark:bg-gray-900">
-        {mode === "select" ? (
+      <DialogContent className="sm:max-w-lg bg-white dark:bg-gray-900 max-h-[90vh] overflow-y-auto">
+        {isGenerating ? (
+          <div className="py-6 px-2 text-center space-y-6">
+            <div className="flex flex-col items-center">
+              <div className="h-16 w-16 rounded-2xl bg-linear-to-tr from-blue-600 via-purple-600 to-pink-500 flex items-center justify-center text-white shadow-xl animate-pulse mb-4">
+                <Sparkles className="h-8 w-8" />
+              </div>
+              <DialogTitle className="text-xl font-bold text-slate-900 dark:text-white">
+                Generating Your Presentation
+              </DialogTitle>
+              <DialogDescription className="text-sm text-slate-500 mt-1">
+                Please wait while our AI creates and styles your deck
+              </DialogDescription>
+            </div>
+
+            <div className="max-w-sm mx-auto space-y-3 text-left">
+              <div className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${generationStage >= 1 ? 'border-blue-500/50 bg-blue-50/50 dark:bg-blue-950/20' : 'border-slate-200 dark:border-slate-800 opacity-50'}`}>
+                {generationStage > 1 ? (
+                  <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
+                ) : generationStage === 1 ? (
+                  <Loader2 className="h-5 w-5 text-blue-600 animate-spin shrink-0" />
+                ) : (
+                  <div className="h-5 w-5 rounded-full border border-slate-300 dark:border-slate-700 shrink-0" />
+                )}
+                <div>
+                  <p className="text-sm font-medium text-slate-800 dark:text-slate-200">1. Outline & Structure</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Crafting narrative and talking points</p>
+                </div>
+              </div>
+
+              <div className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${generationStage >= 2 ? 'border-purple-500/50 bg-purple-50/50 dark:bg-purple-950/20' : 'border-slate-200 dark:border-slate-800 opacity-50'}`}>
+                {generationStage > 2 ? (
+                  <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
+                ) : generationStage === 2 ? (
+                  <Loader2 className="h-5 w-5 text-purple-600 animate-spin shrink-0" />
+                ) : (
+                  <div className="h-5 w-5 rounded-full border border-slate-300 dark:border-slate-700 shrink-0" />
+                )}
+                <div>
+                  <p className="text-sm font-medium text-slate-800 dark:text-slate-200">2. Drafting Slides & Layouts</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Formatting content into responsive columns</p>
+                </div>
+              </div>
+
+              <div className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${generationStage >= 3 ? 'border-pink-500/50 bg-pink-50/50 dark:bg-pink-950/20' : 'border-slate-200 dark:border-slate-800 opacity-50'}`}>
+                {generationStage >= 4 ? (
+                  <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
+                ) : generationStage === 3 ? (
+                  <Loader2 className="h-5 w-5 text-pink-600 animate-spin shrink-0" />
+                ) : (
+                  <div className="h-5 w-5 rounded-full border border-slate-300 dark:border-slate-700 shrink-0" />
+                )}
+                <div>
+                  <p className="text-sm font-medium text-slate-800 dark:text-slate-200">3. Curating Images & Visuals</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Matching high-resolution editorial photography</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : mode === "select" ? (
           <>
             <DialogHeader>
               <DialogTitle>Create new presentation</DialogTitle>
@@ -782,26 +871,35 @@ function CreateProjectModal({
             </DialogHeader>
 
             {limitWarning && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
-                <p className="font-medium">{limitWarning}</p>
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100 flex items-center justify-between gap-2">
+                <div>
+                  <p className="font-medium">{limitWarning}</p>
+                  <p className="text-xs mt-0.5 text-amber-700 dark:text-amber-300">Upgrade to create more decks and unlock higher AI quotas.</p>
+                </div>
                 <Button
-                  variant="link"
-                  className="h-auto p-0 mt-1 text-amber-900 dark:text-amber-100 underline"
+                  size="sm"
+                  className="bg-linear-to-r from-blue-600 to-purple-600 text-white shrink-0 font-medium"
                   onClick={onUpgrade}
                 >
-                  Upgrade for more
+                  Upgrade
                 </Button>
               </div>
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 py-4 items-stretch bg-white dark:bg-gray-900 rounded-lg p-2">
-              {/* make cards fully opaque with explicit light/dark backgrounds and stronger hover shadows */}
               <button
                 onClick={handleCreateBlank}
                 disabled={presentationsAtLimit}
-                className="flex flex-col justify-between items-center gap-3 p-6 min-h-45 border-2 border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-gray-900 shadow-md hover:shadow-lg transition-all opacity-100 h-full disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-md"
+                title={presentationsAtLimit ? "Upgrade to create more presentations" : "Start with a blank presentation"}
+                className="flex flex-col justify-between items-center gap-3 p-6 min-h-45 border-2 border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-gray-900 shadow-md hover:shadow-lg transition-all opacity-100 h-full disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:shadow-md relative"
                 type="button"
               >
+                {presentationsAtLimit && (
+                  <div className="absolute top-2 right-2 flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/60 px-2 py-0.5 rounded-full border border-amber-300 dark:border-amber-700" title="Upgrade to create more presentations">
+                    <Lock className="h-3 w-3" />
+                    <span>Locked</span>
+                  </div>
+                )}
                 <div className="h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                   <FileText className="h-6 w-6 text-slate-600 dark:text-slate-400" />
                 </div>
@@ -814,9 +912,16 @@ function CreateProjectModal({
               <button
                 onClick={() => setMode("generate")}
                 disabled={generateBlocked}
-                className="flex flex-col justify-between items-center gap-3 p-6 min-h-45 border-2 border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-gray-900 shadow-md hover:shadow-lg transition-all opacity-100 h-full disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-md"
+                title={generateBlocked ? "Upgrade to create more presentations" : "Generate with Quick AI"}
+                className="flex flex-col justify-between items-center gap-3 p-6 min-h-45 border-2 border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-gray-900 shadow-md hover:shadow-lg transition-all opacity-100 h-full disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:shadow-md relative"
                 type="button"
               >
+                {generateBlocked && (
+                  <div className="absolute top-2 right-2 flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/60 px-2 py-0.5 rounded-full border border-amber-300 dark:border-amber-700" title="Upgrade to create more presentations">
+                    <Lock className="h-3 w-3" />
+                    <span>Locked</span>
+                  </div>
+                )}
                 <div className="h-12 w-12 rounded-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center">
                   <Wand2 className="h-6 w-6 text-white" />
                 </div>
@@ -830,10 +935,12 @@ function CreateProjectModal({
                 <button
                   type="button"
                   disabled
-                  className="flex flex-col justify-between items-center gap-3 p-6 min-h-45 border-2 border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-gray-900 shadow-md opacity-50 cursor-not-allowed relative overflow-hidden h-full"
+                  title="Upgrade to create more presentations"
+                  className="flex flex-col justify-between items-center gap-3 p-6 min-h-45 border-2 border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-gray-900 shadow-md opacity-60 cursor-not-allowed relative overflow-hidden h-full"
                 >
-                  <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-indigo-500 text-white text-[10px] font-medium">
-                    NEW
+                  <div className="absolute top-2 right-2 flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/60 px-2 py-0.5 rounded-full border border-amber-300 dark:border-amber-700" title="Upgrade to create more presentations">
+                    <Lock className="h-3 w-3" />
+                    <span>Locked</span>
                   </div>
                   <div className="h-12 w-12 rounded-full bg-linear-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center">
                     <Sparkles className="h-6 w-6 text-white" />
@@ -861,6 +968,14 @@ function CreateProjectModal({
                 </Link>
               )}
             </div>
+
+            {/* Direct Upgrade Button Footer */}
+            <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center">
+              <span className="text-xs text-slate-500 dark:text-slate-400">Plan: {planLabel} ({presentationsUsed}/{presentationsTotal} presentations)</span>
+              <Button size="sm" variant="outline" onClick={onUpgrade} className="border-blue-500 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30">
+                Upgrade Plan
+              </Button>
+            </div>
           </>
         ) : (
           <>
@@ -871,17 +986,16 @@ function CreateProjectModal({
               </DialogDescription>
             </DialogHeader>
 
-            {/* wrap generation form in a solid card so the overlay doesn’t show through */}
             <div className="space-y-4 py-4 bg-white dark:bg-gray-900 rounded-lg">
               {limitWarning && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100 flex items-center justify-between">
                   <p className="font-medium">{limitWarning}</p>
                   <Button
-                    variant="link"
-                    className="h-auto p-0 mt-1 text-amber-900 dark:text-amber-100 underline"
+                    size="sm"
+                    className="bg-linear-to-r from-blue-600 to-purple-600 text-white font-medium"
                     onClick={onUpgrade}
                   >
-                    Upgrade for more
+                    Upgrade
                   </Button>
                 </div>
               )}
@@ -983,17 +1097,8 @@ function CreateProjectModal({
                   onClick={handleGenerate}
                   disabled={isGenerating || generateBlocked || !topic.trim()}
                 >
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Wand2 className="mr-2 h-4 w-4" />
-                      Generate
-                    </>
-                  )}
+                  <Wand2 className="mr-2 h-4 w-4" />
+                  Generate
                 </Button>
               </DialogFooter>
             </div>

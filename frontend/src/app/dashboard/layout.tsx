@@ -59,6 +59,7 @@ export default function DashboardLayout({
                             size="icon"
                             onClick={() => setIsMobileOpen(true)}
                             aria-label="Open navigation menu"
+                            className="min-h-11 min-w-11"
                         >
                             <Menu className="h-6 w-6" />
                         </Button>
@@ -66,7 +67,7 @@ export default function DashboardLayout({
                 </header>
 
                 {/* Content Area */}
-                <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+                <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 scroll-pt-16 lg:scroll-pt-0 pt-4 sm:pt-6">
                     <div className="max-w-7xl mx-auto w-full h-full">
                         {children}
                     </div>

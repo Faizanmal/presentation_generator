@@ -106,7 +106,7 @@ export function QuickActionCard({
                 </div>
                 <div className="flex-1 min-w-0 overflow-hidden">
                     <div className="flex flex-wrap items-center gap-1.5 mb-1 min-w-0">
-                        <h3 className="font-semibold text-sm sm:text-base text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors leading-snug [word-break:normal] [overflow-wrap:normal]">
+                        <h3 className="font-semibold text-sm sm:text-base text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors leading-normal break-words [overflow-wrap:anywhere] pt-0.5">
                             {title}
                         </h3>
                         {showSoonBadge && (
@@ -115,7 +115,7 @@ export function QuickActionCard({
                             </span>
                         )}
                     </div>
-                    <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-snug [word-break:normal] [overflow-wrap:normal]">
+                    <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-normal break-words [overflow-wrap:anywhere]">
                         {description}
                     </p>
                 </div>

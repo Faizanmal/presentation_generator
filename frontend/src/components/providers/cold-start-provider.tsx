@@ -7,6 +7,7 @@ import {
   subscribeServerWake,
   warmupServerInBackground,
   startKeepAlive,
+  isSessionApiReady,
 } from '@/lib/server-wakeup';
 
 /**
@@ -19,6 +20,7 @@ export function ColdStartProvider({ children }: { children: React.ReactNode }) {
   const [attempt, setAttempt] = useState(0);
   const [maxAttempts, setMaxAttempts] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [sessionReady, setSessionReady] = useState(isSessionApiReady);
 
   useEffect(() => {
     warmupServerInBackground();
@@ -28,6 +30,9 @@ export function ColdStartProvider({ children }: { children: React.ReactNode }) {
       setMessage(state.message);
       setAttempt(state.attempt);
       setMaxAttempts(state.maxAttempts);
+      if (state.status === 'ready' || isSessionApiReady()) {
+        setSessionReady(true);
+      }
     });
     return () => {
       stopKeepAlive();
@@ -37,7 +42,7 @@ export function ColdStartProvider({ children }: { children: React.ReactNode }) {
 
   // Live timer while server is waking up
   useEffect(() => {
-    if (status !== 'waking') {
+    if (status !== 'waking' || sessionReady) {
       setElapsedSeconds(0);
       return;
     }
@@ -45,9 +50,22 @@ export function ColdStartProvider({ children }: { children: React.ReactNode }) {
       setElapsedSeconds((prev) => prev + 1);
     }, 1000);
     return () => clearInterval(timer);
-  }, [status]);
+  }, [status, sessionReady]);
 
-  const showBanner = status === 'waking' || status === 'failed';
+  // Hide for the rest of the session once any API call succeeds; never show on later pages
+  const showBanner = !sessionReady && (status === 'waking' || status === 'failed');
+
+  const getDynamicWakingMessage = () => {
+    if (message) return message;
+    if (status !== 'waking') return 'Could not reach the API. Please try again.';
+    if (elapsedSeconds < 20) {
+      return `Initializing backend instance (${elapsedSeconds}s elapsed)…`;
+    }
+    if (elapsedSeconds < 60) {
+      return `Spinning up server environment (${elapsedSeconds}s elapsed)…`;
+    }
+    return `Finalizing server boot (${elapsedSeconds}s elapsed, please hold on)…`;
+  };
 
   return (
     <>
@@ -72,19 +90,16 @@ export function ColdStartProvider({ children }: { children: React.ReactNode }) {
                   {status === 'waking' ? 'Waking up the server' : 'Server unavailable'}
                 </p>
                 <p className="text-xs text-slate-600 dark:text-slate-300">
-                  {message ||
-                    (status === 'waking'
-                      ? 'Starting services (usually ready in 25–45s)…'
-                      : 'Could not reach the API. Please try again.')}
+                  {getDynamicWakingMessage()}
                   {status === 'waking' && maxAttempts > 0
-                    ? ` (${attempt}/${maxAttempts} • ${elapsedSeconds}s)`
+                    ? ` • attempt ${attempt}/${maxAttempts}`
                     : ''}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => void ensureServerAwake()}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 focus-visible:ring-2 focus-visible:ring-blue-500"
               >
                 <RefreshCw className="h-3.5 w-3.5" />
                 Retry

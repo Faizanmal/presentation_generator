@@ -480,6 +480,8 @@ export default function SlideCanvas({
               <LayoutCompiler
                 layoutType={rawLayout}
                 blocks={sortedBlocks}
+                slideTitle={slide.title}
+                slideIndex={slide.order ?? 0}
                 theme={theme}
                 presentationDensity={presentationDensity}
                 presentationTone={presentationTone}

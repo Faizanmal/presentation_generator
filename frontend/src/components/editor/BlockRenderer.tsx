@@ -42,6 +42,8 @@ interface BlockRendererProps {
   uniformFontSize?: string;
   /** Avoid double card borders when parent layout cell is already a card */
   suppressCardChrome?: boolean;
+  /** Slide index within the deck for consistent topic-matched image selection */
+  slideIndex?: number;
   /** Topic context from deck/slide for topic-matched image resolution */
   topicContext?: string;
   onFocus?: () => void;
@@ -93,6 +95,7 @@ const BlockRenderer = React.memo(({
   compact = false,
   uniformFontSize,
   suppressCardChrome = false,
+  slideIndex,
   topicContext = '',
   onFocus,
   onBlur,
@@ -554,9 +557,11 @@ const BlockRenderer = React.memo(({
         );
 
       case "IMAGE": {
+        const targetIndex = slideIndex !== undefined ? slideIndex : blockIndex;
+        const rawCandidate = content?.url || content?.src || content?.imageUrl || content?.image || content?.href;
         const imageUrl =
-          mediaUrlFromBlockContent(content, topicContext, blockIndex) ||
-          (isValidMediaUrl(content?.url) ? String(content.url) : undefined);
+          mediaUrlFromBlockContent(content, topicContext, targetIndex) ||
+          (isValidMediaUrl(rawCandidate) ? String(rawCandidate) : undefined);
         if (!imageUrl) {
           return (
             <div

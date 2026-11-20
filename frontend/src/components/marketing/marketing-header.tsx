@@ -42,7 +42,7 @@ export function MarketingHeader({ active, className }: MarketingHeaderProps) {
           <span className="text-base sm:text-xl font-bold truncate">{PRODUCT_NAME}</span>
         </Link>
 
-        <div className="hidden md:flex items-center gap-8">
+        <div className="hidden lg:flex items-center gap-6 xl:gap-8">
           {NAV.map((item) => (
             <Link
               key={item.key}
@@ -60,32 +60,32 @@ export function MarketingHeader({ active, className }: MarketingHeaderProps) {
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-          <div className="hidden md:block">
+          <div className="hidden lg:block">
             <ThemeToggleButton />
           </div>
           {showAuthed ? (
             <>
-              <Link href="/dashboard">
-                <Button variant="ghost" size="sm" className="text-slate-700 dark:text-slate-300 gap-1.5 px-2.5 sm:px-3">
+              <Link href="/dashboard" className="shrink-0">
+                <Button variant="ghost" size="sm" className="text-slate-700 dark:text-slate-300 gap-1.5 px-2.5 sm:px-3 focus-visible:ring-2 focus-visible:ring-blue-500">
                   <LayoutDashboard className="h-4 w-4" />
                   <span className="hidden sm:inline">Dashboard</span>
                 </Button>
               </Link>
-              <Link href="/settings">
-                <Button size="sm" className="bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 max-w-[8rem] sm:max-w-[10rem] truncate text-xs sm:text-sm px-2.5 sm:px-4">
+              <Link href="/settings" className="shrink-0">
+                <Button size="sm" className="bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 max-w-[8rem] sm:max-w-[10rem] truncate text-xs sm:text-sm px-2.5 sm:px-4 focus-visible:ring-2 focus-visible:ring-blue-500">
                   {user?.name || user?.email || 'Account'}
                 </Button>
               </Link>
             </>
           ) : (
             <>
-              <Link href="/login">
-                <Button variant="ghost" size="sm" className="text-slate-700 dark:text-slate-300 text-xs sm:text-sm px-2.5 sm:px-3">
+              <Link href="/login" className="shrink-0">
+                <Button variant="ghost" size="sm" className="text-slate-700 dark:text-slate-300 text-xs sm:text-sm px-2.5 sm:px-3 shrink-0 whitespace-nowrap focus-visible:ring-2 focus-visible:ring-blue-500">
                   Log in
                 </Button>
               </Link>
-              <Link href="/register">
-                <Button size="sm" className="bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-xs sm:text-sm px-2.5 sm:px-4 whitespace-nowrap">
+              <Link href="/register" className="shrink-0">
+                <Button size="sm" className="bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-xs sm:text-sm px-2.5 sm:px-4 whitespace-nowrap shrink-0 focus-visible:ring-2 focus-visible:ring-blue-500">
                   Get Started Free
                 </Button>
               </Link>
@@ -94,7 +94,7 @@ export function MarketingHeader({ active, className }: MarketingHeaderProps) {
           <button
             type="button"
             onClick={() => setMobileMenuOpen((prev) => !prev)}
-            className="md:hidden inline-flex items-center justify-center h-9 w-9 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 shrink-0"
+            className="lg:hidden inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 shrink-0 focus-visible:ring-2 focus-visible:ring-blue-500"
             aria-label="Toggle navigation menu"
             aria-expanded={mobileMenuOpen}
           >
@@ -104,7 +104,7 @@ export function MarketingHeader({ active, className }: MarketingHeaderProps) {
       </div>
 
       {mobileMenuOpen && (
-        <div className="md:hidden mt-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-lg flex flex-col gap-2">
+        <div className="lg:hidden mt-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-lg flex flex-col gap-2">
           {NAV.map((item) => (
             <Link
               key={item.key}

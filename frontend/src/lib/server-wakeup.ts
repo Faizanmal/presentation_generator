@@ -37,7 +37,38 @@ const TOTAL_BUDGET_MS = 90_000;
 let status: WakeStatus = 'idle';
 let attempt = 0;
 let wakePromise: Promise<boolean> | null = null;
+let hasApiSucceededInSession = false;
 const listeners = new Set<WakeListener>();
+
+export function isSessionApiReady(): boolean {
+  if (hasApiSucceededInSession) return true;
+  if (typeof window !== 'undefined') {
+    try {
+      if (sessionStorage.getItem('api_session_ready') === 'true') {
+        hasApiSucceededInSession = true;
+        return true;
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  }
+  return false;
+}
+
+export function markSessionApiReady(): void {
+  hasApiSucceededInSession = true;
+  if (typeof window !== 'undefined') {
+    try {
+      sessionStorage.setItem('api_session_ready', 'true');
+    } catch {
+      // Ignore storage errors
+    }
+  }
+  if (status !== 'ready') {
+    status = 'ready';
+    emit();
+  }
+}
 
 function emit() {
   const message =
@@ -93,6 +124,10 @@ async function pingOnce(): Promise<boolean> {
 export async function ensureServerAwake(): Promise<boolean> {
   if (typeof window === 'undefined') {return true;}
   if (!isColdStartHandlingEnabled()) {return true;}
+  if (isSessionApiReady()) {
+    status = 'ready';
+    return true;
+  }
   if (status === 'ready') {
     // Cheap re-check — if still up, return fast; if not, wake again
     const ok = await pingOnce();
@@ -116,6 +151,7 @@ export async function ensureServerAwake(): Promise<boolean> {
       const ok = await pingOnce();
       if (ok) {
         status = 'ready';
+        markSessionApiReady();
         emit();
         return true;
       }
@@ -140,17 +176,15 @@ export function warmupServerInBackground(): void {
   void ensureServerAwake();
 }
 
-/** Keep-alive ping interval (4 mins) to prevent Render Free from sleeping while app is open */
-const KEEP_ALIVE_INTERVAL_MS = 4 * 60 * 1000;
+/** Keep-alive ping interval (10 mins) to prevent Render Free from sleeping */
+const KEEP_ALIVE_INTERVAL_MS = 10 * 60 * 1000;
 
 export function startKeepAlive(): () => void {
   if (typeof window === 'undefined') return () => {};
   if (!isColdStartHandlingEnabled()) return () => {};
 
   const interval = setInterval(() => {
-    if (!document.hidden && status === 'ready') {
-      void pingOnce();
-    }
+    void pingOnce();
   }, KEEP_ALIVE_INTERVAL_MS);
 
   return () => clearInterval(interval);

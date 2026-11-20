@@ -14,6 +14,7 @@ import {
   Crown,
   Zap,
   Building2,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
@@ -35,7 +36,13 @@ const PLAN_DESCRIPTIONS: Record<PlanId, string> = {
 
 export default function BillingPage() {
   const router = useRouter();
-  const { subscription, isAuthenticated, isLoading: authLoading, initialized } = useAuthStore();
+  const {
+    subscription,
+    isAuthenticated,
+    isLoading: authLoading,
+    initialized,
+    fetchSubscription,
+  } = useAuthStore();
 
   // Compute renewal date to avoid calling Date.now() during render
   const renewalDate = useMemo(() => {
@@ -85,6 +92,24 @@ export default function BillingPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  if (!subscription && initialized && isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-900">
+        <div className="text-center p-8 max-w-md bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <AlertCircle className="h-10 w-10 text-amber-500 mx-auto mb-3" />
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Failed to load billing info</h2>
+          <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">Could not load your subscription details.</p>
+          <div className="flex justify-center gap-3">
+            <Button variant="outline" asChild>
+              <Link href="/dashboard">Back</Link>
+            </Button>
+            <Button onClick={() => void fetchSubscription()}>Retry</Button>
+          </div>
+        </div>
       </div>
     );
   }

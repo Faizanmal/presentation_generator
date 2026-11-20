@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuthStore } from "@/stores/auth-store";
 import { api } from "@/lib/api";
+import { warmupServerInBackground } from "@/lib/server-wakeup";
 import { ThemeToggleButton } from "@/components/ui/enhanced-ui";
 import { PRODUCT_NAME } from "@/lib/brand";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -242,6 +243,10 @@ function EmailSentAnimation({ channel }: { channel: "email" | "sms" }) {
 export default function LoginPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading: isAuthLoading, initialized, login, loginWithOtp } = useAuthStore();
+
+  useEffect(() => {
+    warmupServerInBackground();
+  }, []);
 
   // Redirect to dashboard or saved route if already authenticated
   useEffect(() => {

@@ -61,28 +61,45 @@ const TOPIC_IMAGE_POOLS: Array<{
   },
 ];
 
+/** Cache resolved and upgraded topic image URLs */
+const topicImageMemoryCache = new Map<string, string>();
+
 /**
  * Pick a topic-matched image URL from deck topic + slide title + content keywords.
  * Never falls back to random landscape Picsum seeds.
  */
 export function resolveTopicImageUrl(contextText: string, slideIndex = 0): string {
   const normalized = (contextText || '').trim();
+  const cacheKey = `${normalized}::${slideIndex}`;
+  if (topicImageMemoryCache.has(cacheKey)) {
+    return topicImageMemoryCache.get(cacheKey)!;
+  }
+
+  let resolved = '';
   for (const pool of TOPIC_IMAGE_POOLS) {
     if (pool.keywords.test(normalized)) {
-      return pool.urls[Math.abs(slideIndex) % pool.urls.length];
+      resolved = pool.urls[Math.abs(slideIndex) % pool.urls.length];
+      break;
     }
   }
-  const cleanKeywords = normalized
-    .replace(/[^\w\s-]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 90);
-  if (cleanKeywords) {
-    return `https://image.pollinations.ai/prompt/${encodeURIComponent(
-      `${cleanKeywords} professional editorial photography`,
-    )}?width=1600&height=900&nologo=true`;
+
+  if (!resolved) {
+    const cleanKeywords = normalized
+      .replace(/[^\w\s-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 90);
+    if (cleanKeywords) {
+      resolved = `https://image.pollinations.ai/prompt/${encodeURIComponent(
+        `${cleanKeywords} professional editorial photography`,
+      )}?width=1600&height=900&nologo=true`;
+    } else {
+      resolved = 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1600&q=80';
+    }
   }
-  return 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1600&q=80';
+
+  topicImageMemoryCache.set(cacheKey, resolved);
+  return resolved;
 }
 
 /**
@@ -134,7 +151,15 @@ export function mediaUrlFromBlockContent(
   if (!content) {
     return undefined;
   }
-  const candidates = [content.url, content.src, content.embedUrl, content.text];
+  const candidates = [
+    content.url,
+    content.src,
+    content.imageUrl,
+    content.image,
+    content.embedUrl,
+    content.href,
+    content.text,
+  ];
   const blockContext = [
     contextText,
     typeof content.alt === 'string' ? content.alt : '',
@@ -147,6 +172,11 @@ export function mediaUrlFromBlockContent(
     if (isValidMediaUrl(c)) {
       return upgradeLegacyImageUrl(String(c).trim(), blockContext, slideIndex);
     }
+  }
+  // If content is an image block structure with alt/topic context but missing raw URL,
+  // resolve matching topic image so canvas matches thumbnail and never leaves an empty pane.
+  if (blockContext.trim()) {
+    return resolveTopicImageUrl(blockContext, slideIndex);
   }
   return undefined;
 }

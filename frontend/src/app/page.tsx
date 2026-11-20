@@ -106,7 +106,7 @@ export default function Home() {
               </span>
             </Link>
 
-            <nav className="hidden md:flex items-center gap-7" aria-label="Main navigation">
+            <nav className="hidden lg:flex items-center gap-6 xl:gap-7" aria-label="Main navigation">
               <Link
                 href="/dashboard"
                 className="text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
@@ -140,22 +140,22 @@ export default function Home() {
             </nav>
 
             <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-              <div className="hidden md:block">
+              <div className="hidden lg:block">
                 <ThemeToggleButton />
               </div>
-              <Link href="/login">
+              <Link href="/login" className="shrink-0">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-xs sm:text-sm px-2.5 sm:px-3.5 h-9"
+                  className="text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-xs sm:text-sm px-2.5 sm:px-3.5 h-9 shrink-0 whitespace-nowrap focus-visible:ring-2 focus-visible:ring-blue-500"
                 >
                   Log in
                 </Button>
               </Link>
-              <Link href="/register">
+              <Link href="/register" className="shrink-0">
                 <Button
                   size="sm"
-                  className="bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-md shadow-blue-500/20 text-xs sm:text-sm px-2.5 sm:px-4 h-9 whitespace-nowrap"
+                  className="bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-md shadow-blue-500/20 text-xs sm:text-sm px-2.5 sm:px-4 h-9 whitespace-nowrap shrink-0 focus-visible:ring-2 focus-visible:ring-blue-500"
                 >
                   Get Started Free
                 </Button>
@@ -163,7 +163,7 @@ export default function Home() {
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen((prev) => !prev)}
-                className="md:hidden inline-flex items-center justify-center h-9 w-9 rounded-lg border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 shrink-0"
+                className="lg:hidden inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 shrink-0 focus-visible:ring-2 focus-visible:ring-blue-500"
                 aria-label="Toggle navigation menu"
                 aria-expanded={mobileMenuOpen}
               >
@@ -174,7 +174,7 @@ export default function Home() {
 
           {/* Mobile Hamburger Drawer */}
           {mobileMenuOpen && (
-            <div className="md:hidden mt-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md p-4 shadow-xl flex flex-col gap-1.5">
+            <div className="lg:hidden mt-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md p-4 shadow-xl flex flex-col gap-1.5">
               <Link
                 href="/dashboard"
                 onClick={() => setMobileMenuOpen(false)}

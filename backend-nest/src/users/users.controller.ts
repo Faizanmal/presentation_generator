@@ -1,4 +1,5 @@
-import { Controller, Get, Patch, Put, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Put, Body, UseGuards, Res, Headers, HttpStatus } from '@nestjs/common';
+import type { Response } from 'express';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -33,8 +34,25 @@ export class UsersController {
    * Get current user subscription
    */
   @Get('subscription')
-  async getSubscription(@CurrentUser() user: { id: string }) {
-    return this.usersService.getSubscription(user.id);
+  async getSubscription(
+    @CurrentUser() user: { id: string },
+    @Res({ passthrough: true }) res: Response,
+    @Headers('if-none-match') ifNoneMatch?: string,
+  ) {
+    const subscription = await this.usersService.getSubscription(user.id);
+    const subRecord = subscription as { id?: string; plan?: string; updatedAt?: string | Date } | null;
+    const stamp = subRecord?.updatedAt ? new Date(subRecord.updatedAt).getTime() : 0;
+    const etag = `W/"sub-${user.id}-${subRecord?.plan || 'none'}-${stamp}"`;
+
+    res.setHeader('ETag', etag);
+    res.setHeader('Cache-Control', 'private, no-cache, stale-while-revalidate=60');
+
+    if (ifNoneMatch && ifNoneMatch === etag) {
+      res.status(HttpStatus.NOT_MODIFIED);
+      return;
+    }
+
+    return subscription;
   }
 
   /**

@@ -26,6 +26,24 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   generateEtags: true,
 
+  images: {
+    dangerouslyAllowSVG: true,
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+    formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 86400, // 24 hours
+    remotePatterns: [
+      { protocol: "https", hostname: "placehold.co" },
+      { protocol: "https", hostname: "loremflickr.com" },
+      { protocol: "https", hostname: "picsum.photos" },
+      { protocol: "https", hostname: "fastly.picsum.photos" },
+      { protocol: "https", hostname: "images.unsplash.com" },
+      { protocol: "https", hostname: "**.unsplash.com" },
+      { protocol: "https", hostname: "unsplash.com" },
+      { protocol: "https", hostname: "image.pollinations.ai" },
+      { protocol: "https", hostname: "images.pexels.com" },
+    ],
+  },
+
   // Asset prefix for CDN
   assetPrefix: process.env.NODE_ENV === 'production'
     ? process.env.NEXT_PUBLIC_CDN_URL

@@ -1,6 +1,6 @@
 import type { AxiosInstance, AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
 import axios from 'axios';
-import { ensureServerAwake, isLikelyColdStartError, isColdStartHandlingEnabled } from '@/lib/server-wakeup';
+import { ensureServerAwake, isLikelyColdStartError, isColdStartHandlingEnabled, markSessionApiReady } from '@/lib/server-wakeup';
 import type {
   AuthResponse,
   LoginCredentials,
@@ -296,7 +296,10 @@ class ApiClient {
 
     // Response interceptor for error handling
     this.client.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        markSessionApiReady();
+        return response;
+      },
       async (error: AxiosError) => {
         const originalRequest = error.config as AxiosRequestConfig & {
           _retry?: boolean;

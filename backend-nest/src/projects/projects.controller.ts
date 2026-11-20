@@ -10,7 +10,10 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Res,
+  Headers,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ProjectsService } from './projects.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
@@ -58,14 +61,32 @@ export class ProjectsController {
   @UseGuards(JwtAuthGuard)
   async findAll(
     @CurrentUser() user: { id: string },
+    @Res({ passthrough: true }) res: Response,
+    @Headers('if-none-match') ifNoneMatch?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.projectsService.findAll(
+    const result = await this.projectsService.findAll(
       user.id,
       parseInt(page || '1', 10),
       parseInt(limit || '20', 10),
     );
+    const projectsList = Array.isArray(result) ? result : (result as { projects?: Array<{ updatedAt?: string | Date }> })?.projects || [];
+    const latestTimestamp = projectsList.length > 0 && projectsList[0]?.updatedAt
+      ? new Date(projectsList[0].updatedAt).getTime()
+      : 0;
+    const count = Array.isArray(result) ? result.length : (result as { total?: number })?.total || projectsList.length;
+    const etag = `W/"projects-${user.id}-${count}-${latestTimestamp}"`;
+
+    res.setHeader('ETag', etag);
+    res.setHeader('Cache-Control', 'private, no-cache, stale-while-revalidate=60');
+
+    if (ifNoneMatch && ifNoneMatch === etag) {
+      res.status(HttpStatus.NOT_MODIFIED);
+      return;
+    }
+
+    return result;
   }
 
   /**

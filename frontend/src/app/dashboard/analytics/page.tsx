@@ -12,6 +12,8 @@ import {
   TrendingUp,
   Users,
   FileText,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -72,7 +74,12 @@ export default function AnalyticsPage() {
   const projectId = searchParams.get('projectId') || '';
   const [activeTab, setActiveTab] = useState('overview');
 
-  const { data: projects, isLoading: projectsLoading } = useQuery({
+  const {
+    data: projects,
+    isLoading: projectsLoading,
+    isError: projectsError,
+    refetch: refetchProjects,
+  } = useQuery({
     queryKey: ['projects'],
     queryFn: () => api.projects.getAll(),
   });
@@ -119,7 +126,25 @@ export default function AnalyticsPage() {
         )}
       </div>
 
-      {!projectId && projectsLoading && (
+      {projectsError && (
+        <Card className="border-red-200 dark:border-red-900/50 bg-red-50/50 dark:bg-red-950/20">
+          <CardHeader className="text-center">
+            <AlertCircle className="mx-auto mb-2 h-10 w-10 text-red-500" />
+            <CardTitle>Failed to load analytics data</CardTitle>
+            <CardDescription>
+              We encountered an issue fetching your presentations.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex justify-center pb-6">
+            <Button variant="outline" onClick={() => void refetchProjects()} className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {!projectsError && !projectId && projectsLoading && (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
