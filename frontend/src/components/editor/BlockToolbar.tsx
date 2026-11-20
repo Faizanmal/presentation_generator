@@ -18,6 +18,8 @@ import {
   Table,
   Video,
   ChevronDown,
+  Layout,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +29,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { Slide, BlockType, BlockContent } from "@/types";
 import { api } from "@/lib/api";
 import { useEditorStore } from "@/stores/editor-store";
@@ -34,7 +42,22 @@ import { useEditorStore } from "@/stores/editor-store";
 interface BlockToolbarProps {
   projectId: string;
   slide?: Slide;
+  onRegenerateSlide?: () => void;
+  onLayoutChange?: (layout: string) => void;
 }
+
+const LAYOUT_OPTIONS = [
+  { id: 'title-hero', label: 'Title Hero' },
+  { id: 'two-column', label: 'Two Column' },
+  { id: 'three-column', label: 'Three Column Cards' },
+  { id: 'image-left', label: 'Image Left' },
+  { id: 'image-right', label: 'Image Right' },
+  { id: 'stats-grid', label: 'Stats Grid' },
+  { id: 'timeline', label: 'Timeline' },
+  { id: 'quote-highlight', label: 'Quote Highlight' },
+  { id: 'bento-grid', label: 'Bento Grid' },
+  { id: 'single-column', label: 'Single Column' },
+];
 
 const BLOCK_TYPES: { type: BlockType; label: string; icon: ComponentType<{ className?: string }>; content: BlockContent }[] = [
   { type: "HEADING" as BlockType, label: "Heading", icon: Heading1, content: { text: "Heading" } },
@@ -50,7 +73,12 @@ const BLOCK_TYPES: { type: BlockType; label: string; icon: ComponentType<{ class
   { type: "EMBED" as BlockType, label: "Embed", icon: Video, content: { url: "" } },
 ];
 
-export default function BlockToolbar({ projectId, slide }: BlockToolbarProps) {
+export default function BlockToolbar({
+  projectId,
+  slide,
+  onRegenerateSlide,
+  onLayoutChange,
+}: BlockToolbarProps) {
 
   const addBlock = useEditorStore((state) => state.addBlock);
   const [isAdding, setIsAdding] = useState(false);
@@ -168,6 +196,53 @@ export default function BlockToolbar({ projectId, slide }: BlockToolbarProps) {
           </Button>
         ))}
       </div>
+
+      {onLayoutChange && slide && (
+        <div className="flex items-center border-l border-slate-200 dark:border-slate-700 pl-2 ml-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 text-xs font-medium text-slate-700 dark:text-slate-300">
+                <Layout className="h-3.5 w-3.5 mr-1.5 text-slate-500" />
+                <span className="hidden sm:inline">Layout: </span>{slide.layout || 'Default'}
+                <ChevronDown className="h-3 w-3 ml-1 text-slate-400" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-48">
+              {LAYOUT_OPTIONS.map((opt) => (
+                <DropdownMenuItem
+                  key={opt.id}
+                  onClick={() => onLayoutChange(opt.id)}
+                  className={slide.layout === opt.id ? "bg-slate-100 dark:bg-slate-800 font-semibold" : ""}
+                >
+                  {opt.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
+
+      {onRegenerateSlide && (
+        <div className="flex items-center">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onRegenerateSlide}
+                  className="h-8 text-xs font-medium text-slate-700 dark:text-slate-300"
+                  aria-label="Regenerate this slide"
+                >
+                  <RefreshCw className="h-3.5 w-3.5 mr-1.5 text-slate-500" />
+                  <span className="hidden md:inline">Regenerate this slide</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Re-pick visuals and layout for this slide only</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      )}
     </div>
   );
 }

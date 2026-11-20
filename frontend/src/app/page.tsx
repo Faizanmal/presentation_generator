@@ -51,36 +51,36 @@ const FOOTER_COMING_SOON_BADGE = (
 export default function Home() {
   const router = useRouter();
   const { isAuthenticated, isLoading: isAuthLoading, initialized } = useAuthStore();
+  const [hasToken] = useState(() => {
+    if (typeof window !== "undefined") {
+      return Boolean(localStorage.getItem("token") || localStorage.getItem("refreshToken"));
+    }
+    return false;
+  });
   const [mounted, setMounted] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     warmupServerInBackground();
+    if (hasToken) {
+      router.replace("/dashboard");
+      return;
+    }
     const frame = requestAnimationFrame(() => {
       setMounted(true);
     });
     return () => cancelAnimationFrame(frame);
-  }, []);
+  }, [hasToken, router]);
 
   // Redirect authenticated users straight to the dashboard
   useEffect(() => {
-    if (mounted && initialized && !isAuthLoading && isAuthenticated) {
-      router.push("/dashboard");
+    if (initialized && !isAuthLoading && isAuthenticated) {
+      router.replace("/dashboard");
     }
-  }, [isAuthenticated, isAuthLoading, initialized, router, mounted]);
+  }, [isAuthenticated, isAuthLoading, initialized, router]);
 
-  if (mounted && initialized && !isAuthLoading && isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center">
-        <div className="h-16 w-16 rounded-2xl bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-2xl shadow-blue-500/20 mb-6 scale-110">
-          <Sparkles className="h-10 w-10 text-slate-900 dark:text-white animate-pulse" />
-        </div>
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500 mb-4" />
-        <p className="text-slate-600 dark:text-slate-400 font-medium animate-pulse text-lg">
-          Opening dashboard…
-        </p>
-      </div>
-    );
+  if (hasToken || (initialized && !isAuthLoading && isAuthenticated)) {
+    return null;
   }
 
   return (

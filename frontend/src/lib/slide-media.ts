@@ -102,6 +102,16 @@ export function resolveTopicImageUrl(contextText: string, slideIndex = 0): strin
   return resolved;
 }
 
+export function getTopicImageSuggestions(contextText: string, count = 4): string[] {
+  const normalized = (contextText || '').trim();
+  for (const pool of TOPIC_IMAGE_POOLS) {
+    if (pool.keywords.test(normalized)) {
+      return pool.urls.slice(0, count);
+    }
+  }
+  return TOPIC_IMAGE_POOLS[0].urls.slice(0, count);
+}
+
 /**
  * If an image URL is a legacy random landscape seed (e.g. picsum.photos),
  * upgrade it to a topic-matched image using the deck/slide context.
@@ -156,6 +166,11 @@ export function mediaUrlFromBlockContent(
     content.src,
     content.imageUrl,
     content.image,
+    content.mediaUrl,
+    content.sourceUrl,
+    content.downloadUrl,
+    content.assetUrl,
+    content.photoUrl,
     content.embedUrl,
     content.href,
     content.text,

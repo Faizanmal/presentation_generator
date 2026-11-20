@@ -223,7 +223,7 @@ export function QuickActionsToolbar({
     ];
 
     const positionClasses = {
-        bottom: "fixed bottom-6 left-1/2 -translate-x-1/2",
+        bottom: "fixed bottom-14 md:bottom-6 left-1/2 -translate-x-1/2",
         top: "fixed top-20 left-1/2 -translate-x-1/2",
         left: "fixed left-6 top-1/2 -translate-y-1/2 flex-col",
         right: "fixed right-6 top-1/2 -translate-y-1/2 flex-col",
@@ -232,7 +232,7 @@ export function QuickActionsToolbar({
     return (
         <div
             className={cn(
-                "z-50 flex items-center gap-1 p-2 bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700",
+                "z-30 flex items-center gap-1 p-1.5 sm:p-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 max-w-[calc(100vw-16px)] overflow-x-auto",
                 positionClasses[position],
                 position === "left" || position === "right" ? "flex-col" : "flex-row"
             )}

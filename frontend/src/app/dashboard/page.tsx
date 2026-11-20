@@ -85,6 +85,7 @@ export default function DashboardPage() {
   const initialized = useAuthStore((state) => state.initialized);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"recent" | "name">("recent");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
@@ -340,21 +341,29 @@ export default function DashboardPage() {
     return filtered;
   }, [projects, searchQuery]);
 
-  // Deduplicate list to avoid React key warnings (shouldn't normally happen but
-  // we occasionally merge the same project twice during background polling).
+  // Deduplicate and sort list (by recent update or alphabetical name)
   const uniqueProjects = useMemo(() => {
     if (!filteredProjects) {
       return [];
     }
     const seen = new Set<string>();
-    return filteredProjects.filter((p) => {
+    const deduped = filteredProjects.filter((p) => {
       if (seen.has(p.id)) {
         return false;
       }
       seen.add(p.id);
       return true;
     });
-  }, [filteredProjects]);
+
+    return [...deduped].sort((a, b) => {
+      if (sortBy === "name") {
+        return (a.title || "").localeCompare(b.title || "");
+      }
+      const timeA = new Date(a.updatedAt || 0).getTime();
+      const timeB = new Date(b.updatedAt || 0).getTime();
+      return timeB - timeA;
+    });
+  }, [filteredProjects, sortBy]);
 
   // Handle create blank project
   const handleCreateBlank = useCallback(() => {
@@ -467,24 +476,36 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <div className="relative flex-1 sm:w-64">
+          <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-56 min-w-[140px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <Input
                 placeholder="Search presentations..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
+                className="pl-9 h-9 text-xs"
               />
             </div>
 
-            <div className="flex items-center border rounded-lg overflow-hidden">
+            <Select value={sortBy} onValueChange={(val: "recent" | "name") => setSortBy(val)}>
+              <SelectTrigger className="w-[130px] h-9 text-xs">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="recent">Recently edited</SelectItem>
+                <SelectItem value="name">Name (A-Z)</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <div className="flex items-center border rounded-lg overflow-hidden h-9">
               <button
                 onClick={() => {
                   setViewMode("grid");
                   analytics.engagement.viewModeChange('grid');
                 }}
-                className={`p-2 ${viewMode === "grid" ? "bg-slate-100 dark:bg-slate-800" : ""}`}
+                className={`p-2 h-full ${viewMode === "grid" ? "bg-slate-100 dark:bg-slate-800" : ""}`}
+                title="Grid view"
+                aria-label="Grid view"
               >
                 <LayoutGrid className="h-4 w-4" />
               </button>
@@ -493,14 +514,16 @@ export default function DashboardPage() {
                   setViewMode("list");
                   analytics.engagement.viewModeChange('list');
                 }}
-                className={`p-2 ${viewMode === "list" ? "bg-slate-100 dark:bg-slate-800" : ""}`}
+                className={`p-2 h-full ${viewMode === "list" ? "bg-slate-100 dark:bg-slate-800" : ""}`}
+                title="List view"
+                aria-label="List view"
               >
                 <List className="h-4 w-4" />
               </button>
             </div>
 
-            <Button onClick={openCreateModal}>
-              <Plus className="h-4 w-4 mr-2" />
+            <Button onClick={openCreateModal} size="sm" className="h-9">
+              <Plus className="h-4 w-4 mr-1.5" />
               New
             </Button>
           </div>
@@ -532,73 +555,99 @@ export default function DashboardPage() {
             ))}
           </div>
         ) : filteredProjects?.length === 0 ? (
-          <div className="text-center py-12">
-            <FileText className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">
-              {searchQuery ? "No presentations found" : "No presentations yet"}
+          <div className="text-center py-16 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-8 shadow-xs">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 mx-auto mb-4">
+              <FileText className="h-7 w-7" />
+            </div>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+              {searchQuery ? "No presentations found" : "Create your first deck"}
             </h3>
-            <p className="text-slate-600 dark:text-slate-400 mb-4">
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 max-w-sm mx-auto">
               {searchQuery
-                ? "Try a different search term"
-                : "Create your first presentation to get started"}
+                ? `No presentations matching "${searchQuery}". Try a different keyword.`
+                : "Create polished, professional pitch decks in seconds with AI or start from scratch."}
             </p>
-            {!searchQuery && (
-              <Button onClick={openCreateModal}>
+            {!searchQuery ? (
+              <Button onClick={openCreateModal} size="lg" className="px-6 font-semibold shadow-sm">
                 <Plus className="h-4 w-4 mr-2" />
-                Create presentation
+                Create your first deck
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" onClick={() => setSearchQuery("")}>
+                Clear search
               </Button>
             )}
           </div>
         ) : viewMode === "grid" ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {uniqueProjects.map((project) => (
-              <ProjectCard
+              <div
                 key={project.id}
-                project={project}
-                onOpen={(id) => {
-                  analytics.project.open(id);
-                  router.push(`/editor/${id}`);
+                onMouseEnter={() => {
+                  void queryClient.prefetchQuery({
+                    queryKey: ["project", project.id],
+                    queryFn: () => api.projects.getById(project.id),
+                    staleTime: 60_000,
+                  });
                 }}
-                onEdit={(id) => {
-                  analytics.project.open(id);
-                  router.push(`/editor/${id}`);
-                }}
-                onDuplicate={(id) => duplicateProjectMutation.mutate(id)}
-                onDelete={(id) => setDeleteProjectId(id)}
-                isFavorite={isFavorite(project.id)}
-                onToggleFavorite={(id) => {
-                  const newState = !isFavorite(id);
-                  toggleFavorite(id);
-                  analytics.engagement.toggleFavorite(id, newState);
-                }}
-                variant="grid"
-              />
+              >
+                <ProjectCard
+                  project={project}
+                  onOpen={(id) => {
+                    analytics.project.open(id);
+                    router.push(`/editor/${id}`);
+                  }}
+                  onEdit={(id) => {
+                    analytics.project.open(id);
+                    router.push(`/editor/${id}`);
+                  }}
+                  onDuplicate={(id) => duplicateProjectMutation.mutate(id)}
+                  onDelete={(id) => setDeleteProjectId(id)}
+                  isFavorite={isFavorite(project.id)}
+                  onToggleFavorite={(id) => {
+                    const newState = !isFavorite(id);
+                    toggleFavorite(id);
+                    analytics.engagement.toggleFavorite(id, newState);
+                  }}
+                  variant="grid"
+                />
+              </div>
             ))}
           </div>
         ) : (
           <div className="space-y-2">
             {uniqueProjects.map((project) => (
-              <ProjectCard
+              <div
                 key={project.id}
-                project={project}
-                onOpen={(id) => {
-                  analytics.project.open(id);
-                  router.push(`/editor/${id}`);
+                onMouseEnter={() => {
+                  void queryClient.prefetchQuery({
+                    queryKey: ["project", project.id],
+                    queryFn: () => api.projects.getById(project.id),
+                    staleTime: 60_000,
+                  });
                 }}
-                onEdit={(id) => {
-                  analytics.project.open(id);
-                  router.push(`/editor/${id}`);
-                }}
-                onDuplicate={(id) => duplicateProjectMutation.mutate(id)}
-                onDelete={(id) => setDeleteProjectId(id)}
-                isFavorite={isFavorite(project.id)}
-                onToggleFavorite={(id) => {
-                  const newState = !isFavorite(id);
-                  toggleFavorite(id);
-                  analytics.engagement.toggleFavorite(id, newState);
-                }}
-                variant="list"
-              />
+              >
+                <ProjectCard
+                  project={project}
+                  onOpen={(id) => {
+                    analytics.project.open(id);
+                    router.push(`/editor/${id}`);
+                  }}
+                  onEdit={(id) => {
+                    analytics.project.open(id);
+                    router.push(`/editor/${id}`);
+                  }}
+                  onDuplicate={(id) => duplicateProjectMutation.mutate(id)}
+                  onDelete={(id) => setDeleteProjectId(id)}
+                  isFavorite={isFavorite(project.id)}
+                  onToggleFavorite={(id) => {
+                    const newState = !isFavorite(id);
+                    toggleFavorite(id);
+                    analytics.engagement.toggleFavorite(id, newState);
+                  }}
+                  variant="list"
+                />
+              </div>
             ))}
           </div>
         )}

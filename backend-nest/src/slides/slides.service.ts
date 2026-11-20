@@ -22,6 +22,9 @@ interface UpdateSlideDto {
   title?: string;
   speakerNotes?: string;
   thumbnailUrl?: string;
+  transition?: string;
+  content?: Record<string, unknown> | null;
+  blocks?: Array<Record<string, unknown>>;
 }
 
 interface ReorderSlidesDto {
@@ -170,20 +173,52 @@ export class SlidesService {
       }
     }
 
-    const updated = await this.prisma.slide.update({
-      where: { id: slideId },
-      data: {
-        layout: updateSlideDto.layout,
-        order: updateSlideDto.order,
-        title: updateSlideDto.title,
-        thumbnailUrl: updateSlideDto.thumbnailUrl,
-      },
-      include: {
-        blocks: {
-          orderBy: { order: 'asc' },
+    const dataToUpdate: Prisma.SlideUpdateInput = {};
+    if (updateSlideDto.layout !== undefined) dataToUpdate.layout = updateSlideDto.layout;
+    if (updateSlideDto.order !== undefined) dataToUpdate.order = updateSlideDto.order;
+    if (updateSlideDto.title !== undefined) dataToUpdate.title = updateSlideDto.title;
+    if (updateSlideDto.thumbnailUrl !== undefined) dataToUpdate.thumbnailUrl = updateSlideDto.thumbnailUrl;
+    if (updateSlideDto.speakerNotes !== undefined) dataToUpdate.speakerNotes = updateSlideDto.speakerNotes;
+    if (updateSlideDto.transition !== undefined) dataToUpdate.transition = updateSlideDto.transition;
+    if (updateSlideDto.content !== undefined) dataToUpdate.content = updateSlideDto.content as Prisma.InputJsonValue;
+
+    let updated;
+    if (Array.isArray(updateSlideDto.blocks)) {
+      updated = await this.prisma.$transaction(async (tx) => {
+        await tx.block.deleteMany({ where: { slideId } });
+        if (updateSlideDto.blocks && updateSlideDto.blocks.length > 0) {
+          await tx.block.createMany({
+            data: updateSlideDto.blocks.map((b, idx) => ({
+              projectId: slide.projectId,
+              slideId,
+              blockType: (b.blockType || b.type || 'PARAGRAPH') as BlockType,
+              content: (b.content || {}) as Prisma.InputJsonValue,
+              style: (b.style || {}) as Prisma.InputJsonValue,
+              order: typeof b.order === 'number' ? b.order : idx,
+            })),
+          });
+        }
+        return tx.slide.update({
+          where: { id: slideId },
+          data: dataToUpdate,
+          include: {
+            blocks: {
+              orderBy: { order: 'asc' },
+            },
+          },
+        });
+      });
+    } else {
+      updated = await this.prisma.slide.update({
+        where: { id: slideId },
+        data: dataToUpdate,
+        include: {
+          blocks: {
+            orderBy: { order: 'asc' },
+          },
         },
-      },
-    });
+      });
+    }
 
     // Update project timestamp
     await this.prisma.project.update({

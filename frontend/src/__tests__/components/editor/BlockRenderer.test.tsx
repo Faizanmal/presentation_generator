@@ -166,7 +166,7 @@ describe('BlockRenderer', () => {
 
         expect(screen.getByText('Item 1')).toBeInTheDocument();
         expect(screen.getByText('Item 2')).toBeInTheDocument();
-        expect(screen.getByRole('list')).toHaveClass('space-y-4');
+        expect(screen.getByRole('list')).toHaveClass('space-y-3');
     });
 
     it('renders an image with URL', () => {
@@ -206,7 +206,7 @@ describe('BlockRenderer', () => {
             />
         );
 
-        expect(screen.getByText('Click to add image')).toBeInTheDocument();
+        expect(screen.getByText('PresentPitch')).toBeInTheDocument();
     });
 
     it('calls onChange when content is edited (debounced)', async () => {

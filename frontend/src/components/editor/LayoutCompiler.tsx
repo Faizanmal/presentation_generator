@@ -13,6 +13,7 @@ interface LayoutCompilerProps {
   blocks: Block[];
   theme?: Theme;
   slideTitle?: string;
+  topicContext?: string;
   slideIndex?: number;
   presentationDensity?: number;
   presentationTone?: number;
@@ -117,6 +118,7 @@ export function LayoutCompiler({
   blocks,
   theme,
   slideTitle,
+  topicContext: topicContextProp,
   slideIndex = 0,
   presentationDensity = 60,
   presentationTone = 70,
@@ -144,7 +146,7 @@ export function LayoutCompiler({
     'relative w-full h-full min-h-0 overflow-hidden';
 
   const topicContext = useMemo(() => {
-    const parts = [slideTitle ? String(slideTitle).trim() : ''];
+    const parts = [topicContextProp ? String(topicContextProp).trim() : '', slideTitle ? String(slideTitle).trim() : ''];
     for (const b of blocks) {
       const c = b.content || {};
       const itemsText = Array.isArray(c.items)
@@ -289,7 +291,7 @@ export function LayoutCompiler({
       suppressCardChrome?: boolean;
     },
   ) => (
-    <div className="flex flex-col gap-1.5 min-w-0">
+    <div className={`flex flex-col gap-1.5 min-w-0 ${opts?.fillMedia ? 'h-full min-h-0' : ''}`}>
       <AnimatePresence initial={false}>
         {list.map((block, index) => (
           <React.Fragment key={`${keyPrefix}${block.id}`}>
@@ -717,11 +719,11 @@ export function LayoutCompiler({
           : maxCardChars > 95
           ? '0.925rem'
           : maxCardChars > 45
-          ? '1.02rem'
-          : '1.08rem';
+          ? '1.05rem'
+          : '1.12rem';
 
       return (
-        <div className={`w-full h-full flex flex-col justify-between ${contentPad} gap-3 relative z-10 overflow-hidden min-h-0`}>
+        <div className={`w-full h-full flex flex-col ${maxCardChars < 120 ? 'justify-center my-auto gap-4' : 'justify-between gap-3'} ${contentPad} relative z-10 overflow-hidden min-h-0`}>
           {titleBlocks.length > 0 && (
             <div className="shrink-0 max-w-4xl">
               {renderBlockList(titleBlocks, 't-', { compact: true })}
@@ -736,12 +738,12 @@ export function LayoutCompiler({
               })}
             </div>
           )}
-          <div className={`flex-1 h-full grid grid-cols-3 ${columnGap} items-stretch min-h-0`}>
+          <div className={`flex-1 ${maxCardChars < 120 ? 'my-auto max-h-[82%]' : 'h-full'} grid grid-cols-3 ${columnGap} items-stretch min-h-0`}>
             {cols.map((col, i) => (
               <div
                 // eslint-disable-next-line react/no-array-index-key
                 key={`col-${i}`}
-                className={`flex flex-col justify-between h-full flex-1 min-w-0 min-h-0 overflow-hidden gap-3 ${borderSubtle} rounded-2xl p-4 sm:p-5 shadow-sm`}
+                className={`flex flex-col ${maxCardChars < 120 ? 'justify-center py-5' : 'justify-between'} h-full flex-1 min-w-0 min-h-0 overflow-hidden gap-3 ${borderSubtle} rounded-2xl p-4 sm:p-5 shadow-sm`}
                 style={{ background: surface, opacity: bodyOpacity }}
               >
                 <div
@@ -971,8 +973,9 @@ export function LayoutCompiler({
           ? 'grid-cols-1 max-w-md mx-auto gap-4'
           : 'grid-cols-1 sm:grid-cols-2 gap-4';
 
+      const hasCompactCta = ctaCount > 0 || quoteBlocks.length > 0;
       return (
-        <div className={`w-full h-full flex flex-col justify-between ${contentPad} gap-3.5 relative z-10 overflow-hidden min-h-0`}>
+        <div className={`w-full h-full flex flex-col ${hasCompactCta ? 'justify-center my-auto gap-4' : 'justify-between gap-3.5'} ${contentPad} relative z-10 overflow-hidden min-h-0`}>
           {titleBlocks.length > 0 && (
             <div className="shrink-0 max-w-4xl">
               {renderBlockList(titleBlocks, 't-', { compact: true })}
@@ -1110,19 +1113,23 @@ export function LayoutCompiler({
     }
 
     case 'single-column':
-    default:
+    default: {
+      const contentBlocks = [...bodyBlocks, ...mediaBlocks];
+      const totalChars = contentBlocks.reduce((s, b) => s + blockPlainText(b).length, 0);
+      const isShortContent = totalChars < 160 && contentBlocks.length <= 3;
       return (
-        <div className={`w-full h-full flex flex-col ${contentPad} ${verticalGap} relative z-10 overflow-hidden`}>
+        <div className={`w-full h-full flex flex-col ${contentPad} ${isShortContent ? 'justify-center my-auto gap-4' : verticalGap} relative z-10 overflow-hidden`}>
           {titleBlocks.length > 0 && (
             <div className="shrink-0 max-w-4xl">{renderBlockList(titleBlocks, 't-')}</div>
           )}
           <div
-            className={`flex-1 flex flex-col min-h-0 max-w-3xl ${isDense ? 'gap-3' : 'gap-4'}`}
+            className={`flex-1 flex flex-col min-h-0 max-w-3xl ${isShortContent ? 'justify-center my-auto gap-3.5' : isDense ? 'gap-3' : 'gap-4'}`}
             style={{ opacity: bodyOpacity }}
           >
-            {renderBlockList([...bodyBlocks, ...mediaBlocks], 'content-')}
+            {renderBlockList(contentBlocks, 'content-', { uniformFontSize: isShortContent ? '1.12rem' : undefined })}
           </div>
         </div>
       );
+    }
   }
 }

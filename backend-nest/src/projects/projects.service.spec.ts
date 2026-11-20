@@ -44,6 +44,8 @@ describe('ProjectsService', () => {
     canCreateProject: jest.fn(),
     canGenerateAI: jest.fn(),
     incrementAIGenerations: jest.fn(),
+    assertCanCreateProject: jest.fn().mockResolvedValue(undefined),
+    assertCanGenerateAI: jest.fn().mockResolvedValue(undefined),
   };
 
   const mockAIService = {
@@ -110,7 +112,7 @@ describe('ProjectsService', () => {
         type: ProjectType.PRESENTATION,
       };
 
-      mockUsersService.canCreateProject.mockResolvedValue(true);
+      mockUsersService.assertCanCreateProject.mockResolvedValue(undefined);
       mockPrismaService.project.create.mockResolvedValue(mockProject);
       mockPrismaService.project.findUnique.mockResolvedValue(mockProject); // For findOne call at end of create
       mockPrismaService.slide.create.mockResolvedValue({ id: 'slide1' });
@@ -119,12 +121,14 @@ describe('ProjectsService', () => {
       const result = await service.create(userId, createDto);
 
       expect(result).toEqual(mockProject);
-      expect(mockUsersService.canCreateProject).toHaveBeenCalledWith(userId);
+      expect(mockUsersService.assertCanCreateProject).toHaveBeenCalledWith(userId);
       expect(mockPrismaService.project.create).toHaveBeenCalled();
     });
 
     it('should throw ForbiddenException if project limit reached', async () => {
-      mockUsersService.canCreateProject.mockResolvedValue(false);
+      mockUsersService.assertCanCreateProject.mockRejectedValueOnce(
+        new ForbiddenException('Limit reached'),
+      );
 
       await expect(service.create('user1', { title: 'Test' })).rejects.toThrow(
         ForbiddenException,
@@ -187,8 +191,8 @@ describe('ProjectsService', () => {
       const userId = 'user1';
       const mockJob = { id: 'job1' };
 
-      mockUsersService.canGenerateAI.mockResolvedValue(true);
-      mockUsersService.canCreateProject.mockResolvedValue(true);
+      mockUsersService.assertCanGenerateAI.mockResolvedValue(undefined);
+      mockUsersService.assertCanCreateProject.mockResolvedValue(undefined);
       mockQueue.add.mockResolvedValue(mockJob);
 
       const result = await service.generate(userId, generateDto);

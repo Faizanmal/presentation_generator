@@ -116,6 +116,15 @@ describe('AIService', () => {
   };
 
   beforeEach(async () => {
+    // Reset mocks and default config BEFORE creating module and instantiating AIService
+    jest.clearAllMocks();
+    mockConfigService.get.mockImplementation((key: string) => {
+      const config: Record<string, string> = {
+        OPENAI_API_KEY: 'test-api-key',
+      };
+      return config[key];
+    });
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AIService,
@@ -131,9 +140,6 @@ describe('AIService', () => {
 
     service = module.get<AIService>(AIService);
     // prismaService = module.get<PrismaService>(PrismaService);
-
-    // Reset mocks
-    jest.clearAllMocks();
 
     // Disable the Pollinations provider so image-generation tests exercise the
     // mocked DALL-E path deterministically instead of making real HTTP calls.

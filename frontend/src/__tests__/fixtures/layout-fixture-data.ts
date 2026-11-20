@@ -95,3 +95,9 @@ export const LAYOUT_FIXTURES: LayoutFixture[] = [
     bullets: ['7am–6pm', 'Wifi', 'Pastries'],
   },
 ];
+
+describe('Layout Fixtures Data', () => {
+  it('contains valid fixtures array', () => {
+    expect(LAYOUT_FIXTURES.length).toBeGreaterThan(0);
+  });
+});

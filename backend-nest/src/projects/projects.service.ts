@@ -1149,7 +1149,7 @@ export class ProjectsService {
       throw new ForbiddenException('You cannot edit this project');
     }
     await this.migrateLegacyDeckIfNeeded(project, true);
-    return project;
+    return this.findOne(id, userId);
   }
 
   /**

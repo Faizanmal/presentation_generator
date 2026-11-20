@@ -161,6 +161,11 @@
     },
     "moduleNameMapper": {
       "^uuid$": "<rootDir>/__mocks__/uuid.ts",
+      "^@nestjs/config$": "<rootDir>/__mocks__/nest-config.ts",
+      "^@nestjs/bullmq$": "<rootDir>/__mocks__/nest-bullmq.ts",
+      "^@nestjs/jwt$": "<rootDir>/__mocks__/nest-jwt.ts",
+      "^@nestjs/passport$": "<rootDir>/__mocks__/nest-passport.ts",
+      "^@nestjs/schedule$": "<rootDir>/__mocks__/nest-schedule.ts",
       "^@shared/(.*)$": "<rootDir>/../../shared/$1"
     },
     "collectCoverageFrom": [

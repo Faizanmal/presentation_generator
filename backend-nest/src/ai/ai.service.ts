@@ -1408,6 +1408,23 @@ Slide 1 must be title-hero. Include at least one comparison, one timeline, and o
         layout = this.recommendLayout(blocks, typedSection.heading);
       }
 
+      // Ensure varied layout mix: no two consecutive slides use the same layout
+      if (sections.length > 0 && sections[sections.length - 1].layout === layout) {
+        const alternateLayouts: LayoutType[] = [
+          'three-column',
+          'stats-grid',
+          'comparison',
+          'timeline',
+          'image-right',
+          'quote-highlight',
+          'bento-grid',
+        ];
+        const nextAlt = alternateLayouts.find((alt) => alt !== layout);
+        if (nextAlt) {
+          layout = nextAlt;
+        }
+      }
+
       sections.push({
         heading: typedSection.heading,
         kicker:
@@ -3170,6 +3187,7 @@ Use the advanced presentation JSON format with layouts and image suggestions.`,
   public resolveTopicMatchedImageUrl(
     contextText: string,
     slideIndex = 0,
+    usedUrls?: Set<string>,
   ): string {
     const pools: Array<{ pattern: RegExp; urls: string[] }> = [
       {
@@ -3231,7 +3249,15 @@ Use the advanced presentation JSON format with layouts and image suggestions.`,
         for (let i = 0; i < normalized.length; i++) {
           hash = (hash * 31 + normalized.charCodeAt(i)) >>> 0;
         }
-        return pool.urls[hash % pool.urls.length];
+        let selected = pool.urls[hash % pool.urls.length];
+        if (usedUrls) {
+          const unused = pool.urls.find((u) => !usedUrls.has(u));
+          if (unused) {
+            selected = unused;
+          }
+          usedUrls.add(selected);
+        }
+        return selected;
       }
     }
 
@@ -3245,9 +3271,13 @@ Use the advanced presentation JSON format with layouts and image suggestions.`,
         .join(' ')
         .trim() || 'modern business presentation';
 
-    return `https://image.pollinations.ai/prompt/${encodeURIComponent(
+    const fallbackUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(
       `${keywords} professional editorial photography`,
     )}?width=1600&height=900&nologo=true`;
+    if (usedUrls) {
+      usedUrls.add(fallbackUrl);
+    }
+    return fallbackUrl;
   }
 
   /**
@@ -3262,6 +3292,7 @@ Use the advanced presentation JSON format with layouts and image suggestions.`,
     deckTopic?: string,
   ): Promise<Map<number, ImageGenerationResult>> {
     const imageMap = new Map<number, ImageGenerationResult>();
+    const usedUrls = new Set<string>();
 
     const promptFromSuggestion = (
       suggestion?: GeneratedSection['suggestedImage'],
@@ -3296,7 +3327,7 @@ Use the advanced presentation JSON format with layouts and image suggestions.`,
           .trim();
 
         const queryTerm = rawKeywords || 'modern presentation slide';
-        const imageUrl = this.resolveTopicMatchedImageUrl(queryTerm, index);
+        const imageUrl = this.resolveTopicMatchedImageUrl(queryTerm, index, usedUrls);
         imageMap.set(index, {
           imageUrl,
           revisedPrompt: queryTerm,
@@ -3312,7 +3343,7 @@ Use the advanced presentation JSON format with layouts and image suggestions.`,
           .join(' ')
           .trim();
         imageMap.set(index, {
-          imageUrl: this.resolveTopicMatchedImageUrl(queryTerm, index),
+          imageUrl: this.resolveTopicMatchedImageUrl(queryTerm, index, usedUrls),
           revisedPrompt: queryTerm,
           provider: 'pollinations',
         });

@@ -31,6 +31,7 @@ const Ambient3DBackground = dynamic(
 
 interface SlideCanvasProps {
   projectId: string;
+  projectTitle?: string;
   slide: Slide;
   theme?: Theme;
   presentationDensity?: number;
@@ -193,6 +194,7 @@ const getDecoPattern = (primaryColor: string, accentColor: string, layout: strin
 
 export default function SlideCanvas({
   projectId,
+  projectTitle,
   slide,
   theme,
   presentationDensity = 60,
@@ -426,7 +428,7 @@ export default function SlideCanvas({
     >
       <div
         ref={canvasRef}
-        className="w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden relative transition-all duration-500"
+        className="w-full max-w-5xl aspect-video rounded-2xl shadow-2xl overflow-hidden relative transition-all duration-500 max-h-[85vh]"
         style={{
           aspectRatio: '16 / 9',
           backgroundColor: bgColor,
@@ -481,6 +483,7 @@ export default function SlideCanvas({
                 layoutType={rawLayout}
                 blocks={sortedBlocks}
                 slideTitle={slide.title}
+                topicContext={[projectTitle, slide.title].filter(Boolean).join(' ')}
                 slideIndex={slide.order ?? 0}
                 theme={theme}
                 presentationDensity={presentationDensity}

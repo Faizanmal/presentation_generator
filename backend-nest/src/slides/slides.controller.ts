@@ -10,23 +10,81 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import {
+  IsString,
+  IsInt,
+  IsOptional,
+  IsArray,
+  IsObject,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import { SlidesService } from './slides.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
-class CreateSlideDto {
+export class CreateSlideDto {
+  @IsString()
   projectId!: string;
+
+  @IsInt()
   order!: number;
+
+  @IsString()
+  @IsOptional()
   layout?: string;
+
+  @IsString()
+  @IsOptional()
+  title?: string;
 }
 
-class UpdateSlideDto {
+export class UpdateSlideDto {
+  @IsString()
+  @IsOptional()
+  title?: string;
+
+  @IsString()
+  @IsOptional()
   layout?: string;
+
+  @IsInt()
+  @IsOptional()
   order?: number;
+
+  @IsString()
+  @IsOptional()
+  speakerNotes?: string;
+
+  @IsString()
+  @IsOptional()
+  thumbnailUrl?: string;
+
+  @IsString()
+  @IsOptional()
+  transition?: string;
+
+  @IsOptional()
+  content?: Record<string, unknown> | null;
+
+  @IsArray()
+  @IsOptional()
+  blocks?: Array<Record<string, unknown>>;
 }
 
-class ReorderSlidesDto {
-  slides!: Array<{ id: string; order: number }>;
+class SlideOrderItem {
+  @IsString()
+  id!: string;
+
+  @IsInt()
+  order!: number;
+}
+
+export class ReorderSlidesDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SlideOrderItem)
+  slides!: SlideOrderItem[];
 }
 
 @Controller('slides')

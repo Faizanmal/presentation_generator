@@ -420,6 +420,11 @@ class ApiClient {
     this.token = token;
     if (typeof window !== 'undefined') {
       localStorage.setItem('token', token);
+      try {
+        document.cookie = `auth-token=${encodeURIComponent(token)}; path=/; max-age=604800; SameSite=Lax`;
+      } catch {
+        // Ignore cookie write errors
+      }
     }
   }
 
@@ -436,6 +441,11 @@ class ApiClient {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('token');
       localStorage.removeItem('refreshToken');
+      try {
+        document.cookie = 'auth-token=; path=/; max-age=0; SameSite=Lax';
+      } catch {
+        // Ignore cookie write errors
+      }
     }
   }
 

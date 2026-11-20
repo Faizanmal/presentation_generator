@@ -39,6 +39,7 @@ import {
   FileUp,
   ExternalLink,
   RefreshCw,
+  MoreVertical,
 } from "lucide-react";
 import Link from "next/link";
 import { resolveTopicImageUrl, upgradeLegacyImageUrl, mediaUrlFromBlockContent } from "@/lib/slide-media";
@@ -162,8 +163,16 @@ export default function EditorPage() {
   const deleteSlide = useEditorStore((state) => state.deleteSlide);
   const reorderSlides = useEditorStore((state) => state.reorderSlides);
   const setTheme = useEditorStore((state) => state.setTheme);
+  const updateSlide = useEditorStore((state) => state.updateSlide);
+  const currentSlide = project?.slides?.[currentSlideIndex];
 
-  const [isSidePanelOpen, setIsSidePanelOpen] = useState(true);
+  const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+      setIsSidePanelOpen(true);
+    }
+  }, []);
   const [isThemePanelOpen, setIsThemePanelOpen] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState("");
@@ -190,6 +199,7 @@ export default function EditorPage() {
     canRedo,
     jumpToState,
     clearHistory,
+    pushAction,
   } = useUndoHistory();
 
   // Recent projects tracking
@@ -433,10 +443,11 @@ export default function EditorPage() {
   }, []);
 
   const handleRegenerateLayout = useCallback(async () => {
-    if (!project) {return;}
+    if (!project) return;
     if (autoSaveDebounceTimerRef.current) {
       clearTimeout(autoSaveDebounceTimerRef.current);
     }
+    const previousProject = project;
     setIsRegeneratingLayout(true);
     setSaveStatus("saving");
 
@@ -448,10 +459,8 @@ export default function EditorPage() {
       } catch {
         updated = migrateDeckSlidesClientSide(project, true);
       }
-      loadProject(updated);
-      queryClient.setQueryData(["project", projectId], updated);
 
-      // Persist regenerated layouts to server
+      // Persist regenerated layouts to server atomically BEFORE updating canvas/store
       if (updated.slides) {
         await Promise.all(
           updated.slides.map((s) =>
@@ -460,7 +469,19 @@ export default function EditorPage() {
               layout: s.layout,
               order: s.order,
               speakerNotes: s.speakerNotes,
-            }).catch((err) => console.warn("[Regenerate] slide sync warning:", err))
+              transition: s.transition,
+              ...((s as unknown as Record<string, unknown>).thumbnailUrl
+                ? { thumbnailUrl: String((s as unknown as Record<string, unknown>).thumbnailUrl) }
+                : {}),
+              blocks: (s.blocks || []).map((b) => ({
+                id: b.id,
+                blockType: b.type || (b as unknown as Record<string, unknown>).blockType,
+                type: b.type || (b as unknown as Record<string, unknown>).blockType,
+                content: b.content,
+                style: b.style,
+                order: b.order,
+              })) as unknown as Block[],
+            })
           )
         );
         updated.slides.forEach((s) => {
@@ -470,21 +491,116 @@ export default function EditorPage() {
           );
         });
       }
+
+      // Update store and canvas ONLY after successful save
+      loadProject(updated);
+      queryClient.setQueryData(["project", projectId], updated);
+      pushAction({
+        actionType: "batch_update",
+        description: "Regenerate layout",
+        data: {
+          before: { slides: previousProject.slides },
+          after: { slides: updated.slides },
+        },
+      });
+
       dirtySlideIdsRef.current.clear();
       useEditorStore.setState({ isDirty: false });
       setSaveStatus("saved");
       setTimeout(() => {
         setSaveStatus((prev) => (prev === "saved" ? "idle" : prev));
       }, 2500);
-      toast.success("Layouts and topic visuals updated while keeping your edits");
-    } catch (err) {
-      console.error("[Regenerate] Failed", err);
+      toast.success("Rebuilds layouts and visuals. Your text edits are kept.");
+    } catch (err: unknown) {
+      console.error("[Regenerate] Failed to save regenerated layouts", err);
+      // Rollback store and UI
+      loadProject(previousProject);
       setSaveStatus("error");
-      toast.error("Failed to save layout changes. Click Retry to re-save.");
+      const validationMsg = (err as any)?.response?.data?.message || (err as Error)?.message || "Validation error";
+      const formattedMsg = Array.isArray(validationMsg) ? validationMsg.join(", ") : String(validationMsg);
+      toast.error(`Failed to save layout: ${formattedMsg}`, {
+        action: {
+          label: "Retry",
+          onClick: () => void handleRegenerateLayout(),
+        },
+      });
     } finally {
       setIsRegeneratingLayout(false);
     }
-  }, [project, projectId, migrateDeckSlidesClientSide, loadProject, queryClient]);
+  }, [project, projectId, migrateDeckSlidesClientSide, loadProject, queryClient, pushAction]);
+
+  const handleRegenerateSingleSlide = useCallback(async (slideId: string) => {
+    if (!project?.slides) return;
+    const slideIdx = project.slides.findIndex((s) => s.id === slideId);
+    if (slideIdx === -1) return;
+    const targetSlide = project.slides[slideIdx];
+    const previousSlide = { ...targetSlide };
+
+    const deckTopicContext = [project.title, targetSlide.title].filter(Boolean).join(" ");
+    const nextBlocks = (targetSlide.blocks || []).map((b) => {
+      const bType = String(b.type || (b as any).blockType || "").toUpperCase();
+      if (bType === "IMAGE") {
+        const newUrl = resolveTopicImageUrl(deckTopicContext, targetSlide.order ?? slideIdx);
+        return { ...b, content: { ...(b.content || {}), url: newUrl, src: newUrl, imageUrl: newUrl } };
+      }
+      return b;
+    });
+
+    const updatedSlide: Slide = {
+      ...targetSlide,
+      blocks: nextBlocks,
+    };
+
+    setSaveStatus("saving");
+    try {
+      await api.updateSlide(targetSlide.id, {
+        title: updatedSlide.title,
+        layout: updatedSlide.layout,
+        order: updatedSlide.order,
+        speakerNotes: updatedSlide.speakerNotes,
+        blocks: nextBlocks.map((b) => ({
+          id: b.id,
+          blockType: b.type || (b as unknown as Record<string, unknown>).blockType,
+          type: b.type || (b as unknown as Record<string, unknown>).blockType,
+          content: b.content,
+          style: b.style,
+          order: b.order,
+        })) as unknown as Block[],
+      });
+
+      updateSlide(targetSlide.id, updatedSlide);
+      pushAction({
+        actionType: "update_slide",
+        description: `Regenerate slide ${slideIdx + 1}`,
+        slideId: targetSlide.id,
+        data: { before: previousSlide as any, after: updatedSlide as any },
+      });
+      setSaveStatus("saved");
+      toast.success(`Slide ${slideIdx + 1} visuals updated`);
+    } catch (err) {
+      console.error("[RegenerateSlide] Failed", err);
+      updateSlide(targetSlide.id, previousSlide);
+      setSaveStatus("error");
+      toast.error("Failed to regenerate slide");
+    }
+  }, [project, updateSlide, pushAction]);
+
+  const handleQuickLayoutChange = useCallback(async (layout: string) => {
+    if (!currentSlide) return;
+    const previousLayout = currentSlide.layout;
+    updateSlide(currentSlide.id, { layout });
+    setSaveStatus("saving");
+    try {
+      await api.updateSlide(currentSlide.id, { layout });
+      setSaveStatus("saved");
+      toast.success(`Layout changed to ${layout}`);
+    } catch (err) {
+      console.error("[QuickLayout] Failed", err);
+      updateSlide(currentSlide.id, { layout: previousLayout });
+      setSaveStatus("error");
+      toast.error("Failed to change layout");
+    }
+  }, [currentSlide, updateSlide]);
 
   // Keyboard navigation for next/previous slide
   useEffect(() => {
@@ -565,9 +681,6 @@ export default function EditorPage() {
     }
     setIsEditingTitle(false);
   }, [titleInput, project?.title, updateProject, saveMutation]);
-
-  // Current slide
-  const currentSlide = project?.slides?.[currentSlideIndex];
 
   // DnD sensors
   const sensors = useSensors(
@@ -895,13 +1008,13 @@ export default function EditorPage() {
               onChange={(e) => setTitleInput(e.target.value)}
               onBlur={handleTitleSave}
               onKeyDown={(e) => e.key === "Enter" && handleTitleSave()}
-              className="w-64"
+              className="w-40 sm:w-64"
               autoFocus
             />
           ) : (
             <button
               onClick={() => setIsEditingTitle(true)}
-              className="text-lg font-medium text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800 px-2 py-1 rounded"
+              className="text-base sm:text-lg font-medium text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800 px-2 py-1 rounded truncate max-w-[120px] sm:max-w-[200px] md:max-w-xs text-left"
             >
               {project.title}
             </button>
@@ -937,223 +1050,267 @@ export default function EditorPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Keyboard shortcuts help popover */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-slate-500"
-                aria-label="Keyboard shortcuts"
-                title="Keyboard shortcuts"
-              >
-                <HelpCircle className="h-4 w-4" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-68 p-3 text-xs space-y-2">
-              <div className="font-semibold text-slate-900 dark:text-white border-b pb-1">Keyboard Shortcuts</div>
-              <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
-                <span>Next slide</span>
-                <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded font-mono text-[10px]">→ / J / PgDn</kbd>
-              </div>
-              <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
-                <span>Previous slide</span>
-                <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded font-mono text-[10px]">← / K / PgUp</kbd>
-              </div>
-              <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
-                <span>Undo / Redo</span>
-                <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded font-mono text-[10px]">Ctrl+Z / Ctrl+Y</kbd>
-              </div>
-              <div className="text-[10px] text-slate-400 pt-1 border-t">Autosaved every ~800ms</div>
-            </PopoverContent>
-          </Popover>
-
-          {/* Undo/Redo with history */}
-          <UndoRedoButtons
-            canUndo={canUndo}
-            canRedo={canRedo}
-            onUndo={undo}
-            onRedo={redo}
-          />
-
-          {/* Undo History Panel */}
-          <UndoHistoryPanel
-            history={history}
-            future={future}
-            canUndo={canUndo}
-            canRedo={canRedo}
-            onUndo={undo}
-            onRedo={redo}
-            onJumpToState={jumpToState}
-            onClearHistory={clearHistory}
-          />
-
-          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-2" />
-
-          {/* Slide Outline */}
-          <SlideOutline
-            slides={project.slides || []}
-            currentSlideId={currentSlide?.id}
-            onSlideSelect={(slideId) => {
-              const index = project.slides?.findIndex((s) => s.id === slideId) ?? -1;
-              if (index !== -1) { setCurrentSlideIndex(index); }
-            }}
-            onSlideDelete={handleDeleteSlide}
-            onSlideDuplicate={(slideId) => {
-              const slide = project.slides?.find((s) => s.id === slideId);
-              if (slide) { handleDuplicateSlide(slide); }
-            }}
-          />
-
-          {/* Regenerate layout with tooltip */}
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
+          {/* Desktop-only secondary actions (hidden below 900px) */}
+          <div className="hidden min-[900px]:flex items-center gap-2">
+            {/* Keyboard shortcuts help popover */}
+            <Popover>
+              <PopoverTrigger asChild>
                 <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRegenerateLayout}
-                  disabled={isRegeneratingLayout}
-                  aria-label="Regenerate layout"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-slate-500"
+                  aria-label="Keyboard shortcuts"
+                  title="Keyboard shortcuts"
                 >
+                  <HelpCircle className="h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-68 p-3 text-xs space-y-2">
+                <div className="font-semibold text-slate-900 dark:text-white border-b pb-1">Keyboard Shortcuts</div>
+                <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
+                  <span>Next slide</span>
+                  <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded font-mono text-[10px]">→ / J / PgDn</kbd>
+                </div>
+                <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
+                  <span>Previous slide</span>
+                  <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded font-mono text-[10px]">← / K / PgUp</kbd>
+                </div>
+                <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
+                  <span>Undo / Redo</span>
+                  <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded font-mono text-[10px]">Ctrl+Z / Ctrl+Y</kbd>
+                </div>
+                <div className="text-[10px] text-slate-400 pt-1 border-t">Autosaved every ~800ms</div>
+              </PopoverContent>
+            </Popover>
+
+            {/* Undo/Redo with history */}
+            <UndoRedoButtons
+              canUndo={canUndo}
+              canRedo={canRedo}
+              onUndo={undo}
+              onRedo={redo}
+            />
+
+            {/* Undo History Panel */}
+            <UndoHistoryPanel
+              history={history}
+              future={future}
+              canUndo={canUndo}
+              canRedo={canRedo}
+              onUndo={undo}
+              onRedo={redo}
+              onJumpToState={jumpToState}
+              onClearHistory={clearHistory}
+            />
+
+            <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-2" />
+
+            {/* Slide Outline */}
+            <SlideOutline
+              slides={project.slides || []}
+              currentSlideId={currentSlide?.id}
+              onSlideSelect={(slideId) => {
+                const index = project.slides?.findIndex((s) => s.id === slideId) ?? -1;
+                if (index !== -1) { setCurrentSlideIndex(index); }
+              }}
+              onSlideDelete={handleDeleteSlide}
+              onSlideDuplicate={(slideId) => {
+                const slide = project.slides?.find((s) => s.id === slideId);
+                if (slide) { handleDuplicateSlide(slide); }
+              }}
+            />
+
+            {/* Regenerate layout with exact required tooltip */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRegenerateLayout}
+                    disabled={isRegeneratingLayout}
+                    aria-label="Regenerate layout"
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${isRegeneratingLayout ? "animate-spin" : ""}`} />
+                    Regenerate layout
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs text-xs">
+                  Rebuilds layouts and visuals. Your text edits are kept.
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            {/* Templates */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowTemplatesDialog(true)}
+            >
+              <Layout className="h-4 w-4 mr-2" />
+              Templates
+            </Button>
+
+            {/* Import Document */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowDocUpload(true)}
+            >
+              <FileUp className="h-4 w-4 mr-2" />
+              Import
+            </Button>
+
+            {/* Master Slides */}
+            <Sheet open={showMasterSlides} onOpenChange={setShowMasterSlides}>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Shield className="h-4 w-4 mr-2" />
+                  Master
+                </Button>
+              </SheetTrigger>
+              <SheetContent className="overflow-y-auto p-0 w-96">
+                <MasterSlidePanel
+                  isEnterprise
+                  onApplyTemplate={(template: MasterSlideTemplate) => {
+                    if (project?.slides?.[currentSlideIndex]) {
+                      const slide = project.slides[currentSlideIndex];
+                      template.regions.forEach(async (region, idx) => {
+                        const blockType = region.allowedBlockTypes[0] || 'PARAGRAPH';
+                        try {
+                          await api.blocks.create(projectId, slide.id, {
+                            projectId,
+                            blockType: blockType as BlockType,
+                            content: { text: region.placeholder },
+                            order: idx,
+                            style: {
+                              x: Math.round((region.x / 100) * 1280),
+                              y: Math.round((region.y / 100) * 720),
+                              width: Math.round((region.width / 100) * 1280),
+                              height: Math.round((region.height / 100) * 720),
+                              locked: region.locked,
+                            } as BlockStyle,
+                          });
+                        } catch {
+                          // Continue
+                        }
+                      });
+                      queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+                      setShowMasterSlides(false);
+                    }
+                  }}
+                />
+              </SheetContent>
+            </Sheet>
+
+            <Sheet open={showDesignControls} onOpenChange={setShowDesignControls}>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <SlidersHorizontal className="h-4 w-4 mr-2" />
+                  Design
+                </Button>
+              </SheetTrigger>
+              <SheetContent className="overflow-y-auto p-0 w-96">
+                <div className="p-5 border-b border-slate-200 dark:border-slate-800">
+                  <h3 className="text-base font-semibold text-slate-900 dark:text-white">Presentation Design</h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                    Control density and tone to shape the final presentation style.
+                  </p>
+                </div>
+                <div className="p-5">
+                  <SlideDesignControls
+                    projectId={projectId}
+                    themes={(themes || []).map((theme) => ({
+                      id: theme.id,
+                      name: theme.name,
+                      colors: {
+                        background: theme.colors.background,
+                        primary: theme.colors.primary,
+                        text: theme.colors.text,
+                        accent: theme.colors.accent,
+                      },
+                    }))}
+                    currentThemeId={project.theme?.id}
+                    onThemeChange={handleDesignThemeChange}
+                    onExportPdf={() => requestExport("pdf")}
+                    onLayoutDensityChange={setLayoutDensity}
+                    onToneChange={setToneOfVoice}
+                  />
+                </div>
+              </SheetContent>
+            </Sheet>
+
+            <Sheet open={isThemePanelOpen} onOpenChange={setIsThemePanelOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Palette className="h-4 w-4 mr-2" />
+                  Theme
+                </Button>
+              </SheetTrigger>
+              <SheetContent className="overflow-y-auto">
+                <SheetHeader>
+                  <SheetTitle>Choose Theme</SheetTitle>
+                  <SheetDescription>
+                    Select a theme to apply to your presentation
+                  </SheetDescription>
+                </SheetHeader>
+                <ThemeSelector
+                  themes={themes || []}
+                  currentTheme={project.theme || undefined}
+                  onSelect={handleThemeChange}
+                />
+              </SheetContent>
+            </Sheet>
+
+            <Button variant="outline" size="sm" onClick={() => setShowShare(true)}>
+              <Share2 className="h-4 w-4 mr-2" />
+              Share
+            </Button>
+          </div>
+
+          {/* Collapsed "More" dropdown for screens below 900px */}
+          <div className="flex min-[900px]:hidden items-center gap-1.5">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 px-2 text-xs" aria-label="More actions">
+                  <MoreVertical className="h-3.5 w-3.5" />
+                  <span className="sr-only">More</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={handleRegenerateLayout} disabled={isRegeneratingLayout}>
                   <RefreshCw className={`h-4 w-4 mr-2 ${isRegeneratingLayout ? "animate-spin" : ""}`} />
                   Regenerate layout
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-xs text-xs">
-                Re-render slide layouts and topic visuals while keeping your text and edits.
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowTemplatesDialog(true)}>
+                  <Layout className="h-4 w-4 mr-2" />
+                  Templates
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowDocUpload(true)}>
+                  <FileUp className="h-4 w-4 mr-2" />
+                  Import Document
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowDesignControls(true)}>
+                  <SlidersHorizontal className="h-4 w-4 mr-2" />
+                  Design Controls
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsThemePanelOpen(true)}>
+                  <Palette className="h-4 w-4 mr-2" />
+                  Change Theme
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowShare(true)}>
+                  <Share2 className="h-4 w-4 mr-2" />
+                  Share
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
 
-          {/* Templates */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowTemplatesDialog(true)}
-          >
-            <Layout className="h-4 w-4 mr-2" />
-            Templates
-          </Button>
-
-          {/* Import Document */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowDocUpload(true)}
-          >
-            <FileUp className="h-4 w-4 mr-2" />
-            Import
-          </Button>
-
-          {/* Master Slides */}
-          <Sheet open={showMasterSlides} onOpenChange={setShowMasterSlides}>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Shield className="h-4 w-4 mr-2" />
-                Master
-              </Button>
-            </SheetTrigger>
-            <SheetContent className="overflow-y-auto p-0 w-96">
-              <MasterSlidePanel
-                isEnterprise
-                onApplyTemplate={(template: MasterSlideTemplate) => {
-                  // Apply master template regions as blocks on the current slide
-                  if (project?.slides?.[currentSlideIndex]) {
-                    const slide = project.slides[currentSlideIndex];
-                    // Create blocks from template regions
-                    template.regions.forEach(async (region, idx) => {
-                      const blockType = region.allowedBlockTypes[0] || 'PARAGRAPH';
-                      try {
-                        // api.blocks.create expects projectId, slideId, and then the input object
-                        await api.blocks.create(projectId, slide.id, {
-                          projectId,
-                          blockType: blockType as BlockType,
-                          content: { text: region.placeholder },
-                          order: idx,
-                          style: {
-                            x: Math.round((region.x / 100) * 1280),
-                            y: Math.round((region.y / 100) * 720),
-                            width: Math.round((region.width / 100) * 1280),
-                            height: Math.round((region.height / 100) * 720),
-                            locked: region.locked,
-                          } as BlockStyle,
-                        });
-                      } catch {
-                        // Block creation continues for remaining regions
-                      }
-                    });
-                    queryClient.invalidateQueries({ queryKey: ['project', projectId] });
-                    setShowMasterSlides(false);
-                  }
-                }}
-              />
-            </SheetContent>
-          </Sheet>
-
-          <Sheet open={showDesignControls} onOpenChange={setShowDesignControls}>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="sm">
-                <SlidersHorizontal className="h-4 w-4 mr-2" />
-                Design
-              </Button>
-            </SheetTrigger>
-            <SheetContent className="overflow-y-auto p-0 w-96">
-              <div className="p-5 border-b border-slate-200 dark:border-slate-800">
-                <h3 className="text-base font-semibold text-slate-900 dark:text-white">Presentation Design</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                  Control density and tone to shape the final presentation style.
-                </p>
-              </div>
-              <div className="p-5">
-                <SlideDesignControls
-                  projectId={projectId}
-                  themes={(themes || []).map((theme) => ({
-                    id: theme.id,
-                    name: theme.name,
-                    colors: {
-                      background: theme.colors.background,
-                      primary: theme.colors.primary,
-                      text: theme.colors.text,
-                      accent: theme.colors.accent,
-                    },
-                  }))}
-                  currentThemeId={project.theme?.id}
-                  onThemeChange={handleDesignThemeChange}
-                  onExportPdf={() => requestExport("pdf")}
-                  onLayoutDensityChange={setLayoutDensity}
-                  onToneChange={setToneOfVoice}
-                />
-              </div>
-            </SheetContent>
-          </Sheet>
-
-          <Sheet open={isThemePanelOpen} onOpenChange={setIsThemePanelOpen}>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Palette className="h-4 w-4 mr-2" />
-                Theme
-              </Button>
-            </SheetTrigger>
-            <SheetContent className="overflow-y-auto">
-              <SheetHeader>
-                <SheetTitle>Choose Theme</SheetTitle>
-                <SheetDescription>
-                  Select a theme to apply to your presentation
-                </SheetDescription>
-              </SheetHeader>
-              <ThemeSelector
-                themes={themes || []}
-                currentTheme={project.theme || undefined}
-                onSelect={handleThemeChange}
-              />
-            </SheetContent>
-          </Sheet>
-
+          {/* Export & Present always reachable on all widths */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-2" />
+              <Button variant="outline" size="sm" className="h-8 px-2.5 text-xs">
+                <Download className="h-3.5 w-3.5 mr-1.5" />
                 Export
               </Button>
             </DropdownMenuTrigger>
@@ -1179,13 +1336,8 @@ export default function EditorPage() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button variant="outline" size="sm" onClick={() => setShowShare(true)}>
-            <Share2 className="h-4 w-4 mr-2" />
-            Share
-          </Button>
-
-          <Button size="sm" onClick={handlePresent}>
-            <Play className="h-4 w-4 mr-2" />
+          <Button size="sm" onClick={handlePresent} className="h-8 px-2.5 text-xs">
+            <Play className="h-3.5 w-3.5 mr-1.5" />
             Present
           </Button>
         </div>
@@ -1194,23 +1346,44 @@ export default function EditorPage() {
 
       {/* Main editor area */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Slide panel */}
+        {/* Slide panel / drawer */}
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragEnd={handleSlideReorder}
         >
+          {/* Mobile backdrop */}
+          {isSidePanelOpen && (
+            <div
+              className="min-[900px]:hidden fixed inset-0 bg-black/40 z-30 transition-opacity"
+              onClick={() => setIsSidePanelOpen(false)}
+              aria-hidden="true"
+            />
+          )}
+
           <div
-            className={`${isSidePanelOpen ? "w-64" : "w-0"
-              } bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col transition-all overflow-hidden shrink-0`}
+            className={`${
+              isSidePanelOpen ? "w-64" : "w-0"
+            } bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col transition-all duration-200 overflow-hidden shrink-0 max-[899px]:fixed max-[899px]:left-0 max-[899px]:top-14 max-[899px]:bottom-12 max-[899px]:z-40 max-[899px]:shadow-2xl`}
           >
             <div className="p-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                 Slides ({project.slides?.length || 0})
               </span>
-              <Button variant="ghost" size="icon" onClick={handleAddSlide}>
-                <Plus className="h-4 w-4" />
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="icon" onClick={handleAddSlide} aria-label="Add slide">
+                  <Plus className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="min-[900px]:hidden"
+                  onClick={() => setIsSidePanelOpen(false)}
+                  aria-label="Close slides drawer"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-2">
@@ -1224,7 +1397,12 @@ export default function EditorPage() {
                     slide={slide}
                     index={index}
                     isActive={index === currentSlideIndex}
-                    onClick={() => setCurrentSlideIndex(index)}
+                    onClick={() => {
+                      setCurrentSlideIndex(index);
+                      if (typeof window !== "undefined" && window.innerWidth < 900) {
+                        setIsSidePanelOpen(false);
+                      }
+                    }}
                     onDelete={() => handleDeleteSlide(slide.id)}
                     onDuplicate={() => handleDuplicateSlide(slide)}
                     theme={project.theme || undefined}
@@ -1235,10 +1413,12 @@ export default function EditorPage() {
           </div>
         </DndContext>
 
-        {/* Toggle side panel */}
+        {/* Toggle side panel button */}
         <button
           onClick={() => setIsSidePanelOpen(!isSidePanelOpen)}
-          className="w-4 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-800 shrink-0"
+          className="w-5 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-800 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shrink-0 cursor-pointer text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
+          title={isSidePanelOpen ? "Collapse slides panel" : "Expand slides panel"}
+          aria-label={isSidePanelOpen ? "Collapse slides panel" : "Expand slides panel"}
         >
           {isSidePanelOpen ? (
             <ChevronLeft className="h-4 w-4" />
@@ -1250,13 +1430,19 @@ export default function EditorPage() {
         {/* Canvas area */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Block toolbar */}
-          <BlockToolbar projectId={projectId} slide={currentSlide} />
+          <BlockToolbar
+            projectId={projectId}
+            slide={currentSlide}
+            onRegenerateSlide={() => currentSlide && void handleRegenerateSingleSlide(currentSlide.id)}
+            onLayoutChange={handleQuickLayoutChange}
+          />
 
           {/* Slide canvas */}
-          <div className="flex-1 overflow-auto p-8 flex items-center justify-center">
+          <div className="flex-1 overflow-auto p-2 sm:p-4 md:p-8 flex items-center justify-center">
             {currentSlide && (
               <SlideCanvas
                 projectId={projectId}
+                projectTitle={project.title}
                 slide={currentSlide}
                 theme={project.theme || undefined}
                 presentationDensity={layoutDensity}

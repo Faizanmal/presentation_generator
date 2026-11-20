@@ -173,8 +173,8 @@ async function bootstrap() {
       transformOptions: {
         enableImplicitConversion: true,
       },
-      disableErrorMessages: process.env.NODE_ENV === 'production',
-      stopAtFirstError: true,
+      disableErrorMessages: false,
+      stopAtFirstError: false,
     }),
   );
 

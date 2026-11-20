@@ -59,4 +59,17 @@ describe('slide-media', () => {
       }),
     ).toBe('title-subtitle');
   });
+
+  it('provides topic suggestions and resolves matching images for Coffee deck', () => {
+    const { getTopicImageSuggestions, mediaUrlFromBlockContent } = require('@/lib/slide-media');
+    const coffeeSuggestions = getTopicImageSuggestions('Artisan Coffee Roasters espresso', 4);
+    expect(coffeeSuggestions.length).toBe(4);
+    expect(coffeeSuggestions[0]).toContain('photo-');
+
+    // Slide 1 & 3 image resolution consistency
+    const blockContent = { url: '', alt: 'latte art' };
+    const resolved = mediaUrlFromBlockContent(blockContent, 'Coffee Shop presentation', 0);
+    expect(resolved).toBeTruthy();
+    expect(resolved).toContain('photo-');
+  });
 });

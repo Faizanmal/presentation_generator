@@ -24,7 +24,7 @@ describe('SubscriptionLimitsService', () => {
     it('should return FREE tier limits', () => {
       const limits = service.getLimits('FREE');
 
-      expect(limits.maxProjects).toBe(5);
+      expect(limits.maxProjects).toBe(3);
       expect(limits.maxSlidesPerProject).toBe(15);
       expect(limits.aiGenerationsPerMonth).toBe(10);
       expect(limits.features.customBranding).toBe(false);
@@ -34,9 +34,9 @@ describe('SubscriptionLimitsService', () => {
     it('should return PRO tier limits', () => {
       const limits = service.getLimits('PRO');
 
-      expect(limits.maxProjects).toBe(50);
+      expect(limits.maxProjects).toBe(100);
       expect(limits.maxSlidesPerProject).toBe(100);
-      expect(limits.aiGenerationsPerMonth).toBe(200);
+      expect(limits.aiGenerationsPerMonth).toBe(1000);
       expect(limits.features.customBranding).toBe(true);
       expect(limits.features.advancedExport).toBe(true);
     });
@@ -57,7 +57,7 @@ describe('SubscriptionLimitsService', () => {
         'UNKNOWN' as unknown as import('@prisma/client').SubscriptionPlan,
       );
 
-      expect(limits.maxProjects).toBe(5);
+      expect(limits.maxProjects).toBe(3);
     });
   });
 
@@ -72,8 +72,8 @@ describe('SubscriptionLimitsService', () => {
       const pro = service.getLimits('PRO');
       const enterprise = service.getLimits('ENTERPRISE');
 
-      expect(free.maxProjects).toBe(5);
-      expect(pro.maxProjects).toBe(50);
+      expect(free.maxProjects).toBe(3);
+      expect(pro.maxProjects).toBe(100);
       expect(enterprise.maxProjects).toBe(-1);
     });
   });
