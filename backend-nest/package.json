@@ -6,7 +6,7 @@
   "private": true,
   "license": "MIT",
   "engines": {
-    "node": ">=24.12.0"
+    "node": ">=20.0.0"
   },
   "scripts": {
     "build": "nest build",
@@ -26,7 +26,7 @@
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:seed": "prisma db seed",
-    "prepare": "cd .. && husky backend-nest/.husky || true",
+    "prepare": "node -e \"try { if (!process.env.VERCEL && !process.env.CI) require('child_process').execSync('cd .. && husky backend-nest/.husky', {stdio:'ignore'}); } catch {}\"",
     "load-test": "node ../scripts/load-test.js",
     "load-test:collaboration": "node ../scripts/load-test.js --scenario=collaboration",
     "load-test:ai": "node ../scripts/load-test.js --scenario=ai-generation",
@@ -84,7 +84,7 @@
     "handlebars": "^4.7.8",
     "helmet": "^8.1.0",
     "ioredis": "^6.0.0",
-    "nodemailer": "^9.0.6",
+    "nodemailer": "^10.6.1",
     "ollama": "^0.6.3",
     "openai": "^7.9.0",
     "openid-client": "^6.8.1",
@@ -173,6 +173,10 @@
     "uuid": "^14.0.0",
     "@hono/node-server": "^2.0.1",
     "deepmerge-ts": "^8.0.2",
-    "mysql2": "^3.23.1"
+    "mysql2": "^3.23.1",
+    "effect": "^3.22.5",
+    "glob": "^14.0.6",
+    "minimatch": "^11.0.9",
+    "nodemailer": "^10.6.1"
   }
 }
