@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
 
   // Image optimization
   images: {
+    dangerouslyAllowSVG: true,
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     domains: [
       'localhost',
       // Add your CDN domain here
@@ -18,18 +20,6 @@ const nextConfig: NextConfig = {
     formats: ['image/avif', 'image/webp'],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
-    minimumCacheTTL: 60,
-  },
-
-  // Performance optimizations
-  compress: true,
-  poweredByHeader: false,
-  generateEtags: true,
-
-  images: {
-    dangerouslyAllowSVG: true,
-    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
-    formats: ["image/avif", "image/webp"],
     minimumCacheTTL: 86400, // 24 hours
     remotePatterns: [
       { protocol: "https", hostname: "placehold.co" },
@@ -43,6 +33,11 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "images.pexels.com" },
     ],
   },
+
+  // Performance optimizations
+  compress: true,
+  poweredByHeader: false,
+  generateEtags: true,
 
   // Asset prefix for CDN
   assetPrefix: process.env.NODE_ENV === 'production'

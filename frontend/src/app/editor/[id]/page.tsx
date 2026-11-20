@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -72,7 +72,7 @@ import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useEditorStore } from "@/stores/editor-store";
-import type { Project, Theme, Slide, BlockType, BlockStyle } from "@/types";
+import type { Project, Theme, Slide, Block, BlockType, BlockStyle } from "@/types";
 import dynamic from "next/dynamic";
 import SlidePanel from "@/components/editor/SlidePanel";
 import SlideCanvas from "@/components/editor/SlideCanvas";
@@ -346,7 +346,7 @@ export default function EditorPage() {
         migrated.slides.forEach((s) => {
           lastSavedSnapshotsRef.current.set(
             s.id,
-            JSON.stringify({ title: s.title, layout: s.layout, order: s.order, content: s.content })
+            JSON.stringify({ title: s.title, layout: s.layout, order: s.order, speakerNotes: s.speakerNotes })
           );
         });
       }
@@ -373,11 +373,10 @@ export default function EditorPage() {
               layout: slide.layout,
               order: slide.order,
               speakerNotes: slide.speakerNotes,
-              content: slide.content,
             });
             lastSavedSnapshotsRef.current.set(
               slideId,
-              JSON.stringify({ title: slide.title, layout: slide.layout, order: slide.order, content: slide.content })
+              JSON.stringify({ title: slide.title, layout: slide.layout, order: slide.order, speakerNotes: slide.speakerNotes })
             );
             dirtySlideIdsRef.current.delete(slideId);
           }
@@ -405,7 +404,7 @@ export default function EditorPage() {
         title: slide.title,
         layout: slide.layout,
         order: slide.order,
-        content: slide.content,
+        speakerNotes: slide.speakerNotes,
       });
       const previousSnap = lastSavedSnapshotsRef.current.get(slide.id);
       if (previousSnap && previousSnap !== snap) {
@@ -460,14 +459,14 @@ export default function EditorPage() {
               title: s.title,
               layout: s.layout,
               order: s.order,
-              content: s.content,
+              speakerNotes: s.speakerNotes,
             }).catch((err) => console.warn("[Regenerate] slide sync warning:", err))
           )
         );
         updated.slides.forEach((s) => {
           lastSavedSnapshotsRef.current.set(
             s.id,
-            JSON.stringify({ title: s.title, layout: s.layout, order: s.order, content: s.content })
+            JSON.stringify({ title: s.title, layout: s.layout, order: s.order, speakerNotes: s.speakerNotes })
           );
         });
       }
